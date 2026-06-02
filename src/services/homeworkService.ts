@@ -71,12 +71,49 @@ export const homeworkService = {
       description: homework.description,
       dueDate: homework.dueDate,
       createdByName: homework.createdByName || 'Teacher',
-      submissions: homework.submissions || {}
+      submissions: homework.submissions || {},
+      mediaUrl: homework.mediaUrl || '',
+      mediaType: homework.mediaType || 'image',
+      mediaAttachments: homework.mediaAttachments || []
     };
 
     // 1. Firebase Firestore
     if (!isDemoMode && db) {
       try {
+        const { ref, uploadString, getDownloadURL } = require('firebase/storage');
+        const { storage } = require('./firebase');
+
+        if (storage && newHw.mediaAttachments && newHw.mediaAttachments.length > 0) {
+          for (let i = 0; i < newHw.mediaAttachments.length; i++) {
+            const att = newHw.mediaAttachments[i];
+            if (att.url && att.url.startsWith('data:')) {
+              try {
+                console.log(`Uploading homework attachment ${att.name} to Firebase Storage...`);
+                const fileRef = ref(storage, `homework/${homeworkId}_${i}_${att.name}`);
+                await uploadString(fileRef, att.url, 'data_url');
+                const downloadUrl = await getDownloadURL(fileRef);
+                att.url = downloadUrl;
+                
+                if (newHw.mediaUrl.startsWith('data:')) {
+                  newHw.mediaUrl = downloadUrl;
+                }
+                console.log(`Successfully uploaded homework file. Download URL: ${downloadUrl}`);
+              } catch (storageErr) {
+                console.warn(`Firebase Storage upload failed for ${att.name}:`, storageErr);
+                if (att.url.length > 800 * 1024) {
+                  const placeholder = att.type === 'video'
+                    ? 'https://www.w3schools.com/html/mov_bbb.mp4'
+                    : 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&q=80&w=800';
+                  att.url = placeholder;
+                  if (newHw.mediaUrl.startsWith('data:')) {
+                    newHw.mediaUrl = placeholder;
+                  }
+                }
+              }
+            }
+          }
+        }
+
         const { homeworkId: omitted, ...details } = newHw;
         await setDoc(doc(db, 'homework', homeworkId), details);
         return newHw;
@@ -145,11 +182,47 @@ export const homeworkService = {
     return hw;
   },
   updateHomework: async (homeworkId: string, data: any): Promise<any> => {
+    const updatedHw = { ...data };
+
     // 1. Firebase Firestore
     if (!isDemoMode && db) {
       try {
+        const { ref, uploadString, getDownloadURL } = require('firebase/storage');
+        const { storage } = require('./firebase');
+
+        if (storage && updatedHw.mediaAttachments && updatedHw.mediaAttachments.length > 0) {
+          for (let i = 0; i < updatedHw.mediaAttachments.length; i++) {
+            const att = updatedHw.mediaAttachments[i];
+            if (att.url && att.url.startsWith('data:')) {
+              try {
+                console.log(`Uploading updated homework attachment ${att.name} to Firebase Storage...`);
+                const fileRef = ref(storage, `homework/${homeworkId}_${i}_${att.name}`);
+                await uploadString(fileRef, att.url, 'data_url');
+                const downloadUrl = await getDownloadURL(fileRef);
+                att.url = downloadUrl;
+                
+                if (updatedHw.mediaUrl && updatedHw.mediaUrl.startsWith('data:')) {
+                  updatedHw.mediaUrl = downloadUrl;
+                }
+                console.log(`Successfully uploaded homework file. Download URL: ${downloadUrl}`);
+              } catch (storageErr) {
+                console.warn(`Firebase Storage upload failed for ${att.name}:`, storageErr);
+                if (att.url.length > 800 * 1024) {
+                  const placeholder = att.type === 'video'
+                    ? 'https://www.w3schools.com/html/mov_bbb.mp4'
+                    : 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&q=80&w=800';
+                  att.url = placeholder;
+                  if (updatedHw.mediaUrl && updatedHw.mediaUrl.startsWith('data:')) {
+                    updatedHw.mediaUrl = placeholder;
+                  }
+                }
+              }
+            }
+          }
+        }
+
         const docRef = doc(db, 'homework', homeworkId);
-        await setDoc(docRef, data, { merge: true });
+        await setDoc(docRef, updatedHw, { merge: true });
         const updatedSnap = await getDoc(docRef);
         return { homeworkId, ...updatedSnap.data() };
       } catch (e) {
