@@ -4,7 +4,9 @@ import {
   Pressable,
   TextInput,
   ScrollView,
-  ActivityIndicator
+  ActivityIndicator,
+  Platform,
+  Image
 } from 'react-native';
 import { Plus, BookOpen, CheckCircle, Clock, Trash2, Edit, Mic, Square } from 'lucide-react-native';
 import { ThemedText } from '@/components/themed-text';
@@ -36,6 +38,54 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
   // Audio Guide recording states
   const [recordedVoiceBase64, setRecordedVoiceBase64] = useState<string | null>(null);
   const { isRecording, recordingTime, startRecording, stopRecording, clearRecording } = useAudioRecorder();
+
+  // Media attachment states for Homework
+  const [attachedMediaUrl, setAttachedMediaUrl] = useState<string | null>(null);
+  const [attachedMediaType, setAttachedMediaType] = useState<'image' | 'video' | null>(null);
+  const [attachedMediaName, setAttachedMediaName] = useState<string | null>(null);
+
+  const handleSelectHomeworkMedia = (type: 'image' | 'video') => {
+    if (Platform.OS === 'web') {
+      try {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = type === 'image' ? 'image/*' : 'video/*';
+        input.onchange = (e: any) => {
+          const file = e.target.files?.[0];
+          if (file) {
+            const reader = new FileReader();
+            reader.onload = () => {
+              const dataUrl = reader.result as string;
+              setAttachedMediaUrl(dataUrl);
+              setAttachedMediaType(type);
+              setAttachedMediaName(file.name);
+              showToast(`Attached ${type} for homework: ${file.name}`, 'success');
+            };
+            reader.readAsDataURL(file);
+          }
+        };
+        input.click();
+      } catch (error) {
+        console.error('Failed to open file picker:', error);
+        showToast('Failed to select media from device.', 'error');
+      }
+    } else {
+      const defaultData = type === 'image'
+        ? 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?auto=format&fit=crop&q=80&w=800'
+        : 'https://www.w3schools.com/html/mov_bbb.mp4';
+      setAttachedMediaUrl(defaultData);
+      setAttachedMediaType(type);
+      setAttachedMediaName(`Device_${Date.now()}.${type === 'image' ? 'jpg' : 'mp4'}`);
+      showToast(`Uploaded simulated ${type} successfully.`, 'success');
+    }
+  };
+
+  const handleDiscardHomeworkMedia = () => {
+    setAttachedMediaUrl(null);
+    setAttachedMediaType(null);
+    setAttachedMediaName(null);
+    showToast('Attached media discarded.', 'warning');
+  };
 
   const loadData = async () => {
     setHomework(await mockDb.getHomework());
@@ -108,7 +158,10 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
       description: { en: descEn, ta: descTa },
       dueDate: new Date(Date.now() + 3600000 * 24).toISOString(), // Dummy tomorrow
       createdByName: user?.fullName || 'Teacher',
-      voiceUrl: recordedVoiceBase64 // Attach audio guide!
+      voiceUrl: recordedVoiceBase64, // Attach audio guide!
+      mediaUrl: attachedMediaUrl,     // Attach photo/video URL!
+      mediaType: attachedMediaType,   // Attach photo/video type!
+      mediaName: attachedMediaName    // Attach photo/video name!
     };
 
     try {
@@ -133,6 +186,9 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
     setSelectedClassId('');
     setEditingHwId(null);
     setRecordedVoiceBase64(null);
+    setAttachedMediaUrl(null);
+    setAttachedMediaType(null);
+    setAttachedMediaName(null);
     clearRecording();
     setModalVisible(false);
     loadData();
@@ -146,6 +202,9 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
     setDescEn(item.description.en);
     setDescTa(item.description.ta);
     setRecordedVoiceBase64(item.voiceUrl || null);
+    setAttachedMediaUrl(item.mediaUrl || null);
+    setAttachedMediaType(item.mediaType || null);
+    setAttachedMediaName(item.mediaName || null);
     setTitleTaDirty(true);
     setDescTaDirty(true);
     setModalVisible(true);
@@ -198,6 +257,9 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
               setDescEn('');
               setDescTa('');
               setRecordedVoiceBase64(null);
+              setAttachedMediaUrl(null);
+              setAttachedMediaType(null);
+              setAttachedMediaName(null);
               clearRecording();
               setTitleTaDirty(false);
               setDescTaDirty(false);
@@ -335,6 +397,60 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
             )}
           </View>
 
+          {/* Media Attachment Widget */}
+          <View style={{ marginVertical: 8, gap: 4 }}>
+            <ThemedText style={styles.formInputLabel}>🖼️ Attach Photo/Video / புகைப்படம் அல்லது வீடியோவை இணைக்கவும்</ThemedText>
+            
+            {attachedMediaUrl ? (
+              <View style={{ gap: 8 }}>
+                {attachedMediaType === 'image' ? (
+                  <Image 
+                    source={{ uri: attachedMediaUrl }} 
+                    style={{ width: '100%', height: 180, borderRadius: 12, borderWidth: 1, borderColor: colors.border }} 
+                    resizeMode="cover" 
+                  />
+                ) : (
+                  <View style={{ width: '100%', height: 180, borderRadius: 12, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }}>
+                    <ThemedText style={{ color: '#FFF', fontWeight: 'bold' }}>📹 Video Attached / வீடியோ இணைக்கப்பட்டது</ThemedText>
+                    <ThemedText style={{ color: '#AAA', fontSize: 11, marginTop: 4 }}>{attachedMediaName}</ThemedText>
+                  </View>
+                )}
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <ThemedText style={{ fontSize: 11, color: colors.textSecondary, flex: 1 }} numberOfLines={1}>
+                    Selected: {attachedMediaName}
+                  </ThemedText>
+                  <Pressable 
+                    onPress={handleDiscardHomeworkMedia} 
+                    style={{ paddingVertical: 4, paddingHorizontal: 12, borderRadius: 8, backgroundColor: colors.danger + '15', borderWidth: 1, borderColor: colors.danger }}
+                  >
+                    <ThemedText style={{ color: colors.danger, fontSize: 11, fontWeight: '700' }}>Discard / நீக்கவும்</ThemedText>
+                  </Pressable>
+                </View>
+              </View>
+            ) : (
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <Pressable
+                  onPress={() => handleSelectHomeworkMedia('image')}
+                  style={({ pressed }) => [
+                    { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background },
+                    { opacity: pressed ? 0.8 : 1 }
+                  ]}
+                >
+                  <ThemedText style={{ fontWeight: '700', fontSize: 12 }}>📷 Attach Photo / புகைப்படம்</ThemedText>
+                </Pressable>
+                <Pressable
+                  onPress={() => handleSelectHomeworkMedia('video')}
+                  style={({ pressed }) => [
+                    { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background },
+                    { opacity: pressed ? 0.8 : 1 }
+                  ]}
+                >
+                  <ThemedText style={{ fontWeight: '700', fontSize: 12 }}>📹 Attach Video / வீடியோ</ThemedText>
+                </Pressable>
+              </View>
+            )}
+          </View>
+
           <View style={styles.formButtonRow}>
             <Pressable
               onPress={() => setModalVisible(false)}
@@ -414,6 +530,34 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
                       🔊 Teacher Voice Guide / ஆசிரியர் குரல் வழிமுறை:
                     </ThemedText>
                     <AudioPlayer voiceUrl={item.voiceUrl} colors={colors} />
+                  </View>
+                )}
+
+                {/* Media Attachment Display */}
+                {item.mediaUrl && (
+                  <View style={{ marginVertical: 8 }}>
+                    {item.mediaType === 'image' ? (
+                      <Image
+                        source={{ uri: item.mediaUrl }}
+                        style={{ width: '100%', height: 200, borderRadius: 12, borderWidth: 1, borderColor: colors.border }}
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <View style={{ width: '100%', borderRadius: 12, backgroundColor: '#000', overflow: 'hidden' }}>
+                        {Platform.OS === 'web' ? (
+                          <video 
+                            src={item.mediaUrl} 
+                            controls 
+                            style={{ width: '100%', maxHeight: 240, display: 'block' }}
+                          />
+                        ) : (
+                          <View style={{ padding: 24, alignItems: 'center', gap: 8 }}>
+                            <ThemedText style={{ color: '#FFF', fontWeight: 'bold' }}>📹 Play Video Attachment</ThemedText>
+                            <ThemedText style={{ color: '#AAA', fontSize: 11 }}>{item.mediaName || 'Attached Video'}</ThemedText>
+                          </View>
+                        )}
+                      </View>
+                    )}
                   </View>
                 )}
 

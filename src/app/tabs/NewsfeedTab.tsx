@@ -210,8 +210,41 @@ export function NewsfeedTab({ user, colors, t, showToast, i18n, activeStudentId 
     }
   };
 
-  // Device upload simulation
+  // Device upload / Real Web File Input Picker
   const handleSimulateDeviceUpload = (type: 'image' | 'video') => {
+    if (Platform.OS === 'web') {
+      try {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = type === 'image' ? 'image/*' : 'video/*';
+        input.onchange = (e: any) => {
+          const file = e.target.files?.[0];
+          if (file) {
+            const reader = new FileReader();
+            reader.onload = () => {
+              const dataUrl = reader.result as string;
+              const fileRecord = {
+                name: file.name,
+                type,
+                data: dataUrl
+              };
+              setAttachedFiles(prev => [...prev, fileRecord]);
+              showToast(`Attached ${type}: ${file.name}`, 'success');
+            };
+            reader.readAsDataURL(file);
+          }
+        };
+        input.click();
+      } catch (error) {
+        console.error('Failed to open file picker:', error);
+        fallbackSimulation(type);
+      }
+    } else {
+      fallbackSimulation(type);
+    }
+  };
+
+  const fallbackSimulation = (type: 'image' | 'video') => {
     const defaultData = type === 'image' 
       ? 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?auto=format&fit=crop&q=80&w=800'
       : 'https://www.w3schools.com/html/mov_bbb.mp4';
@@ -223,7 +256,7 @@ export function NewsfeedTab({ user, colors, t, showToast, i18n, activeStudentId 
     };
     
     setAttachedFiles(prev => [...prev, fileRecord]);
-    showToast(`Uploaded ${type} from device files successfully!`, 'success');
+    showToast(`Uploaded simulated ${type} successfully!`, 'success');
   };
 
   const handleSavePost = async () => {
