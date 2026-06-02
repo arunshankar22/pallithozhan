@@ -544,8 +544,8 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
                         {item.mediaType === 'image' ? (
                           <Image
                             source={{ uri: item.mediaUrl }}
-                            style={{ width: '100%', height: 200, borderRadius: 12, borderWidth: 1, borderColor: colors.border }}
-                            resizeMode="cover"
+                            style={{ width: '100%', height: 280, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: '#0a0a0a' }}
+                            resizeMode="contain"
                           />
                         ) : (
                           <View style={{ width: '100%', borderRadius: 12, backgroundColor: '#000', overflow: 'hidden' }}>
@@ -553,7 +553,7 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
                               <video 
                                 src={item.mediaUrl} 
                                 controls 
-                                style={{ width: '100%', maxHeight: 240, display: 'block' }}
+                                style={{ width: '100%', maxHeight: 280, display: 'block', objectFit: 'contain' }}
                               />
                             ) : (
                               <View style={{ padding: 24, alignItems: 'center', gap: 8 }}>
@@ -576,8 +576,8 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
                               {media.type === 'image' ? (
                                 <Image
                                   source={{ uri: fileUrl }}
-                                  style={{ width: '100%', height: 200, borderRadius: 12, borderWidth: 1, borderColor: colors.border }}
-                                  resizeMode="cover"
+                                  style={{ width: '100%', height: 280, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: '#0a0a0a' }}
+                                  resizeMode="contain"
                                 />
                               ) : (
                                 <View style={{ width: '100%', borderRadius: 12, backgroundColor: '#000', overflow: 'hidden' }}>
@@ -585,7 +585,7 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
                                     <video 
                                       src={fileUrl} 
                                       controls 
-                                      style={{ width: '100%', maxHeight: 240, display: 'block' }}
+                                      style={{ width: '100%', maxHeight: 280, display: 'block', objectFit: 'contain' }}
                                     />
                                   ) : (
                                     <View style={{ padding: 24, alignItems: 'center', gap: 8 }}>
