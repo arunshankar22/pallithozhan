@@ -615,7 +615,7 @@ export const styles = StyleSheet.create({
     marginBottom: Spacing.two,
   },
   postImageWrapper: {
-    height: 200,
+    height: 280,
     borderRadius: 16,
     overflow: 'hidden',
     marginTop: Spacing.one,

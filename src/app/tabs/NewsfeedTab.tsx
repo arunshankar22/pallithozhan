@@ -949,7 +949,7 @@ export function NewsfeedTab({ user, colors, t, showToast, i18n, activeStudentId 
                                       <video 
                                         src={fileUrl} 
                                         controls 
-                                        style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                                        style={{ width: '100%', height: '100%', objectFit: 'contain' }} 
                                       />
                                     ) : (
                                       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
@@ -958,12 +958,12 @@ export function NewsfeedTab({ user, colors, t, showToast, i18n, activeStudentId 
                                     )}
                                   </View>
                                 ) : (
-                                  <View style={{ flex: 1 }}>
+                                  <View style={{ flex: 1, backgroundColor: '#0a0a0a' }}>
                                     {Platform.OS === 'web' ? (
                                       <img 
                                         src={fileUrl} 
                                         alt={`Slide ${idx}`} 
-                                        style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                                        style={{ width: '100%', height: '100%', objectFit: 'contain' }} 
                                       />
                                     ) : (
                                       <View style={[styles.simulatedImage, { backgroundColor: colors.background }]}>
@@ -1017,19 +1017,19 @@ export function NewsfeedTab({ user, colors, t, showToast, i18n, activeStudentId 
                               <video 
                                 src={post.mediaUrl} 
                                 controls 
-                                style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                                style={{ width: '100%', height: '100%', objectFit: 'contain' }} 
                               />
                             ) : (
                               <ThemedText style={{ color: '#FFF' }}>📹 Simulated Video File playing</ThemedText>
                             )}
                           </View>
                         ) : (
-                          <View style={{ flex: 1 }}>
+                          <View style={{ flex: 1, backgroundColor: '#0a0a0a' }}>
                             {Platform.OS === 'web' ? (
                               <img 
                                 src={post.mediaUrl} 
                                 alt="Attachment" 
-                                style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                                style={{ width: '100%', height: '100%', objectFit: 'contain' }} 
                               />
                             ) : (
                               <View style={[styles.simulatedImage, { backgroundColor: colors.background }]}>
