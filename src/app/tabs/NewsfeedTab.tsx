@@ -297,6 +297,11 @@ export function NewsfeedTab({ user, colors, t, showToast, i18n, activeStudentId 
       authorName: user?.fullName || 'Staff Member',
       taggedClassIds: selectedTaggedClassIds,
       taggedStudentIds: selectedTaggedStudentIds,
+      mediaAttachments: attachedFiles.map(f => ({
+        name: f.name,
+        type: f.type,
+        url: f.data
+      }))
     };
 
     try {

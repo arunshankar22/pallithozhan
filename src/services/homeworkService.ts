@@ -74,7 +74,8 @@ export const homeworkService = {
       submissions: homework.submissions || {},
       mediaUrl: homework.mediaUrl || '',
       mediaType: homework.mediaType || 'image',
-      mediaAttachments: homework.mediaAttachments || []
+      mediaAttachments: homework.mediaAttachments || [],
+      voiceUrl: homework.voiceUrl || ''
     };
 
     // 1. Firebase Firestore
@@ -82,6 +83,20 @@ export const homeworkService = {
       try {
         const { ref, uploadString, getDownloadURL } = require('firebase/storage');
         const { storage } = require('./firebase');
+
+        // Upload Voice Guide if present in Base64
+        if (storage && newHw.voiceUrl && newHw.voiceUrl.startsWith('data:')) {
+          try {
+            console.log('Uploading homework voice guide to Firebase Storage...');
+            const voiceRef = ref(storage, `homework/${homeworkId}_voice.mp3`);
+            await uploadString(voiceRef, newHw.voiceUrl, 'data_url');
+            const downloadUrl = await getDownloadURL(voiceRef);
+            newHw.voiceUrl = downloadUrl;
+            console.log('Voice guide uploaded successfully:', downloadUrl);
+          } catch (voiceErr) {
+            console.warn('Voice guide upload failed:', voiceErr);
+          }
+        }
 
         if (storage && newHw.mediaAttachments && newHw.mediaAttachments.length > 0) {
           for (let i = 0; i < newHw.mediaAttachments.length; i++) {
@@ -190,6 +205,20 @@ export const homeworkService = {
       try {
         const { ref, uploadString, getDownloadURL } = require('firebase/storage');
         const { storage } = require('./firebase');
+
+        // Upload Voice Guide if present in Base64
+        if (storage && updatedHw.voiceUrl && updatedHw.voiceUrl.startsWith('data:')) {
+          try {
+            console.log('Uploading updated homework voice guide to Firebase Storage...');
+            const voiceRef = ref(storage, `homework/${homeworkId}_voice.mp3`);
+            await uploadString(voiceRef, updatedHw.voiceUrl, 'data_url');
+            const downloadUrl = await getDownloadURL(voiceRef);
+            updatedHw.voiceUrl = downloadUrl;
+            console.log('Updated voice guide uploaded successfully:', downloadUrl);
+          } catch (voiceErr) {
+            console.warn('Voice guide upload failed:', voiceErr);
+          }
+        }
 
         if (storage && updatedHw.mediaAttachments && updatedHw.mediaAttachments.length > 0) {
           for (let i = 0; i < updatedHw.mediaAttachments.length; i++) {
