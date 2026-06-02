@@ -11,6 +11,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/services/auth';
 import { mockDb } from '@/services/mockBackend';
+import { isDemoMode } from '@/services/firebase';
 import { Colors, Spacing, MaxContentWidth } from '@/constants/theme';
 import { ThemedText } from '@/components/themed-text';
 import { styles } from '@/app/styles';
@@ -202,9 +203,37 @@ export default function HomeScreen() {
           source={require('../../assets/images/balarmalar_logo.png')} 
           style={{ width: displayWidth, height: displayHeight, resizeMode: 'contain' }} 
         />
-        <ThemedText style={{ color: colors.secondary, fontSize: 9, fontWeight: '800', marginLeft: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-          {currentBranch.ta}
-        </ThemedText>
+        <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginTop: 2 }}>
+          <ThemedText style={{ color: colors.secondary, fontSize: 9, fontWeight: '800', marginLeft: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+            {currentBranch.ta}
+          </ThemedText>
+          <View style={{
+            paddingHorizontal: 5,
+            paddingVertical: 1.5,
+            borderRadius: 6,
+            backgroundColor: isDemoMode ? 'rgba(234, 83, 48, 0.08)' : 'rgba(16, 185, 129, 0.08)',
+            borderWidth: 0.5,
+            borderColor: isDemoMode ? 'rgba(234, 83, 48, 0.25)' : 'rgba(16, 185, 129, 0.25)',
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 3
+          }}>
+            <View style={{
+              width: 4,
+              height: 4,
+              borderRadius: 2,
+              backgroundColor: isDemoMode ? colors.danger : '#10B981'
+            }} />
+            <ThemedText style={{
+              fontSize: 7.5,
+              fontWeight: '800',
+              color: isDemoMode ? colors.danger : '#10B981',
+              textTransform: 'uppercase'
+            }}>
+              {isDemoMode ? 'Demo Sandbox' : 'Cloud Connected'}
+            </ThemedText>
+          </View>
+        </View>
       </View>
     );
   };
@@ -328,6 +357,33 @@ export default function HomeScreen() {
           <View style={[styles.mobileHeader, getGlassStyle(colors.cardBg, 0.75, 20), { borderBottomWidth: 1, borderColor: colors.border }]}>
             <BalarMalarBranchLogo size={24} />
             <View style={styles.headerRightActions}>
+              <View style={{
+                paddingHorizontal: 6,
+                paddingVertical: 2,
+                borderRadius: 6,
+                backgroundColor: isDemoMode ? 'rgba(234, 83, 48, 0.08)' : 'rgba(16, 185, 129, 0.08)',
+                borderWidth: 0.5,
+                borderColor: isDemoMode ? 'rgba(234, 83, 48, 0.25)' : 'rgba(16, 185, 129, 0.25)',
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 3,
+                marginRight: 6
+              }}>
+                <View style={{
+                  width: 4,
+                  height: 4,
+                  borderRadius: 2,
+                  backgroundColor: isDemoMode ? colors.danger : '#10B981'
+                }} />
+                <ThemedText style={{
+                  fontSize: 7.5,
+                  fontWeight: '800',
+                  color: isDemoMode ? colors.danger : '#10B981',
+                  textTransform: 'uppercase'
+                }}>
+                  {isDemoMode ? 'Demo' : 'Cloud'}
+                </ThemedText>
+              </View>
               <Pressable onPress={() => setActiveTab('profile')} style={styles.headerIconButton}>
                 <UserIcon size={18} color={activeTab === 'profile' ? colors.primary : colors.text} />
               </Pressable>

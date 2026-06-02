@@ -99,7 +99,35 @@ export default function LoginScreen({ onNavigateToRegister }: LoginScreenProps) 
             style={{ width: 220, height: 60, resizeMode: 'contain', marginBottom: Spacing.two }} 
           />
           <ThemedText style={styles.titleText}>{t('appName')}</ThemedText>
-          <ThemedText style={[styles.subtitleText, { color: colors.textSecondary }]}>{t('tagline')}</ThemedText>
+          <ThemedText style={[styles.subtitleText, { color: colors.textSecondary, marginBottom: 8 }]}>{t('tagline')}</ThemedText>
+          
+          <View style={{
+            paddingHorizontal: 8,
+            paddingVertical: 3,
+            borderRadius: 8,
+            backgroundColor: isDemoMode ? 'rgba(234, 83, 48, 0.08)' : 'rgba(16, 185, 129, 0.08)',
+            borderWidth: 0.5,
+            borderColor: isDemoMode ? 'rgba(234, 83, 48, 0.25)' : 'rgba(16, 185, 129, 0.25)',
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 4
+          }}>
+            <View style={{
+              width: 5,
+              height: 5,
+              borderRadius: 2.5,
+              backgroundColor: isDemoMode ? colors.danger : '#10B981'
+            }} />
+            <ThemedText style={{
+              fontSize: 9,
+              fontWeight: '800',
+              color: isDemoMode ? colors.danger : '#10B981',
+              textTransform: 'uppercase',
+              letterSpacing: 0.5
+            }}>
+              {isDemoMode ? 'Demo Sandbox Mode' : 'Firebase Cloud Mode Active'}
+            </ThemedText>
+          </View>
         </View>
 
         {/* Login Card */}
