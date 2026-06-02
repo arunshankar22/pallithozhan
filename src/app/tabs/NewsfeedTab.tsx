@@ -210,13 +210,13 @@ export function NewsfeedTab({ user, colors, t, showToast, i18n, activeStudentId 
     }
   };
 
-  // Device upload / Real Web File Input Picker (Allows multiple selection!)
-  const handleSimulateDeviceUpload = (type: 'image' | 'video') => {
+  // Device upload / Real Web File Input Picker (Allows multiple mixed selection!)
+  const handleSimulateDeviceUpload = (type: 'image' | 'video' | 'mixed' = 'mixed') => {
     if (Platform.OS === 'web') {
       try {
         const input = document.createElement('input');
         input.type = 'file';
-        input.accept = type === 'image' ? 'image/*' : 'video/*';
+        input.accept = 'image/*,video/*'; // Allow selecting both photos and videos!
         input.multiple = true; // Allow selecting multiple files at once!
         
         input.onchange = (e: any) => {
@@ -230,11 +230,15 @@ export function NewsfeedTab({ user, colors, t, showToast, i18n, activeStudentId 
               const file = files[i];
               const reader = new FileReader();
               
+              // Dynamically resolve if the file is an image or video
+              const isVideo = file.type ? file.type.startsWith('video/') : /\.(mp4|mov|avi|mkv|webm)$/i.test(file.name);
+              const resolvedType = isVideo ? 'video' : 'image';
+              
               reader.onload = () => {
                 const dataUrl = reader.result as string;
                 newFileRecords.push({
                   name: file.name,
-                  type,
+                  type: resolvedType,
                   data: dataUrl
                 });
                 
@@ -242,7 +246,7 @@ export function NewsfeedTab({ user, colors, t, showToast, i18n, activeStudentId 
                 if (loadedCount === filesCount) {
                   // Maintain ordering and add all at once
                   setAttachedFiles(prev => [...prev, ...newFileRecords]);
-                  showToast(`Attached ${filesCount} ${type}(s) successfully!`, 'success');
+                  showToast(`Attached ${filesCount} file(s) successfully!`, 'success');
                 }
               };
               
@@ -253,10 +257,10 @@ export function NewsfeedTab({ user, colors, t, showToast, i18n, activeStudentId 
         input.click();
       } catch (error) {
         console.error('Failed to open file picker:', error);
-        fallbackSimulation(type);
+        fallbackSimulation('image');
       }
     } else {
-      fallbackSimulation(type);
+      fallbackSimulation(type === 'mixed' ? 'image' : type);
     }
   };
 
@@ -798,13 +802,10 @@ export function NewsfeedTab({ user, colors, t, showToast, i18n, activeStudentId 
 
             <View style={{ gap: Spacing.two }}>
               <View style={styles.mediaPresetRow}>
-                <Pressable onPress={() => handleSimulateDeviceUpload('image')} style={[styles.mediaPresetCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
-                  <ImageIcon size={12} color={colors.primary} style={{ marginRight: 4 }} />
-                  <ThemedText style={styles.mediaPresetText}>Upload Photo</ThemedText>
-                </Pressable>
-                <Pressable onPress={() => handleSimulateDeviceUpload('video')} style={[styles.mediaPresetCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
-                  <Video size={12} color={colors.accent} style={{ marginRight: 4 }} />
-                  <ThemedText style={styles.mediaPresetText}>Upload Video</ThemedText>
+                <Pressable onPress={() => handleSimulateDeviceUpload('mixed')} style={[styles.mediaPresetCard, { backgroundColor: colors.cardBg, borderColor: colors.border, flex: 1, paddingVertical: 10, justifyContent: 'center' }]}>
+                  <ImageIcon size={14} color={colors.primary} style={{ marginRight: 6 }} />
+                  <Video size={14} color={colors.accent} style={{ marginRight: 6 }} />
+                  <ThemedText style={[styles.mediaPresetText, { fontWeight: '700' }]}>Upload Photo/Video / புகைப்படம்/வீடியோவை பதிவேற்றவும்</ThemedText>
                 </Pressable>
                 <Pressable
                   onPress={() => {

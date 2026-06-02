@@ -42,12 +42,12 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
   // Media attachment states for Homework (Allows multiple selection!)
   const [attachedHomeworkFiles, setAttachedHomeworkFiles] = useState<{ name: string; type: 'image' | 'video'; data: string; }[]>([]);
 
-  const handleSelectHomeworkMedia = (type: 'image' | 'video') => {
+  const handleSelectHomeworkMedia = (type: 'image' | 'video' | 'mixed' = 'mixed') => {
     if (Platform.OS === 'web') {
       try {
         const input = document.createElement('input');
         input.type = 'file';
-        input.accept = type === 'image' ? 'image/*' : 'video/*';
+        input.accept = 'image/*,video/*'; // Allow both photos and videos!
         input.multiple = true; // Allow selecting multiple files at once!
         
         input.onchange = (e: any) => {
@@ -61,18 +61,22 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
               const file = files[i];
               const reader = new FileReader();
               
+              // Dynamically resolve if the file is an image or video
+              const isVideo = file.type ? file.type.startsWith('video/') : /\.(mp4|mov|avi|mkv|webm)$/i.test(file.name);
+              const resolvedType = isVideo ? 'video' : 'image';
+              
               reader.onload = () => {
                 const dataUrl = reader.result as string;
                 newFileRecords.push({
                   name: file.name,
-                  type,
+                  type: resolvedType,
                   data: dataUrl
                 });
                 
                 loadedCount++;
                 if (loadedCount === filesCount) {
                   setAttachedHomeworkFiles(prev => [...prev, ...newFileRecords]);
-                  showToast(`Attached ${filesCount} ${type}(s) successfully for homework!`, 'success');
+                  showToast(`Attached ${filesCount} file(s) successfully for homework!`, 'success');
                 }
               };
               
@@ -86,18 +90,18 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
         showToast('Failed to select media from device.', 'error');
       }
     } else {
-      const defaultData = type === 'image'
-        ? 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?auto=format&fit=crop&q=80&w=800'
-        : 'https://www.w3schools.com/html/mov_bbb.mp4';
+      const defaultData = type === 'video'
+        ? 'https://www.w3schools.com/html/mov_bbb.mp4'
+        : 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?auto=format&fit=crop&q=80&w=800';
       
       const fileRecord = {
-        name: `Device_${Date.now()}.${type === 'image' ? 'jpg' : 'mp4'}`,
-        type,
+        name: `Device_${Date.now()}.${type === 'video' ? 'mp4' : 'jpg'}`,
+        type: type === 'video' ? 'video' as const : 'image' as const,
         data: defaultData
       };
       
       setAttachedHomeworkFiles(prev => [...prev, fileRecord]);
-      showToast(`Uploaded simulated ${type} successfully for homework.`, 'success');
+      showToast(`Uploaded simulated media successfully for homework.`, 'success');
     }
   };
 
@@ -434,26 +438,15 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
               </ScrollView>
             )}
 
-            <View style={{ flexDirection: 'row', gap: 10 }}>
-              <Pressable
-                onPress={() => handleSelectHomeworkMedia('image')}
-                style={({ pressed }) => [
-                  { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background },
-                  { opacity: pressed ? 0.8 : 1 }
-                ]}
-              >
-                <ThemedText style={{ fontWeight: '700', fontSize: 12 }}>📷 Attach Photo / புகைப்படம்</ThemedText>
-              </Pressable>
-              <Pressable
-                onPress={() => handleSelectHomeworkMedia('video')}
-                style={({ pressed }) => [
-                  { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background },
-                  { opacity: pressed ? 0.8 : 1 }
-                ]}
-              >
-                <ThemedText style={{ fontWeight: '700', fontSize: 12 }}>📹 Attach Video / வீடியோ</ThemedText>
-              </Pressable>
-            </View>
+            <Pressable
+              onPress={() => handleSelectHomeworkMedia('mixed')}
+              style={({ pressed }) => [
+                { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background },
+                { opacity: pressed ? 0.8 : 1 }
+              ]}
+            >
+              <ThemedText style={{ fontWeight: '700', fontSize: 12 }}>🖼️ Attach Photo/Video / புகைப்படம்/வீடியோவை இணைக்கவும்</ThemedText>
+            </Pressable>
           </View>
 
           <View style={styles.formButtonRow}>
