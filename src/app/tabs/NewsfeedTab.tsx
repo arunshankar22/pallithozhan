@@ -912,32 +912,130 @@ export function NewsfeedTab({ user, colors, t, showToast, i18n, activeStudentId 
                 <ThemedText style={styles.postTitle}>{title}</ThemedText>
                 <ThemedText style={[styles.postContent, { color: colors.text }]}>{content}</ThemedText>
 
-                {/* Attached media display */}
-                {post.mediaUrl && (
-                  <View style={[styles.postImageWrapper, { borderColor: colors.border, borderWidth: 1 }]}>
-                    {post.mediaType === 'video' ? (
-                      <View style={[styles.simulatedImage, { backgroundColor: '#000' }]}>
-                        {Platform.OS === 'web' ? (
-                          <video 
-                            src={post.mediaUrl} 
-                            controls 
-                            style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-                          />
-                        ) : (
-                          <ThemedText style={{ color: '#FFF' }}>📹 Simulated Video File playing</ThemedText>
+                {/* Attached media display (Autoscrolling Carousel for multiple, single fallback) */}
+                {((post.mediaAttachments && post.mediaAttachments.length > 0) || post.mediaUrl) && (
+                  <View 
+                    style={[styles.postImageWrapper, { borderColor: colors.border, borderWidth: 1, overflow: 'hidden' }]}
+                    onLayout={(event) => {
+                      const { width } = event.nativeEvent.layout;
+                      if (width > 0 && wrapperWidths[post.postId] !== width) {
+                        setWrapperWidths(prev => ({ ...prev, [post.postId]: width }));
+                      }
+                    }}
+                  >
+                    {post.mediaAttachments && post.mediaAttachments.length > 0 ? (
+                      <View style={{ flex: 1 }}>
+                        <ScrollView
+                          ref={el => { carouselRefs.current[post.postId] = el; }}
+                          horizontal
+                          pagingEnabled
+                          showsHorizontalScrollIndicator={false}
+                          onMomentumScrollEnd={(event) => {
+                            const width = wrapperWidths[post.postId] || 400;
+                            const offsetX = event.nativeEvent.contentOffset.x;
+                            const idx = Math.round(offsetX / width);
+                            setActiveSlides(prev => ({ ...prev, [post.postId]: idx }));
+                          }}
+                          style={{ flex: 1 }}
+                        >
+                          {post.mediaAttachments.map((media: any, idx: number) => {
+                            const fileUrl = media.url || media.data;
+                            const slideWidth = wrapperWidths[post.postId] || 400;
+                            return (
+                              <View key={idx} style={{ width: slideWidth, height: '100%' }}>
+                                {media.type === 'video' ? (
+                                  <View style={{ width: '100%', height: '100%', backgroundColor: '#000' }}>
+                                    {Platform.OS === 'web' ? (
+                                      <video 
+                                        src={fileUrl} 
+                                        controls 
+                                        style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                                      />
+                                    ) : (
+                                      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                                        <ThemedText style={{ color: '#FFF' }}>📹 Simulated Video File</ThemedText>
+                                      </View>
+                                    )}
+                                  </View>
+                                ) : (
+                                  <View style={{ flex: 1 }}>
+                                    {Platform.OS === 'web' ? (
+                                      <img 
+                                        src={fileUrl} 
+                                        alt={`Slide ${idx}`} 
+                                        style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                                      />
+                                    ) : (
+                                      <View style={[styles.simulatedImage, { backgroundColor: colors.background }]}>
+                                        <ThemedText style={styles.simulatedImageText}>📷 Slide {idx + 1}</ThemedText>
+                                      </View>
+                                    )}
+                                  </View>
+                                )}
+                              </View>
+                            );
+                          })}
+                        </ScrollView>
+
+                        {/* Navigation dots indicator */}
+                        {post.mediaAttachments.length > 1 && (
+                          <View style={{
+                            position: 'absolute',
+                            bottom: 12,
+                            left: 0,
+                            right: 0,
+                            flexDirection: 'row',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            gap: 6
+                          }}>
+                            {post.mediaAttachments.map((_: any, idx: number) => {
+                              const isCurrent = (activeSlides[post.postId] || 0) === idx;
+                              return (
+                                <View
+                                  key={idx}
+                                  style={{
+                                    width: isCurrent ? 14 : 6,
+                                    height: 6,
+                                    borderRadius: 3,
+                                    backgroundColor: isCurrent ? colors.primary : 'rgba(255, 255, 255, 0.65)',
+                                    borderWidth: 0.5,
+                                    borderColor: 'rgba(0, 0, 0, 0.15)'
+                                  }}
+                                />
+                              );
+                            })}
+                          </View>
                         )}
                       </View>
                     ) : (
+                      // Single mediaUrl fallback (backward compatibility)
                       <View style={{ flex: 1 }}>
-                        {Platform.OS === 'web' ? (
-                          <img 
-                            src={post.mediaUrl} 
-                            alt="Attachment" 
-                            style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-                          />
+                        {post.mediaType === 'video' ? (
+                          <View style={[styles.simulatedImage, { backgroundColor: '#000', flex: 1 }]}>
+                            {Platform.OS === 'web' ? (
+                              <video 
+                                src={post.mediaUrl} 
+                                controls 
+                                style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                              />
+                            ) : (
+                              <ThemedText style={{ color: '#FFF' }}>📹 Simulated Video File playing</ThemedText>
+                            )}
+                          </View>
                         ) : (
-                          <View style={[styles.simulatedImage, { backgroundColor: colors.background }]}>
-                            <ThemedText style={styles.simulatedImageText}>📷 Image: {post.mediaUrl.substring(0, 40)}...</ThemedText>
+                          <View style={{ flex: 1 }}>
+                            {Platform.OS === 'web' ? (
+                              <img 
+                                src={post.mediaUrl} 
+                                alt="Attachment" 
+                                style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                              />
+                            ) : (
+                              <View style={[styles.simulatedImage, { backgroundColor: colors.background }]}>
+                                <ThemedText style={styles.simulatedImageText}>📷 Image: {post.mediaUrl.substring(0, 40)}...</ThemedText>
+                              </View>
+                            )}
                           </View>
                         )}
                       </View>

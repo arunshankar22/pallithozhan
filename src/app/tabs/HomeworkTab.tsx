@@ -569,32 +569,35 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
                     {/* Multiple attachments renderer */}
                     {item.mediaAttachments && item.mediaAttachments.length > 0 && (
                       <View style={{ gap: 10 }}>
-                        {item.mediaAttachments.map((media: any, idx: number) => (
-                          <View key={idx}>
-                            {media.type === 'image' ? (
-                              <Image
-                                source={{ uri: media.data }}
-                                style={{ width: '100%', height: 200, borderRadius: 12, borderWidth: 1, borderColor: colors.border }}
-                                resizeMode="cover"
-                              />
-                            ) : (
-                              <View style={{ width: '100%', borderRadius: 12, backgroundColor: '#000', overflow: 'hidden' }}>
-                                {Platform.OS === 'web' ? (
-                                  <video 
-                                    src={media.data} 
-                                    controls 
-                                    style={{ width: '100%', maxHeight: 240, display: 'block' }}
-                                  />
-                                ) : (
-                                  <View style={{ padding: 24, alignItems: 'center', gap: 8 }}>
-                                    <ThemedText style={{ color: '#FFF', fontWeight: 'bold' }}>📹 Play Video Attachment</ThemedText>
-                                    <ThemedText style={{ color: '#AAA', fontSize: 11 }}>{media.name || 'Attached Video'}</ThemedText>
-                                  </View>
-                                )}
-                              </View>
-                            )}
-                          </View>
-                        ))}
+                        {item.mediaAttachments.map((media: any, idx: number) => {
+                          const fileUrl = media.url || media.data;
+                          return (
+                            <View key={idx}>
+                              {media.type === 'image' ? (
+                                <Image
+                                  source={{ uri: fileUrl }}
+                                  style={{ width: '100%', height: 200, borderRadius: 12, borderWidth: 1, borderColor: colors.border }}
+                                  resizeMode="cover"
+                                />
+                              ) : (
+                                <View style={{ width: '100%', borderRadius: 12, backgroundColor: '#000', overflow: 'hidden' }}>
+                                  {Platform.OS === 'web' ? (
+                                    <video 
+                                      src={fileUrl} 
+                                      controls 
+                                      style={{ width: '100%', maxHeight: 240, display: 'block' }}
+                                    />
+                                  ) : (
+                                    <View style={{ padding: 24, alignItems: 'center', gap: 8 }}>
+                                      <ThemedText style={{ color: '#FFF', fontWeight: 'bold' }}>📹 Play Video Attachment</ThemedText>
+                                      <ThemedText style={{ color: '#AAA', fontSize: 11 }}>{media.name || 'Attached Video'}</ThemedText>
+                                    </View>
+                                  )}
+                                </View>
+                              )}
+                            </View>
+                          );
+                        })}
                       </View>
                     )}
                   </View>
