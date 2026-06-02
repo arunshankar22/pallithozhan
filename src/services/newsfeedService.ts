@@ -1,7 +1,7 @@
 // Balar Malar Parramatta - Newsfeed Database Service (Firestore, REST API & Local Sandbox)
 import { db, isDemoMode } from './firebase';
 import { collection, doc, getDocs, setDoc, addDoc } from 'firebase/firestore';
-import { getLocalStorageItem, setLocalStorageItem, API_URL, isServerOnline } from './dbCommon';
+import { getLocalStorageItem, setLocalStorageItem, API_URL, isServerOnline, cleanFirestoreData } from './dbCommon';
 
 export const MEDIA_PRESETS = [
   { id: 'img_fair', title: 'Tamil Speech Competition', type: 'image', url: 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&q=80&w=800' },
@@ -124,7 +124,8 @@ export const newsfeedService = {
         }
 
         const { postId: omitted, ...details } = newPost;
-        await setDoc(doc(db, 'newsfeed', postId), details);
+        const cleanedDetails = cleanFirestoreData(details);
+        await setDoc(doc(db, 'newsfeed', postId), cleanedDetails);
         return newPost;
       } catch (e) {
         console.warn('Firestore createNewsfeedPost failed, falling back:', e);
@@ -190,7 +191,8 @@ export const newsfeedService = {
           }
         }
 
-        await setDoc(doc(db, 'newsfeed', postId), updatedPost, { merge: true });
+        const cleanedPost = cleanFirestoreData(updatedPost);
+        await setDoc(doc(db, 'newsfeed', postId), cleanedPost, { merge: true });
         return { postId, ...updatedPost };
       } catch (e) {
         console.warn('Firestore updateNewsfeedPost failed, falling back:', e);

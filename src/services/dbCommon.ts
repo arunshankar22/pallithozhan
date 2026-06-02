@@ -78,3 +78,21 @@ export const setLocalStorageItem = (key: string, value: any) => {
     // Ignore
   }
 };
+
+// Recursively strips undefined values from objects/arrays to satisfy strict Cloud Firestore serialization
+export const cleanFirestoreData = (obj: any): any => {
+  if (obj === null || obj === undefined) return null;
+  if (Array.isArray(obj)) {
+    return obj.map(cleanFirestoreData);
+  }
+  if (typeof obj === 'object') {
+    const clean: any = {};
+    Object.keys(obj).forEach((key) => {
+      if (obj[key] !== undefined) {
+        clean[key] = cleanFirestoreData(obj[key]);
+      }
+    });
+    return clean;
+  }
+  return obj;
+};

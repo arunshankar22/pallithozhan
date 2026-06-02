@@ -1,7 +1,7 @@
 // Balar Malar Parramatta - Homework Database Service (Firestore, REST API & Local Sandbox)
 import { db, isDemoMode } from './firebase';
 import { collection, doc, getDocs, setDoc, getDoc } from 'firebase/firestore';
-import { getLocalStorageItem, setLocalStorageItem, API_URL, isServerOnline } from './dbCommon';
+import { getLocalStorageItem, setLocalStorageItem, API_URL, isServerOnline, cleanFirestoreData } from './dbCommon';
 
 export const DEFAULT_HOMEWORK = [
   {
@@ -115,7 +115,8 @@ export const homeworkService = {
         }
 
         const { homeworkId: omitted, ...details } = newHw;
-        await setDoc(doc(db, 'homework', homeworkId), details);
+        const cleanedDetails = cleanFirestoreData(details);
+        await setDoc(doc(db, 'homework', homeworkId), cleanedDetails);
         return newHw;
       } catch (e) {
         console.warn('Firestore createHomework failed, falling back:', e);
@@ -222,7 +223,8 @@ export const homeworkService = {
         }
 
         const docRef = doc(db, 'homework', homeworkId);
-        await setDoc(docRef, updatedHw, { merge: true });
+        const cleanedHw = cleanFirestoreData(updatedHw);
+        await setDoc(docRef, cleanedHw, { merge: true });
         const updatedSnap = await getDoc(docRef);
         return { homeworkId, ...updatedSnap.data() };
       } catch (e) {
