@@ -39,10 +39,8 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
   const [recordedVoiceBase64, setRecordedVoiceBase64] = useState<string | null>(null);
   const { isRecording, recordingTime, startRecording, stopRecording, clearRecording } = useAudioRecorder();
 
-  // Media attachment states for Homework
-  const [attachedMediaUrl, setAttachedMediaUrl] = useState<string | null>(null);
-  const [attachedMediaType, setAttachedMediaType] = useState<'image' | 'video' | null>(null);
-  const [attachedMediaName, setAttachedMediaName] = useState<string | null>(null);
+  // Media attachment states for Homework (Allows multiple selection!)
+  const [attachedHomeworkFiles, setAttachedHomeworkFiles] = useState<{ name: string; type: 'image' | 'video'; data: string; }[]>([]);
 
   const handleSelectHomeworkMedia = (type: 'image' | 'video') => {
     if (Platform.OS === 'web') {
@@ -50,18 +48,36 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
         const input = document.createElement('input');
         input.type = 'file';
         input.accept = type === 'image' ? 'image/*' : 'video/*';
+        input.multiple = true; // Allow selecting multiple files at once!
+        
         input.onchange = (e: any) => {
-          const file = e.target.files?.[0];
-          if (file) {
-            const reader = new FileReader();
-            reader.onload = () => {
-              const dataUrl = reader.result as string;
-              setAttachedMediaUrl(dataUrl);
-              setAttachedMediaType(type);
-              setAttachedMediaName(file.name);
-              showToast(`Attached ${type} for homework: ${file.name}`, 'success');
-            };
-            reader.readAsDataURL(file);
+          const files = e.target.files;
+          if (files && files.length > 0) {
+            const filesCount = files.length;
+            const newFileRecords: { name: string; type: 'image' | 'video'; data: string; }[] = [];
+            let loadedCount = 0;
+            
+            for (let i = 0; i < filesCount; i++) {
+              const file = files[i];
+              const reader = new FileReader();
+              
+              reader.onload = () => {
+                const dataUrl = reader.result as string;
+                newFileRecords.push({
+                  name: file.name,
+                  type,
+                  data: dataUrl
+                });
+                
+                loadedCount++;
+                if (loadedCount === filesCount) {
+                  setAttachedHomeworkFiles(prev => [...prev, ...newFileRecords]);
+                  showToast(`Attached ${filesCount} ${type}(s) successfully for homework!`, 'success');
+                }
+              };
+              
+              reader.readAsDataURL(file);
+            }
           }
         };
         input.click();
@@ -73,18 +89,16 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
       const defaultData = type === 'image'
         ? 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?auto=format&fit=crop&q=80&w=800'
         : 'https://www.w3schools.com/html/mov_bbb.mp4';
-      setAttachedMediaUrl(defaultData);
-      setAttachedMediaType(type);
-      setAttachedMediaName(`Device_${Date.now()}.${type === 'image' ? 'jpg' : 'mp4'}`);
-      showToast(`Uploaded simulated ${type} successfully.`, 'success');
+      
+      const fileRecord = {
+        name: `Device_${Date.now()}.${type === 'image' ? 'jpg' : 'mp4'}`,
+        type,
+        data: defaultData
+      };
+      
+      setAttachedHomeworkFiles(prev => [...prev, fileRecord]);
+      showToast(`Uploaded simulated ${type} successfully for homework.`, 'success');
     }
-  };
-
-  const handleDiscardHomeworkMedia = () => {
-    setAttachedMediaUrl(null);
-    setAttachedMediaType(null);
-    setAttachedMediaName(null);
-    showToast('Attached media discarded.', 'warning');
   };
 
   const loadData = async () => {
@@ -159,9 +173,7 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
       dueDate: new Date(Date.now() + 3600000 * 24).toISOString(), // Dummy tomorrow
       createdByName: user?.fullName || 'Teacher',
       voiceUrl: recordedVoiceBase64, // Attach audio guide!
-      mediaUrl: attachedMediaUrl,     // Attach photo/video URL!
-      mediaType: attachedMediaType,   // Attach photo/video type!
-      mediaName: attachedMediaName    // Attach photo/video name!
+      mediaAttachments: attachedHomeworkFiles // Attach photo/video files array!
     };
 
     try {
@@ -186,9 +198,7 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
     setSelectedClassId('');
     setEditingHwId(null);
     setRecordedVoiceBase64(null);
-    setAttachedMediaUrl(null);
-    setAttachedMediaType(null);
-    setAttachedMediaName(null);
+    setAttachedHomeworkFiles([]);
     clearRecording();
     setModalVisible(false);
     loadData();
@@ -202,9 +212,7 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
     setDescEn(item.description.en);
     setDescTa(item.description.ta);
     setRecordedVoiceBase64(item.voiceUrl || null);
-    setAttachedMediaUrl(item.mediaUrl || null);
-    setAttachedMediaType(item.mediaType || null);
-    setAttachedMediaName(item.mediaName || null);
+    setAttachedHomeworkFiles(item.mediaAttachments || []);
     setTitleTaDirty(true);
     setDescTaDirty(true);
     setModalVisible(true);
@@ -257,9 +265,7 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
               setDescEn('');
               setDescTa('');
               setRecordedVoiceBase64(null);
-              setAttachedMediaUrl(null);
-              setAttachedMediaType(null);
-              setAttachedMediaName(null);
+              setAttachedHomeworkFiles([]);
               clearRecording();
               setTitleTaDirty(false);
               setDescTaDirty(false);
@@ -401,54 +407,53 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
           <View style={{ marginVertical: 8, gap: 4 }}>
             <ThemedText style={styles.formInputLabel}>🖼️ Attach Photo/Video / புகைப்படம் அல்லது வீடியோவை இணைக்கவும்</ThemedText>
             
-            {attachedMediaUrl ? (
-              <View style={{ gap: 8 }}>
-                {attachedMediaType === 'image' ? (
-                  <Image 
-                    source={{ uri: attachedMediaUrl }} 
-                    style={{ width: '100%', height: 180, borderRadius: 12, borderWidth: 1, borderColor: colors.border }} 
-                    resizeMode="cover" 
-                  />
-                ) : (
-                  <View style={{ width: '100%', height: 180, borderRadius: 12, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }}>
-                    <ThemedText style={{ color: '#FFF', fontWeight: 'bold' }}>📹 Video Attached / வீடியோ இணைக்கப்பட்டது</ThemedText>
-                    <ThemedText style={{ color: '#AAA', fontSize: 11, marginTop: 4 }}>{attachedMediaName}</ThemedText>
+            {attachedHomeworkFiles.length > 0 && (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row', marginVertical: 6 }}>
+                {attachedHomeworkFiles.map((file, i) => (
+                  <View key={i} style={{ width: 120, height: 120, borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: colors.border, position: 'relative', marginRight: 10 }}>
+                    {file.type === 'image' ? (
+                      <Image 
+                        source={{ uri: file.data }} 
+                        style={{ width: '100%', height: '100%' }} 
+                        resizeMode="cover" 
+                      />
+                    ) : (
+                      <View style={{ width: '100%', height: '100%', backgroundColor: '#000', justifyContent: 'center', alignItems: 'center', padding: 4 }}>
+                        <ThemedText style={{ color: '#FFF', fontSize: 10, fontWeight: 'bold', textAlign: 'center' }}>📹 Video Attachment</ThemedText>
+                        <ThemedText style={{ color: '#AAA', fontSize: 8, marginTop: 4 }} numberOfLines={2}>{file.name}</ThemedText>
+                      </View>
+                    )}
+                    <Pressable
+                      onPress={() => setAttachedHomeworkFiles(prev => prev.filter((_, idx) => idx !== i))}
+                      style={{ position: 'absolute', top: 4, right: 4, width: 20, height: 20, borderRadius: 10, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' }}
+                    >
+                      <ThemedText style={{ color: '#FFF', fontSize: 10, fontWeight: 'bold' }}>✕</ThemedText>
+                    </Pressable>
                   </View>
-                )}
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <ThemedText style={{ fontSize: 11, color: colors.textSecondary, flex: 1 }} numberOfLines={1}>
-                    Selected: {attachedMediaName}
-                  </ThemedText>
-                  <Pressable 
-                    onPress={handleDiscardHomeworkMedia} 
-                    style={{ paddingVertical: 4, paddingHorizontal: 12, borderRadius: 8, backgroundColor: colors.danger + '15', borderWidth: 1, borderColor: colors.danger }}
-                  >
-                    <ThemedText style={{ color: colors.danger, fontSize: 11, fontWeight: '700' }}>Discard / நீக்கவும்</ThemedText>
-                  </Pressable>
-                </View>
-              </View>
-            ) : (
-              <View style={{ flexDirection: 'row', gap: 10 }}>
-                <Pressable
-                  onPress={() => handleSelectHomeworkMedia('image')}
-                  style={({ pressed }) => [
-                    { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background },
-                    { opacity: pressed ? 0.8 : 1 }
-                  ]}
-                >
-                  <ThemedText style={{ fontWeight: '700', fontSize: 12 }}>📷 Attach Photo / புகைப்படம்</ThemedText>
-                </Pressable>
-                <Pressable
-                  onPress={() => handleSelectHomeworkMedia('video')}
-                  style={({ pressed }) => [
-                    { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background },
-                    { opacity: pressed ? 0.8 : 1 }
-                  ]}
-                >
-                  <ThemedText style={{ fontWeight: '700', fontSize: 12 }}>📹 Attach Video / வீடியோ</ThemedText>
-                </Pressable>
-              </View>
+                ))}
+              </ScrollView>
             )}
+
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <Pressable
+                onPress={() => handleSelectHomeworkMedia('image')}
+                style={({ pressed }) => [
+                  { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background },
+                  { opacity: pressed ? 0.8 : 1 }
+                ]}
+              >
+                <ThemedText style={{ fontWeight: '700', fontSize: 12 }}>📷 Attach Photo / புகைப்படம்</ThemedText>
+              </Pressable>
+              <Pressable
+                onPress={() => handleSelectHomeworkMedia('video')}
+                style={({ pressed }) => [
+                  { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background },
+                  { opacity: pressed ? 0.8 : 1 }
+                ]}
+              >
+                <ThemedText style={{ fontWeight: '700', fontSize: 12 }}>📹 Attach Video / வீடியோ</ThemedText>
+              </Pressable>
+            </View>
           </View>
 
           <View style={styles.formButtonRow}>
@@ -533,29 +538,66 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
                   </View>
                 )}
 
-                {/* Media Attachment Display */}
-                {item.mediaUrl && (
-                  <View style={{ marginVertical: 8 }}>
-                    {item.mediaType === 'image' ? (
-                      <Image
-                        source={{ uri: item.mediaUrl }}
-                        style={{ width: '100%', height: 200, borderRadius: 12, borderWidth: 1, borderColor: colors.border }}
-                        resizeMode="cover"
-                      />
-                    ) : (
-                      <View style={{ width: '100%', borderRadius: 12, backgroundColor: '#000', overflow: 'hidden' }}>
-                        {Platform.OS === 'web' ? (
-                          <video 
-                            src={item.mediaUrl} 
-                            controls 
-                            style={{ width: '100%', maxHeight: 240, display: 'block' }}
+                {/* Media Attachment Display (Supports multiple attachments!) */}
+                {((item.mediaAttachments && item.mediaAttachments.length > 0) || item.mediaUrl) && (
+                  <View style={{ marginVertical: 8, gap: 10 }}>
+                    {/* Backward compatibility fallback */}
+                    {(!item.mediaAttachments || item.mediaAttachments.length === 0) && item.mediaUrl && (
+                      <View>
+                        {item.mediaType === 'image' ? (
+                          <Image
+                            source={{ uri: item.mediaUrl }}
+                            style={{ width: '100%', height: 200, borderRadius: 12, borderWidth: 1, borderColor: colors.border }}
+                            resizeMode="cover"
                           />
                         ) : (
-                          <View style={{ padding: 24, alignItems: 'center', gap: 8 }}>
-                            <ThemedText style={{ color: '#FFF', fontWeight: 'bold' }}>📹 Play Video Attachment</ThemedText>
-                            <ThemedText style={{ color: '#AAA', fontSize: 11 }}>{item.mediaName || 'Attached Video'}</ThemedText>
+                          <View style={{ width: '100%', borderRadius: 12, backgroundColor: '#000', overflow: 'hidden' }}>
+                            {Platform.OS === 'web' ? (
+                              <video 
+                                src={item.mediaUrl} 
+                                controls 
+                                style={{ width: '100%', maxHeight: 240, display: 'block' }}
+                              />
+                            ) : (
+                              <View style={{ padding: 24, alignItems: 'center', gap: 8 }}>
+                                <ThemedText style={{ color: '#FFF', fontWeight: 'bold' }}>📹 Play Video Attachment</ThemedText>
+                                <ThemedText style={{ color: '#AAA', fontSize: 11 }}>{item.mediaName || 'Attached Video'}</ThemedText>
+                              </View>
+                            )}
                           </View>
                         )}
+                      </View>
+                    )}
+
+                    {/* Multiple attachments renderer */}
+                    {item.mediaAttachments && item.mediaAttachments.length > 0 && (
+                      <View style={{ gap: 10 }}>
+                        {item.mediaAttachments.map((media: any, idx: number) => (
+                          <View key={idx}>
+                            {media.type === 'image' ? (
+                              <Image
+                                source={{ uri: media.data }}
+                                style={{ width: '100%', height: 200, borderRadius: 12, borderWidth: 1, borderColor: colors.border }}
+                                resizeMode="cover"
+                              />
+                            ) : (
+                              <View style={{ width: '100%', borderRadius: 12, backgroundColor: '#000', overflow: 'hidden' }}>
+                                {Platform.OS === 'web' ? (
+                                  <video 
+                                    src={media.data} 
+                                    controls 
+                                    style={{ width: '100%', maxHeight: 240, display: 'block' }}
+                                  />
+                                ) : (
+                                  <View style={{ padding: 24, alignItems: 'center', gap: 8 }}>
+                                    <ThemedText style={{ color: '#FFF', fontWeight: 'bold' }}>📹 Play Video Attachment</ThemedText>
+                                    <ThemedText style={{ color: '#AAA', fontSize: 11 }}>{media.name || 'Attached Video'}</ThemedText>
+                                  </View>
+                                )}
+                              </View>
+                            )}
+                          </View>
+                        ))}
                       </View>
                     )}
                   </View>

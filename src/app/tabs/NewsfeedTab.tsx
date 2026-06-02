@@ -210,28 +210,44 @@ export function NewsfeedTab({ user, colors, t, showToast, i18n, activeStudentId 
     }
   };
 
-  // Device upload / Real Web File Input Picker
+  // Device upload / Real Web File Input Picker (Allows multiple selection!)
   const handleSimulateDeviceUpload = (type: 'image' | 'video') => {
     if (Platform.OS === 'web') {
       try {
         const input = document.createElement('input');
         input.type = 'file';
         input.accept = type === 'image' ? 'image/*' : 'video/*';
+        input.multiple = true; // Allow selecting multiple files at once!
+        
         input.onchange = (e: any) => {
-          const file = e.target.files?.[0];
-          if (file) {
-            const reader = new FileReader();
-            reader.onload = () => {
-              const dataUrl = reader.result as string;
-              const fileRecord = {
-                name: file.name,
-                type,
-                data: dataUrl
+          const files = e.target.files;
+          if (files && files.length > 0) {
+            const filesCount = files.length;
+            const newFileRecords: { name: string; type: 'image' | 'video'; data: string; }[] = [];
+            let loadedCount = 0;
+            
+            for (let i = 0; i < filesCount; i++) {
+              const file = files[i];
+              const reader = new FileReader();
+              
+              reader.onload = () => {
+                const dataUrl = reader.result as string;
+                newFileRecords.push({
+                  name: file.name,
+                  type,
+                  data: dataUrl
+                });
+                
+                loadedCount++;
+                if (loadedCount === filesCount) {
+                  // Maintain ordering and add all at once
+                  setAttachedFiles(prev => [...prev, ...newFileRecords]);
+                  showToast(`Attached ${filesCount} ${type}(s) successfully!`, 'success');
+                }
               };
-              setAttachedFiles(prev => [...prev, fileRecord]);
-              showToast(`Attached ${type}: ${file.name}`, 'success');
-            };
-            reader.readAsDataURL(file);
+              
+              reader.readAsDataURL(file);
+            }
           }
         };
         input.click();
