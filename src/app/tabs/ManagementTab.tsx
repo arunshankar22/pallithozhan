@@ -1,0 +1,1896 @@
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Pressable,
+  TextInput,
+  ScrollView,
+  Modal,
+  ActivityIndicator,
+  Dimensions,
+  Platform
+} from 'react-native';
+import { Edit, Trash2, UserPlus, Plus, X, CheckCircle } from 'lucide-react-native';
+import { ThemedText } from '@/components/themed-text';
+import { TabProps } from '@/app/sharedTypes';
+import { styles } from '@/app/styles';
+import { mockDb } from '@/services/mockBackend';
+import { Spacing } from '@/constants/theme';
+import { spreadsheetService } from '@/services/spreadsheetService';
+import { UserModal } from '@/components/UserModal';
+import { UserBulkBar } from '@/components/UserBulkBar';
+
+export function ManagementTab({ user, colors, t, showToast, i18n }: TabProps) {
+  const { width: windowWidth } = Dimensions.get('window');
+  const isLargeScreen = windowWidth >= 768;
+  const [subTab, setSubTab] = useState<'users' | 'classes' | 'calendar' | 'import_export'>('users');
+  const [users, setUsers] = useState<any[]>([]);
+  const [classes, setClasses] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  
+  // Custom School Session Dates states
+  const [schoolDates, setSchoolDates] = useState<any[]>([]);
+  const [genYear, setGenYear] = useState('2026');
+  const [genTerm, setGenTerm] = useState('2');
+  const [genPattern, setGenPattern] = useState<'saturdays' | 'weekdays'>('saturdays');
+  const [genStartDate, setGenStartDate] = useState('2026-04-25');
+  const [genEndDate, setGenEndDate] = useState('2026-07-04');
+
+  // Holiday overrides states
+  const [holidayModalVisible, setHolidayModalVisible] = useState(false);
+  const [holidayDateId, setHolidayDateId] = useState('');
+  const [holidayName, setHolidayName] = useState('');
+  const [isHolidayStatus, setIsHolidayStatus] = useState(true);
+
+  // Custom date modal states
+  const [customDateModalVisible, setCustomDateModalVisible] = useState(false);
+  const [customDateVal, setCustomDateVal] = useState('2026-05-15');
+  const [customDateTerm, setCustomDateTerm] = useState('2');
+
+  // User search & filtering
+  const [searchQuery, setSearchQuery] = useState('');
+  const [roleFilter, setRoleFilter] = useState<string>('all');
+  const [userViewMode, setUserViewMode] = useState<'card' | 'table'>('card');
+
+  // Filtered users
+  const filteredUsers = users.filter(u => {
+    const matchSearch = u.fullName.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                        u.email.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchRole = roleFilter === 'all' || u.role === roleFilter;
+    return matchSearch && matchRole && u.uid !== 'admin_1'; // Hide base admin from deleting
+  });
+
+  // Modals visibility
+  const [userModalVisible, setUserModalVisible] = useState(false);
+  const [classModalVisible, setClassModalVisible] = useState(false);
+  
+  // Add/Edit User Form states
+  const [editingUser, setEditingUser] = useState<any | null>(null);
+
+  // Class Form states
+  const [editingClass, setEditingClass] = useState<any | null>(null);
+  const [classNameInput, setClassNameInput] = useState('');
+  const [classTeacherIds, setClassTeacherIds] = useState<string[]>([]);
+  const [classVolunteers, setClassVolunteers] = useState<string[]>([]);
+  const [classStudents, setClassStudents] = useState<string[]>([]);
+
+  // Excel / Spreadsheet Bulk Import & Export States
+  const [importRole, setImportRole] = useState<'student' | 'teacher' | 'volunteer'>('student');
+  const [importText, setImportText] = useState('');
+  const [importPreview, setImportPreview] = useState<any[]>([]);
+  const [importError, setImportError] = useState('');
+  const [importSuccess, setImportSuccess] = useState(false);
+  const [importLogs, setImportLogs] = useState<string[]>([]);
+  const [importing, setImporting] = useState(false);
+
+  useEffect(() => {
+    if (!importText.trim()) {
+      setImportPreview([]);
+      setImportError('');
+      return;
+    }
+    
+    try {
+      const parsed = spreadsheetService.parseSheetText(importText, importRole);
+      setImportPreview(parsed.records);
+      setImportError(parsed.error || '');
+    } catch (e: any) {
+      setImportError(`Parsing error: ${e.message}`);
+      setImportPreview([]);
+    }
+  }, [importText, importRole]);
+
+  const triggerFileDownload = (content: string, filename: string) => {
+    spreadsheetService.triggerFileDownload(content, filename, showToast);
+  };
+
+  const triggerFileUpload = () => {
+    if (Platform.OS === 'web') {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.xlsx,.xls,.csv,.tsv,.txt';
+      input.onchange = (event: any) => {
+        const file = event.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
+          
+          reader.onload = (e) => {
+            if (isExcel) {
+              const parsed = spreadsheetService.parseExcelBinary(e.target?.result as ArrayBuffer, importRole);
+              if (parsed.error) {
+                setImportError(parsed.error);
+                showToast(parsed.error, 'error');
+              } else {
+                setImportPreview(parsed.records);
+                setImportError('');
+                showToast(`Parsed Excel ${file.name} successfully! Check preview below.`, 'success');
+              }
+            } else {
+              const text = e.target?.result as string;
+              setImportText(text);
+              showToast(`Loaded text ${file.name} successfully! Check preview below.`, 'success');
+            }
+          };
+          
+          if (isExcel) {
+            reader.readAsArrayBuffer(file);
+          } else {
+            reader.readAsText(file);
+          }
+        }
+      };
+      input.click();
+    } else {
+      showToast('File uploads only supported in web environment.', 'warning');
+    }
+  };
+
+  const handleExportStudents = async () => {
+    try {
+      const dbUsers = await mockDb.getUsers();
+      const dbClasses = await mockDb.getClasses();
+      const csvContent = spreadsheetService.formatStudentsCSV(dbUsers.filter(u => u.role === 'student'), dbClasses, dbUsers);
+      triggerFileDownload(csvContent, 'BMPM_Students_Export.xls');
+      showToast('Student database exported successfully!', 'success');
+    } catch (e) {
+      showToast('Failed to export students.', 'error');
+    }
+  };
+
+  const handleExportStaff = async (role: 'teacher' | 'volunteer') => {
+    try {
+      const dbUsers = await mockDb.getUsers();
+      const csvContent = spreadsheetService.formatStaffCSV(dbUsers.filter(u => u.role === role), role);
+      const filename = role === 'teacher' ? 'BMPM_Teachers_Export.xls' : 'BMPM_Volunteers_Export.xls';
+      triggerFileDownload(csvContent, filename);
+      showToast(`${role === 'teacher' ? 'Teachers' : 'Volunteers'} exported successfully!`, 'success');
+    } catch (e) {
+      showToast(`Failed to export ${role}s.`, 'error');
+    }
+  };
+
+  const handleExecuteImport = async () => {
+    if (importPreview.length === 0) return;
+    setImporting(true);
+    setImportSuccess(false);
+    const logs: string[] = [];
+    logs.push(`🚀 Initializing bulk import for ${importPreview.length} ${importRole}(s)...`);
+
+    try {
+      const dbUsers = await mockDb.getUsers();
+      const dbClasses = await mockDb.getClasses();
+      
+      const parentEmailMap: Record<string, any> = {};
+      
+      let studentsImported = 0;
+      let parentsCreated = 0;
+      let parentsMerged = 0;
+      let teachersImported = 0;
+      let volunteersImported = 0;
+      let classesCreated = 0;
+      let enrollmentsUpdated = 0;
+
+      const classUpdates: Record<string, any> = {};
+      dbClasses.forEach(c => {
+        classUpdates[c.classId] = { ...c };
+      });
+
+      if (importRole === 'student') {
+        for (const record of importPreview) {
+          const existingStudent = dbUsers.find(u => u.uid === record.uid || u.email.toLowerCase() === record.email.toLowerCase());
+          if (existingStudent) {
+            const updatedData = {
+              fullName: record.fullName,
+              fullNameTamil: record.fullNameTamil || existingStudent.fullNameTamil || '',
+              gender: record.gender || existingStudent.gender || '',
+              dateOfBirth: record.dateOfBirth || existingStudent.dateOfBirth || '',
+              mainstreamSchoolName: record.mainstreamSchoolName || existingStudent.mainstreamSchoolName || '',
+              mainstreamSchoolClass: record.mainstreamSchoolClass || existingStudent.mainstreamSchoolClass || '',
+              className: record.className || existingStudent.className || '',
+              okToIssueBooks: record.okToIssueBooks || existingStudent.okToIssueBooks || 'NO',
+              stationaryIssued: record.stationaryIssued || existingStudent.stationaryIssued || 'NO',
+              booksIssued: record.booksIssued || existingStudent.booksIssued || 'NO',
+              prevBmSchoolClass: record.prevBmSchoolClass || existingStudent.prevBmSchoolClass || '',
+              studentCreated: record.studentCreated || existingStudent.studentCreated || '',
+              effectiveFrom: record.effectiveFrom || existingStudent.effectiveFrom || '',
+              effectiveTo: record.effectiveTo || existingStudent.effectiveTo || '',
+            };
+            await mockDb.updateUser(existingStudent.uid, updatedData);
+            logs.push(`🔄 Student ${record.fullName} already exists. Merged & updated profile with sheet details.`);
+            studentsImported++;
+          } else {
+            await mockDb.createUser({
+              uid: record.uid,
+              fullName: record.fullName,
+              email: record.email,
+              role: 'student',
+              languagePreference: 'ta',
+              fullNameTamil: record.fullNameTamil,
+              gender: record.gender,
+              dateOfBirth: record.dateOfBirth,
+              mainstreamSchoolName: record.mainstreamSchoolName,
+              mainstreamSchoolClass: record.mainstreamSchoolClass,
+              className: record.className,
+              okToIssueBooks: record.okToIssueBooks,
+              stationaryIssued: record.stationaryIssued,
+              booksIssued: record.booksIssued,
+              prevBmSchoolClass: record.prevBmSchoolClass,
+              studentCreated: record.studentCreated,
+              effectiveFrom: record.effectiveFrom || '',
+              effectiveTo: record.effectiveTo || '',
+            });
+            studentsImported++;
+          }
+
+          if (record.parent1) {
+            const p1 = record.parent1;
+            const existingP = dbUsers.find(u => u.email.toLowerCase() === p1.email.toLowerCase());
+            const batchP = parentEmailMap[p1.email.toLowerCase()];
+
+            if (existingP) {
+              const currentStudents = existingP.associatedStudents || [];
+              const updatedData: any = {
+                fullName: p1.fullName,
+                phone: p1.phone || existingP.phone || '',
+                parentVolunteer: p1.volunteer !== undefined ? p1.volunteer : existingP.parentVolunteer,
+              };
+              if (!currentStudents.includes(record.uid)) {
+                updatedData.associatedStudents = [...currentStudents, record.uid];
+                logs.push(`🔗 Sibling detected: Linked existing Parent ${p1.fullName} (email: ${p1.email}) to Child UID: ${record.uid}`);
+              } else {
+                logs.push(`🔄 Parent ${p1.fullName} already linked. Merged details with sheet data.`);
+              }
+              await mockDb.updateUser(existingP.uid, updatedData);
+              parentsMerged++;
+            } else if (batchP) {
+              if (!batchP.associatedStudents.includes(record.uid)) {
+                batchP.associatedStudents.push(record.uid);
+                parentsMerged++;
+              }
+            } else {
+              const newParent = {
+                fullName: p1.fullName,
+                email: p1.email,
+                phone: p1.phone,
+                role: 'parent' as const,
+                languagePreference: 'ta' as const,
+                associatedStudents: [record.uid],
+                parentVolunteer: p1.volunteer,
+              };
+              parentEmailMap[p1.email.toLowerCase()] = newParent;
+              parentsCreated++;
+            }
+          }
+
+          if (record.parent2) {
+            const p2 = record.parent2;
+            const existingP = dbUsers.find(u => u.email.toLowerCase() === p2.email.toLowerCase());
+            const batchP = parentEmailMap[p2.email.toLowerCase()];
+
+            if (existingP) {
+              const currentStudents = existingP.associatedStudents || [];
+              const updatedData: any = {
+                fullName: p2.fullName,
+                phone: p2.phone || existingP.phone || '',
+                parentVolunteer: p2.volunteer !== undefined ? p2.volunteer : existingP.parentVolunteer,
+              };
+              if (!currentStudents.includes(record.uid)) {
+                updatedData.associatedStudents = [...currentStudents, record.uid];
+                logs.push(`🔗 Sibling detected: Linked existing Parent ${p2.fullName} (email: ${p2.email}) to Child UID: ${record.uid}`);
+              } else {
+                logs.push(`🔄 Parent ${p2.fullName} already linked. Merged details with sheet data.`);
+              }
+              await mockDb.updateUser(existingP.uid, updatedData);
+              parentsMerged++;
+            } else if (batchP) {
+              if (!batchP.associatedStudents.includes(record.uid)) {
+                batchP.associatedStudents.push(record.uid);
+                parentsMerged++;
+              }
+            } else {
+              const newParent = {
+                fullName: p2.fullName,
+                email: p2.email,
+                phone: p2.phone,
+                role: 'parent' as const,
+                languagePreference: 'ta' as const,
+                associatedStudents: [record.uid],
+                parentVolunteer: p2.volunteer,
+              };
+              parentEmailMap[p2.email.toLowerCase()] = newParent;
+              parentsCreated++;
+            }
+          }
+
+          if (record.className) {
+            const targetClassName = record.className.trim();
+            let matchedClassId = '';
+            for (const cid of Object.keys(classUpdates)) {
+              if (classUpdates[cid].className.toLowerCase().includes(targetClassName.toLowerCase())) {
+                matchedClassId = cid;
+                break;
+              }
+            }
+
+            if (matchedClassId) {
+              const cls = classUpdates[matchedClassId];
+              cls.studentIds = cls.studentIds || [];
+              if (!cls.studentIds.includes(record.uid)) {
+                cls.studentIds.push(record.uid);
+                enrollmentsUpdated++;
+              }
+            } else {
+              const newClassId = `class_imported_${Date.now()}_${studentsImported}`;
+              classUpdates[newClassId] = {
+                classId: newClassId,
+                className: `${targetClassName} - Imported`,
+                teacherId: '',
+                teacherIds: [],
+                studentIds: [record.uid],
+                volunteerIds: [],
+              };
+              classesCreated++;
+              logs.push(`🏫 New Classroom initialized: "${targetClassName} - Imported"`);
+            }
+          }
+        }
+
+        for (const email of Object.keys(parentEmailMap)) {
+          const parentData = parentEmailMap[email];
+          await mockDb.createUser(parentData);
+          logs.push(`👤 Created new Parent profile: ${parentData.fullName} (${email})`);
+        }
+
+      } else {
+        for (const record of importPreview) {
+          const existingUser = dbUsers.find(u => u.uid === record.uid || u.email.toLowerCase() === record.email.toLowerCase());
+          if (existingUser) {
+            const updatedData = {
+              fullName: record.fullName,
+              phone: record.phone || existingUser.phone || '',
+              wwcNumber: record.wwcNumber || existingUser.wwcNumber || '',
+              dob: record.dob || existingUser.dob || '',
+              wwcVerified: record.wwcVerified !== undefined ? record.wwcVerified : existingUser.wwcVerified,
+              wwcVerifiedDate: record.wwcVerifiedDate || existingUser.wwcVerifiedDate || '',
+              wwcExpiryDate: record.wwcExpiryDate || existingUser.wwcExpiryDate || '',
+              stage: record.stage || existingUser.stage || '',
+              effectiveFrom: record.effectiveFrom || existingUser.effectiveFrom || '',
+              effectiveTo: record.effectiveTo || existingUser.effectiveTo || '',
+            };
+            await mockDb.updateUser(existingUser.uid, updatedData);
+            logs.push(`🔄 ${importRole === 'teacher' ? 'Teacher' : 'Volunteer'} ${record.fullName} already exists. Merged & updated profile with sheet details.`);
+            if (importRole === 'teacher') teachersImported++;
+            else volunteersImported++;
+          } else {
+            await mockDb.createUser({
+              uid: record.uid,
+              fullName: record.fullName,
+              email: record.email,
+              phone: record.phone,
+              role: record.role,
+              languagePreference: 'ta',
+              wwcNumber: record.wwcNumber,
+              dob: record.dob,
+              wwcVerified: record.wwcVerified,
+              wwcVerifiedDate: record.wwcVerifiedDate,
+              wwcExpiryDate: record.wwcExpiryDate,
+              effectiveFrom: record.effectiveFrom,
+              effectiveTo: record.effectiveTo,
+            });
+            if (importRole === 'teacher') teachersImported++;
+            else volunteersImported++;
+          }
+
+          if (record.stage) {
+            const targetStage = record.stage.trim();
+            let matchedClassId = '';
+            for (const cid of Object.keys(classUpdates)) {
+              if (classUpdates[cid].className.toLowerCase().includes(targetStage.toLowerCase())) {
+                matchedClassId = cid;
+                break;
+              }
+            }
+
+            if (matchedClassId) {
+              const cls = classUpdates[matchedClassId];
+              if (importRole === 'teacher') {
+                cls.teacherIds = cls.teacherIds || [];
+                if (!cls.teacherIds.includes(record.uid)) {
+                  cls.teacherIds.push(record.uid);
+                  if (!cls.teacherId) cls.teacherId = record.uid;
+                  enrollmentsUpdated++;
+                }
+              } else {
+                cls.volunteerIds = cls.volunteerIds || [];
+                if (!cls.volunteerIds.includes(record.uid)) {
+                  cls.volunteerIds.push(record.uid);
+                  enrollmentsUpdated++;
+                }
+              }
+            } else if (importRole === 'teacher') {
+              const isGeneralRole = ['admin', 'it', 'office'].some(r => targetStage.toLowerCase().includes(r));
+              if (!isGeneralRole) {
+                const newClassId = `class_imported_${Date.now()}_${teachersImported}`;
+                classUpdates[newClassId] = {
+                  classId: newClassId,
+                  className: `${targetStage} - Classroom`,
+                  teacherId: record.uid,
+                  teacherIds: [record.uid],
+                  studentIds: [],
+                  volunteerIds: [],
+                };
+                classesCreated++;
+                logs.push(`🏫 New Classroom initialized for Teacher: "${targetStage} - Classroom"`);
+              }
+            }
+          }
+        }
+      }
+
+      for (const cid of Object.keys(classUpdates)) {
+        const cls = classUpdates[cid];
+        const existingClass = dbClasses.find(c => c.classId === cid);
+        if (existingClass) {
+          await mockDb.updateClass(cid, cls);
+        } else {
+          await mockDb.createClass(cls);
+        }
+      }
+
+      logs.push(`\n🎉 IMPORT COMPLETED SUCCESSFULLY!`);
+      if (importRole === 'student') {
+        logs.push(`✅ Students Imported: ${studentsImported}`);
+        logs.push(`✅ Parents Created: ${parentsCreated}`);
+        logs.push(`✅ Parent-Child Sibling Links Merged: ${parentsMerged}`);
+      } else if (importRole === 'teacher') {
+        logs.push(`✅ Teachers Imported: ${teachersImported}`);
+      } else {
+        logs.push(`✅ Volunteers Imported: ${volunteersImported}`);
+      }
+      logs.push(`✅ Class structures created: ${classesCreated}`);
+      logs.push(`✅ Enrollments linked/updated: ${enrollmentsUpdated}`);
+
+      setImportSuccess(true);
+      showToast(`Bulk ${importRole} import completed successfully!`, 'success');
+      await refreshData();
+      setImportText('');
+    } catch (e: any) {
+      logs.push(`❌ EXCEPTION FAILED DURING RUNTIME: ${e.message}`);
+      showToast('Excel/CSV batch import failed.', 'error');
+    } finally {
+      setImporting(false);
+      setImportLogs(logs);
+    }
+  };
+
+  const refreshData = async () => {
+    setLoading(true);
+    try {
+      const uList = await mockDb.getUsers();
+      const cList = await mockDb.getClasses();
+      const dList = await mockDb.getSchoolDates();
+      setUsers(uList);
+      setClasses(cList);
+      setSchoolDates(dList);
+    } catch (e) {
+      showToast('Failed to sync administrative portal data.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGenerateCalendar = async () => {
+    if (!genYear || !genTerm || !genStartDate || !genEndDate) {
+      showToast('Please fill out all calendar generation parameters.', 'warning');
+      return;
+    }
+    setLoading(true);
+    try {
+      await mockDb.generateTermDates(
+        parseInt(genYear),
+        parseInt(genTerm),
+        genPattern,
+        genStartDate,
+        genEndDate
+      );
+      showToast(`Generated Term ${genTerm} dates successfully!`, 'success');
+      await refreshData();
+    } catch (e) {
+      showToast('Failed to generate calendar dates schedule.', 'error');
+    }
+    setLoading(false);
+  };
+
+  const handleSaveHolidayOverride = async () => {
+    if (!holidayDateId) return;
+    try {
+      await mockDb.toggleHolidayOverride(holidayDateId, isHolidayStatus, holidayName);
+      showToast(isHolidayStatus ? 'Holiday override applied successfully!' : 'Session day successfully reinstated!', 'success');
+      setHolidayModalVisible(false);
+      setHolidayName('');
+      await refreshData();
+    } catch (e) {
+      showToast('Failed to update holiday override status.', 'error');
+    }
+  };
+
+  const handleAddCustomDate = async () => {
+    if (!customDateVal) return;
+    try {
+      await mockDb.addCustomDate(customDateVal, parseInt(customDateTerm));
+      showToast(`Ad-hoc class date ${customDateVal} added to Term ${customDateTerm}!`, 'success');
+      setCustomDateModalVisible(false);
+      await refreshData();
+    } catch (e) {
+      showToast('Failed to add ad-hoc calendar date.', 'error');
+    }
+  };
+
+  useEffect(() => {
+    refreshData();
+  }, []);
+
+  const [selectedUserUids, setSelectedUserUids] = useState<Record<string, boolean>>({});
+
+  const handleToggleUserSelection = (uid: string) => {
+    setSelectedUserUids(prev => ({
+      ...prev,
+      [uid]: !prev[uid]
+    }));
+  };
+
+  const selectedCount = Object.keys(selectedUserUids).filter(id => selectedUserUids[id]).length;
+  const isAllSelected = filteredUsers.length > 0 && filteredUsers.every(u => selectedUserUids[u.uid]);
+
+  const handleToggleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedUserUids({});
+    } else {
+      const newSel: Record<string, boolean> = {};
+      filteredUsers.forEach(u => {
+        newSel[u.uid] = true;
+      });
+      setSelectedUserUids(newSel);
+    }
+  };
+
+  const handleDeleteSelectedUsers = async () => {
+    const uidsToDelete = Object.keys(selectedUserUids).filter(id => selectedUserUids[id]);
+    if (uidsToDelete.length === 0) return;
+
+    const confirmed = Platform.OS === 'web'
+      ? window.confirm(`Are you sure you want to delete ${uidsToDelete.length} selected user(s)?`)
+      : true;
+
+    if (!confirmed) return;
+
+    setLoading(true);
+    try {
+      for (const uid of uidsToDelete) {
+        await mockDb.deleteUser(uid);
+      }
+      showToast(`${uidsToDelete.length} user(s) removed successfully.`, 'success');
+      setSelectedUserUids({});
+      await refreshData();
+    } catch (e) {
+      showToast('Failed to delete selected users.', 'error');
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    setSelectedUserUids({});
+  }, [roleFilter, searchQuery, subTab]);
+
+  const openAddUser = () => {
+    setEditingUser(null);
+    setUserModalVisible(true);
+  };
+
+  const openEditUser = (u: any) => {
+    setEditingUser(u);
+    setUserModalVisible(true);
+  };
+
+  const handleDeleteUser = async (uid: string) => {
+    const confirmed = Platform.OS === 'web' ? window.confirm('Are you sure you want to delete this user?') : true;
+    if (!confirmed) return;
+    try {
+      await mockDb.deleteUser(uid);
+      showToast('User has been removed from database.', 'success');
+      refreshData();
+    } catch (e) {
+      showToast('Failed to remove user.', 'error');
+    }
+  };
+
+  const openAddClass = () => {
+    setEditingClass(null);
+    setClassNameInput('');
+    setClassTeacherIds([]);
+    setClassVolunteers([]);
+    setClassStudents([]);
+    setClassModalVisible(true);
+  };
+
+  const openEditClass = (c: any) => {
+    setEditingClass(c);
+    setClassNameInput(c.className);
+    setClassTeacherIds(c.teacherIds || (c.teacherId ? [c.teacherId] : []));
+    setClassVolunteers(c.volunteerIds || []);
+    setClassStudents(c.studentIds || []);
+    setClassModalVisible(true);
+  };
+
+  const handleSaveClass = async () => {
+    if (!classNameInput.trim()) {
+      showToast('Please provide a class name!', 'warning');
+      return;
+    }
+    const data = {
+      className: classNameInput.trim(),
+      teacherId: classTeacherIds[0] || '',
+      teacherIds: classTeacherIds,
+      volunteerIds: classVolunteers,
+      studentIds: classStudents
+    };
+
+    try {
+      if (editingClass) {
+        await mockDb.updateClass(editingClass.classId, data);
+        showToast('Class configuration synchronized!', 'success');
+      } else {
+        await mockDb.createClass(data);
+        showToast('New class successfully initialized!', 'success');
+      }
+      setClassModalVisible(false);
+      refreshData();
+    } catch (e) {
+      showToast('Failed to save class.', 'error');
+    }
+  };
+
+  const handleDeleteClass = async (classId: string) => {
+    try {
+      await mockDb.deleteClass(classId);
+      showToast('Class structure has been deleted.', 'success');
+      refreshData();
+    } catch (e) {
+      showToast('Failed to remove class.', 'error');
+    }
+  };
+
+
+
+  return (
+    <View style={styles.tabContentWrapper}>
+      <ThemedText style={styles.sectionTitle}>Portal Management / நிர்வாகக் குழு</ThemedText>
+      <ThemedText style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>
+        Manage registered roles, assign classes, and orchestrate parent-student linkages
+      </ThemedText>
+
+      {/* Sub-tabs Selection */}
+      <View style={{ flexDirection: 'row', gap: Spacing.two, marginBottom: Spacing.two, flexWrap: 'wrap' }}>
+        <Pressable
+          onPress={() => setSubTab('users')}
+          style={[
+            { paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20, borderWidth: 1 },
+            subTab === 'users' 
+              ? { backgroundColor: colors.primary, borderColor: colors.primary } 
+              : { backgroundColor: 'transparent', borderColor: colors.border }
+          ]}
+        >
+          <ThemedText style={{ color: subTab === 'users' ? '#FFF' : colors.text, fontWeight: '700', fontSize: 13 }}>
+            👥 Users Directory
+          </ThemedText>
+        </Pressable>
+        <Pressable
+          onPress={() => setSubTab('classes')}
+          style={[
+            { paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20, borderWidth: 1 },
+            subTab === 'classes' 
+              ? { backgroundColor: colors.primary, borderColor: colors.primary } 
+              : { backgroundColor: 'transparent', borderColor: colors.border }
+          ]}
+        >
+          <ThemedText style={{ color: subTab === 'classes' ? '#FFF' : colors.text, fontWeight: '700', fontSize: 13 }}>
+            🏫 Classes Assignment
+          </ThemedText>
+        </Pressable>
+        <Pressable
+          onPress={() => setSubTab('calendar')}
+          style={[
+            { paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20, borderWidth: 1 },
+            subTab === 'calendar' 
+              ? { backgroundColor: colors.primary, borderColor: colors.primary } 
+              : { backgroundColor: 'transparent', borderColor: colors.border }
+          ]}
+        >
+          <ThemedText style={{ color: subTab === 'calendar' ? '#FFF' : colors.text, fontWeight: '700', fontSize: 13 }}>
+            📅 School Calendar
+          </ThemedText>
+        </Pressable>
+        <Pressable
+          onPress={() => setSubTab('import_export')}
+          style={[
+            { paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20, borderWidth: 1 },
+            subTab === 'import_export' 
+              ? { backgroundColor: colors.primary, borderColor: colors.primary } 
+              : { backgroundColor: 'transparent', borderColor: colors.border }
+          ]}
+        >
+          <ThemedText style={{ color: subTab === 'import_export' ? '#FFF' : colors.text, fontWeight: '700', fontSize: 13 }}>
+            📤 Import / Export
+          </ThemedText>
+        </Pressable>
+      </View>
+
+      {loading ? (
+        <ActivityIndicator size="large" color={colors.primary} style={{ marginVertical: Spacing.three }} />
+      ) : subTab === 'users' ? (
+        /* USERS SUB-TAB */
+        <View style={{ flex: 1 }}>
+          {/* Search and Filters */}
+          <View style={{ flexDirection: 'row', gap: Spacing.one, marginBottom: Spacing.two, flexWrap: 'wrap', alignItems: 'center' }}>
+            <TextInput
+              style={[styles.directPathInput, { color: colors.text, borderColor: colors.border, flex: 1, minWidth: 200 }]}
+              placeholder="Search users by name or email..."
+              placeholderTextColor={colors.textSecondary}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+            
+            {/* Filter Pills */}
+            <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
+              {['all', 'teacher', 'volunteer', 'parent', 'student'].map((role) => (
+                <Pressable
+                  key={role}
+                  onPress={() => setRoleFilter(role)}
+                  style={[
+                    { paddingVertical: 5, paddingHorizontal: 10, borderRadius: 12, borderWidth: 1 },
+                    roleFilter === role 
+                      ? { backgroundColor: colors.secondaryLight, borderColor: colors.secondary } 
+                      : { backgroundColor: colors.background, borderColor: colors.border }
+                  ]}
+                >
+                  <ThemedText style={{ fontSize: 11, fontWeight: '600', color: roleFilter === role ? colors.secondary : colors.textSecondary }}>
+                    {role.toUpperCase()}
+                  </ThemedText>
+                </Pressable>
+              ))}
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: Spacing.two, alignItems: 'center' }}>
+              <Pressable
+                onPress={handleToggleSelectAll}
+                style={[
+                  { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background },
+                  isAllSelected ? { borderColor: colors.secondary, backgroundColor: colors.secondaryLight } : {}
+                ]}
+              >
+                <View style={{
+                  width: 14,
+                  height: 14,
+                  borderWidth: 1.5,
+                  borderColor: isAllSelected ? colors.secondary : colors.textSecondary,
+                  borderRadius: 3,
+                  backgroundColor: isAllSelected ? colors.secondary : 'transparent',
+                  justifyContent: 'center',
+                  alignItems: 'center'
+                }}>
+                  {isAllSelected && <CheckCircle size={10} color="#FFF" />}
+                </View>
+                <ThemedText style={{ fontSize: 11, fontWeight: '700', color: isAllSelected ? colors.secondary : colors.text }}>Select All</ThemedText>
+              </Pressable>
+
+              <Pressable
+                onPress={() => setUserViewMode(prev => prev === 'card' ? 'table' : 'card')}
+                style={[
+                  { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background },
+                  userViewMode === 'table' ? { borderColor: colors.secondary, backgroundColor: colors.secondaryLight } : {}
+                ]}
+              >
+                <ThemedText style={{ fontSize: 11, fontWeight: '700', color: userViewMode === 'table' ? colors.secondary : colors.text }}>
+                  {userViewMode === 'card' ? '📊 Table View' : '🎛️ Card View'}
+                </ThemedText>
+              </Pressable>
+
+              <Pressable
+                onPress={openAddUser}
+                style={({ pressed }) => [
+                  { backgroundColor: colors.primary, flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, gap: 4 },
+                  { opacity: pressed ? 0.9 : 1 }
+                ]}
+              >
+                <UserPlus size={14} color="#FFF" />
+                <ThemedText style={{ color: '#FFF', fontSize: 12, fontWeight: '700' }}>Enroll User</ThemedText>
+              </Pressable>
+            </View>
+          </View>
+
+          {/* Bulk Action Selection Bar */}
+          <UserBulkBar
+            selectedCount={selectedCount}
+            isAllSelected={isAllSelected}
+            onToggleSelectAll={handleToggleSelectAll}
+            onDeleteSelected={handleDeleteSelectedUsers}
+            colors={colors}
+            isDark={colors.cardBg?.includes('rgba(30') || colors.background?.includes('#1')}
+          />
+
+          {/* Users list */}
+          {filteredUsers.length === 0 ? (
+            <ThemedText style={{ textAlign: 'center', marginVertical: Spacing.three, color: colors.textSecondary }}>
+              No users found matching current filters.
+            </ThemedText>
+          ) : userViewMode === 'card' ? (
+            <ScrollView style={{ flex: 1 }}>
+              <View style={{ gap: Spacing.two }}>
+                {filteredUsers.map((u) => {
+                  const isChecked = !!selectedUserUids[u.uid];
+                  return (
+                    <View key={u.uid} style={[{ padding: 12, borderRadius: 12, borderWidth: 1, backgroundColor: colors.cardBg, borderColor: colors.border, flexDirection: 'row', alignItems: 'center', gap: 10 }]}>
+                      {/* Checkbox Column */}
+                      <Pressable
+                        onPress={() => handleToggleUserSelection(u.uid)}
+                        style={{
+                          width: 18,
+                          height: 18,
+                          borderWidth: 2,
+                          borderColor: isChecked ? colors.secondary : colors.border,
+                          borderRadius: 4,
+                          backgroundColor: isChecked ? colors.secondary : 'transparent',
+                          justifyContent: 'center',
+                          alignItems: 'center'
+                        }}
+                      >
+                        {isChecked && <CheckCircle size={12} color="#FFF" />}
+                      </Pressable>
+
+                      {/* Main Details */}
+                      <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <View style={{ gap: 4, flex: 1, marginRight: 8 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                            <ThemedText style={{ fontSize: 15, fontWeight: '700' }}>{u.fullName}</ThemedText>
+                            <View style={{ backgroundColor: u.role === 'teacher' ? colors.primaryLight : u.role === 'volunteer' ? colors.secondaryLight : colors.background, paddingVertical: 2, paddingHorizontal: 6, borderRadius: 4 }}>
+                              <ThemedText style={{ fontSize: 9, fontWeight: '700', color: u.role === 'teacher' ? colors.primary : u.role === 'volunteer' ? colors.secondary : colors.textSecondary }}>
+                                {u.role.toUpperCase()}
+                              </ThemedText>
+                            </View>
+                          </View>
+                          <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>✉️ {u.email}  |  📞 {u.phone || 'No phone'}</ThemedText>
+                          {u.role === 'parent' && u.associatedStudents && u.associatedStudents.length > 0 && (
+                            <ThemedText style={{ fontSize: 11, color: colors.secondary, fontWeight: '600' }}>
+                              🔗 Children: {u.associatedStudents.map((sId: string) => users.find(x => x.uid === sId)?.fullName || sId).join(', ')}
+                            </ThemedText>
+                          )}
+                          {(u.effectiveFrom || u.prevBmSchoolClass || u.studentCreated) && (
+                            <ThemedText style={{ fontSize: 10, color: colors.textSecondary, marginTop: 2 }}>
+                              {u.prevBmSchoolClass ? `Prev BM: ${u.prevBmSchoolClass}  |  ` : ''}
+                              {u.effectiveFrom ? `Effective: ${u.effectiveFrom}` : ''}
+                              {u.effectiveTo ? ` to ${u.effectiveTo}` : ''}
+                            </ThemedText>
+                          )}
+                        </View>
+
+                        <View style={{ flexDirection: 'row', gap: 8 }}>
+                          <Pressable onPress={() => openEditUser(u)} style={{ padding: 6, borderRadius: 6, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border }}>
+                            <Edit size={14} color={colors.textSecondary} />
+                          </Pressable>
+                          <Pressable onPress={() => handleDeleteUser(u.uid)} style={{ padding: 6, borderRadius: 6, backgroundColor: colors.primaryLight || '#FFE5E5', borderWidth: 1, borderColor: colors.danger || '#FF4D4D' }}>
+                            <Trash2 size={14} color={colors.danger || '#FF4D4D'} />
+                          </Pressable>
+                        </View>
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            </ScrollView>
+          ) : (
+            <View style={{ flex: 1, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.cardBg, overflow: 'hidden' }}>
+              <ScrollView style={{ flex: 1 }}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={true}>
+                  <View style={{ flexDirection: 'column' }}>
+                    {/* Header Row */}
+                    <View style={{ flexDirection: 'row', backgroundColor: colors.background, borderBottomWidth: 2, borderBottomColor: colors.border, paddingVertical: 10, alignItems: 'center' }}>
+                      {(roleFilter === 'student' ? [
+                        { label: '', width: 40 },
+                        { label: 'Actions', width: 90 },
+                        { label: 'English Name', width: 160 },
+                        { label: 'Tamil Name', width: 140 },
+                        { label: 'Email', width: 200 },
+                        { label: 'Phone', width: 120 },
+                        { label: 'Gender', width: 80 },
+                        { label: 'DOB', width: 100 },
+                        { label: 'BM Class', width: 100 },
+                        { label: 'Prev BM Class', width: 120 },
+                        { label: 'Enrollment Date', width: 160 },
+                        { label: 'Effective From', width: 160 },
+                        { label: 'Effective To', width: 120 },
+                        { label: 'Mainstream School', width: 180 },
+                        { label: 'Mainstream Grade', width: 120 },
+                        { label: 'Parent 1 Name', width: 140 },
+                        { label: 'Parent 1 Email', width: 180 },
+                        { label: 'Parent 1 Phone', width: 120 },
+                        { label: 'Parent 1 Vol', width: 90 },
+                        { label: 'Parent 2 Name', width: 140 },
+                        { label: 'Parent 2 Email', width: 180 },
+                        { label: 'Parent 2 Phone', width: 120 },
+                        { label: 'Parent 2 Vol', width: 90 },
+                        { label: 'Books OK', width: 80 },
+                        { label: 'Stationary', width: 80 },
+                        { label: 'Books Issued', width: 80 }
+                      ] : roleFilter === 'teacher' || roleFilter === 'volunteer' ? [
+                        { label: '', width: 40 },
+                        { label: 'Actions', width: 90 },
+                        { label: 'Full Name', width: 160 },
+                        { label: 'Role', width: 90 },
+                        { label: 'Email', width: 200 },
+                        { label: 'Phone', width: 120 },
+                        { label: 'Class Stage', width: 110 },
+                        { label: 'WWC Number', width: 130 },
+                        { label: 'WWC Verified', width: 110 },
+                        { label: 'Verified Date', width: 130 },
+                        { label: 'Expiry Date', width: 130 },
+                        { label: 'Date of Birth', width: 110 },
+                        { label: 'Effective From', width: 160 },
+                        { label: 'Effective To', width: 120 }
+                      ] : roleFilter === 'parent' ? [
+                        { label: '', width: 40 },
+                        { label: 'Actions', width: 90 },
+                        { label: 'Full Name', width: 160 },
+                        { label: 'Email', width: 200 },
+                        { label: 'Phone', width: 120 },
+                        { label: 'Volunteer Interest', width: 130 },
+                        { label: 'Tagged Children', width: 250 },
+                        { label: 'Effective From', width: 160 },
+                        { label: 'Effective To', width: 120 }
+                      ] : [
+                        { label: '', width: 40 },
+                        { label: 'Actions', width: 90 },
+                        { label: 'Full Name', width: 160 },
+                        { label: 'Role', width: 90 },
+                        { label: 'Email', width: 200 },
+                        { label: 'Phone', width: 120 },
+                        { label: 'Details & Custom Fields', width: 300 },
+                        { label: 'Effective From', width: 160 },
+                        { label: 'Effective To', width: 120 }
+                      ]).map((col, idx) => (
+                        <View key={idx} style={{ width: col.width, paddingHorizontal: 8 }}>
+                          <ThemedText style={{ fontSize: 11, fontWeight: '800', color: colors.textSecondary }}>
+                            {col.label}
+                          </ThemedText>
+                        </View>
+                      ))}
+                    </View>
+
+                    {/* Body Rows */}
+                    {filteredUsers.map((u) => {
+                      const isChecked = !!selectedUserUids[u.uid];
+                      
+                      // Resolve parent details for student
+                      const parents = u.role === 'student' ? users.filter(x => x.role === 'parent' && x.associatedStudents?.includes(u.uid)) : [];
+                      const parent1 = parents[0] || null;
+                      const parent2 = parents[1] || null;
+
+                      // Badge Helper
+                      const renderBadge = (text: string, type: 'success' | 'danger' | 'primary' | 'secondary' | 'neutral') => {
+                        let bg = colors.background;
+                        let tc = colors.textSecondary;
+                        if (type === 'success') { bg = colors.successLight || 'rgba(76, 175, 80, 0.12)'; tc = colors.success || '#4CAF50'; }
+                        else if (type === 'danger') { bg = colors.dangerLight || 'rgba(244, 67, 54, 0.12)'; tc = colors.danger || '#F44336'; }
+                        else if (type === 'primary') { bg = colors.primaryLight; tc = colors.primary; }
+                        else if (type === 'secondary') { bg = colors.secondaryLight; tc = colors.secondary; }
+                        return (
+                          <View style={{ backgroundColor: bg, paddingVertical: 2, paddingHorizontal: 6, borderRadius: 4, alignSelf: 'flex-start' }}>
+                            <ThemedText style={{ fontSize: 10, fontWeight: '700', color: tc }}>{text}</ThemedText>
+                          </View>
+                        );
+                      };
+
+                      return (
+                        <View key={u.uid} style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: 8, alignItems: 'center', backgroundColor: isChecked ? colors.secondaryLight || 'rgba(33, 150, 243, 0.08)' : 'transparent' }}>
+                          
+                          {/* Checkbox (width: 40) */}
+                          <View style={{ width: 40, paddingHorizontal: 8, alignItems: 'center' }}>
+                            <Pressable
+                              onPress={() => handleToggleUserSelection(u.uid)}
+                              style={{
+                                width: 16,
+                                height: 16,
+                                borderWidth: 1.5,
+                                borderColor: isChecked ? colors.secondary : colors.border,
+                                borderRadius: 3,
+                                backgroundColor: isChecked ? colors.secondary : 'transparent',
+                                justifyContent: 'center',
+                                alignItems: 'center'
+                              }}
+                            >
+                              {isChecked && <CheckCircle size={10} color="#FFF" />}
+                            </Pressable>
+                          </View>
+
+                          {/* Actions (width: 90) */}
+                          <View style={{ width: 90, paddingHorizontal: 8, flexDirection: 'row', gap: 6 }}>
+                            <Pressable onPress={() => openEditUser(u)} style={{ padding: 5, borderRadius: 6, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border }}>
+                              <Edit size={12} color={colors.textSecondary} />
+                            </Pressable>
+                            <Pressable onPress={() => handleDeleteUser(u.uid)} style={{ padding: 5, borderRadius: 6, backgroundColor: colors.primaryLight || '#FFE5E5', borderWidth: 1, borderColor: colors.danger || '#FF4D4D' }}>
+                              <Trash2 size={12} color={colors.danger || '#FF4D4D'} />
+                            </Pressable>
+                          </View>
+
+                          {/* DYNAMIC CELLS */}
+                          {roleFilter === 'student' ? (
+                            <>
+                              {/* English Name (160) */}
+                              <View style={{ width: 160, paddingHorizontal: 8 }}>
+                                <ThemedText style={{ fontSize: 13, fontWeight: '600', color: colors.text }}>{u.fullName}</ThemedText>
+                              </View>
+                              {/* Tamil Name (140) */}
+                              <View style={{ width: 140, paddingHorizontal: 8 }}>
+                                <ThemedText style={{ fontSize: 13, color: colors.text }}>{u.fullNameTamil || '-'}</ThemedText>
+                              </View>
+                              {/* Email (200) */}
+                              <View style={{ width: 200, paddingHorizontal: 8 }}>
+                                <ThemedText numberOfLines={1} style={{ fontSize: 12, color: colors.textSecondary }}>{u.email}</ThemedText>
+                              </View>
+                              {/* Phone (120) */}
+                              <View style={{ width: 120, paddingHorizontal: 8 }}>
+                                <ThemedText style={{ fontSize: 13, color: colors.textSecondary }}>{u.phone || '-'}</ThemedText>
+                              </View>
+                              {/* Gender (80) */}
+                              <View style={{ width: 80, paddingHorizontal: 8 }}>
+                                <ThemedText style={{ fontSize: 13, color: colors.text }}>{u.gender || '-'}</ThemedText>
+                              </View>
+                              {/* DOB (100) */}
+                              <View style={{ width: 100, paddingHorizontal: 8 }}>
+                                <ThemedText style={{ fontSize: 13, color: colors.textSecondary }}>{u.dateOfBirth || '-'}</ThemedText>
+                              </View>
+                              {/* BM Class (100) */}
+                              <View style={{ width: 100, paddingHorizontal: 8 }}>
+                                <ThemedText style={{ fontSize: 13, fontWeight: '600', color: colors.secondary }}>{u.className || '-'}</ThemedText>
+                              </View>
+                              {/* Prev BM Class (120) */}
+                              <View style={{ width: 120, paddingHorizontal: 8 }}>
+                                <ThemedText style={{ fontSize: 13, color: colors.textSecondary }}>{u.prevBmSchoolClass || '-'}</ThemedText>
+                              </View>
+                              {/* Enrollment Date (160) */}
+                              <View style={{ width: 160, paddingHorizontal: 8 }}>
+                                <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>{u.studentCreated || '-'}</ThemedText>
+                              </View>
+                              {/* Effective From (160) */}
+                              <View style={{ width: 160, paddingHorizontal: 8 }}>
+                                <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>{u.effectiveFrom || '-'}</ThemedText>
+                              </View>
+                              {/* Effective To (120) */}
+                              <View style={{ width: 120, paddingHorizontal: 8 }}>
+                                <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>{u.effectiveTo || '-'}</ThemedText>
+                              </View>
+                              {/* Mainstream School (180) */}
+                              <View style={{ width: 180, paddingHorizontal: 8 }}>
+                                <ThemedText numberOfLines={1} style={{ fontSize: 13, color: colors.text }}>{u.mainstreamSchoolName || '-'}</ThemedText>
+                              </View>
+                              {/* Mainstream Grade (120) */}
+                              <View style={{ width: 120, paddingHorizontal: 8 }}>
+                                <ThemedText style={{ fontSize: 13, color: colors.text }}>{u.mainstreamSchoolClass || '-'}</ThemedText>
+                              </View>
+                              {/* Parent 1 Name (140) */}
+                              <View style={{ width: 140, paddingHorizontal: 8 }}>
+                                <ThemedText style={{ fontSize: 13, color: colors.text }}>{parent1 ? parent1.fullName : '-'}</ThemedText>
+                              </View>
+                              {/* Parent 1 Email (180) */}
+                              <View style={{ width: 180, paddingHorizontal: 8 }}>
+                                <ThemedText numberOfLines={1} style={{ fontSize: 12, color: colors.textSecondary }}>{parent1 ? parent1.email : '-'}</ThemedText>
+                              </View>
+                              {/* Parent 1 Phone (120) */}
+                              <View style={{ width: 120, paddingHorizontal: 8 }}>
+                                <ThemedText style={{ fontSize: 13, color: colors.textSecondary }}>{parent1 ? parent1.phone : '-'}</ThemedText>
+                              </View>
+                              {/* Parent 1 Vol (90) */}
+                              <View style={{ width: 90, paddingHorizontal: 8 }}>
+                                {parent1 ? renderBadge(parent1.parentVolunteer ? 'YES' : 'NO', parent1.parentVolunteer ? 'success' : 'danger') : <ThemedText style={{ color: colors.textSecondary }}>-</ThemedText>}
+                              </View>
+                              {/* Parent 2 Name (140) */}
+                              <View style={{ width: 140, paddingHorizontal: 8 }}>
+                                <ThemedText style={{ fontSize: 13, color: colors.text }}>{parent2 ? parent2.fullName : '-'}</ThemedText>
+                              </View>
+                              {/* Parent 2 Email (180) */}
+                              <View style={{ width: 180, paddingHorizontal: 8 }}>
+                                <ThemedText numberOfLines={1} style={{ fontSize: 12, color: colors.textSecondary }}>{parent2 ? parent2.email : '-'}</ThemedText>
+                              </View>
+                              {/* Parent 2 Phone (120) */}
+                              <View style={{ width: 120, paddingHorizontal: 8 }}>
+                                <ThemedText style={{ fontSize: 13, color: colors.textSecondary }}>{parent2 ? parent2.phone : '-'}</ThemedText>
+                              </View>
+                              {/* Parent 2 Vol (90) */}
+                              <View style={{ width: 90, paddingHorizontal: 8 }}>
+                                {parent2 ? renderBadge(parent2.parentVolunteer ? 'YES' : 'NO', parent2.parentVolunteer ? 'success' : 'danger') : <ThemedText style={{ color: colors.textSecondary }}>-</ThemedText>}
+                              </View>
+                              {/* Books OK (80) */}
+                              <View style={{ width: 80, paddingHorizontal: 8 }}>
+                                {renderBadge(u.okToIssueBooks || 'NO', u.okToIssueBooks === 'YES' ? 'success' : 'danger')}
+                              </View>
+                              {/* Stationary (80) */}
+                              <View style={{ width: 80, paddingHorizontal: 8 }}>
+                                {renderBadge(u.stationaryIssued || 'NO', u.stationaryIssued === 'YES' ? 'success' : 'danger')}
+                              </View>
+                              {/* Books Issued (80) */}
+                              <View style={{ width: 80, paddingHorizontal: 8 }}>
+                                {renderBadge(u.booksIssued || 'NO', u.booksIssued === 'YES' ? 'success' : 'danger')}
+                              </View>
+                            </>
+                          ) : u.role === 'teacher' || u.role === 'volunteer' ? (
+                            <>
+                              {/* Full Name (160) */}
+                              <View style={{ width: 160, paddingHorizontal: 8 }}>
+                                <ThemedText style={{ fontSize: 13, fontWeight: '600', color: colors.text }}>{u.fullName}</ThemedText>
+                              </View>
+                              {/* Role (90) */}
+                              <View style={{ width: 90, paddingHorizontal: 8 }}>
+                                {renderBadge(u.role.toUpperCase(), u.role === 'teacher' ? 'primary' : 'secondary')}
+                              </View>
+                              {/* Email (200) */}
+                              <View style={{ width: 200, paddingHorizontal: 8 }}>
+                                <ThemedText numberOfLines={1} style={{ fontSize: 12, color: colors.textSecondary }}>{u.email}</ThemedText>
+                              </View>
+                              {/* Phone (120) */}
+                              <View style={{ width: 120, paddingHorizontal: 8 }}>
+                                <ThemedText style={{ fontSize: 13, color: colors.textSecondary }}>{u.phone || '-'}</ThemedText>
+                              </View>
+                              {/* Class Stage (110) */}
+                              <View style={{ width: 110, paddingHorizontal: 8 }}>
+                                <ThemedText style={{ fontSize: 13, fontWeight: '600', color: colors.primary }}>{u.stage || '-'}</ThemedText>
+                              </View>
+                              {/* WWC Number (130) */}
+                              <View style={{ width: 130, paddingHorizontal: 8 }}>
+                                <ThemedText style={{ fontSize: 12, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', color: colors.text }}>{u.wwcNumber || '-'}</ThemedText>
+                              </View>
+                              {/* WWC Verified (110) */}
+                              <View style={{ width: 110, paddingHorizontal: 8 }}>
+                                {renderBadge(u.wwcVerified ? 'VERIFIED' : 'PENDING', u.wwcVerified ? 'success' : 'danger')}
+                              </View>
+                              {/* Verified Date (130) */}
+                              <View style={{ width: 130, paddingHorizontal: 8 }}>
+                                <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>{u.wwcVerifiedDate || '-'}</ThemedText>
+                              </View>
+                              {/* Expiry Date (130) */}
+                              <View style={{ width: 130, paddingHorizontal: 8 }}>
+                                <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>{u.wwcExpiryDate || '-'}</ThemedText>
+                              </View>
+                              {/* Date of Birth (110) */}
+                              <View style={{ width: 110, paddingHorizontal: 8 }}>
+                                <ThemedText style={{ fontSize: 13, color: colors.textSecondary }}>{u.dob || '-'}</ThemedText>
+                              </View>
+                              {/* Effective From (160) */}
+                              <View style={{ width: 160, paddingHorizontal: 8 }}>
+                                <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>{u.effectiveFrom || '-'}</ThemedText>
+                              </View>
+                              {/* Effective To (120) */}
+                              <View style={{ width: 120, paddingHorizontal: 8 }}>
+                                <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>{u.effectiveTo || '-'}</ThemedText>
+                              </View>
+                            </>
+                          ) : u.role === 'parent' ? (
+                            <>
+                              {/* Full Name (160) */}
+                              <View style={{ width: 160, paddingHorizontal: 8 }}>
+                                <ThemedText style={{ fontSize: 13, fontWeight: '600', color: colors.text }}>{u.fullName}</ThemedText>
+                              </View>
+                              {/* Email (200) */}
+                              <View style={{ width: 200, paddingHorizontal: 8 }}>
+                                <ThemedText numberOfLines={1} style={{ fontSize: 12, color: colors.textSecondary }}>{u.email}</ThemedText>
+                              </View>
+                              {/* Phone (120) */}
+                              <View style={{ width: 120, paddingHorizontal: 8 }}>
+                                <ThemedText style={{ fontSize: 13, color: colors.textSecondary }}>{u.phone || '-'}</ThemedText>
+                              </View>
+                              {/* Volunteer Interest (130) */}
+                              <View style={{ width: 130, paddingHorizontal: 8 }}>
+                                {renderBadge(u.parentVolunteer ? 'VOLUNTEER' : 'NONE', u.parentVolunteer ? 'success' : 'neutral')}
+                              </View>
+                              {/* Tagged Children (250) */}
+                              <View style={{ width: 250, paddingHorizontal: 8 }}>
+                                <ThemedText numberOfLines={1} style={{ fontSize: 12, color: colors.secondary, fontWeight: '600' }}>
+                                  {u.associatedStudents && u.associatedStudents.length > 0 
+                                    ? u.associatedStudents.map((sId: string) => users.find(x => x.uid === sId)?.fullName || sId).join(', ')
+                                    : 'None'}
+                                </ThemedText>
+                              </View>
+                              {/* Effective From (160) */}
+                              <View style={{ width: 160, paddingHorizontal: 8 }}>
+                                <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>{u.effectiveFrom || '-'}</ThemedText>
+                              </View>
+                              {/* Effective To (120) */}
+                              <View style={{ width: 120, paddingHorizontal: 8 }}>
+                                <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>{u.effectiveTo || '-'}</ThemedText>
+                              </View>
+                            </>
+                          ) : (
+                            <>
+                              {/* Full Name (160) */}
+                              <View style={{ width: 160, paddingHorizontal: 8 }}>
+                                <ThemedText style={{ fontSize: 13, fontWeight: '600', color: colors.text }}>{u.fullName}</ThemedText>
+                              </View>
+                              {/* Role (90) */}
+                              <View style={{ width: 90, paddingHorizontal: 8 }}>
+                                {renderBadge(u.role.toUpperCase(), u.role === 'admin' ? 'primary' : 'neutral')}
+                              </View>
+                              {/* Email (200) */}
+                              <View style={{ width: 200, paddingHorizontal: 8 }}>
+                                <ThemedText numberOfLines={1} style={{ fontSize: 12, color: colors.textSecondary }}>{u.email}</ThemedText>
+                              </View>
+                              {/* Phone (120) */}
+                              <View style={{ width: 120, paddingHorizontal: 8 }}>
+                                <ThemedText style={{ fontSize: 13, color: colors.textSecondary }}>{u.phone || '-'}</ThemedText>
+                              </View>
+                              {/* Details Summary (300) */}
+                              <View style={{ width: 300, paddingHorizontal: 8 }}>
+                                <ThemedText numberOfLines={1} style={{ fontSize: 12, color: colors.textSecondary }}>
+                                  {u.role === 'student' ? `Class: ${u.className || '-'} | Mainstream: ${u.mainstreamSchoolName || '-'}` 
+                                    : u.role === 'teacher' || u.role === 'volunteer' ? `Stage: ${u.stage || '-'} | WWC: ${u.wwcNumber || '-'}`
+                                    : u.role === 'parent' ? `Children: ${u.associatedStudents?.length || 0}`
+                                    : 'System Administrator'}
+                                </ThemedText>
+                              </View>
+                              {/* Effective From (160) */}
+                              <View style={{ width: 160, paddingHorizontal: 8 }}>
+                                <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>{u.effectiveFrom || '-'}</ThemedText>
+                              </View>
+                              {/* Effective To (120) */}
+                              <View style={{ width: 120, paddingHorizontal: 8 }}>
+                                <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>{u.effectiveTo || '-'}</ThemedText>
+                              </View>
+                            </>
+                          )}
+                        </View>
+                      );
+                    })}
+                  </View>
+                </ScrollView>
+              </ScrollView>
+            </View>
+          )}
+        </View>
+      ) : subTab === 'classes' ? (
+        /* CLASSES SUB-TAB */
+        <View style={{ flex: 1 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.two }}>
+            <ThemedText style={{ fontSize: 14, fontWeight: '700' }}>Active School Classrooms</ThemedText>
+            <Pressable
+              onPress={openAddClass}
+              style={({ pressed }) => [
+                { backgroundColor: colors.primary, flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, gap: 4 },
+                { opacity: pressed ? 0.9 : 1 }
+              ]}
+            >
+              <Plus size={14} color="#FFF" />
+              <ThemedText style={{ color: '#FFF', fontSize: 12, fontWeight: '700' }}>Create Class</ThemedText>
+            </Pressable>
+          </View>
+
+          <ScrollView style={{ flex: 1 }}>
+            <View style={{ gap: Spacing.two }}>
+              {classes.map((c) => {
+                const teacherNames = c.teacherIds && c.teacherIds.length > 0
+                  ? c.teacherIds.map((id: string) => users.find((x: any) => x.uid === id)?.fullName).filter(Boolean).join(', ')
+                  : (users.find((x: any) => x.uid === c.teacherId)?.fullName || 'Not assigned');
+                return (
+                  <View key={c.classId} style={[{ padding: 16, borderRadius: 12, borderWidth: 1, backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                      <View>
+                        <ThemedText style={{ fontSize: 16, fontWeight: '700', color: colors.primary }}>{c.className}</ThemedText>
+                        <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>
+                          👨‍🏫 Teachers: <ThemedText style={{ fontWeight: '700', color: colors.text }}>{teacherNames}</ThemedText>
+                        </ThemedText>
+                      </View>
+                      
+                      <View style={{ flexDirection: 'row', gap: 8 }}>
+                        <Pressable onPress={() => openEditClass(c)} style={{ padding: 8, borderRadius: 8, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border }}>
+                          <Edit size={16} color={colors.textSecondary} />
+                        </Pressable>
+                        <Pressable onPress={() => handleDeleteClass(c.classId)} style={{ padding: 8, borderRadius: 8, backgroundColor: colors.primaryLight || '#FFE5E5', borderWidth: 1, borderColor: colors.danger || '#FF4D4D' }}>
+                          <Trash2 size={16} color={colors.danger || '#FF4D4D'} />
+                        </Pressable>
+                      </View>
+                    </View>
+
+                    {/* Enrolled details */}
+                    <View style={{ flexDirection: 'row', gap: 20, borderTopWidth: 1, borderColor: colors.border, paddingTop: 10 }}>
+                      <View style={{ flex: 1 }}>
+                        <ThemedText style={{ fontSize: 12, fontWeight: '700', color: colors.secondary, marginBottom: 4 }}>
+                          Students ({c.studentIds?.length || 0})
+                        </ThemedText>
+                        <ThemedText style={{ fontSize: 11, color: colors.text }}>
+                          {c.studentIds && c.studentIds.length > 0
+                            ? c.studentIds.map((sId: string) => users.find(x => x.uid === sId)?.fullName || sId).join(', ')
+                            : 'None'
+                          }
+                        </ThemedText>
+                      </View>
+                      
+                      <View style={{ flex: 1 }}>
+                        <ThemedText style={{ fontSize: 12, fontWeight: '700', color: colors.accent, marginBottom: 4 }}>
+                          Volunteers ({c.volunteerIds?.length || 0})
+                        </ThemedText>
+                        <ThemedText style={{ fontSize: 11, color: colors.text }}>
+                          {c.volunteerIds && c.volunteerIds.length > 0
+                            ? c.volunteerIds.map((vId: string) => users.find(x => x.uid === vId)?.fullName || vId).join(', ')
+                            : 'None'
+                          }
+                        </ThemedText>
+                      </View>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          </ScrollView>
+        </View>
+      ) : subTab === 'calendar' ? (
+        /* CALENDAR SUB-TAB */
+        <View style={{ flex: 1 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.two, flexWrap: 'wrap', gap: 6 }}>
+            <View>
+              <ThemedText style={{ fontSize: 15, fontWeight: '700' }}>School Attendance Sessions Calendar / பள்ளி நாட்காட்டி</ThemedText>
+              <ThemedText style={{ fontSize: 11, color: colors.textSecondary }}>Define school session dates, repeat schedules, and manage holiday overrides.</ThemedText>
+            </View>
+            <Pressable
+              onPress={() => setCustomDateModalVisible(true)}
+              style={({ pressed }) => [
+                { backgroundColor: colors.secondary, flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, gap: 4 },
+                { opacity: pressed ? 0.9 : 1 }
+              ]}
+            >
+              <Plus size={14} color="#FFF" />
+              <ThemedText style={{ color: '#FFF', fontSize: 12, fontWeight: '700' }}>Add Ad-hoc Date</ThemedText>
+            </Pressable>
+          </View>
+
+          <View style={{ flexDirection: isLargeScreen ? 'row' : 'column', gap: Spacing.three, flex: 1, marginTop: 4 }}>
+            {/* Date Generator Form Card */}
+            <View style={[{ padding: 16, borderRadius: 16, borderWidth: 1, backgroundColor: colors.cardBg, borderColor: colors.border, width: isLargeScreen ? '35%' : '100%', height: 'auto', gap: Spacing.two }]}>
+              <ThemedText style={{ fontSize: 14, fontWeight: '700', color: colors.primary }}>📅 Term Dates Schedule Generator</ThemedText>
+              
+              <View style={{ gap: Spacing.two, marginTop: 4 }}>
+                <View style={{ flexDirection: 'row', gap: Spacing.two }}>
+                  <View style={{ flex: 1 }}>
+                    <ThemedText style={{ fontSize: 11, fontWeight: '600', marginBottom: 2 }}>Year</ThemedText>
+                    <TextInput
+                      style={[styles.formInput, { color: colors.text, borderColor: colors.border, padding: 8 }]}
+                      value={genYear}
+                      onChangeText={setGenYear}
+                      placeholder="2026"
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <ThemedText style={{ fontSize: 11, fontWeight: '600', marginBottom: 2 }}>School Term</ThemedText>
+                    <TextInput
+                      style={[styles.formInput, { color: colors.text, borderColor: colors.border, padding: 8 }]}
+                      value={genTerm}
+                      onChangeText={setGenTerm}
+                      placeholder="1-4"
+                    />
+                  </View>
+                </View>
+
+                <View>
+                  <ThemedText style={{ fontSize: 11, fontWeight: '600', marginBottom: 4 }}>Repeating Pattern</ThemedText>
+                  <View style={{ flexDirection: 'row', gap: 6 }}>
+                    {[
+                      { key: 'saturdays', label: 'Saturdays only' },
+                      { key: 'weekdays', label: 'Mon to Fri Weekdays' }
+                    ].map((p) => {
+                      const isSel = genPattern === p.key;
+                      return (
+                        <Pressable
+                          key={p.key}
+                          onPress={() => setGenPattern(p.key as any)}
+                          style={[
+                            { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, flex: 1, alignItems: 'center' },
+                            isSel ? { backgroundColor: colors.primary, borderColor: colors.primary } : { backgroundColor: 'transparent', borderColor: colors.border }
+                          ]}
+                        >
+                          <ThemedText style={{ color: isSel ? '#FFF' : colors.text, fontSize: 11, fontWeight: '700' }}>
+                            {p.label}
+                          </ThemedText>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
+
+                <View style={{ flexDirection: 'row', gap: Spacing.two }}>
+                  <View style={{ flex: 1 }}>
+                    <ThemedText style={{ fontSize: 11, fontWeight: '600', marginBottom: 2 }}>Start Date</ThemedText>
+                    <TextInput
+                      style={[styles.formInput, { color: colors.text, borderColor: colors.border, padding: 8 }]}
+                      value={genStartDate}
+                      onChangeText={setGenStartDate}
+                      placeholder="YYYY-MM-DD"
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <ThemedText style={{ fontSize: 11, fontWeight: '600', marginBottom: 2 }}>End Date</ThemedText>
+                    <TextInput
+                      style={[styles.formInput, { color: colors.text, borderColor: colors.border, padding: 8 }]}
+                      value={genEndDate}
+                      onChangeText={setGenEndDate}
+                      placeholder="YYYY-MM-DD"
+                    />
+                  </View>
+                </View>
+
+                <Pressable
+                  onPress={handleGenerateCalendar}
+                  style={({ pressed }) => [
+                    { backgroundColor: colors.primary, borderRadius: 10, paddingVertical: 10, alignItems: 'center', justifyContent: 'center', marginTop: 8 },
+                    { opacity: pressed ? 0.9 : 1 }
+                  ]}
+                >
+                  <ThemedText style={{ color: '#FFF', fontWeight: '700', fontSize: 13 }}>⚙️ Generate Term Schedule</ThemedText>
+                </Pressable>
+              </View>
+            </View>
+
+            {/* School Session Dates Grid List */}
+            <View style={{ flex: 1, maxHeight: 420 }}>
+              <ThemedText style={{ fontSize: 13, fontWeight: '700', marginBottom: 8 }}>Generated Session Days ({schoolDates.length})</ThemedText>
+              {schoolDates.length === 0 ? (
+                <ThemedText style={{ fontStyle: 'italic', color: colors.textSecondary }}>No dates generated yet.</ThemedText>
+              ) : (
+                <ScrollView style={{ flex: 1 }}>
+                  <View style={{ gap: 8 }}>
+                    {schoolDates.map((sd) => {
+                      return (
+                        <View key={sd.dateId} style={[{ padding: 10, borderRadius: 10, borderWidth: 1, backgroundColor: colors.cardBg, borderColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap', flex: 1 }}>
+                            <ThemedText style={{ fontSize: 14, fontWeight: '700', textDecorationLine: sd.isHoliday ? 'line-through' : 'none', color: sd.isHoliday ? colors.danger : colors.text }}>
+                              📅 {sd.date}
+                            </ThemedText>
+                            <View style={{ backgroundColor: sd.isHoliday ? colors.danger + '15' : colors.primaryLight, paddingVertical: 2, paddingHorizontal: 6, borderRadius: 4 }}>
+                              <ThemedText style={{ fontSize: 9, fontWeight: '700', color: sd.isHoliday ? colors.danger : colors.primary }}>
+                                {sd.isHoliday ? `HOLIDAY: ${sd.holidayName || 'Break'}` : `TERM ${sd.term} SESSION`}
+                              </ThemedText>
+                            </View>
+                            {sd.customAdded && (
+                              <View style={{ backgroundColor: colors.secondaryLight, paddingVertical: 2, paddingHorizontal: 6, borderRadius: 4 }}>
+                                <ThemedText style={{ fontSize: 9, fontWeight: '700', color: colors.secondary }}>
+                                  AD-HOC
+                                </ThemedText>
+                              </View>
+                            )}
+                          </View>
+
+                          <Pressable
+                            onPress={() => {
+                              setHolidayDateId(sd.dateId);
+                              setIsHolidayStatus(!sd.isHoliday);
+                              setHolidayName(sd.holidayName || '');
+                              setHolidayModalVisible(true);
+                            }}
+                            style={[
+                              { paddingVertical: 4, paddingHorizontal: 10, borderRadius: 6, borderWidth: 1 },
+                              sd.isHoliday 
+                                ? { backgroundColor: colors.secondaryLight, borderColor: colors.secondary } 
+                                : { backgroundColor: colors.danger + '10', borderColor: colors.danger }
+                            ]}
+                          >
+                            <ThemedText style={{ fontSize: 10, fontWeight: '700', color: sd.isHoliday ? colors.secondary : colors.danger }}>
+                              {sd.isHoliday ? 'Activate Session' : 'Mark Holiday Override'}
+                            </ThemedText>
+                          </Pressable>
+                        </View>
+                      );
+                    })}
+                  </View>
+                </ScrollView>
+              )}
+            </View>
+          </View>
+        </View>
+      ) : (
+        /* IMPORT_EXPORT SUB-TAB */
+        <View style={{ flex: 1, gap: Spacing.three }}>
+          <View style={{ flexDirection: 'row', gap: Spacing.two, borderBottomWidth: 1, borderColor: colors.border, paddingBottom: 10 }}>
+            <ThemedText style={{ fontSize: 16, fontWeight: '800', color: colors.primary }}>📤 Spreadsheet Bulk Utilities / விரிதாள் தரவு மேலாண்மை</ThemedText>
+          </View>
+
+          <View style={{ flexDirection: isLargeScreen ? 'row' : 'column', gap: Spacing.three, flex: 1 }}>
+            
+            {/* LEFT SECTION: IMPORT BOARD */}
+            <View style={[{ padding: 20, borderRadius: 16, borderWidth: 1, backgroundColor: colors.cardBg, borderColor: colors.border, flex: 1, gap: 12 }]}>
+              <ThemedText style={{ fontSize: 15, fontWeight: '700', color: colors.primary }}>📂 Bulk Import Data / தொகுதி இறக்குமதி</ThemedText>
+              
+              {/* Role Select Pills */}
+              <View style={{ flexDirection: 'row', gap: 6 }}>
+                {[
+                  { key: 'student', label: 'Students & Parents' },
+                  { key: 'teacher', label: 'Teachers' },
+                  { key: 'volunteer', label: 'Volunteers' }
+                ].map(r => {
+                  const isSel = importRole === r.key;
+                  return (
+                    <Pressable
+                      key={r.key}
+                      onPress={() => {
+                        setImportRole(r.key as any);
+                        setImportText('');
+                      }}
+                      style={[
+                        { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, flex: 1, alignItems: 'center' },
+                        isSel ? { backgroundColor: colors.primary, borderColor: colors.primary } : { backgroundColor: 'transparent', borderColor: colors.border }
+                      ]}
+                    >
+                      <ThemedText style={{ color: isSel ? '#FFF' : colors.text, fontSize: 11, fontWeight: '700' }}>{r.label}</ThemedText>
+                    </Pressable>
+                  );
+                })}
+              </View>
+
+              {/* Guidance Alert explaining the exact headers */}
+              <View style={{ backgroundColor: colors.background, padding: 10, borderRadius: 10, borderWidth: 1, borderColor: colors.border, gap: 4 }}>
+                <ThemedText style={{ fontSize: 11, fontWeight: '700', color: colors.secondary }}>💡 Expected Column Headers:</ThemedText>
+                <ThemedText style={{ fontSize: 10, color: colors.textSecondary, fontFamily: Platform.OS === 'web' ? 'monospace' : 'default' }}>
+                  {importRole === 'student'
+                    ? 'school_code, year, student_id, student_email, given_name, family_name, full_name_tamil, gender, DATE_OF_BIRTH, class_name, mainstream_school_name, mainstream_school_class, parent1_name, parent1_email, parent1_mobile, parent1_volunteer, parent2_name, parent2_email, parent2_mobile, parent2_volunteer'
+                    : 'id, school_code, name, stage, WWC, dob, WWC_verified, email, mobile_no, WWC_verified_Date, WWC_expiry_date'
+                  }
+                </ThemedText>
+                <ThemedText style={{ fontSize: 10, color: colors.textSecondary, fontStyle: 'italic', marginTop: 4 }}>
+                  * TSV (Excel copy-paste) and CSV file formats supported. Existing parent emails are auto-merged (siblings) and classes enrolled automatically.
+                </ThemedText>
+              </View>
+
+              {/* Import Text area & Upload Button */}
+              <View style={{ gap: 6 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <ThemedText style={{ fontSize: 11, fontWeight: '700' }}>Paste Spreadsheet Cells or Upload File:</ThemedText>
+                  <Pressable
+                    onPress={triggerFileUpload}
+                    style={{ backgroundColor: colors.secondaryLight, borderWidth: 1, borderColor: colors.secondary, paddingVertical: 4, paddingHorizontal: 10, borderRadius: 6 }}
+                  >
+                    <ThemedText style={{ fontSize: 10, fontWeight: '700', color: colors.secondary }}>📁 Choose File (.csv, .txt)</ThemedText>
+                  </Pressable>
+                </View>
+
+                <TextInput
+                  style={[styles.formTextArea, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background, minHeight: 120, fontSize: 11, fontFamily: Platform.OS === 'web' ? 'monospace' : 'default' }]}
+                  multiline
+                  placeholder="Paste rows copied from your Excel/Google spreadsheet here..."
+                  placeholderTextColor={colors.textSecondary}
+                  value={importText}
+                  onChangeText={setImportText}
+                />
+              </View>
+
+              {importError ? (
+                <ThemedText style={{ fontSize: 11, color: colors.danger, fontWeight: '700' }}>❌ {importError}</ThemedText>
+              ) : null}
+
+              {importPreview.length > 0 ? (
+                <View style={{ gap: 6 }}>
+                  <ThemedText style={{ fontSize: 12, fontWeight: '700', color: colors.secondary }}>
+                    👀 Ready to Import: {importPreview.length} record(s) parsed
+                  </ThemedText>
+                  {/* Small Preview Grid */}
+                  <ScrollView horizontal style={{ maxHeight: 110, borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 6, backgroundColor: colors.background }}>
+                    <View style={{ gap: 4 }}>
+                      {importPreview.slice(0, 5).map((rec, idx) => (
+                        <View key={idx} style={{ flexDirection: 'row', gap: 10 }}>
+                          <ThemedText style={{ fontSize: 10, fontWeight: '700', width: 120 }} numberOfLines={1}>👤 {rec.fullName}</ThemedText>
+                          <ThemedText style={{ fontSize: 10, color: colors.textSecondary, width: 180 }} numberOfLines={1}>✉️ {rec.email}</ThemedText>
+                          <ThemedText style={{ fontSize: 10, color: colors.primary, fontWeight: '700' }}>🏫 {rec.className || rec.stage || 'General'}</ThemedText>
+                        </View>
+                      ))}
+                      {importPreview.length > 5 && (
+                        <ThemedText style={{ fontSize: 9, color: colors.textSecondary, fontStyle: 'italic' }}>
+                          ...and {importPreview.length - 5} more records.
+                        </ThemedText>
+                      )}
+                    </View>
+                  </ScrollView>
+
+                  <Pressable
+                    onPress={handleExecuteImport}
+                    disabled={importing}
+                    style={({ pressed }) => [
+                      { backgroundColor: colors.primary, paddingVertical: 10, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
+                      { opacity: pressed || importing ? 0.9 : 1 }
+                    ]}
+                  >
+                    {importing ? (
+                      <ActivityIndicator size="small" color="#FFF" />
+                    ) : (
+                      <ThemedText style={{ color: '#FFF', fontWeight: '700', fontSize: 13 }}>🚀 Confirm & Execute Import</ThemedText>
+                    )}
+                  </Pressable>
+                </View>
+              ) : null}
+
+              {/* Logs output console */}
+              {importLogs.length > 0 && (
+                <View style={{ gap: 4, marginTop: 4 }}>
+                  <ThemedText style={{ fontSize: 11, fontWeight: '700', color: colors.text }}>⚙️ Execution Logs Console:</ThemedText>
+                  <ScrollView style={{ height: 110, backgroundColor: '#1e1e1e', borderRadius: 10, padding: 8, borderWidth: 1, borderColor: '#333' }}>
+                    {importLogs.map((log, idx) => (
+                      <ThemedText key={idx} style={{ color: log.startsWith('❌') ? '#ff6b6b' : log.startsWith('⚠️') ? '#ffd23f' : log.startsWith('✅') ? '#51cf66' : '#dcdcdc', fontSize: 10, fontFamily: Platform.OS === 'web' ? 'monospace' : 'default', marginBottom: 2 }}>
+                        {log}
+                      </ThemedText>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+            </View>
+
+            {/* RIGHT SECTION: EXPORT BOARD */}
+            <View style={[{ padding: 20, borderRadius: 16, borderWidth: 1, backgroundColor: colors.cardBg, borderColor: colors.border, width: isLargeScreen ? '40%' : '100%', height: 'auto', gap: 16 }]}>
+              <ThemedText style={{ fontSize: 15, fontWeight: '700', color: colors.primary }}>📤 Bulk Export Data / தொகுதி ஏற்றுமதி</ThemedText>
+              <ThemedText style={{ fontSize: 11, color: colors.textSecondary }}>Download the current database collections as Excel-compatible tab-separated spreadsheets matching the official school database schema structures.</ThemedText>
+              
+              <View style={{ gap: 10, marginTop: 4 }}>
+                {[
+                  { label: 'Export Student Directory', desc: 'Students, mainstream details & parent linkages', onExport: handleExportStudents },
+                  { label: 'Export Teacher Directory', desc: 'Teachers, WWC details & stage roles', onExport: () => handleExportStaff('teacher') },
+                  { label: 'Export Volunteer Directory', desc: 'Volunteers, WWC verification & stages', onExport: () => handleExportStaff('volunteer') }
+                ].map((item, idx) => (
+                  <View key={idx} style={{ padding: 12, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background, gap: 4 }}>
+                    <ThemedText style={{ fontSize: 12, fontWeight: '700' }}>{item.label}</ThemedText>
+                    <ThemedText style={{ fontSize: 10, color: colors.textSecondary, marginBottom: 4 }}>{item.desc}</ThemedText>
+                    <Pressable
+                      onPress={item.onExport}
+                      style={({ pressed }) => [
+                        { backgroundColor: colors.secondary, paddingVertical: 6, borderRadius: 8, alignItems: 'center' },
+                        { opacity: pressed ? 0.9 : 1 }
+                      ]}
+                    >
+                      <ThemedText style={{ color: '#FFF', fontSize: 11, fontWeight: '700' }}>📥 Export Spreadsheet</ThemedText>
+                    </Pressable>
+                  </View>
+                ))}
+              </View>
+            </View>
+
+          </View>
+        </View>
+      )}
+
+      {/* ==================== USER MODAL FORM ==================== */}
+      <UserModal
+        visible={userModalVisible}
+        onClose={() => setUserModalVisible(false)}
+        editingUser={editingUser}
+        users={users}
+        colors={colors}
+        t={t}
+        showToast={showToast}
+        onSaveSuccess={refreshData}
+      />
+
+      {/* ==================== CLASS MODAL FORM ==================== */}
+      <Modal visible={classModalVisible} transparent animationType="slide">
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: Spacing.two }}>
+          <View style={[styles.driveModalContainer, { backgroundColor: colors.cardBg, borderColor: colors.border, width: '100%', maxWidth: 500, height: '85%' }]}>
+            <View style={styles.driveModalHeader}>
+              <ThemedText style={styles.driveModalTitle}>{editingClass ? 'Configure Classroom' : 'Initialize Classroom'}</ThemedText>
+              <Pressable onPress={() => setClassModalVisible(false)} style={{ padding: 4 }}>
+                <X size={20} color={colors.textSecondary} />
+              </Pressable>
+            </View>
+
+            <ScrollView style={{ padding: Spacing.two }} contentContainerStyle={{ gap: Spacing.two }}>
+              <View style={styles.formGroup}>
+                <ThemedText style={styles.formLabel}>Class Name / வகுப்பறைப் பெயர்</ThemedText>
+                <TextInput
+                  style={[styles.formInput, { color: colors.text, borderColor: colors.border }]}
+                  value={classNameInput}
+                  onChangeText={setClassNameInput}
+                  placeholder="e.g. Standard 3 - A (Tamil Advanced)"
+                  placeholderTextColor={colors.textSecondary}
+                />
+              </View>
+
+               {/* SELECT TEACHERS */}
+               <View style={styles.formGroup}>
+                 <ThemedText style={styles.formLabel}>Assign Class Teachers / ஆசிரியர்கள்</ThemedText>
+                 <ScrollView style={{ maxHeight: 100, borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 8, marginTop: 4 }}>
+                   {users.filter(u => u.role === 'teacher').map(t => {
+                     const isSel = classTeacherIds.includes(t.uid);
+                     return (
+                       <Pressable
+                         key={t.uid}
+                         onPress={() => {
+                           setClassTeacherIds(prev =>
+                             prev.includes(t.uid) ? prev.filter(id => id !== t.uid) : [...prev, t.uid]
+                           );
+                         }}
+                         style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 6, gap: 8 }}
+                       >
+                         <View style={{ width: 16, height: 16, borderWidth: 2, borderColor: colors.primary, borderRadius: 3, backgroundColor: isSel ? colors.primary : 'transparent', justifyContent: 'center', alignItems: 'center' }}>
+                           {isSel && <View style={{ width: 8, height: 8, borderRadius: 1, backgroundColor: '#FFF' }} />}
+                         </View>
+                         <ThemedText style={{ fontSize: 13 }}>{t.fullName}</ThemedText>
+                       </Pressable>
+                     );
+                   })}
+                 </ScrollView>
+               </View>
+
+              {/* SELECT VOLUNTEERS */}
+              <View style={styles.formGroup}>
+                <ThemedText style={styles.formLabel}>Assign Volunteers / உதவியாளர்கள்</ThemedText>
+                <ScrollView style={{ maxHeight: 100, borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 8, marginTop: 4 }}>
+                  {users.filter(u => u.role === 'volunteer').map(v => {
+                    const isSel = classVolunteers.includes(v.uid);
+                    return (
+                      <Pressable
+                        key={v.uid}
+                        onPress={() => {
+                          setClassVolunteers(prev => 
+                            prev.includes(v.uid) ? prev.filter(id => id !== v.uid) : [...prev, v.uid]
+                          );
+                        }}
+                        style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 6, gap: 8 }}
+                      >
+                        <View style={{ width: 16, height: 16, borderWidth: 2, borderColor: colors.accent, borderRadius: 3, backgroundColor: isSel ? colors.accent : 'transparent', justifyContent: 'center', alignItems: 'center' }}>
+                          {isSel && <CheckCircle size={10} color="#FFF" />}
+                        </View>
+                        <ThemedText style={{ fontSize: 13 }}>{v.fullName}</ThemedText>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+
+              {/* SELECT STUDENTS */}
+              <View style={styles.formGroup}>
+                <ThemedText style={styles.formLabel}>Enroll Students / மாணவர்கள் சேர்க்கை</ThemedText>
+                <ScrollView style={{ maxHeight: 150, borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 8, marginTop: 4 }}>
+                  {users.filter(u => u.role === 'student').map(s => {
+                    const isSel = classStudents.includes(s.uid);
+                    return (
+                      <Pressable
+                        key={s.uid}
+                        onPress={() => {
+                          setClassStudents(prev => 
+                            prev.includes(s.uid) ? prev.filter(id => id !== s.uid) : [...prev, s.uid]
+                          );
+                        }}
+                        style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 6, gap: 8 }}
+                      >
+                        <View style={{ width: 16, height: 16, borderWidth: 2, borderColor: colors.secondary, borderRadius: 3, backgroundColor: isSel ? colors.secondary : 'transparent', justifyContent: 'center', alignItems: 'center' }}>
+                          {isSel && <CheckCircle size={10} color="#FFF" />}
+                        </View>
+                        <ThemedText style={{ fontSize: 13 }}>{s.fullName}</ThemedText>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            </ScrollView>
+
+            <View style={styles.driveModalFooter}>
+              <Pressable onPress={() => setClassModalVisible(false)} style={[styles.formCancelButton, { borderColor: colors.border }]}>
+                <ThemedText>Cancel</ThemedText>
+              </Pressable>
+              <Pressable onPress={handleSaveClass} style={[styles.formSubmitButton, { backgroundColor: colors.primary }]}>
+                <ThemedText style={{ color: '#FFF', fontWeight: '700' }}>Save Class</ThemedText>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ==================== HOLIDAY OVERRIDE MODAL ==================== */}
+      <Modal visible={holidayModalVisible} transparent animationType="fade">
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: Spacing.two }}>
+          <View style={[styles.driveModalContainer, { backgroundColor: colors.cardBg, borderColor: colors.border, width: '90%', maxWidth: 400 }]}>
+            <View style={styles.driveModalHeader}>
+              <ThemedText style={styles.driveModalTitle}>{isHolidayStatus ? 'Mark Holiday Override' : 'Reinstate Session Day'}</ThemedText>
+              <Pressable onPress={() => setHolidayModalVisible(false)} style={{ padding: 4 }}>
+                <X size={20} color={colors.textSecondary} />
+              </Pressable>
+            </View>
+
+            <View style={{ padding: Spacing.three, gap: Spacing.three }}>
+              {isHolidayStatus ? (
+                <View style={styles.formGroup}>
+                  <ThemedText style={styles.formLabel}>Holiday Label / விடுமுறைப் பெயர் (e.g. Queen's Birthday Break)</ThemedText>
+                  <TextInput
+                    style={[styles.formInput, { color: colors.text, borderColor: colors.border, marginTop: 6 }]}
+                    value={holidayName}
+                    onChangeText={setHolidayName}
+                    placeholder="e.g. Term 2 Break / King's Birthday"
+                    placeholderTextColor={colors.textSecondary}
+                  />
+                </View>
+              ) : (
+                <ThemedText style={{ fontSize: 13 }}>Are you sure you want to reinstate 📅 {holidayDateId} as an active Balar Malar school day?</ThemedText>
+              )}
+
+              <View style={[styles.driveModalFooter, { paddingHorizontal: 0, marginTop: 10 }]}>
+                <Pressable onPress={() => setHolidayModalVisible(false)} style={[styles.formCancelButton, { borderColor: colors.border }]}>
+                  <ThemedText>Cancel</ThemedText>
+                </Pressable>
+                <Pressable onPress={handleSaveHolidayOverride} style={[styles.formSubmitButton, { backgroundColor: isHolidayStatus ? colors.danger : colors.primary }]}>
+                  <ThemedText style={{ color: '#FFF', fontWeight: '700' }}>
+                    {isHolidayStatus ? 'Mark Holiday' : 'Reinstate Day'}
+                  </ThemedText>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ==================== CUSTOM AD-HOC DATE MODAL ==================== */}
+      <Modal visible={customDateModalVisible} transparent animationType="fade">
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: Spacing.two }}>
+          <View style={[styles.driveModalContainer, { backgroundColor: colors.cardBg, borderColor: colors.border, width: '90%', maxWidth: 400 }]}>
+            <View style={styles.driveModalHeader}>
+              <ThemedText style={styles.driveModalTitle}>Add Custom Ad-hoc Session Day</ThemedText>
+              <Pressable onPress={() => setCustomDateModalVisible(false)} style={{ padding: 4 }}>
+                <X size={20} color={colors.textSecondary} />
+              </Pressable>
+            </View>
+
+            <View style={{ padding: Spacing.three, gap: Spacing.three }}>
+              <View style={styles.formGroup}>
+                <ThemedText style={styles.formLabel}>Custom Date / வகுப்பு நாள் (YYYY-MM-DD)</ThemedText>
+                <TextInput
+                  style={[styles.formInput, { color: colors.text, borderColor: colors.border, marginTop: 6 }]}
+                  value={customDateVal}
+                  onChangeText={setCustomDateVal}
+                  placeholder="YYYY-MM-DD"
+                  placeholderTextColor={colors.textSecondary}
+                />
+              </View>
+
+              <View style={styles.formGroup}>
+                <ThemedText style={styles.formLabel}>School Term (1 to 4)</ThemedText>
+                <TextInput
+                  style={[styles.formInput, { color: colors.text, borderColor: colors.border, marginTop: 6 }]}
+                  value={customDateTerm}
+                  onChangeText={setCustomDateTerm}
+                  placeholder="2"
+                  placeholderTextColor={colors.textSecondary}
+                />
+              </View>
+
+              <View style={[styles.driveModalFooter, { paddingHorizontal: 0, marginTop: 10 }]}>
+                <Pressable onPress={() => setCustomDateModalVisible(false)} style={[styles.formCancelButton, { borderColor: colors.border }]}>
+                  <ThemedText>Cancel</ThemedText>
+                </Pressable>
+                <Pressable onPress={handleAddCustomDate} style={[styles.formSubmitButton, { backgroundColor: colors.primary }]}>
+                  <ThemedText style={{ color: '#FFF', fontWeight: '700' }}>Add Session Date</ThemedText>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+    </View>
+  );
+}

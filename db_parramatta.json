@@ -1,0 +1,247 @@
+{
+  "users": [
+    {
+      "uid": "admin_1",
+      "email": "admin@example.com",
+      "fullName": "Arun Pandian",
+      "role": "admin",
+      "phone": "+91 98765 43210",
+      "schoolId": "school_parramatta",
+      "languagePreference": "ta"
+    },
+    {
+      "uid": "teacher_1",
+      "email": "teacher@example.com",
+      "fullName": "Suresh Kumar (Parramatta)",
+      "role": "teacher",
+      "phone": "+91 87654 32109",
+      "schoolId": "school_parramatta",
+      "languagePreference": "ta"
+    },
+    {
+      "uid": "volunteer_1",
+      "email": "volunteer@example.com",
+      "fullName": "Meena Ramasamy (Parramatta)",
+      "role": "volunteer",
+      "phone": "+91 76543 21098",
+      "schoolId": "school_parramatta",
+      "languagePreference": "en"
+    },
+    {
+      "uid": "parent_1",
+      "email": "parent@example.com",
+      "fullName": "Karthik Raja (Parramatta)",
+      "role": "parent",
+      "phone": "+91 65432 10987",
+      "schoolId": "school_parramatta",
+      "languagePreference": "ta",
+      "associatedStudents": [
+        "student_1"
+      ]
+    },
+    {
+      "uid": "student_1",
+      "email": "student@example.com",
+      "fullName": "Deepak Karthik (Parramatta)",
+      "role": "student",
+      "phone": "",
+      "schoolId": "school_parramatta",
+      "languagePreference": "ta"
+    },
+    {
+      "uid": "student_2",
+      "email": "student2@example.com",
+      "fullName": "Abinaya Sundar (Parramatta)",
+      "role": "student",
+      "phone": "",
+      "schoolId": "school_parramatta",
+      "languagePreference": "ta"
+    },
+    {
+      "uid": "student_3",
+      "email": "student3@example.com",
+      "fullName": "Ganesh Mani (Parramatta)",
+      "role": "student",
+      "phone": "",
+      "schoolId": "school_parramatta",
+      "languagePreference": "en"
+    }
+  ],
+  "classes": [
+    {
+      "classId": "class_1",
+      "className": "Standard 1 - A (Tamil Basic)",
+      "teacherId": "teacher_1",
+      "teacherIds": [
+        "teacher_1"
+      ],
+      "studentIds": [
+        "student_1",
+        "student_2"
+      ],
+      "volunteerIds": [
+        "volunteer_1"
+      ]
+    },
+    {
+      "classId": "class_2",
+      "className": "Standard 2 - B (Tamil Intermediate)",
+      "teacherId": "teacher_1",
+      "teacherIds": [
+        "teacher_1"
+      ],
+      "studentIds": [
+        "student_3"
+      ],
+      "volunteerIds": []
+    }
+  ],
+  "newsfeed": [
+    {
+      "postId": "post_1",
+      "title": {
+        "en": "Annual Thirukkural Recitation Competition!",
+        "ta": "ஆண்டு திருக்குறள் ஒப்புவித்தல் போட்டி!"
+      },
+      "content": {
+        "en": "The annual Thirukkural recitation contest is scheduled for next Saturday.",
+        "ta": "வரவிருக்கும் சனிக்கிழமை அன்று பரமட்டா பள்ளித்தோழன் கிளையில் ஆண்டு திருக்குறள் ஒப்புவித்தல் போட்டி நடைபெறவுள்ளது."
+      },
+      "mediaUrl": "https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&q=80&w=800",
+      "mediaType": "image",
+      "authorName": "Arun Pandian (Admin)",
+      "createdAt": "2026-05-31T04:01:14.878Z"
+    }
+  ],
+  "homework": [
+    {
+      "homeworkId": "hw_1",
+      "classId": "class_1",
+      "title": {
+        "en": "Memorize Thirukkural 1 to 5",
+        "ta": "அறத்துப்பால் - திருக்குறள் 1 முதல் 5 வரை மனப்பாடம் செய்தல்"
+      },
+      "description": {
+        "en": "Practice reading and writing first 5 Thirukkurals.",
+        "ta": "முதல் 5 திருக்குறள்களை எளிய பொருளுடன் படித்து எழுதி பழகி வரவும்."
+      },
+      "dueDate": "2026-06-03T06:01:14.880Z",
+      "createdByName": "Suresh Kumar",
+      "submissions": {}
+    },
+    {
+      "homeworkId": "hw_1780207964574",
+      "classId": "class_2",
+      "title": {
+        "en": "Write Uyir Ezhuthukal",
+        "ta": "தமிழ் உயிர் எழுத்துக்கள்"
+      },
+      "description": {
+        "en": "Write Uyir Ezhuthukal 3 times",
+        "ta": "எழுதுக தமிழ் உயிர் எழுத்துக்கள் 3 tஇமெஸ்"
+      },
+      "dueDate": "2026-06-01T06:12:44.567Z",
+      "createdByName": "Arun Pandian",
+      "submissions": {}
+    }
+  ],
+  "attendance": [],
+  "pending_approvals": [],
+  "pushed_alerts": [],
+  "messages": [],
+  "events": [
+    {
+      "eventId": "evt_1",
+      "title": {
+        "en": "Tamil New Year Celebration",
+        "ta": "தமிழ்ப் புத்தாண்டு திருவிழா"
+      },
+      "description": {
+        "en": "Traditional cultural performances and sweet distribution.",
+        "ta": "பாரம்பரிய கலை நிகழ்ச்சிகள் மற்றும் இனிப்புகள் வழங்குதல்."
+      },
+      "startDate": "2026-06-05T06:01:14.880Z",
+      "endDate": "2026-06-05T10:01:14.880Z"
+    }
+  ],
+  "schooldates": [
+    {
+      "dateId": "2026-04-25",
+      "date": "2026-04-25",
+      "term": 2,
+      "isHoliday": false,
+      "customAdded": false
+    },
+    {
+      "dateId": "2026-05-02",
+      "date": "2026-05-02",
+      "term": 2,
+      "isHoliday": false,
+      "customAdded": false
+    },
+    {
+      "dateId": "2026-05-09",
+      "date": "2026-05-09",
+      "term": 2,
+      "isHoliday": false,
+      "customAdded": false
+    },
+    {
+      "dateId": "2026-05-16",
+      "date": "2026-05-16",
+      "term": 2,
+      "isHoliday": false,
+      "customAdded": false
+    },
+    {
+      "dateId": "2026-05-23",
+      "date": "2026-05-23",
+      "term": 2,
+      "isHoliday": false,
+      "customAdded": false
+    },
+    {
+      "dateId": "2026-05-30",
+      "date": "2026-05-30",
+      "term": 2,
+      "isHoliday": false,
+      "customAdded": false
+    },
+    {
+      "dateId": "2026-06-06",
+      "date": "2026-06-06",
+      "term": 2,
+      "isHoliday": true,
+      "holidayName": "Queen's Birthday Break / NSW Long Weekend",
+      "customAdded": false
+    },
+    {
+      "dateId": "2026-06-13",
+      "date": "2026-06-13",
+      "term": 2,
+      "isHoliday": false,
+      "customAdded": false
+    },
+    {
+      "dateId": "2026-06-20",
+      "date": "2026-06-20",
+      "term": 2,
+      "isHoliday": false,
+      "customAdded": false
+    },
+    {
+      "dateId": "2026-06-27",
+      "date": "2026-06-27",
+      "term": 2,
+      "isHoliday": false,
+      "customAdded": false
+    },
+    {
+      "dateId": "2026-07-04",
+      "date": "2026-07-04",
+      "term": 2,
+      "isHoliday": false,
+      "customAdded": false
+    }
+  ]
+}

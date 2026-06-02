@@ -1,0 +1,80 @@
+// Balar Malar Parramatta - Unified Database Common Utilities
+export const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
+
+export let isServerOnline = false;
+
+export const getActiveBranch = (): string => {
+  if (typeof window === 'undefined' || typeof window.localStorage === 'undefined') {
+    return 'main';
+  }
+  return localStorage.getItem('pallithozhan_active_branch') || 'main';
+};
+
+// Check if live Node.js REST API server is running
+export const checkServerStatus = async (): Promise<boolean> => {
+  try {
+    const res = await fetch(`${API_URL}/health`, { method: 'GET', signal: AbortSignal.timeout(1000) });
+    const data = await res.json();
+    isServerOnline = data && data.status === 'healthy';
+    return isServerOnline;
+  } catch (e) {
+    isServerOnline = false;
+    return false;
+  }
+};
+
+// Global Fetch Interceptor to partition requests by branch automatically on server!
+if (typeof window !== 'undefined') {
+  const originalFetch = window.fetch;
+  window.fetch = function (input: RequestInfo | URL, init?: RequestInit) {
+    if (typeof input === 'object' && input !== null && 'url' in input) {
+      const req = input as any;
+      const url = req.url || '';
+      if (url.startsWith(API_URL) && !url.includes('?branch=') && !url.includes('&branch=')) {
+        const branch = getActiveBranch();
+        const separator = url.includes('?') ? '&' : '?';
+        return originalFetch(new Request(`${url}${separator}branch=${branch}`, req), init);
+      }
+      return originalFetch(input, init);
+    } else {
+      let url = typeof input === 'string' ? input : input.toString();
+      if (url.startsWith(API_URL) && !url.includes('?branch=') && !url.includes('&branch=')) {
+        const branch = getActiveBranch();
+        const separator = url.includes('?') ? '&' : '?';
+        url = `${url}${separator}branch=${branch}`;
+      }
+      return originalFetch(url, init);
+    }
+  };
+}
+
+// Start periodic checks
+if (typeof window !== 'undefined') {
+  checkServerStatus();
+  setInterval(checkServerStatus, 5000);
+}
+
+export const getLocalStorageItem = (key: string, defaultValue: any) => {
+  if (typeof window === 'undefined' || typeof window.localStorage === 'undefined') {
+    return defaultValue;
+  }
+  try {
+    const branch = getActiveBranch();
+    const data = localStorage.getItem(`pallithozhan_${branch}_${key}`);
+    return data ? JSON.parse(data) : defaultValue;
+  } catch (e) {
+    return defaultValue;
+  }
+};
+
+export const setLocalStorageItem = (key: string, value: any) => {
+  if (typeof window === 'undefined' || typeof window.localStorage === 'undefined') {
+    return;
+  }
+  try {
+    const branch = getActiveBranch();
+    localStorage.setItem(`pallithozhan_${branch}_${key}`, JSON.stringify(value));
+  } catch (e) {
+    // Ignore
+  }
+};
