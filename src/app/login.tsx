@@ -5,9 +5,8 @@ import { useAuth } from '@/services/auth';
 import { Colors, Spacing } from '@/constants/theme';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { firebaseConfig, isDemoMode } from '@/services/firebase';
-import { mockDb } from '@/services/mockBackend';
-import { Shield, Mail, Lock, Languages, UserCheck, BookOpen, Database } from 'lucide-react-native';
+import { isDemoMode } from '@/services/firebase';
+import { Mail, Lock, Languages, BookOpen } from 'lucide-react-native';
 
 interface LoginScreenProps {
   onNavigateToRegister: () => void;
@@ -34,20 +33,6 @@ export default function LoginScreen({ onNavigateToRegister }: LoginScreenProps) 
   const [password, setPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [loading, setLoading] = useState(false);
-  const [seeding, setSeeding] = useState(false);
-
-  const handleSeedDatabase = async () => {
-    setSeeding(true);
-    setErrorMsg('');
-    try {
-      await mockDb.seedCloudDatabase(firebaseConfig);
-      setErrorMsg('Cloud database initialized! All seed accounts created. Enter credentials above or use Quick Logins.');
-    } catch (e: any) {
-      setErrorMsg('Seeding failed: ' + e.message);
-    } finally {
-      setSeeding(false);
-    }
-  };
 
   const handleLogin = async (eEmail = email, ePassword = password) => {
     if (!eEmail || !ePassword) {
@@ -70,13 +55,7 @@ export default function LoginScreen({ onNavigateToRegister }: LoginScreenProps) 
     updateLanguage(nextLang);
   };
 
-  // Developer Quick Logins to showcase different role dashboards
-  const quickLogins = [
-    { label: 'Admin (நிர்வாகி)', email: 'admin@example.com', color: colors.danger },
-    { label: 'Teacher (ஆசிரியர்)', email: 'teacher@example.com', color: colors.primary },
-    { label: 'Volunteer (தன்னார்வலர்)', email: 'volunteer@example.com', color: colors.accent },
-    { label: 'Parent (பெற்றோர்)', email: 'parent@example.com', color: colors.success },
-  ];
+
 
   return (
     <ScrollView contentContainerStyle={styles.scrollContainer} style={{ backgroundColor: colors.background }}>
@@ -101,33 +80,7 @@ export default function LoginScreen({ onNavigateToRegister }: LoginScreenProps) 
           <ThemedText style={styles.titleText}>{t('appName')}</ThemedText>
           <ThemedText style={[styles.subtitleText, { color: colors.textSecondary, marginBottom: 8 }]}>{t('tagline')}</ThemedText>
           
-          <View style={{
-            paddingHorizontal: 8,
-            paddingVertical: 3,
-            borderRadius: 8,
-            backgroundColor: isDemoMode ? 'rgba(234, 83, 48, 0.08)' : 'rgba(16, 185, 129, 0.08)',
-            borderWidth: 0.5,
-            borderColor: isDemoMode ? 'rgba(234, 83, 48, 0.25)' : 'rgba(16, 185, 129, 0.25)',
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 4
-          }}>
-            <View style={{
-              width: 5,
-              height: 5,
-              borderRadius: 2.5,
-              backgroundColor: isDemoMode ? colors.danger : '#10B981'
-            }} />
-            <ThemedText style={{
-              fontSize: 9,
-              fontWeight: '800',
-              color: isDemoMode ? colors.danger : '#10B981',
-              textTransform: 'uppercase',
-              letterSpacing: 0.5
-            }}>
-              {isDemoMode ? 'Demo Sandbox Mode' : 'Firebase Cloud Mode Active'}
-            </ThemedText>
-          </View>
+
         </View>
 
         {/* Login Card */}
@@ -289,67 +242,7 @@ export default function LoginScreen({ onNavigateToRegister }: LoginScreenProps) 
           </View>
         </View>
 
-        {/* Developer Sandbox Panel - For Testing Roles easily */}
-        <View style={[styles.sandboxPanel, { backgroundColor: colors.backgroundElement, borderColor: colors.border }]}>
-          <View style={styles.sandboxHeader}>
-            <Shield size={16} color={colors.primary} />
-            <ThemedText style={styles.sandboxTitle}>Developer Sandbox Mode</ThemedText>
-          </View>
-          <ThemedText style={[styles.sandboxDesc, { color: colors.textSecondary }]}>
-            Quickly sign in as any pre-loaded role to test the custom dashboard features:
-          </ThemedText>
-          
-          <View style={styles.quickGrid}>
-            {quickLogins.map((item, idx) => (
-              <Pressable
-                key={idx}
-                onPress={() => handleLogin(item.email, 'password')}
-                style={({ pressed }) => [
-                  styles.quickBadge,
-                  { borderColor: item.color, backgroundColor: colors.cardBg, opacity: pressed ? 0.8 : 1 }
-                ]}
-              >
-                <UserCheck size={12} color={item.color} style={{ marginRight: 4 }} />
-                <ThemedText style={[styles.quickBadgeText, { color: item.color }]}>
-                  {item.label}
-                </ThemedText>
-              </Pressable>
-            ))}
-          </View>
 
-          {!isDemoMode && (
-            <Pressable
-              onPress={handleSeedDatabase}
-              style={({ pressed }) => [
-                {
-                  marginTop: Spacing.three,
-                  paddingVertical: 10,
-                  borderRadius: 12,
-                  borderWidth: 1,
-                  borderColor: colors.primary,
-                  backgroundColor: colors.primaryLight,
-                  flexDirection: 'row',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  gap: 6,
-                  opacity: pressed ? 0.85 : 1
-                }
-              ]}
-              disabled={seeding}
-            >
-              {seeding ? (
-                <ActivityIndicator size="small" color={colors.primary} />
-              ) : (
-                <>
-                  <Database size={14} color={colors.primary} />
-                  <ThemedText style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>
-                    Initialize Firebase Cloud Database
-                  </ThemedText>
-                </>
-              )}
-            </Pressable>
-          )}
-        </View>
 
       </ThemedView>
     </ScrollView>

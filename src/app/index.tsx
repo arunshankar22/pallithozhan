@@ -1455,32 +1455,6 @@ export default function HomeScreen() {
             </ThemedText>
           </View>
         </View>
-        <View style={{
-          paddingHorizontal: 4,
-          paddingVertical: 1,
-          borderRadius: 4,
-          backgroundColor: isDemoMode ? 'rgba(234, 83, 48, 0.08)' : 'rgba(16, 185, 129, 0.08)',
-          borderWidth: 0.5,
-          borderColor: isDemoMode ? 'rgba(234, 83, 48, 0.25)' : 'rgba(16, 185, 129, 0.25)',
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: 2.5
-        }}>
-          <View style={{
-            width: 3.5,
-            height: 3.5,
-            borderRadius: 1.75,
-            backgroundColor: isDemoMode ? colors.danger : '#10B981'
-          }} />
-          <ThemedText style={{
-            fontSize: 7,
-            fontWeight: '800',
-            color: isDemoMode ? colors.danger : '#10B981',
-            textTransform: 'uppercase'
-          }}>
-            {isDemoMode ? 'Demo' : 'Connected'}
-          </ThemedText>
-        </View>
       </View>
     );
   };
@@ -1609,33 +1583,6 @@ export default function HomeScreen() {
           <View style={[styles.mobileHeader, getGlassStyle(colors.cardBg, 0.75, 20), { borderBottomWidth: 1, borderColor: colors.border }]}>
             <BalarMalarBranchLogo size={24} />
             <View style={styles.headerRightActions}>
-              <View style={{
-                paddingHorizontal: 6,
-                paddingVertical: 2,
-                borderRadius: 6,
-                backgroundColor: isDemoMode ? 'rgba(234, 83, 48, 0.08)' : 'rgba(16, 185, 129, 0.08)',
-                borderWidth: 0.5,
-                borderColor: isDemoMode ? 'rgba(234, 83, 48, 0.25)' : 'rgba(16, 185, 129, 0.25)',
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 3,
-                marginRight: 6
-              }}>
-                <View style={{
-                  width: 4,
-                  height: 4,
-                  borderRadius: 2,
-                  backgroundColor: isDemoMode ? colors.danger : '#10B981'
-                }} />
-                <ThemedText style={{
-                  fontSize: 7.5,
-                  fontWeight: '800',
-                  color: isDemoMode ? colors.danger : '#10B981',
-                  textTransform: 'uppercase'
-                }}>
-                  {isDemoMode ? 'Demo' : 'Cloud'}
-                </ThemedText>
-              </View>
               <Pressable onPress={() => setActiveTab('profile')} style={styles.headerIconButton}>
                 <UserIcon size={18} color={activeTab === 'profile' ? colors.primary : colors.text} />
               </Pressable>
