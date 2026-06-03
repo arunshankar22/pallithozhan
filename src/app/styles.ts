@@ -46,7 +46,7 @@ export const styles = StyleSheet.create({
     borderRadius: 16,
     paddingVertical: 12,
     paddingHorizontal: Spacing.three,
-    zIndex: 10000,
+    zIndex: 1000000,
     justifyContent: 'center',
     shadowOffset: { width: 0, height: 6 },
     shadowRadius: 16,

@@ -60,6 +60,7 @@ export default function HomeScreen() {
   const [newHwPassword, setNewHwPassword] = useState('');
   const [confirmHwPassword, setConfirmHwPassword] = useState('');
   const [hwPasswordChanging, setHwPasswordChanging] = useState(false);
+  const [forceChangeError, setForceChangeError] = useState<string | null>(null);
 
   useEffect(() => {
     const loadMainData = async () => {
@@ -135,11 +136,14 @@ export default function HomeScreen() {
   };
 
   const handleForceChangePassword = async () => {
+    setForceChangeError(null);
     if (newHwPassword.length < 6) {
+      setForceChangeError('Password must be at least 6 characters long.');
       showToast('Password must be at least 6 characters long.', 'warning');
       return;
     }
     if (newHwPassword !== confirmHwPassword) {
+      setForceChangeError('Passwords do not match.');
       showToast('Passwords do not match.', 'warning');
       return;
     }
@@ -150,6 +154,7 @@ export default function HomeScreen() {
       setConfirmHwPassword('');
       showToast('Password updated successfully! Your account is now secure.', 'success');
     } catch (e: any) {
+      setForceChangeError(e.message || 'Failed to change password.');
       showToast(e.message || 'Failed to change password.', 'error');
     } finally {
       setHwPasswordChanging(false);
@@ -279,7 +284,8 @@ export default function HomeScreen() {
           {
             backgroundColor: toast.type === 'success' ? colors.secondary : toast.type === 'error' ? colors.primary : colors.accent,
             shadowColor: colors.shadowColor,
-            shadowOpacity: colors.shadowOpacity
+            shadowOpacity: colors.shadowOpacity,
+            zIndex: 1000000
           }
         ]}>
           <View style={styles.toastContent}>
@@ -570,6 +576,26 @@ export default function HomeScreen() {
                 உங்கள் கணக்கின் பாதுகாப்பை உறுதிசெய்ய, உங்கள் முதன்முறை உள்நுழைவில் புதிய கடவுச்சொல்லை அமைக்க வேண்டும்.
               </ThemedText>
             </ThemedText>
+
+            {forceChangeError && (
+              <View style={{
+                padding: Spacing.two,
+                borderRadius: 12,
+                backgroundColor: 'rgba(234, 83, 48, 0.1)',
+                borderWidth: 1,
+                borderColor: 'rgba(234, 83, 48, 0.3)',
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 8,
+                marginTop: Spacing.one,
+                marginBottom: Spacing.one
+              }}>
+                <AlertTriangle size={16} color={colors.danger} />
+                <ThemedText style={{ color: colors.danger, fontSize: 12, fontWeight: '700', flex: 1 }}>
+                  {forceChangeError}
+                </ThemedText>
+              </View>
+            )}
 
             <View style={{ gap: Spacing.two }}>
               <View style={{ gap: 4 }}>
