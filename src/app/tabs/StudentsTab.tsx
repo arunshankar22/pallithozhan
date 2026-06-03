@@ -3,6 +3,7 @@ import { View, Pressable } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { TabProps } from '@/app/sharedTypes';
 import { Spacing } from '@/constants/theme';
+import { mockDb } from '@/services/mockBackend';
 
 interface StudentsTabProps extends TabProps {
   studentProfiles: any[];
@@ -20,6 +21,79 @@ export function StudentsTab({
   showToast,
   t
 }: StudentsTabProps) {
+  const [studentStats, setStudentStats] = React.useState<Record<string, {
+    classTeacher: string;
+    attendanceRate: string;
+    homeworkCompletion: number;
+  }>>({});
+
+  React.useEffect(() => {
+    let active = true;
+    async function loadStats() {
+      try {
+        const [allUsers, allHomework] = await Promise.all([
+          mockDb.getUsers(),
+          mockDb.getHomework()
+        ]);
+
+        const stats: Record<string, { classTeacher: string; attendanceRate: string; homeworkCompletion: number }> = {};
+
+        for (const student of studentProfiles) {
+          const studentClass = classes.find(c => c.studentIds && c.studentIds.includes(student.uid));
+
+          // 1. Resolve Class Teacher(s)
+          let teacherNames = 'Not Assigned';
+          if (studentClass) {
+            const tIds = studentClass.teacherIds || (studentClass.teacherId ? [studentClass.teacherId] : []);
+            const names = tIds
+              .map((tId: string) => allUsers.find((u: any) => u.uid === tId)?.fullName)
+              .filter(Boolean);
+            if (names.length > 0) {
+              teacherNames = names.join(', ');
+            }
+          }
+
+          // 2. Fetch Student Attendance & Calculate Rate
+          const attendanceRecords = await mockDb.getStudentAttendance(student.uid);
+          const totalSessions = attendanceRecords.length;
+          // Present includes present and late for rate calculation
+          const presentSessions = attendanceRecords.filter((r: any) => r.status === 'present' || r.status === 'late').length;
+          const attendanceRate = totalSessions > 0
+            ? `${Math.round((presentSessions / totalSessions) * 100)}%`
+            : '100%';
+
+          // 3. Calculate Homework Completion Rate
+          let homeworkCompletion = 0;
+          if (studentClass) {
+            const classHomeworks = allHomework.filter((h: any) => h.classId === studentClass.classId);
+            const totalHw = classHomeworks.length;
+            const completedHw = classHomeworks.filter((h: any) => {
+              const sub = h.submissions?.[student.uid];
+              return sub === true || (sub && typeof sub === 'object' && sub.completed === true);
+            }).length;
+
+            homeworkCompletion = totalHw > 0 ? Math.round((completedHw / totalHw) * 100) : 0;
+          }
+
+          stats[student.uid] = {
+            classTeacher: teacherNames,
+            attendanceRate,
+            homeworkCompletion
+          };
+        }
+
+        if (active) {
+          setStudentStats(stats);
+        }
+      } catch (err) {
+        console.warn('Failed to load student stats dynamically:', err);
+      }
+    }
+
+    loadStats();
+    return () => { active = false; };
+  }, [studentProfiles, classes]);
+
   return (
     <View style={{ gap: Spacing.four, paddingBottom: 24 }}>
       <View>
@@ -39,8 +113,10 @@ export function StudentsTab({
         <View style={{ gap: Spacing.three }}>
           {studentProfiles.map(student => {
             const studentClass = classes.find(c => c.studentIds && c.studentIds.includes(student.uid));
-            const attendanceRate = student.attendanceRate || '95%';
-            const classTeacher = studentClass ? "Lakshmi Shankar" : "Not Assigned";
+            const stats = studentStats[student.uid];
+            const classTeacher = stats ? stats.classTeacher : (studentClass ? "Loading..." : "Not Assigned");
+            const attendanceRate = stats ? stats.attendanceRate : (student.attendanceRate || '100%');
+            const homeworkCompletion = stats ? stats.homeworkCompletion : 0;
 
             return (
               <View
@@ -108,10 +184,10 @@ export function StudentsTab({
                 <View style={{ gap: 4, marginTop: 4 }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                     <ThemedText style={{ fontSize: 11, color: colors.textSecondary }}>Homework Completion / வீட்டுப்பாடம்:</ThemedText>
-                    <ThemedText style={{ fontSize: 11, fontWeight: '700', color: colors.secondary }}>80%</ThemedText>
+                    <ThemedText style={{ fontSize: 11, fontWeight: '700', color: colors.secondary }}>{homeworkCompletion}%</ThemedText>
                   </View>
                   <View style={{ height: 6, width: '100%', backgroundColor: colors.border, borderRadius: 3, overflow: 'hidden' }}>
-                    <View style={{ height: '100%', width: '80%', backgroundColor: colors.secondary, borderRadius: 3 }} />
+                    <View style={{ height: '100%', width: `${homeworkCompletion}%`, backgroundColor: colors.secondary, borderRadius: 3 }} />
                   </View>
                 </View>
 

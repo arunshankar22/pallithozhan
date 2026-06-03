@@ -95,38 +95,43 @@ export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentI
   useEffect(() => {
     const loadRolls = async () => {
       if (selectedClassId && selectedDate) {
-        const cls = await mockDb.getClass(selectedClassId);
-        if (cls) {
-          const list: any[] = [];
-          
-          for (const sId of cls.studentIds) {
-            const profile = await mockDb.getUser(sId);
-            if (profile) list.push(profile);
-          }
-          
-          for (const vId of cls.volunteerIds) {
-            const profile = await mockDb.getUser(vId);
-            if (profile) list.push(profile);
-          }
+        let list: any[] = [];
+        let existingRecord = null;
 
-          setStudentList(list);
-
-          // Get attendance record for specific selected date
-          const existingRecord = await mockDb.getAttendanceRecord(selectedClassId, selectedDate);
-
-          const initialRolls: Record<string, 'present' | 'absent' | 'late'> = {};
-          list.forEach(item => {
-            if (existingRecord && existingRecord.rolls && existingRecord.rolls[item.uid]) {
-              initialRolls[item.uid] = existingRecord.rolls[item.uid];
-            } else {
-              initialRolls[item.uid] = 'present';
+        if (selectedClassId === 'staff_attendance') {
+          const allUsers = await mockDb.getUsers();
+          list = allUsers.filter(u => u.role === 'teacher' || u.role === 'volunteer');
+          existingRecord = await mockDb.getAttendanceRecord('staff_attendance', selectedDate);
+        } else {
+          const cls = await mockDb.getClass(selectedClassId);
+          if (cls) {
+            for (const sId of cls.studentIds) {
+              const profile = await mockDb.getUser(sId);
+              if (profile) list.push(profile);
             }
-          });
-          setRolls(initialRolls);
-          
-          if (existingRecord) {
-            showToast(`Loaded rolls call logs for modifications on ${selectedDate}.`, 'success');
+            
+            for (const vId of cls.volunteerIds) {
+              const profile = await mockDb.getUser(vId);
+              if (profile) list.push(profile);
+            }
+            existingRecord = await mockDb.getAttendanceRecord(selectedClassId, selectedDate);
           }
+        }
+
+        setStudentList(list);
+
+        const initialRolls: Record<string, 'present' | 'absent' | 'late'> = {};
+        list.forEach(item => {
+          if (existingRecord && existingRecord.rolls && existingRecord.rolls[item.uid]) {
+            initialRolls[item.uid] = existingRecord.rolls[item.uid];
+          } else {
+            initialRolls[item.uid] = 'present';
+          }
+        });
+        setRolls(initialRolls);
+        
+        if (existingRecord) {
+          showToast(`Loaded rolls call logs for modifications on ${selectedDate}.`, 'success');
         }
       } else {
         setStudentList([]);
@@ -332,7 +337,9 @@ export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentI
                     <View style={styles.queueTextDetails}>
                       <ThemedText style={styles.queueStudentName}>{item.studentName}</ThemedText>
                       <ThemedText style={[styles.queueClassDetails, { color: colors.textSecondary }]}>
-                        Marked ABSENT in {item.markedByName}'s class today
+                        {item.classId === 'staff_attendance'
+                          ? `Marked ABSENT (Staff) by ${item.markedByName} today`
+                          : `Marked ABSENT in ${item.markedByName}'s class today`}
                       </ThemedText>
                     </View>
                     
@@ -380,6 +387,21 @@ export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentI
                   </Pressable>
                 );
               })}
+              <Pressable
+                key="staff_attendance"
+                onPress={() => setSelectedClassId('staff_attendance')}
+                style={[
+                  styles.classChip,
+                  {
+                    backgroundColor: selectedClassId === 'staff_attendance' ? colors.primaryLight : colors.background,
+                    borderColor: selectedClassId === 'staff_attendance' ? colors.primary : colors.border
+                  }
+                ]}
+              >
+                <ThemedText style={[styles.classChipText, { color: selectedClassId === 'staff_attendance' ? colors.primary : colors.text }]}>
+                  👥 Staff Attendance / ஊழியர்கள் வருகை
+                </ThemedText>
+              </Pressable>
             </View>
 
             {/* Session Date Selector */}
@@ -439,7 +461,9 @@ export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentI
             {/* Student lists to toggle present / absent / late */}
             {selectedClassId && studentList.length > 0 ? (
               <View style={styles.studentListWrapper}>
-                <ThemedText style={styles.listHeaderTitle}>Active Student Roll (Choose Status)</ThemedText>
+                <ThemedText style={styles.listHeaderTitle}>
+                  {selectedClassId === 'staff_attendance' ? 'Active Staff Roll (Choose Status)' : 'Active Student Roll (Choose Status)'}
+                </ThemedText>
                 
                 {studentList.map((student) => {
                   const status = rolls[student.uid] || 'present';

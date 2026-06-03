@@ -106,13 +106,16 @@ export const attendanceService = {
       for (const uId of Object.keys(record.rolls)) {
         if (record.rolls[uId] === 'absent') {
           const studentObj = await userService.getUser(uId);
-          if (studentObj && studentObj.role === 'student') {
+          if (studentObj && (studentObj.role === 'student' || studentObj.role === 'teacher' || studentObj.role === 'volunteer')) {
             const appDocId = `app_${record.date}_${uId}`;
             
-            // Dynamic parent lookup
-            const usersList = await userService.getUsers();
-            const parentObj = usersList.find((u: any) => u.role === 'parent' && u.associatedStudents?.includes(uId));
-            const parentUid = parentObj ? parentObj.uid : 'parent_1';
+            // Dynamic parent lookup (only for students)
+            let parentUid = '';
+            if (studentObj.role === 'student') {
+              const usersList = await userService.getUsers();
+              const parentObj = usersList.find((u: any) => u.role === 'parent' && u.associatedStudents?.includes(uId));
+              parentUid = parentObj ? parentObj.uid : 'parent_1';
+            }
 
             await setDoc(doc(db, 'pending_approvals', appDocId), {
               classId: record.classId,
@@ -121,11 +124,12 @@ export const attendanceService = {
               markedByName: cleanRecord.markedByName,
               studentId: uId,
               studentName: studentObj.fullName,
+              studentRole: studentObj.role,
               parentUid: parentUid,
               status: isAdmin ? 'approved' : 'pending'
             });
 
-            if (isAdmin) {
+            if (isAdmin && studentObj.role === 'student') {
               // Instantly push alert to parent
               const alertDocId = `alert_${Date.now()}_${uId}`;
               await setDoc(doc(db, 'pushed_alerts', alertDocId), {
@@ -172,11 +176,14 @@ export const attendanceService = {
     for (const uId of Object.keys(record.rolls)) {
       if (record.rolls[uId] === 'absent') {
         const studentObj = await userService.getUser(uId);
-        if (studentObj && studentObj.role === 'student') {
+        if (studentObj && (studentObj.role === 'student' || studentObj.role === 'teacher' || studentObj.role === 'volunteer')) {
           // Dynamic parent lookup
-          const usersList = await userService.getUsers();
-          const parentObj = usersList.find((u: any) => u.role === 'parent' && u.associatedStudents?.includes(uId));
-          const parentUid = parentObj ? parentObj.uid : 'parent_1';
+          let parentUid = '';
+          if (studentObj.role === 'student') {
+            const usersList = await userService.getUsers();
+            const parentObj = usersList.find((u: any) => u.role === 'parent' && u.associatedStudents?.includes(uId));
+            parentUid = parentObj ? parentObj.uid : 'parent_1';
+          }
 
           cleanApprovals.push({
             approvalId: `app_${record.date}_${uId}`,
@@ -186,11 +193,12 @@ export const attendanceService = {
             markedByName: cleanRecord.markedByName,
             studentId: uId,
             studentName: studentObj.fullName,
+            studentRole: studentObj.role,
             parentUid: parentUid,
             status: isAdmin ? 'approved' : 'pending'
           });
 
-          if (isAdmin) {
+          if (isAdmin && studentObj.role === 'student') {
             // Instantly push alert in sandbox
             const alerts = getLocalStorageItem('pushed_alerts', []);
             alerts.push({
@@ -270,13 +278,15 @@ export const attendanceService = {
         const attDocId = `${appData.classId}_${appData.date}`;
         await setDoc(doc(db, 'attendance', attDocId), { approved: true }, { merge: true });
 
-        const alertDocId = `alert_${Date.now()}`;
-        await setDoc(doc(db, 'pushed_alerts', alertDocId), {
-          parentUid: appData.parentUid || 'parent_1',
-          title: 'Absence Alert / வருகை அறிவிப்பு',
-          body: `${appData.studentName} was marked absent today in ${appData.markedByName}'s class. Absence has been authorized by Administration.`,
-          createdAt: new Date().toISOString()
-        });
+        if (appData.parentUid) {
+          const alertDocId = `alert_${Date.now()}`;
+          await setDoc(doc(db, 'pushed_alerts', alertDocId), {
+            parentUid: appData.parentUid,
+            title: 'Absence Alert / வருகை அறிவிப்பு',
+            body: `${appData.studentName} was marked absent today in ${appData.markedByName}'s class. Absence has been authorized by Administration.`,
+            createdAt: new Date().toISOString()
+          });
+        }
 
         return { approvalId, ...appData, status: 'approved' };
       }
@@ -311,15 +321,17 @@ export const attendanceService = {
         setLocalStorageItem('attendance', attList);
       }
       
-      const alerts = getLocalStorageItem('pushed_alerts', []);
-      alerts.push({
-        alertId: `alert_${Date.now()}`,
-        parentUid: app.parentUid,
-        title: 'Absence Alert / வருகை அறிவிப்பு',
-        body: `${app.studentName} was marked absent today in ${app.markedByName}'s class. Absence has been authorized by Administration.`,
-        createdAt: new Date().toISOString()
-      });
-      setLocalStorageItem('pushed_alerts', alerts);
+      if (app.parentUid) {
+        const alerts = getLocalStorageItem('pushed_alerts', []);
+        alerts.push({
+          alertId: `alert_${Date.now()}`,
+          parentUid: app.parentUid,
+          title: 'Absence Alert / வருகை அறிவிப்பு',
+          body: `${app.studentName} was marked absent today in ${app.markedByName}'s class. Absence has been authorized by Administration.`,
+          createdAt: new Date().toISOString()
+        });
+        setLocalStorageItem('pushed_alerts', alerts);
+      }
       return app;
     }
     return null;
