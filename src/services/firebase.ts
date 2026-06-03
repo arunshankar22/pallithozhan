@@ -14,7 +14,7 @@ export const firebaseConfig = {
   appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID || ""
 };
 
-const isConfigured = !!firebaseConfig.apiKey;
+const isConfigured = !!firebaseConfig.apiKey && firebaseConfig.apiKey !== "" && !firebaseConfig.apiKey.includes("PLACEHOLDER");
 
 let app;
 let auth: any;
