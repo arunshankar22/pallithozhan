@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import i18n from './i18n';
 import { isDemoMode, auth as fbAuth } from './firebase';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updatePassword as fbUpdatePassword } from 'firebase/auth';
 import { mockDb } from './mockBackend';
 
 // Define the shape of our User Profile
@@ -14,6 +14,7 @@ export interface UserProfile {
   schoolId: string;
   languagePreference: string;
   associatedStudents?: string[];
+  requirePasswordChange?: boolean;
 }
 
 interface AuthContextType {
@@ -23,6 +24,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   updateLanguage: (lang: string) => void;
   updateProfile: (fullName: string, phone: string) => Promise<void>;
+  updateAuthPassword: (newPassword: string) => Promise<void>;
   isLoading: boolean;
 }
 
@@ -86,16 +88,57 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return matched;
       } else {
         // Complete Firebase production integration
-        const userCredential = await signInWithEmailAndPassword(fbAuth, email, password);
-        const fbUser = userCredential.user;
-        const profile = await mockDb.getUser(fbUser.uid);
-        if (!profile) {
-          throw new Error('User authenticated in Firebase, but profile not found in database.');
+        try {
+          const userCredential = await signInWithEmailAndPassword(fbAuth, email, password);
+          const fbUser = userCredential.user;
+          const profile = await mockDb.getUser(fbUser.uid);
+          if (!profile) {
+            throw new Error('User authenticated in Firebase, but profile not found in database.');
+          }
+          setUser(profile);
+          i18n.changeLanguage(profile.languagePreference);
+          setIsLoading(false);
+          return profile;
+        } catch (fbAuthErr: any) {
+          // INTERCEPT SPREADSHEET IMPORTED USERS FIRST-TIME ACTIVATION
+          if (fbAuthErr.code === 'auth/user-not-found' || fbAuthErr.code === 'auth/invalid-credential' || fbAuthErr.code === 'auth/invalid-email') {
+            try {
+              const users = await mockDb.getUsers();
+              const matchedImported = users.find((u: any) => u.email && u.email.toLowerCase() === email.toLowerCase());
+              
+              if (matchedImported) {
+                console.log(`Self-healing Auth record found for imported user: ${email}`);
+                // Automatically register the user in Firebase Auth using the credentials they just supplied
+                const registerCredential = await createUserWithEmailAndPassword(fbAuth, email, password);
+                const fbUser = registerCredential.user;
+                
+                // Map Firestore profile to the newly created Auth UID
+                const oldUid = matchedImported.uid;
+                const newProfile: UserProfile = {
+                  ...matchedImported,
+                  uid: fbUser.uid,
+                  requirePasswordChange: true // Flag to force password change!
+                };
+                
+                // Save updated user to Firestore
+                await mockDb.createUser(newProfile);
+                
+                // Delete the old spreadsheet placeholder user to prevent duplicate records
+                if (oldUid !== fbUser.uid) {
+                  await mockDb.deleteUser(oldUid);
+                }
+                
+                setUser(newProfile);
+                i18n.changeLanguage(newProfile.languagePreference || 'ta');
+                setIsLoading(false);
+                return newProfile;
+              }
+            } catch (autoRegErr) {
+              console.error('Self-healing imported user auth registration failed:', autoRegErr);
+            }
+          }
+          throw fbAuthErr;
         }
-        setUser(profile);
-        i18n.changeLanguage(profile.languagePreference);
-        setIsLoading(false);
-        return profile;
       }
     } catch (error: any) {
       setIsLoading(false);
@@ -184,8 +227,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const updateAuthPassword = async (newPassword: string): Promise<void> => {
+    setIsLoading(true);
+    try {
+      if (isDemoMode) {
+        console.log('Mock password updated in demo mode.');
+        if (user) {
+          const updated = { ...user, requirePasswordChange: false };
+          await mockDb.createUser(updated);
+          setUser(updated);
+        }
+      } else {
+        const currentUser = fbAuth.currentUser;
+        if (!currentUser) {
+          throw new Error('No user is currently authenticated.');
+        }
+        await fbUpdatePassword(currentUser, newPassword);
+        if (user) {
+          const updated = { ...user, requirePasswordChange: false };
+          await mockDb.createUser(updated);
+          setUser(updated);
+        }
+      }
+      setIsLoading(false);
+    } catch (err: any) {
+      setIsLoading(false);
+      throw err;
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, updateLanguage, updateProfile, isLoading }}>
+    <AuthContext.Provider value={{ user, login, register, logout, updateLanguage, updateProfile, updateAuthPassword, isLoading }}>
       {children}
     </AuthContext.Provider>
   );

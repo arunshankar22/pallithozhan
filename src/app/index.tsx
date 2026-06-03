@@ -6,7 +6,9 @@ import {
   useColorScheme,
   Dimensions,
   Platform,
-  Image
+  Image,
+  TextInput,
+  ActivityIndicator
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/services/auth';
@@ -27,7 +29,9 @@ import {
   Languages,
   CheckCircle,
   AlertTriangle,
-  Users
+  Users,
+  Lock,
+  Shield
 } from 'lucide-react-native';
 
 // Modular Tabs
@@ -44,13 +48,18 @@ const { width: windowWidth } = Dimensions.get('window');
 
 export default function HomeScreen() {
   const { t, i18n } = useTranslation();
-  const { user, logout, updateLanguage } = useAuth();
+  const { user, logout, updateLanguage, updateAuthPassword } = useAuth();
   const scheme = useColorScheme();
   const colors = Colors[scheme === 'unspecified' || !scheme ? 'light' : scheme];
 
   const [classes, setClasses] = useState<any[]>([]);
   const [studentProfiles, setStudentProfiles] = useState<any[]>([]);
   const [activeStudentId, setActiveStudentId] = useState<string>('');
+
+  // Force password change states
+  const [newHwPassword, setNewHwPassword] = useState('');
+  const [confirmHwPassword, setConfirmHwPassword] = useState('');
+  const [hwPasswordChanging, setHwPasswordChanging] = useState(false);
 
   useEffect(() => {
     const loadMainData = async () => {
@@ -123,6 +132,28 @@ export default function HomeScreen() {
     setTimeout(() => {
       setToast(prev => ({ ...prev, visible: false }));
     }, 4000);
+  };
+
+  const handleForceChangePassword = async () => {
+    if (newHwPassword.length < 6) {
+      showToast('Password must be at least 6 characters long.', 'warning');
+      return;
+    }
+    if (newHwPassword !== confirmHwPassword) {
+      showToast('Passwords do not match.', 'warning');
+      return;
+    }
+    setHwPasswordChanging(true);
+    try {
+      await updateAuthPassword(newHwPassword);
+      setNewHwPassword('');
+      setConfirmHwPassword('');
+      showToast('Password updated successfully! Your account is now secure.', 'success');
+    } catch (e: any) {
+      showToast(e.message || 'Failed to change password.', 'error');
+    } finally {
+      setHwPasswordChanging(false);
+    }
   };
 
   useEffect(() => {
@@ -476,6 +507,154 @@ export default function HomeScreen() {
           })}
         </View>
       ) : null}
+
+      {/* FORCE PASSWORD CHANGE OVERLAY MODAL */}
+      {user?.requirePasswordChange === true && (
+        <View style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: scheme === 'dark' ? 'rgba(15, 23, 42, 0.9)' : 'rgba(241, 245, 249, 0.9)',
+          zIndex: 99999,
+          justifyContent: 'center',
+          alignItems: 'center',
+          padding: Spacing.four,
+          ...Platform.select({
+            web: {
+              backdropFilter: 'blur(20px)',
+              WebkitBackdropFilter: 'blur(20px)',
+            }
+          })
+        }}>
+          <View style={{
+            width: '100%',
+            maxWidth: 440,
+            borderRadius: 24,
+            padding: Spacing.five,
+            backgroundColor: colors.cardBg,
+            borderWidth: 1,
+            borderColor: colors.border,
+            shadowColor: colors.shadowColor,
+            shadowOffset: { width: 0, height: 12 },
+            shadowRadius: 24,
+            shadowOpacity: 0.15,
+            elevation: 10,
+            gap: Spacing.three
+          }}>
+            <View style={{ alignItems: 'center', gap: Spacing.two, marginBottom: Spacing.one }}>
+              <View style={{
+                width: 56,
+                height: 56,
+                borderRadius: 28,
+                backgroundColor: colors.primaryLight,
+                justifyContent: 'center',
+                alignItems: 'center',
+                marginBottom: Spacing.one
+              }}>
+                <Shield size={28} color={colors.primary} />
+              </View>
+              <ThemedText style={{ fontSize: 18, fontWeight: '800', textAlign: 'center', color: colors.text }}>
+                First-Time Security Activation
+              </ThemedText>
+              <ThemedText style={{ fontSize: 14, fontWeight: '700', textAlign: 'center', color: colors.secondary }}>
+                முதன்முறை பாதுகாப்புச் செயலாக்கம்
+              </ThemedText>
+            </View>
+
+            <ThemedText style={{ fontSize: 12.5, color: colors.textSecondary, textAlign: 'center', lineHeight: 18, marginBottom: Spacing.two }}>
+              To secure your account, you are required to choose a new password on your first login.
+              {"\n"}
+              <ThemedText style={{ fontStyle: 'italic', fontWeight: '500' }}>
+                உங்கள் கணக்கின் பாதுகாப்பை உறுதிசெய்ய, உங்கள் முதன்முறை உள்நுழைவில் புதிய கடவுச்சொல்லை அமைக்க வேண்டும்.
+              </ThemedText>
+            </ThemedText>
+
+            <View style={{ gap: Spacing.two }}>
+              <View style={{ gap: 4 }}>
+                <ThemedText style={{ fontSize: 12, fontWeight: '600', color: colors.textSecondary }}>
+                  New Password / புதிய கடவுச்சொல்
+                </ThemedText>
+                <TextInput
+                  secureTextEntry
+                  value={newHwPassword}
+                  onChangeText={setNewHwPassword}
+                  style={[styles.formInput, { color: colors.text, borderColor: colors.border, marginTop: 4, width: '100%', height: 44 }]}
+                  placeholder="Minimum 6 characters"
+                  placeholderTextColor={colors.textSecondary}
+                />
+              </View>
+
+              <View style={{ gap: 4 }}>
+                <ThemedText style={{ fontSize: 12, fontWeight: '600', color: colors.textSecondary }}>
+                  Confirm New Password / கடவுச்சொல்லை உறுதிப்படுத்துக
+                </ThemedText>
+                <TextInput
+                  secureTextEntry
+                  value={confirmHwPassword}
+                  onChangeText={setConfirmHwPassword}
+                  style={[styles.formInput, { color: colors.text, borderColor: colors.border, marginTop: 4, width: '100%', height: 44 }]}
+                  placeholder="Confirm new password"
+                  placeholderTextColor={colors.textSecondary}
+                />
+              </View>
+            </View>
+
+            <Pressable
+              onPress={handleForceChangePassword}
+              disabled={hwPasswordChanging}
+              style={({ pressed }) => [
+                styles.actionButton,
+                {
+                  backgroundColor: colors.primary,
+                  opacity: (pressed || hwPasswordChanging) ? 0.9 : 1,
+                  width: '100%',
+                  justifyContent: 'center',
+                  height: 46,
+                  borderRadius: 14,
+                  alignItems: 'center',
+                  marginTop: Spacing.two
+                }
+              ]}
+            >
+              {hwPasswordChanging ? (
+                <ActivityIndicator size="small" color="#FFF" />
+              ) : (
+                <>
+                  <Shield size={16} color="#FFF" style={{ marginRight: 6 }} />
+                  <ThemedText style={styles.actionButtonText}>
+                    Update Password & Activate Account
+                  </ThemedText>
+                </>
+              )}
+            </Pressable>
+
+            <Pressable
+              onPress={logout}
+              disabled={hwPasswordChanging}
+              style={({ pressed }) => [
+                {
+                  width: '100%',
+                  justifyContent: 'center',
+                  height: 40,
+                  borderRadius: 12,
+                  alignItems: 'center',
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  backgroundColor: 'transparent',
+                  opacity: pressed ? 0.8 : 1,
+                  marginTop: Spacing.one
+                }
+              ]}
+            >
+              <ThemedText style={{ fontSize: 13, fontWeight: '600', color: colors.danger }}>
+                Cancel & Log Out / வெளியேறவும்
+              </ThemedText>
+            </Pressable>
+          </View>
+        </View>
+      )}
 
     </View>
   );
