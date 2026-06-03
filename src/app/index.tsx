@@ -234,7 +234,8 @@ export default function HomeScreen() {
             const targetClass = childClasses.find((cls: any) => cls.classId === h.classId);
             if (targetClass?.studentIds?.includes(cId)) {
               parentTotalHws++;
-              if (h.submissions?.[cId]) {
+              const sub = h.submissions?.[cId];
+              if (sub === true || (sub && typeof sub === 'object' && sub.completed === true)) {
                 parentCompletedHws++;
               }
             }
@@ -242,25 +243,28 @@ export default function HomeScreen() {
         });
       }
       
-      const parentTotalCount = parentTotalHws > 0 ? parentTotalHws : 5;
-      const parentCompletedCount = parentTotalHws > 0 ? parentCompletedHws : 4; 
-      const parentProgressPct = Math.round((parentCompletedCount / parentTotalCount) * 100);
+      const parentTotalCount = parentTotalHws;
+      const parentCompletedCount = parentCompletedHws; 
+      const parentProgressPct = parentTotalCount > 0 ? Math.round((parentCompletedCount / parentTotalCount) * 100) : 100;
 
       // --- 4. STUDENT STATS ---
       // This Week's Lesson Progress: student's attendance/lessons completed
-      let studentCompletedLessons = 0;
+      let studentTotalCount = 0;
+      let studentCompletedCount = 0;
       const studentId = user?.uid;
       
       if (studentId) {
-        const studentAtts = allAttendance.filter((a: any) => 
-          a.rolls?.[studentId] === 'present' || a.rolls?.[studentId] === 'late'
-        );
-        studentCompletedLessons = studentAtts.length;
+        const studentClass = allClassList.find((c: any) => c.studentIds?.includes(studentId));
+        if (studentClass) {
+          const classAtts = allAttendance.filter((a: any) => a.classId === studentClass.classId);
+          studentTotalCount = classAtts.length;
+          studentCompletedCount = classAtts.filter((a: any) => 
+            a.rolls?.[studentId] === 'present' || a.rolls?.[studentId] === 'late'
+          ).length;
+        }
       }
       
-      const studentTotalCount = 4;
-      const studentCompletedCount = studentCompletedLessons > 0 ? studentCompletedLessons : 3;
-      const studentProgressPct = Math.round((studentCompletedCount / studentTotalCount) * 100);
+      const studentProgressPct = studentTotalCount > 0 ? Math.round((studentCompletedCount / studentTotalCount) * 100) : 100;
 
       // --- 5. NEXT LEARNING SESSION ---
       let nextSessionLevel = i18n.language === 'ta' ? 'நிலை 3' : 'Level 3';
