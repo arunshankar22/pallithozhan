@@ -19,11 +19,15 @@ import { mockDb } from '@/services/mockBackend';
 import { Spacing } from '@/constants/theme';
 
 export function ProfileTab({ user, colors, t, showToast, i18n, logout }: TabProps) {
-  const { updateProfile, updateLanguage, updateAuthPassword } = useAuth();
+  const { updateProfile, updateLanguage, updateAuthPassword, switchRole } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [fullName, setFullName] = useState(user?.fullName || '');
   const [phone, setPhone] = useState(user?.phone || '');
   const [selectedLang, setSelectedLang] = useState<'ta' | 'en'>(user?.languagePreference || 'ta');
+
+  const canSwitchRole = (user?.originalRole === 'teacher' || user?.originalRole === 'volunteer' || user?.originalRole === 'admin') && 
+                        (user?.associatedStudents && user?.associatedStudents.length > 0);
+  const alternateRole = user?.role === 'parent' ? user?.originalRole : 'parent';
 
   // Profile Photo Upload states
   const [photoModalVisible, setPhotoModalVisible] = useState(false);
@@ -455,6 +459,58 @@ export function ProfileTab({ user, colors, t, showToast, i18n, logout }: TabProp
           borderColor: colors.border,
           overflow: 'hidden'
         }}>
+          {/* Active Role Switcher Row for Dual Roles */}
+          {canSwitchRole && alternateRole && (
+            <View style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: Spacing.three,
+              borderBottomWidth: 1,
+              borderColor: colors.border
+            }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <Shield size={18} color={colors.primary} />
+                <View style={{ gap: 2 }}>
+                  <ThemedText style={{ fontSize: 13, fontWeight: '700', color: colors.text }}>
+                    Switch View Role / பொறுப்பை மாற்று
+                  </ThemedText>
+                  <ThemedText style={{ fontSize: 11, color: colors.textSecondary }}>
+                    {user?.role === 'parent' 
+                      ? `Viewing as Parent (Switch back to ${user?.originalRole?.toUpperCase()})` 
+                      : `Viewing as ${user?.role?.toUpperCase()} (Switch to Parent View)`}
+                  </ThemedText>
+                </View>
+              </View>
+              <Pressable
+                onPress={() => {
+                  switchRole(alternateRole);
+                  showToast(
+                    i18n.language === 'ta'
+                      ? `காட்சிப் பொறுப்பு ${alternateRole.toUpperCase()} ஆக மாற்றப்பட்டது!`
+                      : `Switched view context to ${alternateRole.toUpperCase()}!`,
+                    'success'
+                  );
+                }}
+                style={({ pressed }) => [
+                  {
+                    backgroundColor: colors.primaryLight,
+                    paddingVertical: 6,
+                    paddingHorizontal: 12,
+                    borderRadius: 8,
+                    borderWidth: 1,
+                    borderColor: colors.primary,
+                    opacity: pressed ? 0.9 : 1
+                  }
+                ]}
+              >
+                <ThemedText style={{ color: colors.primary, fontSize: 11, fontWeight: '700' }}>
+                  {user?.role === 'parent' ? `Switch to ${user?.originalRole?.toUpperCase()}` : 'Switch to PARENT'}
+                </ThemedText>
+              </Pressable>
+            </View>
+          )}
+
           {/* Notifications Toggle */}
           <View style={{
             flexDirection: 'row',

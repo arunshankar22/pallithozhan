@@ -224,8 +224,11 @@ export function UserModal({
       payload.wwcExpiryDate = wwcExpiryDate;
       payload.effectiveFrom = effectiveFrom.trim();
       payload.effectiveTo = effectiveTo.trim();
+      payload.associatedStudents = associatedStudents;
     } else if (role === 'parent') {
       payload.parentVolunteer = parentVolunteer;
+      payload.associatedStudents = associatedStudents;
+    } else if (role === 'admin') {
       payload.associatedStudents = associatedStudents;
     }
 
@@ -760,90 +763,91 @@ export function UserModal({
 
             {/* PARENT SPECIFIC */}
             {role === 'parent' && (
-              <View style={{ gap: Spacing.two }}>
-                <View style={localStyles.cardSection}>
-                  <ThemedText style={localStyles.sectionHeader}>🤝 Volunteer Preferences / தன்னார்வலர் விபரம்</ThemedText>
-                  <Pressable
-                    onPress={() => setParentVolunteer(prev => !prev)}
-                    style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginVertical: 6 }}
-                  >
-                    <View style={{ width: 18, height: 18, borderWidth: 2, borderColor: colors.secondary, borderRadius: 4, backgroundColor: parentVolunteer ? colors.secondary : 'transparent', justifyContent: 'center', alignItems: 'center' }}>
-                      {parentVolunteer && <CheckCircle size={12} color="#FFF" />}
-                    </View>
-                    <ThemedText style={{ fontSize: 13, fontWeight: '600' }}>Volunteer Interest / பள்ளிப் பணிகளில் உதவ விருப்பம்</ThemedText>
-                  </Pressable>
-                </View>
+              <View style={localStyles.cardSection}>
+                <ThemedText style={localStyles.sectionHeader}>🤝 Volunteer Preferences / தன்னார்வலர் விபரம்</ThemedText>
+                <Pressable
+                  onPress={() => setParentVolunteer(prev => !prev)}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginVertical: 6 }}
+                >
+                  <View style={{ width: 18, height: 18, borderWidth: 2, borderColor: colors.secondary, borderRadius: 4, backgroundColor: parentVolunteer ? colors.secondary : 'transparent', justifyContent: 'center', alignItems: 'center' }}>
+                    {parentVolunteer && <CheckCircle size={12} color="#FFF" />}
+                  </View>
+                  <ThemedText style={{ fontSize: 13, fontWeight: '600' }}>Volunteer Interest / பள்ளிப் பணிகளில் உதவ விருப்பம்</ThemedText>
+                </Pressable>
+              </View>
+            )}
 
-                <View style={localStyles.cardSection}>
-                  <ThemedText style={localStyles.sectionHeader}>🔗 Associated Student(s) / இணைக்கப்பட்ட மாணவர்கள்</ThemedText>
-                  
-                  {suggestedStudents.length > 0 && (
-                    <View style={{ marginBottom: 10, marginTop: 4 }}>
-                      <ThemedText style={{ fontSize: 11, fontWeight: '700', color: colors.secondary }}>
-                        💡 Suggested child tags / பரிந்துரைகள்:
-                      </ThemedText>
-                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
-                        {suggestedStudents.map(s => (
-                          <Pressable
-                            key={s.uid}
-                            onPress={() => {
-                              setAssociatedStudents(prev => [...prev, s.uid]);
-                              showToast(`Tagged ${s.fullName}!`, 'success');
-                            }}
-                            style={{
-                              backgroundColor: colors.secondaryLight,
-                              borderColor: colors.secondary,
-                              borderWidth: 1,
-                              borderRadius: 20,
-                              paddingVertical: 4,
-                              paddingHorizontal: 10,
-                            }}
-                          >
-                            <ThemedText style={{ fontSize: 11, color: colors.secondary, fontWeight: '700' }}>
-                              + {s.fullName}
-                            </ThemedText>
-                          </Pressable>
-                        ))}
-                      </View>
+            {/* ASSOCIATED STUDENTS TAGGING FOR DUAL-ROLE SUPPORT */}
+            {['parent', 'teacher', 'volunteer', 'admin'].includes(role) && (
+              <View style={localStyles.cardSection}>
+                <ThemedText style={localStyles.sectionHeader}>🔗 Associated Student(s) / இணைக்கப்பட்ட மாணவர்கள்</ThemedText>
+                
+                {suggestedStudents.length > 0 && (
+                  <View style={{ marginBottom: 10, marginTop: 4 }}>
+                    <ThemedText style={{ fontSize: 11, fontWeight: '700', color: colors.secondary }}>
+                      💡 Suggested child tags / பரிந்துரைகள்:
+                    </ThemedText>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+                      {suggestedStudents.map(s => (
+                        <Pressable
+                          key={s.uid}
+                          onPress={() => {
+                            setAssociatedStudents(prev => [...prev, s.uid]);
+                            showToast(`Tagged ${s.fullName}!`, 'success');
+                          }}
+                          style={{
+                            backgroundColor: colors.secondaryLight,
+                            borderColor: colors.secondary,
+                            borderWidth: 1,
+                            borderRadius: 20,
+                            paddingVertical: 4,
+                            paddingHorizontal: 10,
+                          }}
+                        >
+                          <ThemedText style={{ fontSize: 11, color: colors.secondary, fontWeight: '700' }}>
+                            + {s.fullName}
+                          </ThemedText>
+                        </Pressable>
+                      ))}
                     </View>
+                  </View>
+                )}
+
+                <TextInput
+                  style={[styles.formInput, { color: colors.text, borderColor: colors.border, marginBottom: 8, paddingVertical: 4, height: 32, marginTop: 4 }]}
+                  placeholder="🔍 Search student to tag..."
+                  placeholderTextColor={colors.textSecondary}
+                  value={studentQuery}
+                  onChangeText={setStudentQuery}
+                />
+
+                <ScrollView style={{ maxHeight: 120, borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 8 }}>
+                  {filteredStudents.length === 0 ? (
+                    <ThemedText style={{ color: colors.textSecondary, fontSize: 12, fontStyle: 'italic', textAlign: 'center', marginVertical: 8 }}>
+                      No students match your query.
+                    </ThemedText>
+                  ) : (
+                    filteredStudents.map(s => {
+                      const isLinked = associatedStudents.includes(s.uid);
+                      return (
+                        <Pressable
+                          key={s.uid}
+                          onPress={() => {
+                            setAssociatedStudents(prev => 
+                              prev.includes(s.uid) ? prev.filter(id => id !== s.uid) : [...prev, s.uid]
+                            );
+                          }}
+                          style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 6, gap: 8 }}
+                        >
+                          <View style={{ width: 16, height: 16, borderWidth: 2, borderColor: colors.secondary, borderRadius: 3, backgroundColor: isLinked ? colors.secondary : 'transparent', justifyContent: 'center', alignItems: 'center' }}>
+                            {isLinked && <CheckCircle size={10} color="#FFF" />}
+                          </View>
+                          <ThemedText style={{ fontSize: 13 }}>{s.fullName}</ThemedText>
+                        </Pressable>
+                      );
+                    })
                   )}
-
-                  <TextInput
-                    style={[styles.formInput, { color: colors.text, borderColor: colors.border, marginBottom: 8, paddingVertical: 4, height: 32, marginTop: 4 }]}
-                    placeholder="🔍 Search student to tag..."
-                    placeholderTextColor={colors.textSecondary}
-                    value={studentQuery}
-                    onChangeText={setStudentQuery}
-                  />
-
-                  <ScrollView style={{ maxHeight: 120, borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 8 }}>
-                    {filteredStudents.length === 0 ? (
-                      <ThemedText style={{ color: colors.textSecondary, fontSize: 12, fontStyle: 'italic', textAlign: 'center', marginVertical: 8 }}>
-                        No students match your query.
-                      </ThemedText>
-                    ) : (
-                      filteredStudents.map(s => {
-                        const isLinked = associatedStudents.includes(s.uid);
-                        return (
-                          <Pressable
-                            key={s.uid}
-                            onPress={() => {
-                              setAssociatedStudents(prev => 
-                                prev.includes(s.uid) ? prev.filter(id => id !== s.uid) : [...prev, s.uid]
-                              );
-                            }}
-                            style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 6, gap: 8 }}
-                          >
-                            <View style={{ width: 16, height: 16, borderWidth: 2, borderColor: colors.secondary, borderRadius: 3, backgroundColor: isLinked ? colors.secondary : 'transparent', justifyContent: 'center', alignItems: 'center' }}>
-                              {isLinked && <CheckCircle size={10} color="#FFF" />}
-                            </View>
-                            <ThemedText style={{ fontSize: 13 }}>{s.fullName}</ThemedText>
-                          </Pressable>
-                        );
-                      })
-                    )}
-                  </ScrollView>
-                </View>
+                </ScrollView>
               </View>
             )}
           </ScrollView>

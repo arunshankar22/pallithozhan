@@ -10,6 +10,7 @@ export interface UserProfile {
   email: string;
   fullName: string;
   role: 'admin' | 'teacher' | 'volunteer' | 'parent' | 'student';
+  originalRole?: 'admin' | 'teacher' | 'volunteer' | 'parent' | 'student';
   phone: string;
   schoolId: string;
   languagePreference: string;
@@ -26,6 +27,7 @@ interface AuthContextType {
   updateLanguage: (lang: string) => void;
   updateProfile: (fullName: string, phone: string, profilePicture?: string) => Promise<void>;
   updateAuthPassword: (newPassword: string) => Promise<void>;
+  switchRole: (role: 'admin' | 'teacher' | 'volunteer' | 'parent' | 'student') => void;
   isLoading: boolean;
 }
 
@@ -34,6 +36,15 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  const resolveUserProfile = (profile: any): UserProfile => {
+    const storedOverride = typeof window !== 'undefined' ? localStorage.getItem(`active_role_${profile.uid}`) : null;
+    return {
+      ...profile,
+      originalRole: profile.originalRole || profile.role,
+      role: (storedOverride || profile.role) as any
+    };
+  };
 
   // Sync state with persistent session or state
   useEffect(() => {
@@ -45,7 +56,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (storedUid) {
           const profile = await mockDb.getUser(storedUid);
           if (profile) {
-            setUser(profile);
+            setUser(resolveUserProfile(profile));
             i18n.changeLanguage(profile.languagePreference);
           }
         }
@@ -55,9 +66,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (fbUser) {
             // Fetch profile from Firestore mock/production
             const profile = await mockDb.getUser(fbUser.uid);
-            setUser(profile);
             if (profile) {
+              setUser(resolveUserProfile(profile));
               i18n.changeLanguage(profile.languagePreference);
+            } else {
+              setUser(null);
             }
           } else {
             setUser(null);
@@ -79,12 +92,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (!matched) {
           throw new Error('User not found. Use admin@example.com, teacher@example.com, parent@example.com, etc.');
         }
-        setUser(matched);
-        i18n.changeLanguage(matched.languagePreference);
+        const resolved = resolveUserProfile(matched);
+        setUser(resolved);
+        i18n.changeLanguage(resolved.languagePreference);
         if (typeof window !== 'undefined') {
-          localStorage.setItem('pallithozhan_session_uid', matched.uid);
+          localStorage.setItem('pallithozhan_session_uid', resolved.uid);
         }
-        return matched;
+        return resolved;
       } else {
         // Complete Firebase production integration
         try {
@@ -117,9 +131,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             
             await mockDb.createUser(profile);
           }
-          setUser(profile);
-          i18n.changeLanguage(profile.languagePreference);
-          return profile;
+          const resolved = resolveUserProfile(profile);
+          setUser(resolved);
+          i18n.changeLanguage(resolved.languagePreference);
+          return resolved;
         } catch (fbAuthErr: any) {
           // INTERCEPT SPREADSHEET IMPORTED USERS FIRST-TIME ACTIVATION
           if (fbAuthErr.code === 'auth/user-not-found' || fbAuthErr.code === 'auth/invalid-credential' || fbAuthErr.code === 'auth/invalid-email') {
@@ -149,9 +164,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                   await mockDb.deleteUser(oldUid);
                 }
                 
-                setUser(newProfile);
-                i18n.changeLanguage(newProfile.languagePreference || 'ta');
-                return newProfile;
+                const resolved = resolveUserProfile(newProfile);
+                setUser(resolved);
+                i18n.changeLanguage(resolved.languagePreference || 'ta');
+                return resolved;
               }
             } catch (autoRegErr) {
               console.error('Self-healing imported user auth registration failed:', autoRegErr);
@@ -182,12 +198,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
 
         const created = await mockDb.createUser(newUserProfile);
-        setUser(created);
-        i18n.changeLanguage(created.languagePreference);
+        const resolved = resolveUserProfile(created);
+        setUser(resolved);
+        i18n.changeLanguage(resolved.languagePreference);
         if (typeof window !== 'undefined') {
-          localStorage.setItem('pallithozhan_session_uid', created.uid);
+          localStorage.setItem('pallithozhan_session_uid', resolved.uid);
         }
-        return created;
+        return resolved;
       } else {
         if (!password) {
           throw new Error('Password is required for production registration.');
@@ -200,9 +217,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           ...profile
         };
         const created = await mockDb.createUser(newUserProfile);
-        setUser(created);
-        i18n.changeLanguage(created.languagePreference);
-        return created;
+        const resolved = resolveUserProfile(created);
+        setUser(resolved);
+        i18n.changeLanguage(resolved.languagePreference);
+        return resolved;
       }
     } catch (error: any) {
       throw error;
@@ -211,6 +229,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     setIsLoading(true);
+    if (user && typeof window !== 'undefined') {
+      localStorage.removeItem(`active_role_${user.uid}`);
+    }
     if (isDemoMode) {
       setUser(null);
       if (typeof window !== 'undefined') {
@@ -272,8 +293,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const switchRole = (newRole: 'admin' | 'teacher' | 'volunteer' | 'parent' | 'student') => {
+    if (user) {
+      const updated = { ...user, role: newRole };
+      setUser(updated);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(`active_role_${user.uid}`, newRole);
+      }
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, updateLanguage, updateProfile, updateAuthPassword, isLoading }}>
+    <AuthContext.Provider value={{ user, login, register, logout, updateLanguage, updateProfile, updateAuthPassword, switchRole, isLoading }}>
       {children}
     </AuthContext.Provider>
   );
