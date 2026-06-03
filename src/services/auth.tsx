@@ -92,9 +92,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try {
           const userCredential = await signInWithEmailAndPassword(fbAuth, email, password);
           const fbUser = userCredential.user;
-          const profile = await mockDb.getUser(fbUser.uid);
+          let profile = await mockDb.getUser(fbUser.uid);
           if (!profile) {
-            throw new Error('User authenticated in Firebase, but profile not found in database.');
+            console.log(`Profile not found in Firestore for authenticated UID: ${fbUser.uid}. Auto-creating default profile...`);
+            let role: 'admin' | 'teacher' | 'volunteer' | 'parent' | 'student' = 'parent';
+            const lowerEmail = (email || '').toLowerCase();
+            if (lowerEmail.includes('admin')) {
+              role = 'admin';
+            } else if (lowerEmail.includes('teacher')) {
+              role = 'teacher';
+            } else if (lowerEmail.includes('volunteer')) {
+              role = 'volunteer';
+            } else if (lowerEmail.includes('student')) {
+              role = 'student';
+            }
+            
+            profile = {
+              uid: fbUser.uid,
+              email: fbUser.email || email,
+              fullName: fbUser.displayName || email.split('@')[0],
+              role: role,
+              phone: fbUser.phoneNumber || '',
+              schoolId: 'school_main',
+              languagePreference: 'en'
+            };
+            
+            await mockDb.createUser(profile);
           }
           setUser(profile);
           i18n.changeLanguage(profile.languagePreference);
