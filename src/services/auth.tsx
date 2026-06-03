@@ -71,7 +71,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = async (email: string, password: string): Promise<UserProfile> => {
-    setIsLoading(true);
     try {
       if (isDemoMode) {
         // Match with pre-existing mock accounts
@@ -85,7 +84,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (typeof window !== 'undefined') {
           localStorage.setItem('pallithozhan_session_uid', matched.uid);
         }
-        setIsLoading(false);
         return matched;
       } else {
         // Complete Firebase production integration
@@ -121,7 +119,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
           setUser(profile);
           i18n.changeLanguage(profile.languagePreference);
-          setIsLoading(false);
           return profile;
         } catch (fbAuthErr: any) {
           // INTERCEPT SPREADSHEET IMPORTED USERS FIRST-TIME ACTIVATION
@@ -154,7 +151,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 
                 setUser(newProfile);
                 i18n.changeLanguage(newProfile.languagePreference || 'ta');
-                setIsLoading(false);
                 return newProfile;
               }
             } catch (autoRegErr) {
@@ -165,13 +161,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
     } catch (error: any) {
-      setIsLoading(false);
       throw error;
     }
   };
 
   const register = async (profile: Omit<UserProfile, 'uid' | 'schoolId'>, password?: string): Promise<UserProfile> => {
-    setIsLoading(true);
     try {
       const schoolId = 'school_main'; // default base school, scalable to multi-school
       if (isDemoMode) {
@@ -193,7 +187,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (typeof window !== 'undefined') {
           localStorage.setItem('pallithozhan_session_uid', created.uid);
         }
-        setIsLoading(false);
         return created;
       } else {
         if (!password) {
@@ -209,11 +202,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const created = await mockDb.createUser(newUserProfile);
         setUser(created);
         i18n.changeLanguage(created.languagePreference);
-        setIsLoading(false);
         return created;
       }
     } catch (error: any) {
-      setIsLoading(false);
       throw error;
     }
   };
@@ -256,7 +247,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const updateAuthPassword = async (newPassword: string): Promise<void> => {
-    setIsLoading(true);
     try {
       if (isDemoMode) {
         console.log('Mock password updated in demo mode.');
@@ -277,9 +267,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setUser(updated);
         }
       }
-      setIsLoading(false);
     } catch (err: any) {
-      setIsLoading(false);
       throw err;
     }
   };
