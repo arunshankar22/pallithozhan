@@ -15,25 +15,25 @@ import { Platform } from 'react-native';
 export const Colors = {
   light: {
     // Template standard compatible fields
-    text: '#4B4C47', // Warm Charcoal Slate
-    background: '#FDFCF7', // Warm Pearl Off-white
-    backgroundElement: '#FFFFFF', // Solid White cards
-    backgroundSelected: '#F5F4EE', // Slightly darker cream for selected states
-    textSecondary: '#7A7C75', // Muted sage slate
-
+    text: '#131d21', // on-surface / on-background Charcoal
+    background: '#FFFBF2', // surface-cream Warm background
+    backgroundElement: '#ffffff', // surface-container-lowest Card bg
+    backgroundSelected: '#ebf5fa', // surface-container-low selected state
+    textSecondary: '#5a413b', // on-surface-variant Muted rust-gray
+    
     // Balar Malar Brand aligned fields
-    primary: '#EA5330', // Playful Coral Orange-Red
-    primaryLight: '#FDECE9', // Soft Coral light wash
-    secondary: '#669D89', // Sage Green
-    secondaryLight: '#F0F6F4', // Soft Sage wash
-    accent: '#FEC42B', // Honey Gold / Amber Yellow
-    accentLight: '#FFF9E8', // Light Gold wash
-    border: '#EAE8DE', // Soft warm cream border
-    success: '#669D89', // Use Secondary Sage Green as Success
-    warning: '#FEC42B', // Use Accent Gold as Warning
-    danger: '#EA5330', // Use Primary Coral as Danger / Alert
-    cardBg: '#FFFFFF',
-    shadowColor: '#4B4C47',
+    primary: '#af2907', // primary red
+    primaryLight: '#ffdad2', // primary-fixed soft red wash
+    secondary: '#785a00', // secondary gold
+    secondaryLight: '#ffdf9d', // secondary-fixed soft gold wash
+    accent: '#fdc32a', // secondary-container bright yellow
+    accentLight: '#ffdf9d', // soft yellow wash
+    border: '#dfeaef', // surface-container-high soft beige border
+    success: '#2f6654', // tertiary green
+    warning: '#785a00', // secondary gold
+    danger: '#ba1a1a', // error red
+    cardBg: '#ffffff', // pure white
+    shadowColor: '#1A2B44', // navy-heritage soft shadow base
     shadowOpacity: 0.05,
   },
   dark: {
@@ -77,7 +77,7 @@ export const Fonts = Platform.select({
     mono: 'monospace',
   },
   web: {
-    sans: 'Montserrat, "Open Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    sans: '"Plus Jakarta Sans", Montserrat, "Open Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
     serif: 'Georgia, Cambria, "Times New Roman", Times, serif',
     rounded: 'system-ui, sans-serif',
     mono: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',

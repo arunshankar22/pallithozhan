@@ -4,35 +4,28 @@ import { useTranslation } from 'react-i18next';
 import { Colors, Spacing, MaxContentWidth } from '@/constants/theme';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { BookOpen, MapPin, Clock, Award, Sparkles, Languages, Shield, ArrowRight, X, Heart, Flower } from 'lucide-react-native';
+import { 
+  BookOpen, 
+  MapPin, 
+  Clock, 
+  Award, 
+  Sparkles, 
+  Languages, 
+  Shield, 
+  ArrowRight, 
+  X, 
+  Heart, 
+  Flower, 
+  Users, 
+  Rocket, 
+  Compass, 
+  Mail, 
+  Phone 
+} from 'lucide-react-native';
 import LoginScreen from './login';
 import RegisterScreen from './register';
 
 const { width: windowWidth } = Dimensions.get('window');
-
-const LANDING_HERO_SLIDES = [
-  {
-    image: 'https://images.unsplash.com/photo-1577896851231-70ef18881754?auto=format&fit=crop&q=80&w=1200',
-    titleTa: 'நமது தாய்மொழி தமிழைக் கற்போம்!',
-    titleEn: 'Learn Tamil, Protect Culture.',
-    descTa: 'ஆஸ்திரேலியாவின் முன்னணித் தமிழ்ப் பள்ளி அமைப்பான பாலர் மலர் அமைப்பின் பரமட்டா கிளைக்கு உங்களை வரவேற்கிறோம். நமது குழந்தைகளுக்குத் தமிழ்க் கல்வியையும் பண்பாட்டையும் சிறந்த முறையில் பயிற்றுவிக்கிறோம்.',
-    descEn: 'Welcome to Balar Malar Parramatta, a premier branch of Balar Malar NSW—Australia’s pioneer community Tamil school. Providing structural academic development and cultural alignment since 1977.'
-  },
-  {
-    image: 'https://images.unsplash.com/photo-1427504494785-3a9ca7044f45?auto=format&fit=crop&q=80&w=1200',
-    titleTa: 'புதுமையான கற்பித்தல் முறைகள்!',
-    titleEn: 'Interactive Classroom Learning',
-    descTa: 'வாராந்திர வகுப்புகள், பேச்சுப் போட்டிகள், மற்றும் விளையாட்டுகளுடன் கூடிய நவீன தமிழ்க் கல்வி முறைகள்.',
-    descEn: 'Engage in structured weekend curriculum, oratorical alignments, and fun educational Tamil games customized for young minds.'
-  },
-  {
-    image: 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?auto=format&fit=crop&q=80&w=1200',
-    titleTa: 'ஆர்வமுள்ள தன்னார்வ ஆசிரியர்கள்!',
-    titleEn: 'Dedicated Community Volunteers',
-    descTa: 'எங்கள் ஆசிரியர்கள் மற்றும் தன்னார்வலர்களின் அர்ப்பணிப்புடன் மாணவர்களுக்கு ஒரு சிறந்த தமிழ் சூழலை உருவாக்குகிறோம்.',
-    descEn: 'Our passionate educators foster a warm, inclusive, and rich environment dedicated to cultural enrichment and Tamil heritage.'
-  }
-];
 
 interface LandingScreenProps {
   onLoginSuccess: () => void;
@@ -44,34 +37,11 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
   const colors = Colors[scheme === 'unspecified' || !scheme ? 'light' : scheme];
 
   const [activeBranch, setActiveBranch] = useState(
-    typeof window !== 'undefined' ? localStorage.getItem('pallithozhan_active_branch') || 'main' : 'main'
+    typeof window !== 'undefined' ? localStorage.getItem('pallithozhan_active_branch') || 'parramatta' : 'parramatta'
   );
   const [portalVisible, setPortalVisible] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [isLargeScreen, setIsLargeScreen] = useState(windowWidth >= 768);
-
-  const [heroIndex, setHeroIndex] = useState(0);
-  const heroScrollViewRef = useRef<ScrollView | null>(null);
-  const [heroWidth, setHeroWidth] = useState(windowWidth);
-
-  const handleSelectBranch = (branchKey: string) => {
-    setActiveBranch(branchKey);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('pallithozhan_active_branch', branchKey);
-    }
-  };
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      const nextIndex = (heroIndex + 1) % LANDING_HERO_SLIDES.length;
-      setHeroIndex(nextIndex);
-      if (heroScrollViewRef.current && heroScrollViewRef.current.scrollTo) {
-        heroScrollViewRef.current.scrollTo({ x: nextIndex * heroWidth, animated: true });
-      }
-    }, 5000);
-
-    return () => clearInterval(timer);
-  }, [heroIndex, heroWidth]);
 
   React.useEffect(() => {
     const handleResize = () => {
@@ -86,73 +56,110 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
     i18n.changeLanguage(nextLang);
   };
 
-  const activeBranchName = 
-    activeBranch === 'main' ? 'Balar Malar Main (Sydney)' : 
-    activeBranch === 'parramatta' ? 'Balar Malar Parramatta' : 
-    'Balar Malar Seven Hills';
+  const handleSelectBranch = (branchKey: string) => {
+    setActiveBranch(branchKey);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('pallithozhan_active_branch', branchKey);
+    }
+  };
 
-  const activeBranchNameTa = 
-    activeBranch === 'main' ? 'தலைமைக் கிளை (சிட்னி)' : 
-    activeBranch === 'parramatta' ? 'பரமட்டா கிளை' : 
-    'செவன் ஹில்ஸ் கிளை';
+  const activeBranchName = 
+    activeBranch === 'parramatta' ? 'Balar Malar Parramatta' : 
+    activeBranch === 'sevenhills' ? 'Balar Malar Seven Hills' : 
+    'Balar Malar Blacktown';
 
   const branchAddress = 
-    activeBranch === 'main' ? 'Sydney Corporate Office, NSW 2000' : 
-    activeBranch === 'parramatta' ? 'Parramatta Public School Campus, NSW 2150' : 
-    'Seven Hills High School, NSW 2147';
+    activeBranch === 'parramatta' ? 'Parramatta Public School, 177 Macquarie St, Parramatta NSW 2150' : 
+    activeBranch === 'sevenhills' ? 'Seven Hills West Public School, Lucas Rd & Sackville St, Seven Hills NSW 2147' : 
+    'Blacktown Boys High School, Fifth Ave, Blacktown NSW 2148';
 
   const branchSchedule = 
-    activeBranch === 'main' ? 'Every Friday, 6:00 PM – 8:30 PM' : 
-    activeBranch === 'parramatta' ? 'Every Saturday, 2:00 PM – 5:00 PM' : 
-    'Every Sunday, 10:00 AM – 1:00 PM';
+    activeBranch === 'parramatta' ? 'Every Saturday, 2:00 PM – 4:30 PM' : 
+    activeBranch === 'sevenhills' ? 'Every Saturday, 2:00 PM – 4:30 PM' : 
+    'Every Saturday, 9:00 AM – 12:00 PM';
 
-  const branchFeatures = [
+  const coreFeatures = [
     {
-      title: i18n.language === 'ta' ? 'அடிப்படைத் தமிழ்' : 'Basic Tamil (Primary)',
-      desc: i18n.language === 'ta' ? 'ஆரம்பநிலை மாணவர்களுக்கான தமிழ் எழுத்துக்கள் மற்றும் எளிய சொற்கள் கற்றல்.' : 'Tamil alphabet writing, vowel-consonant structure, and basic vocabulary.',
-      icon: BookOpen,
+      title: i18n.language === 'ta' ? 'கலாச்சார பாரம்பரியம்' : 'Cultural Heritage',
+      desc: i18n.language === 'ta' 
+        ? 'மாணவர்களிடம் தமிழ் மொழி, கலை மற்றும் பண்பாட்டு விழுமியங்களை வளர்த்து வலுவான அடையாளத்தை உருவாக்குதல்.' 
+        : 'Instilling the rich values of Tamil literature, arts, and traditions, fostering a strong identity.',
+      icon: Heart,
       color: colors.primary
     },
     {
-      title: i18n.language === 'ta' ? 'திருக்குறள் & கலை' : 'Thirukkural & Speech',
-      desc: i18n.language === 'ta' ? 'மனப்பாடப் போட்டிகள், பேச்சுப் போட்டிகள் மற்றும் பாரம்பரிய கலைப் பயிற்சி.' : 'Thirukkural recitation competitions, oratorical training, and speech contest alignment.',
-      icon: Award,
-      color: colors.secondary
+      title: i18n.language === 'ta' ? 'நவீன கற்றல்' : 'Modern Learning',
+      desc: i18n.language === 'ta' 
+        ? 'நவீன கற்பித்தல் முறைகளுடன் பாரம்பரிய விழுமியங்களை இணைத்து சுவாரஸ்யமான கற்றல் சூழலை வழங்குதல்.' 
+        : 'We combine traditional wisdom with modern pedagogy and digital tools, making Tamil learning engaging and digital-ready.',
+      icon: Rocket,
+      color: '#10B981'
     },
     {
-      title: i18n.language === 'ta' ? 'நவீன பாடத்திட்டம்' : 'Structured Curriculum',
-      desc: i18n.language === 'ta' ? 'ஆஸ்திரேலியா தமிழ்க் கல்வி வாரிய வழிகாட்டுதலுடன் தரம் வாய்ந்த கற்றல்.' : 'NSW Community Languages Schools Program accredited academic syllabus.',
-      icon: Sparkles,
-      color: colors.accent
+      title: i18n.language === 'ta' ? 'சமூக மேம்பாடு' : 'Community Driven',
+      desc: i18n.language === 'ta' 
+        ? 'மாணவர்கள், பெற்றோர்கள் மற்றும் கல்வியாளர்கள் இணைந்த ஒரு சிறந்த தமிழ்ச் சமூகத்தை உருவாக்குதல்.' 
+        : 'Active, vibrant community of parents and educators dedicated to preserving our linguistic legacy for generations to come.',
+      icon: Users,
+      color: '#F59E0B'
     }
   ];
 
-  const BalarMalarLogo = ({ size = 26 }: { size?: number }) => {
-    const displayWidth = size * 4;
-    const displayHeight = size * 1.1;
-
-    return (
-      <View style={styles.logoRow}>
-        <Image 
-          source={require('../../assets/images/balarmalar_logo.png')} 
-          style={{ width: displayWidth, height: displayHeight, resizeMode: 'contain' }} 
-        />
-        <View style={{ marginLeft: 6, justifyContent: 'center' }}>
-          <ThemedText style={[styles.logoTextSub, { color: colors.secondary, fontSize: 10, fontWeight: '700' }]}>
-            {activeBranchNameTa}
-          </ThemedText>
-        </View>
-      </View>
-    );
-  };
+  const curriculumStages = [
+    {
+      stage: i18n.language === 'ta' ? 'தொடக்க நிலை' : 'Foundation Stage',
+      title: i18n.language === 'ta' ? 'அரும்பு, மொட்டு, மலர் (KG & Yr 1)' : 'அரும்பு, மொட்டு, மலர் (KG & Yr 1)',
+      desc: i18n.language === 'ta' 
+        ? 'கதைகள், பாடல்கள் மூலம் தமிழ் எழுத்துக்கள் மற்றும் எளிய உரையாடல்களை விளையாட்டு முறையில் கற்றல்.' 
+        : 'Introduction to basic letters, sounds and conversational Tamil through stories and songs.',
+      image: 'https://images.unsplash.com/photo-1502086223501-7ea6ecd79368?auto=format&fit=crop&q=80&w=600',
+      isDark: false
+    },
+    {
+      stage: i18n.language === 'ta' ? 'வகுப்பு நிலை 1-2' : 'Primary Stage',
+      title: i18n.language === 'ta' ? 'நிலை 1 - 2 (Years 1 - 4)' : 'நிலை 1 - 2 (Years 1 - 4)',
+      desc: i18n.language === 'ta' 
+        ? 'வாசிப்புத் திறன், அடிப்படை எழுத்துத் திறன் மற்றும் எளிய வாக்கியங்களை அமைத்தல் ஆகியவற்றைப் பயிற்சி செய்தல்.' 
+        : 'Building reading fluency and foundational writing skills with interactive exercises.',
+      bgColor: scheme === 'dark' ? '#3B1A12' : '#FFF5F3',
+      borderColor: scheme === 'dark' ? '#6E2312' : '#FFD9D2',
+      icon: Compass,
+      isDark: false
+    },
+    {
+      stage: i18n.language === 'ta' ? 'வகுப்பு நிலை 3-4' : 'Intermediate Stage',
+      title: i18n.language === 'ta' ? 'நிலை 3 - 4 (Years 5 - 8)' : 'நிலை 3 - 4 (Years 5 - 8)',
+      desc: i18n.language === 'ta' 
+        ? 'இலக்கிய நூல்கள் வாயிலாக தமிழ்ச் சொற்களஞ்சியத்தை வளர்த்தல் மற்றும் கூட்டு வாக்கியங்களை அமைத்தல்.' 
+        : 'Deepening vocabulary and complex sentence structures through literary texts.',
+      bgColor: scheme === 'dark' ? '#3B2F12' : '#FFFBF0',
+      borderColor: scheme === 'dark' ? '#6E5512' : '#FFEBB8',
+      icon: BookOpen,
+      isDark: false
+    },
+    {
+      stage: i18n.language === 'ta' ? 'மேல்நிலை வகுப்புகள்' : 'Advanced Stage',
+      title: i18n.language === 'ta' ? 'நிலை 5 - 6 (HS & Prep)' : 'நிலை 5 - 6 (HS & Prep)',
+      desc: i18n.language === 'ta' 
+        ? 'தமிழ் இலக்கிய ஆய்வு, கவிதை நயம் மற்றும் நியூ சவுத் வேல்ஸ் HSC பொதுத் தேர்வுகளுக்கான சிறப்புப் பயிற்சி.' 
+        : 'Advanced Tamil literature analysis, poetry, and exam preparation for the NSW HSC Tamil examination.',
+      bgColor: '#131d21',
+      borderColor: '#283236',
+      isDark: true,
+      stats: [
+        { label: i18n.language === 'ta' ? 'HSC தேர்ச்சி' : 'HSC Pass Rate', value: '98%' },
+        { label: i18n.language === 'ta' ? 'HSC பட்டதாரிகள்' : 'HSC Graduates', value: '100+' }
+      ]
+    }
+  ];
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      
+      {/* HEADER NAVBAR */}
       <View style={[
         styles.headbar, 
         { 
-          backgroundColor: scheme === 'dark' ? 'rgba(26, 30, 25, 0.7)' : 'rgba(255, 255, 255, 0.7)', 
+          backgroundColor: scheme === 'dark' ? 'rgba(19, 29, 33, 0.85)' : 'rgba(255, 255, 255, 0.85)', 
           borderColor: colors.border,
           borderBottomWidth: 1,
           ...Platform.select({
@@ -163,13 +170,28 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
           })
         }
       ]}>
-        <BalarMalarLogo size={36} />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+          <Image 
+            source={require('../../assets/images/balarmalar_logo.png')} 
+            style={{ width: 80, height: 24, resizeMode: 'contain' }} 
+          />
+          {/* Vertical Separator */}
+          <View style={{ width: 1, height: 16, backgroundColor: colors.border, marginHorizontal: 2 }} />
+          
+          <Image 
+            source={require('../../assets/images/pallithozhan_logo.png')} 
+            style={{ width: 26, height: 26, borderRadius: 6 }} 
+          />
+          <ThemedText style={{ color: colors.primary, fontSize: 16, fontWeight: '800', letterSpacing: 0.5 }}>
+            Pallithozhan
+          </ThemedText>
+        </View>
 
         <View style={styles.headbarActions}>
           <Pressable onPress={toggleLanguage} style={[styles.langBadge, { backgroundColor: colors.background, borderColor: colors.border }]}>
             <Languages size={14} color={colors.primary} />
             <ThemedText style={styles.langText}>
-              {i18n.language === 'ta' ? 'English' : 'தமிழ் பதிப்பு'}
+              {i18n.language === 'ta' ? 'English' : 'தமிழ்'}
             </ThemedText>
           </Pressable>
 
@@ -180,84 +202,92 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
               { 
                 backgroundColor: colors.primary, 
                 opacity: pressed ? 0.9 : 1,
-                ...Platform.select({
-                  web: {
-                    backdropFilter: 'blur(8px)',
-                    WebkitBackdropFilter: 'blur(8px)',
-                    boxShadow: '0 8px 24px rgba(234, 83, 48, 0.25)',
-                    borderWidth: 1,
-                    borderColor: 'rgba(255, 255, 255, 0.25)',
-                  }
-                })
               }
             ]}
           >
             <Shield size={14} color="#FFF" style={{ marginRight: 6 }} />
-            <ThemedText style={styles.portalButtonText}>Portal / நுழைவு</ThemedText>
+            <ThemedText style={styles.portalButtonText}>Portal / Login</ThemedText>
           </Pressable>
         </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollWrapper}>
         
-        <View
-          style={{ width: '100%', height: isLargeScreen ? 420 : 380, backgroundColor: '#000', position: 'relative' }}
-          onLayout={(event) => { const { width } = event.nativeEvent.layout; if (width > 0) setHeroWidth(width); }}
-        >
-          <ScrollView
-            ref={heroScrollViewRef}
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            scrollEventThrottle={16}
-            onScroll={(event) => {
-              const slideWidth = event.nativeEvent.layoutMeasurement.width || heroWidth;
-              const offset = event.nativeEvent.contentOffset.x;
-              const page = Math.round(offset / slideWidth);
-              if (heroIndex !== page) setHeroIndex(page);
-            }}
-            style={{ width: '100%', height: '100%' }}
-          >
-            {LANDING_HERO_SLIDES.map((slide, idx) => (
-              <View key={idx} style={{ width: heroWidth, height: '100%', justifyContent: 'center', alignItems: 'center' }}>
-                <Image source={{ uri: slide.image }} style={{ width: '100%', height: '100%', position: 'absolute' }} />
-                <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.55)' }} />
-                <View style={{ maxWidth: 800, width: '100%', paddingHorizontal: isLargeScreen ? 72 : 44, zIndex: 10, gap: 10 }}>
-                  <ThemedText style={{ fontSize: isLargeScreen ? 34 : 26, fontWeight: '800', color: '#FFF' }}>{slide.titleTa}</ThemedText>
-                  <ThemedText style={{ fontSize: isLargeScreen ? 24 : 18, fontWeight: '800', color: colors.primaryLight }}>{slide.titleEn}</ThemedText>
-                  <ThemedText style={{ fontSize: 13, lineHeight: 20, color: 'rgba(255,255,255,0.88)' }}>{i18n.language === 'ta' ? slide.descTa : slide.descEn}</ThemedText>
-                </View>
-              </View>
-            ))}
-          </ScrollView>
+        {/* HERO SECTION */}
+        <View style={styles.heroContainer}>
+          <Image 
+            source={{ uri: 'https://images.unsplash.com/photo-1577896851231-70ef18881754?auto=format&fit=crop&q=80&w=1200' }} 
+            style={styles.heroBgImage} 
+          />
+          <View style={styles.heroOverlay} />
+          
+          <View style={styles.heroContent}>
+            {/* Banner Badge */}
+            <View style={[styles.heroBadge, { borderColor: colors.secondary }]}>
+              <ThemedText style={{ color: colors.secondary, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>
+                {i18n.language === 'ta' ? 'பாலர் மலர் 2026 • வகுப்புகள் துவங்கின!' : 'Balar Malar 2026 • Classes Started!'}
+              </ThemedText>
+            </View>
+
+            {/* Title */}
+            <ThemedText style={styles.heroTitle}>
+              {i18n.language === 'ta' 
+                ? 'தமிழ் மொழியால் இளைய தலைமுறையை மேம்படுத்துவோம்' 
+                : 'Empowering the Next Generation through Tamil Excellence'}
+            </ThemedText>
+
+            {/* Description */}
+            <ThemedText style={styles.heroDesc}>
+              {i18n.language === 'ta'
+                ? 'ஆஸ்திரேலியாவின் முன்னோடித் தமிழ்ப் பள்ளி அமைப்பான பாலர் மலர் NSW. 1977 முதல் நமது குழந்தைகளுக்கு முறையான தமிழ்க் கல்வியையும் கலாச்சாரத்தையும் பயிற்றுவித்து வருகிறோம்.'
+                : 'Balar Malar NSW - Australia\'s pioneer community Tamil school. Providing structured academic development and cultural alignment since 1977.'}
+            </ThemedText>
+
+            {/* Action Buttons */}
+            <View style={styles.heroActions}>
+              <Pressable 
+                onPress={() => { setAuthMode('register'); setPortalVisible(true); }}
+                style={({ pressed }) => [
+                  styles.heroBtnPrimary,
+                  { backgroundColor: colors.primary, opacity: pressed ? 0.9 : 1 }
+                ]}
+              >
+                <ThemedText style={styles.heroBtnText}>
+                  {i18n.language === 'ta' ? 'பதிவு செய்க 2026' : 'Enroll for 2026'}
+                </ThemedText>
+              </Pressable>
+
+              <Pressable 
+                style={({ pressed }) => [
+                  styles.heroBtnSecondary,
+                  { opacity: pressed ? 0.8 : 1 }
+                ]}
+              >
+                <ThemedText style={[styles.heroBtnText, { color: '#FFF' }]}>
+                  {i18n.language === 'ta' ? 'மேலும் அறிய' : 'Learn More'}
+                </ThemedText>
+              </Pressable>
+            </View>
+          </View>
         </View>
 
-
-
+        {/* CORE FEATURES SECTION */}
         <View style={styles.mainGridWrapper}>
-          <ThemedText style={styles.gridSectionHeader}>Why {activeBranchName}?</ThemedText>
           <View style={styles.featuresGrid}>
-            {branchFeatures.map((item, idx) => {
+            {coreFeatures.map((item, idx) => {
               const Icon = item.icon;
               return (
                 <View key={idx} style={[
                   styles.featureCard, 
                   { 
-                    backgroundColor: scheme === 'dark' ? 'rgba(29, 33, 28, 0.65)' : 'rgba(255, 255, 255, 0.65)', 
-                    borderColor: scheme === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(255, 255, 255, 0.55)',
-                    ...Platform.select({
-                      web: {
-                        backdropFilter: 'blur(16px)',
-                        WebkitBackdropFilter: 'blur(16px)',
-                        boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.04)',
-                      }
-                    })
+                    backgroundColor: colors.cardBg, 
+                    borderColor: colors.border
                   }
                 ]}>
                   <View style={[styles.featureIconContainer, { backgroundColor: item.color + '15' }]}>
-                    <Icon size={22} color={item.color} />
+                    <Icon size={20} color={item.color} />
                   </View>
-                  <ThemedText style={styles.featureTitle}>{item.title}</ThemedText>
+                  <ThemedText style={[styles.featureTitle, { color: colors.text }]}>{item.title}</ThemedText>
                   <ThemedText style={[styles.featureDesc, { color: colors.textSecondary }]}>{item.desc}</ThemedText>
                 </View>
               );
@@ -265,45 +295,302 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
           </View>
         </View>
 
-        <View style={[
-          styles.infoBannerRow, 
-          { 
-            borderTopWidth: 1, 
-            borderBottomWidth: 1, 
-            borderColor: colors.border,
-            backgroundColor: scheme === 'dark' ? 'rgba(26, 30, 25, 0.65)' : 'rgba(255, 255, 255, 0.6)', 
-            ...Platform.select({
-              web: {
-                backdropFilter: 'blur(16px)',
-                WebkitBackdropFilter: 'blur(16px)',
-              }
-            })
-          }
-        ]}>
-          <View style={styles.infoCol}>
-            <MapPin size={24} color={colors.primary} />
-            <ThemedText style={styles.infoColTitle}>Class Address</ThemedText>
-            <ThemedText style={[styles.infoColValue, { color: colors.text }]}>{branchAddress}</ThemedText>
+        {/* CURRICULUM TIMELINE SECTION */}
+        <View style={[styles.mainGridWrapper, { paddingTop: 0 }]}>
+          <View style={styles.sectionHeaderContainer}>
+            <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>
+              {i18n.language === 'ta' ? 'பாடத்திட்டப் பயண அமைப்பு' : 'A Journey of Language Proficiency'}
+            </ThemedText>
+            <ThemedText style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>
+              {i18n.language === 'ta' 
+                ? 'அடிப்படை எழுத்துக்கள் முதல் மேல்நிலைத் தேர்வு தயாரிப்பு வரையிலான எங்களது திட்டமிட்ட தமிழ்ப் பயிற்றுவிப்பு முறைகள்.' 
+                : 'Our structured curriculum is designed to guide students from their first words to higher secondary curriculum.'}
+            </ThemedText>
+            <Pressable style={styles.curriculumLink}>
+              <ThemedText style={{ color: colors.primary, fontSize: 13, fontWeight: '700' }}>
+                {i18n.language === 'ta' ? 'முழு பாடத்திட்டத்தை ஆராய்க >' : 'Explore Full Curriculum >'}
+              </ThemedText>
+            </Pressable>
           </View>
-          <View style={styles.infoCol}>
-            <Clock size={24} color={colors.secondary} />
-            <ThemedText style={styles.infoColTitle}>Branch Schedule</ThemedText>
-            <ThemedText style={[styles.infoColValue, { color: colors.text }]}>{branchSchedule}</ThemedText>
+
+          {/* Timeline Cards Grid */}
+          <View style={styles.curriculumGrid}>
+            {curriculumStages.map((stage, idx) => {
+              return (
+                <View 
+                  key={idx} 
+                  style={[
+                    styles.curriculumCard, 
+                    { 
+                      backgroundColor: stage.bgColor || colors.cardBg, 
+                      borderColor: stage.borderColor || colors.border,
+                      borderWidth: 1
+                    }
+                  ]}
+                >
+                  {stage.image ? (
+                    <View style={styles.cardImageContainer}>
+                      <Image source={{ uri: stage.image }} style={styles.cardImage} />
+                      <View style={[styles.cardStageBadge, { backgroundColor: colors.primary }]}>
+                        <ThemedText style={styles.cardStageBadgeText}>{stage.stage}</ThemedText>
+                      </View>
+                    </View>
+                  ) : (
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                      <View style={[styles.cardStageBadgeInline, { backgroundColor: stage.isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.06)' }]}>
+                        <ThemedText style={[styles.cardStageBadgeText, { color: stage.isDark ? '#FFF' : colors.text }]}>{stage.stage}</ThemedText>
+                      </View>
+                      {stage.icon && (
+                        <View style={[styles.cardIconCircle, { backgroundColor: stage.isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.04)' }]}>
+                          <stage.icon size={16} color={stage.isDark ? '#FFF' : colors.primary} />
+                        </View>
+                      )}
+                    </View>
+                  )}
+
+                  <View style={{ gap: 6, flex: 1, padding: stage.image ? Spacing.three : 0 }}>
+                    <ThemedText style={[styles.cardTitle, { color: stage.isDark ? '#FFF' : colors.text }]}>
+                      {stage.title}
+                    </ThemedText>
+                    <ThemedText style={[styles.cardDesc, { color: stage.isDark ? 'rgba(255,255,255,0.75)' : colors.textSecondary }]}>
+                      {stage.desc}
+                    </ThemedText>
+
+                    {/* Stats badges for Advanced stage */}
+                    {stage.stats && (
+                      <View style={styles.statsRow}>
+                        {stage.stats.map((s, sIdx) => (
+                          <View key={sIdx} style={styles.statBadge}>
+                            <ThemedText style={styles.statValue}>{s.value}</ThemedText>
+                            <ThemedText style={styles.statLabel}>{s.label}</ThemedText>
+                          </View>
+                        ))}
+                      </View>
+                    )}
+                  </View>
+                </View>
+              );
+            })}
           </View>
         </View>
+
+        {/* MAP & FIND BRANCH SECTION */}
+        <View style={[styles.mainGridWrapper, { paddingTop: 0, paddingBottom: Spacing.six }]}>
+          <View style={{ flexDirection: isLargeScreen ? 'row' : 'column', gap: Spacing.four, alignItems: 'stretch' }}>
+            
+            {/* Left Column: Branch Info list */}
+            <View style={{ flex: 1, gap: Spacing.three, justifyContent: 'center' }}>
+              <ThemedText style={[styles.sectionTitle, { textAlign: 'left', marginBottom: 2 }]}>
+                {i18n.language === 'ta' ? 'அருகிலுள்ள கிளையைக் கண்டறிக' : 'Find a Branch Near You'}
+              </ThemedText>
+              <ThemedText style={[styles.sectionSubtitle, { textAlign: 'left', maxWidth: '100%', marginBottom: 12 }]}>
+                {i18n.language === 'ta' 
+                  ? 'ஆஸ்திரேலியா நியூ சவுத் வேல்ஸ் மாநிலத்தில் 15க்கும் மேற்பட்ட கிளைகளில் தமிழ் வகுப்புகள் சிறப்பாக நடத்தப்படுகின்றன.' 
+                  : 'We have 15+ centers across NSW to ensure quality Tamil education is accessible in your community.'}
+              </ThemedText>
+
+              {/* Branch quick items */}
+              <View style={{ gap: 10 }}>
+                <Pressable 
+                  onPress={() => handleSelectBranch('parramatta')}
+                  style={[styles.branchListItem, { 
+                    borderColor: activeBranch === 'parramatta' ? colors.primary : colors.border, 
+                    backgroundColor: activeBranch === 'parramatta' ? colors.primaryLight : colors.cardBg 
+                  }]}
+                >
+                  <MapPin size={16} color={colors.primary} />
+                  <ThemedText style={[styles.branchListText, { color: colors.text, fontWeight: activeBranch === 'parramatta' ? '700' : 'normal' }]}>
+                    Parramatta – Central CBD (Parramatta Public School)
+                  </ThemedText>
+                </Pressable>
+
+                <Pressable 
+                  onPress={() => handleSelectBranch('sevenhills')}
+                  style={[styles.branchListItem, { 
+                    borderColor: activeBranch === 'sevenhills' ? colors.primary : colors.border, 
+                    backgroundColor: activeBranch === 'sevenhills' ? colors.primaryLight : colors.cardBg 
+                  }]}
+                >
+                  <MapPin size={16} color={colors.primary} />
+                  <ThemedText style={[styles.branchListText, { color: colors.text, fontWeight: activeBranch === 'sevenhills' ? '700' : 'normal' }]}>
+                    Seven Hills – West Public School
+                  </ThemedText>
+                </Pressable>
+
+                <Pressable 
+                  onPress={() => handleSelectBranch('blacktown')}
+                  style={[styles.branchListItem, { 
+                    borderColor: activeBranch === 'blacktown' ? colors.primary : colors.border, 
+                    backgroundColor: activeBranch === 'blacktown' ? colors.primaryLight : colors.cardBg 
+                  }]}
+                >
+                  <MapPin size={16} color={colors.primary} />
+                  <ThemedText style={[styles.branchListText, { color: colors.text, fontWeight: activeBranch === 'blacktown' ? '700' : 'normal' }]}>
+                    Blacktown – Fifth Ave (Blacktown Boys High)
+                  </ThemedText>
+                </Pressable>
+              </View>
+
+              <Pressable style={[styles.viewBranchesButton, { borderColor: colors.primary }]}>
+                <ThemedText style={{ color: colors.primary, fontSize: 13, fontWeight: '700' }}>
+                  {i18n.language === 'ta' ? 'அனைத்து 15 கிளைகளையும் காண்க' : 'View All 15 Branches'}
+                </ThemedText>
+              </Pressable>
+            </View>
+
+            {/* Right Column: NSW Map graphic with card overlay */}
+            <View style={{ flex: 1.2, position: 'relative', borderRadius: 24, overflow: 'hidden', minHeight: 320 }}>
+              <Image 
+                source={require('../../assets/images/nsw_tamil_school_map.png')} 
+                style={styles.mapImage} 
+              />
+              <View style={styles.mapDarkenOverlay} />
+
+              {/* School Details overlay card */}
+              <View style={styles.mapOverlayCard}>
+                <View style={{ gap: 2 }}>
+                  <ThemedText style={{ color: '#FFF', fontSize: 13, fontWeight: '700' }}>
+                    {activeBranchName}
+                  </ThemedText>
+                  <ThemedText style={{ color: 'rgba(255,255,255,0.75)', fontSize: 10 }}>
+                    {branchAddress}
+                  </ThemedText>
+                  <ThemedText style={{ color: colors.secondary, fontSize: 10, fontWeight: '600', marginTop: 2 }}>
+                    {branchSchedule}
+                  </ThemedText>
+                </View>
+                <Pressable 
+                  onPress={() => { setAuthMode('login'); setPortalVisible(true); }}
+                  style={{ backgroundColor: colors.primary, paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8 }}
+                >
+                  <ThemedText style={{ color: '#FFF', fontSize: 10, fontWeight: '700' }}>
+                    School Details
+                  </ThemedText>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {/* RED CTA BANNER */}
+        <View style={styles.ctaBannerWrapper}>
+          <View style={[styles.ctaBannerCard, { backgroundColor: colors.primary }]}>
+            <ThemedText style={styles.ctaTitle}>
+              {i18n.language === 'ta' ? 'உங்கள் தமிழ்ப் பயணத்தை இன்றே தொடங்குங்கள்' : 'Start Your Tamil Journey Today'}
+            </ThemedText>
+            <ThemedText style={styles.ctaSubtitle}>
+              {i18n.language === 'ta' 
+                ? 'தமிழ் மொழியின் அழகையும் பண்பாட்டையும் கண்டறியும் 1500க்கும் மேற்பட்ட மாணவர்களுடன் இணையுங்கள்.' 
+                : 'Join over 1500 students who are discovering the beauty of their mother tongue.'}
+            </ThemedText>
+            <View style={styles.ctaActions}>
+              <Pressable 
+                onPress={() => { setAuthMode('register'); setPortalVisible(true); }}
+                style={styles.ctaBtnDark}
+              >
+                <ThemedText style={[styles.ctaBtnText, { color: '#FFF' }]}>
+                  {i18n.language === 'ta' ? 'பதிவு செய்க 2026' : 'Enroll for 2026'}
+                </ThemedText>
+              </Pressable>
+              <Pressable style={styles.ctaBtnWhite}>
+                <ThemedText style={[styles.ctaBtnText, { color: colors.primary }]}>
+                  {i18n.language === 'ta' ? 'தொடர்பு கொள்ள' : 'Contact Admissions'}
+                </ThemedText>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+
+        {/* RESPONSIVE FOOTER */}
+        <View style={[styles.footerBlock, { backgroundColor: '#131d21' }]}>
+          <View style={styles.footerTopGrid}>
+            
+            {/* Col 1: Logo & Branding */}
+            <View style={{ flex: 1.5, gap: 12, minWidth: 260 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Image 
+                  source={require('../../assets/images/pallithozhan_logo.png')} 
+                  style={{ width: 32, height: 32, borderRadius: 8 }} 
+                />
+                <ThemedText style={{ color: '#FFF', fontSize: 20, fontWeight: '800', letterSpacing: 0.5 }}>
+                  Pallithozhan
+                </ThemedText>
+              </View>
+              <ThemedText style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, lineHeight: 18 }}>
+                {i18n.language === 'ta' 
+                  ? '1977 முதல் உள்ளூர் சமூகங்கள் முழுவதிலும் தமிழ் மொழியைப் பாதுகாப்பதற்கும் வளர்ப்பதற்கும் அர்ப்பணிக்கப்பட்ட நியூ சவுத் வேல்ஸின் மிகப்பெரிய தமிழ்க் கல்வி அமைப்பு.'
+                  : 'NSW\'s largest provider dedicated to preserving Tamil language across local communities since 1977.'}
+              </ThemedText>
+              {/* NSW Community Logo badge placeholders */}
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
+                <View style={styles.footerBadgePlaceholder}>
+                  <Award size={14} color="#F59E0B" />
+                  <ThemedText style={{ color: '#FFF', fontSize: 9, fontWeight: '600' }}>CLS Accredited</ThemedText>
+                </View>
+                <View style={styles.footerBadgePlaceholder}>
+                  <Sparkles size={14} color="#10B981" />
+                  <ThemedText style={{ color: '#FFF', fontSize: 9, fontWeight: '600' }}>NSW HSL School</ThemedText>
+                </View>
+              </View>
+            </View>
+
+            {/* Col 2: Quick Links */}
+            <View style={styles.footerLinkCol}>
+              <ThemedText style={styles.footerColHeader}>Quick Links</ThemedText>
+              <Pressable><ThemedText style={styles.footerLinkText}>Curriculum</ThemedText></Pressable>
+              <Pressable><ThemedText style={styles.footerLinkText}>Branches</ThemedText></Pressable>
+              <Pressable><ThemedText style={styles.footerLinkText}>Annual Magazine</ThemedText></Pressable>
+              <Pressable><ThemedText style={styles.footerLinkText}>Admissions</ThemedText></Pressable>
+            </View>
+
+            {/* Col 3: Administration */}
+            <View style={styles.footerLinkCol}>
+              <ThemedText style={styles.footerColHeader}>Administration</ThemedText>
+              <Pressable><ThemedText style={styles.footerLinkText}>Syllabus Guidelines</ThemedText></Pressable>
+              <Pressable onPress={() => { setAuthMode('login'); setPortalVisible(true); }}><ThemedText style={styles.footerLinkText}>Portal Login</ThemedText></Pressable>
+              <Pressable onPress={() => { setAuthMode('register'); setPortalVisible(true); }}><ThemedText style={styles.footerLinkText}>Student Register</ThemedText></Pressable>
+              <Pressable><ThemedText style={styles.footerLinkText}>Admissions Board</ThemedText></Pressable>
+            </View>
+
+            {/* Col 4: Contact */}
+            <View style={styles.footerLinkCol}>
+              <ThemedText style={styles.footerColHeader}>Contact</ThemedText>
+              <View style={styles.footerContactItem}>
+                <Mail size={12} color="rgba(255,255,255,0.5)" />
+                <ThemedText style={styles.footerContactText}>admin@balarmalar.nsw.edu.au</ThemedText>
+              </View>
+              <View style={styles.footerContactItem}>
+                <Phone size={12} color="rgba(255,255,255,0.5)" />
+                <ThemedText style={styles.footerContactText}>02 9876 5432</ThemedText>
+              </View>
+              
+              <View style={styles.footerAccreditationBlock}>
+                <ThemedText style={{ color: 'rgba(255,255,255,0.5)', fontSize: 9, lineHeight: 12 }}>
+                  This program is funded by the NSW Government and aligned with NSW Community Languages Program guidelines.
+                </ThemedText>
+              </View>
+            </View>
+
+          </View>
+
+          {/* Footer Bottom copyright */}
+          <View style={[styles.footerBottom, { borderTopColor: 'rgba(255,255,255,0.1)' }]}>
+            <ThemedText style={styles.footerCopyrightText}>
+              © 2026 Balar Malar Tamil School (NSW) Inc. All Rights Reserved.
+            </ThemedText>
+          </View>
+        </View>
+
       </ScrollView>
 
-      <View style={[styles.footer, { backgroundColor: colors.cardBg, borderTopWidth: 1, borderColor: colors.border }]}>
-        <ThemedText style={[styles.footerText, { color: colors.textSecondary }]}>© 2026 Balar Malar Tamil School (NSW) Inc. All Rights Reserved.</ThemedText>
-      </View>
-
+      {/* PORTAL MODAL DIALOG */}
       {portalVisible && (
         <View style={styles.modalBackdrop}>
           <Pressable style={styles.modalBackdropClickable} onPress={() => setPortalVisible(false)} />
           <View style={[
             styles.modalCard, 
             { 
-              backgroundColor: scheme === 'dark' ? 'rgba(19, 21, 18, 0.85)' : 'rgba(253, 252, 247, 0.85)', 
+              backgroundColor: scheme === 'dark' ? 'rgba(19, 21, 18, 0.92)' : 'rgba(253, 252, 247, 0.95)', 
               borderColor: colors.border,
               ...Platform.select({
                 web: {
@@ -314,18 +601,34 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
             }
           ]}>
             <View style={[styles.modalHeader, { borderColor: colors.border }]}>
-              <BalarMalarLogo size={28} />
-              <Pressable onPress={() => setPortalVisible(false)} style={styles.closeButton}><X size={20} color={colors.text} /></Pressable>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Image 
+                  source={require('../../assets/images/pallithozhan_logo.png')} 
+                  style={{ width: 22, height: 22, borderRadius: 4 }} 
+                />
+                <ThemedText style={{ fontSize: 14, fontWeight: '800', color: colors.primary }}>
+                  Pallithozhan Portal
+                </ThemedText>
+              </View>
+              <Pressable onPress={() => setPortalVisible(false)} style={styles.closeButton}>
+                <X size={18} color={colors.text} />
+              </Pressable>
             </View>
-            <View style={{ backgroundColor: colors.primaryLight, padding: 8, borderRadius: 12, marginHorizontal: Spacing.three, marginTop: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-              <MapPin size={14} color={colors.primary} />
-              <ThemedText style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>Active Session: {activeBranchName.toUpperCase()}</ThemedText>
+            
+            <View style={{ backgroundColor: colors.primaryLight, padding: 8, borderRadius: 10, marginHorizontal: Spacing.three, marginTop: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+              <MapPin size={12} color={colors.primary} />
+              <ThemedText style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>Active Center: {activeBranchName.toUpperCase()}</ThemedText>
             </View>
+
             <ScrollView contentContainerStyle={styles.modalScroll}>
               {authMode === 'login' ? (
-                <LoginScreen onNavigateToRegister={() => setAuthMode('register')} />
+                <LoginScreen 
+                  onNavigateToRegister={() => setAuthMode('register')} 
+                />
               ) : (
-                <RegisterScreen onNavigateToLogin={() => setAuthMode('login')} />
+                <RegisterScreen 
+                  onNavigateToLogin={() => setAuthMode('login')} 
+                />
               )}
             </ScrollView>
           </View>
@@ -336,37 +639,118 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
 }
 
 const styles = StyleSheet.create({
-  logoRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
-  logoTextMain: { fontSize: 15, fontWeight: '800', lineHeight: 16 },
-  logoTextSub: { fontSize: 10, fontWeight: '700', lineHeight: 11 },
   headbar: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: Spacing.two, paddingHorizontal: Spacing.three, borderBottomWidth: 1, height: 64, zIndex: 100,
-    ...Platform.select({ web: { backdropFilter: 'blur(16px)', backgroundColor: 'rgba(255, 255, 255, 0.75)', position: 'sticky', top: 0 } })
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: Spacing.two, paddingHorizontal: Spacing.three, borderBottomWidth: 1, height: 60, zIndex: 100,
+    ...Platform.select({ web: { position: 'sticky', top: 0 } })
   },
   headbarActions: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
-  langBadge: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, paddingHorizontal: Spacing.two, borderRadius: 16, borderWidth: 1 },
+  langBadge: { flexDirection: 'row', alignItems: 'center', paddingVertical: 5, paddingHorizontal: Spacing.two, borderRadius: 14, borderWidth: 1 },
   langText: { fontSize: 11, fontWeight: '600', marginLeft: 6 },
   portalButton: {
-    flexDirection: 'row', alignItems: 'center', paddingVertical: 6, paddingHorizontal: Spacing.two, borderRadius: 16,
-    ...Platform.select({ web: { boxShadow: '0 4px 12px rgba(234, 83, 48, 0.25)', transition: 'all 0.2s ease' } })
+    flexDirection: 'row', alignItems: 'center', paddingVertical: 5, paddingHorizontal: Spacing.two, borderRadius: 14,
   },
   portalButtonText: { color: '#FFF', fontSize: 11, fontWeight: '700' },
   scrollWrapper: { flexGrow: 1 },
-  mainGridWrapper: { paddingVertical: Spacing.five, paddingHorizontal: Spacing.four, maxWidth: MaxContentWidth, alignSelf: 'center', width: '100%' },
-  gridSectionHeader: { fontSize: 22, fontWeight: '800', textAlign: 'center', marginBottom: Spacing.one },
-  gridSectionSubtitle: { fontSize: 13, textAlign: 'center', marginBottom: Spacing.four, lineHeight: 18 },
-  branchSelectGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.three },
-  branchSelectCard: {
-    flex: 1, minWidth: 240, padding: Spacing.four, borderRadius: 24, borderWidth: 2, position: 'relative', gap: 8,
-    ...Platform.select({ web: { transition: 'all 0.3s ease', boxShadow: '0 4px 12px rgba(0,0,0,0.03)' } })
+  
+  // Hero section
+  heroContainer: {
+    width: '100%',
+    minHeight: 440,
+    position: 'relative',
+    justifyContent: 'center',
+    paddingVertical: Spacing.six,
+    backgroundColor: '#050B0D'
   },
-  glassSelectedCard: { ...Platform.select({ web: { backgroundColor: 'rgba(234, 83, 48, 0.05)', boxShadow: '0 8px 32px rgba(234, 83, 48, 0.12)' } }) },
-  branchCodeBadge: { alignSelf: 'flex-start', paddingVertical: 3, paddingHorizontal: 10, borderRadius: 8 },
-  branchCardTitleTa: { fontSize: 16, fontWeight: '800', marginTop: 4 },
-  branchCardTitleEn: { fontSize: 13, fontWeight: '700' },
-  branchCardDesc: { fontSize: 11, lineHeight: 16 },
-  branchSelectIndicator: { position: 'absolute', top: 16, right: 16, width: 18, height: 18, borderRadius: 9, borderWidth: 2, justifyContent: 'center', alignItems: 'center' },
-  featuresGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.three },
+  heroBgImage: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover'
+  },
+  heroOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(13, 27, 33, 0.72)'
+  },
+  heroContent: {
+    maxWidth: 800,
+    width: '100%',
+    alignSelf: 'center',
+    paddingHorizontal: Spacing.four,
+    gap: 16,
+    zIndex: 10,
+    alignItems: 'center'
+  },
+  heroBadge: {
+    alignSelf: 'center',
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    backgroundColor: 'rgba(253, 195, 42, 0.08)',
+  },
+  heroTitle: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#FFF',
+    textAlign: 'center',
+    lineHeight: 36,
+  },
+  heroDesc: {
+    fontSize: 13,
+    lineHeight: 20,
+    color: 'rgba(255,255,255,0.85)',
+    textAlign: 'center',
+    maxWidth: 640
+  },
+  heroActions: {
+    flexDirection: 'row',
+    gap: Spacing.two,
+    marginTop: 8,
+    flexWrap: 'wrap',
+    justifyContent: 'center'
+  },
+  heroBtnPrimary: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+  },
+  heroBtnSecondary: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.4)',
+    backgroundColor: 'rgba(255,255,255,0.1)'
+  },
+  heroBtnText: {
+    color: '#FFF',
+    fontSize: 13,
+    fontWeight: '700'
+  },
+
+  // Main grid wrapping
+  mainGridWrapper: { 
+    paddingVertical: Spacing.five, 
+    paddingHorizontal: Spacing.four, 
+    maxWidth: MaxContentWidth, 
+    alignSelf: 'center', 
+    width: '100%' 
+  },
+  featuresGrid: { 
+    flexDirection: 'row', 
+    flexWrap: 'wrap', 
+    gap: Spacing.three,
+    marginTop: -Spacing.four,
+    zIndex: 20
+  },
   featureCard: {
     flex: 1,
     minWidth: 260,
@@ -374,14 +758,19 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     gap: 8,
+    ...Platform.select({
+      web: {
+        boxShadow: '0 10px 25px -5px rgba(0,0,0,0.03)'
+      }
+    })
   },
   featureIconContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
+    width: 40,
+    height: 40,
+    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: Spacing.one,
+    marginBottom: 4,
   },
   featureTitle: {
     fontSize: 15,
@@ -389,46 +778,287 @@ const styles = StyleSheet.create({
   },
   featureDesc: {
     fontSize: 12,
-    lineHeight: 16,
+    lineHeight: 18,
   },
-  infoBannerRow: {
+
+  // Curriculum timeline section
+  sectionHeaderContainer: {
+    alignItems: 'center',
+    marginBottom: Spacing.four,
+    gap: 6
+  },
+  sectionTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  sectionSubtitle: {
+    fontSize: 13,
+    lineHeight: 18,
+    textAlign: 'center',
+    maxWidth: 580,
+  },
+  curriculumLink: {
+    marginTop: 4
+  },
+  curriculumGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    paddingVertical: Spacing.four,
-    paddingHorizontal: Spacing.three,
-    gap: Spacing.four,
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    marginTop: Spacing.four,
+    gap: Spacing.three,
+    marginTop: Spacing.two
   },
-  infoCol: {
+  curriculumCard: {
     flex: 1,
-    minWidth: 240,
-    alignItems: 'center',
-    gap: Spacing.one,
-    paddingVertical: Spacing.two,
+    minWidth: 260,
+    borderRadius: 20,
+    overflow: 'hidden',
+    padding: Spacing.three,
+    gap: 8,
   },
-  infoColTitle: {
-    fontSize: 11,
+  cardImageContainer: {
+    width: '100%',
+    height: 120,
+    borderRadius: 14,
+    overflow: 'hidden',
+    position: 'relative'
+  },
+  cardImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover'
+  },
+  cardStageBadge: {
+    position: 'absolute',
+    bottom: 8,
+    left: 8,
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    borderRadius: 6
+  },
+  cardStageBadgeInline: {
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    borderRadius: 6
+  },
+  cardStageBadgeText: {
+    color: '#FFF',
+    fontSize: 9,
     fontWeight: '700',
+    textTransform: 'uppercase'
+  },
+  cardIconCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  cardTitle: {
+    fontSize: 14,
+    fontWeight: '800'
+  },
+  cardDesc: {
+    fontSize: 11,
+    lineHeight: 16
+  },
+  statsRow: {
+    flexDirection: 'row',
+    gap: Spacing.two,
+    marginTop: 6
+  },
+  statBadge: {
+    flex: 1,
+    padding: 6,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    alignItems: 'center',
+    gap: 2
+  },
+  statValue: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#FFF'
+  },
+  statLabel: {
+    fontSize: 8,
+    color: 'rgba(255,255,255,0.5)',
+    fontWeight: '600',
+    textTransform: 'uppercase'
+  },
+
+  // NSW Map Finder Section
+  branchListItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: Spacing.three,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  branchListText: {
+    fontSize: 12,
+  },
+  viewBranchesButton: {
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingVertical: 10,
+    alignItems: 'center',
+    marginTop: 6
+  },
+  mapImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover'
+  },
+  mapDarkenOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.15)'
+  },
+  mapOverlayCard: {
+    position: 'absolute',
+    bottom: Spacing.three,
+    left: Spacing.three,
+    right: Spacing.three,
+    padding: Spacing.three,
+    borderRadius: 16,
+    backgroundColor: 'rgba(19, 29, 33, 0.9)',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 8,
+    ...Platform.select({
+      web: {
+        backdropFilter: 'blur(10px)',
+        WebkitBackdropFilter: 'blur(10px)',
+      }
+    })
+  },
+
+  // CTA Banner
+  ctaBannerWrapper: {
+    paddingHorizontal: Spacing.four,
+    paddingBottom: Spacing.five,
+    maxWidth: MaxContentWidth,
+    alignSelf: 'center',
+    width: '100%'
+  },
+  ctaBannerCard: {
+    padding: Spacing.five,
+    borderRadius: 24,
+    alignItems: 'center',
+    gap: 12
+  },
+  ctaTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#FFF',
+    textAlign: 'center'
+  },
+  ctaSubtitle: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.85)',
+    textAlign: 'center',
+    maxWidth: 480,
+    lineHeight: 18
+  },
+  ctaActions: {
+    flexDirection: 'row',
+    gap: Spacing.two,
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    marginTop: 4
+  },
+  ctaBtnDark: {
+    backgroundColor: '#131d21',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 16
+  },
+  ctaBtnWhite: {
+    backgroundColor: '#FFF',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 16
+  },
+  ctaBtnText: {
+    fontSize: 12,
+    fontWeight: '700'
+  },
+
+  // Footer Block
+  footerBlock: {
+    paddingVertical: Spacing.six,
+    paddingHorizontal: Spacing.four,
+    width: '100%'
+  },
+  footerTopGrid: {
+    maxWidth: MaxContentWidth,
+    alignSelf: 'center',
+    width: '100%',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.four,
+    justifyContent: 'space-between',
+    paddingBottom: Spacing.four
+  },
+  footerBadgePlaceholder: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 6
+  },
+  footerLinkCol: {
+    minWidth: 140,
+    gap: 8
+  },
+  footerColHeader: {
+    color: '#FFF',
+    fontSize: 12,
+    fontWeight: '800',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+    marginBottom: 4
   },
-  infoColValue: {
-    fontSize: 13,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  footer: {
-    paddingVertical: Spacing.four,
-    paddingHorizontal: Spacing.four,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  footerText: {
+  footerLinkText: {
+    color: 'rgba(255,255,255,0.6)',
     fontSize: 11,
-    textAlign: 'center',
   },
+  footerContactItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6
+  },
+  footerContactText: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 11,
+  },
+  footerAccreditationBlock: {
+    marginTop: 8,
+    maxWidth: 220
+  },
+  footerBottom: {
+    maxWidth: MaxContentWidth,
+    alignSelf: 'center',
+    width: '100%',
+    borderTopWidth: 1,
+    paddingTop: Spacing.three,
+    alignItems: 'center'
+  },
+  footerCopyrightText: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 10,
+    textAlign: 'center'
+  },
+
+  // Modal Backdrop
   modalBackdrop: {
     position: 'absolute',
     top: 0,
@@ -445,14 +1075,14 @@ const styles = StyleSheet.create({
     left: 0,
     width: '100%',
     height: '100%',
-    backgroundColor: 'rgba(75, 76, 71, 0.4)', // Slate gray wash overlay
+    backgroundColor: 'rgba(15, 23, 26, 0.45)', 
   },
   modalCard: {
     width: '90%',
     maxWidth: 500,
     height: '85%',
     maxHeight: 700,
-    borderRadius: 28,
+    borderRadius: 24,
     borderWidth: 1,
     overflow: 'hidden',
     ...Platform.select({
@@ -464,7 +1094,7 @@ const styles = StyleSheet.create({
         elevation: 10,
       },
       web: {
-        boxShadow: '0 20px 40px -10px rgba(0,0,0,0.15)',
+        boxShadow: '0 20px 40px -10px rgba(0,0,0,0.25)',
       }
     }),
   },

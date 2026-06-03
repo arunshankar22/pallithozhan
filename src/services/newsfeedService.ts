@@ -35,24 +35,20 @@ export const newsfeedService = {
   getNewsfeed: async (): Promise<any[]> => {
     // 1. Firebase Firestore
     if (!isDemoMode && db) {
-      try {
-        const querySnapshot = await getDocs(collection(db, 'newsfeed'));
-        const feedList: any[] = [];
-        querySnapshot.forEach((doc) => {
-          feedList.push({ postId: doc.id, ...doc.data() });
-        });
-        
-        if (feedList.length === 0) {
-          for (const p of DEFAULT_NEWSFEED) {
-            const { postId, ...details } = p;
-            await setDoc(doc(db, 'newsfeed', postId), details);
-            feedList.push(p);
-          }
+      const querySnapshot = await getDocs(collection(db, 'newsfeed'));
+      const feedList: any[] = [];
+      querySnapshot.forEach((doc) => {
+        feedList.push({ postId: doc.id, ...doc.data() });
+      });
+      
+      if (feedList.length === 0) {
+        for (const p of DEFAULT_NEWSFEED) {
+          const { postId, ...details } = p;
+          await setDoc(doc(db, 'newsfeed', postId), details);
+          feedList.push(p);
         }
-        return feedList.sort((a: any, b: any) => b.createdAt.localeCompare(a.createdAt));
-      } catch (e) {
-        console.warn('Firestore getNewsfeed failed, falling back:', e);
       }
+      return feedList.sort((a: any, b: any) => b.createdAt.localeCompare(a.createdAt));
     }
 
     // 2. Local REST API Server
@@ -86,50 +82,46 @@ export const newsfeedService = {
 
     // 1. Firebase Firestore
     if (!isDemoMode && db) {
-      try {
-        const { ref, uploadString, getDownloadURL } = require('firebase/storage');
-        const { storage } = require('./firebase');
+      const { ref, uploadString, getDownloadURL } = require('firebase/storage');
+      const { storage } = require('./firebase');
 
-        if (storage && newPost.mediaAttachments && newPost.mediaAttachments.length > 0) {
-          for (let i = 0; i < newPost.mediaAttachments.length; i++) {
-            const att = newPost.mediaAttachments[i];
-            if (att.url && att.url.startsWith('data:')) {
-              try {
-                console.log(`Uploading attachment ${att.name} to Firebase Storage...`);
-                const fileRef = ref(storage, `newsfeed/${postId}_${i}_${att.name}`);
-                await uploadString(fileRef, att.url, 'data_url');
-                const downloadUrl = await getDownloadURL(fileRef);
-                att.url = downloadUrl;
-                
+      if (storage && newPost.mediaAttachments && newPost.mediaAttachments.length > 0) {
+        for (let i = 0; i < newPost.mediaAttachments.length; i++) {
+          const att = newPost.mediaAttachments[i];
+          if (att.url && att.url.startsWith('data:')) {
+            try {
+              console.log(`Uploading attachment ${att.name} to Firebase Storage...`);
+              const fileRef = ref(storage, `newsfeed/${postId}_${i}_${att.name}`);
+              await uploadString(fileRef, att.url, 'data_url');
+              const downloadUrl = await getDownloadURL(fileRef);
+              att.url = downloadUrl;
+              
+              if (newPost.mediaUrl.startsWith('data:')) {
+                newPost.mediaUrl = downloadUrl;
+              }
+              console.log(`Successfully uploaded. Download URL: ${downloadUrl}`);
+            } catch (storageErr) {
+              console.warn(`Firebase Storage upload failed for ${att.name}:`, storageErr);
+              // Truncate giant base64 to prevent Firestore crash (>1MB)
+              if (att.url.length > 800 * 1024) {
+                console.warn(`Base64 too large for Firestore, falling back to placeholder.`);
+                const placeholder = att.type === 'video'
+                  ? 'https://www.w3schools.com/html/mov_bbb.mp4'
+                  : 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&q=80&w=800';
+                att.url = placeholder;
                 if (newPost.mediaUrl.startsWith('data:')) {
-                  newPost.mediaUrl = downloadUrl;
-                }
-                console.log(`Successfully uploaded. Download URL: ${downloadUrl}`);
-              } catch (storageErr) {
-                console.warn(`Firebase Storage upload failed for ${att.name}:`, storageErr);
-                // Truncate giant base64 to prevent Firestore crash (>1MB)
-                if (att.url.length > 800 * 1024) {
-                  console.warn(`Base64 too large for Firestore, falling back to placeholder.`);
-                  const placeholder = att.type === 'video'
-                    ? 'https://www.w3schools.com/html/mov_bbb.mp4'
-                    : 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&q=80&w=800';
-                  att.url = placeholder;
-                  if (newPost.mediaUrl.startsWith('data:')) {
-                    newPost.mediaUrl = placeholder;
-                  }
+                  newPost.mediaUrl = placeholder;
                 }
               }
             }
           }
         }
-
-        const { postId: omitted, ...details } = newPost;
-        const cleanedDetails = cleanFirestoreData(details);
-        await setDoc(doc(db, 'newsfeed', postId), cleanedDetails);
-        return newPost;
-      } catch (e) {
-        console.warn('Firestore createNewsfeedPost failed, falling back:', e);
       }
+
+      const { postId: omitted, ...details } = newPost;
+      const cleanedDetails = cleanFirestoreData(details);
+      await setDoc(doc(db, 'newsfeed', postId), cleanedDetails);
+      return newPost;
     }
 
     // 2. Local REST API Server
@@ -154,49 +146,45 @@ export const newsfeedService = {
   updateNewsfeedPost: async (postId: string, post: any): Promise<any> => {
     // 1. Firebase Firestore
     if (!isDemoMode && db) {
-      try {
-        const { ref, uploadString, getDownloadURL } = require('firebase/storage');
-        const { storage } = require('./firebase');
+      const { ref, uploadString, getDownloadURL } = require('firebase/storage');
+      const { storage } = require('./firebase');
 
-        const updatedPost = { ...post };
+      const updatedPost = { ...post };
 
-        if (storage && updatedPost.mediaAttachments && updatedPost.mediaAttachments.length > 0) {
-          for (let i = 0; i < updatedPost.mediaAttachments.length; i++) {
-            const att = updatedPost.mediaAttachments[i];
-            if (att.url && att.url.startsWith('data:')) {
-              try {
-                console.log(`Uploading attachment ${att.name} to Firebase Storage...`);
-                const fileRef = ref(storage, `newsfeed/${postId}_${i}_${att.name}`);
-                await uploadString(fileRef, att.url, 'data_url');
-                const downloadUrl = await getDownloadURL(fileRef);
-                att.url = downloadUrl;
-                
+      if (storage && updatedPost.mediaAttachments && updatedPost.mediaAttachments.length > 0) {
+        for (let i = 0; i < updatedPost.mediaAttachments.length; i++) {
+          const att = updatedPost.mediaAttachments[i];
+          if (att.url && att.url.startsWith('data:')) {
+            try {
+              console.log(`Uploading attachment ${att.name} to Firebase Storage...`);
+              const fileRef = ref(storage, `newsfeed/${postId}_${i}_${att.name}`);
+              await uploadString(fileRef, att.url, 'data_url');
+              const downloadUrl = await getDownloadURL(fileRef);
+              att.url = downloadUrl;
+              
+              if (updatedPost.mediaUrl.startsWith('data:')) {
+                updatedPost.mediaUrl = downloadUrl;
+              }
+            } catch (storageErr) {
+              console.warn(`Firebase Storage upload failed for ${att.name}:`, storageErr);
+              // Truncate giant base64 to prevent Firestore crash (>1MB)
+              if (att.url.length > 800 * 1024) {
+                const placeholder = att.type === 'video'
+                  ? 'https://www.w3schools.com/html/mov_bbb.mp4'
+                  : 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&q=80&w=800';
+                att.url = placeholder;
                 if (updatedPost.mediaUrl.startsWith('data:')) {
-                  updatedPost.mediaUrl = downloadUrl;
-                }
-              } catch (storageErr) {
-                console.warn(`Firebase Storage upload failed for ${att.name}:`, storageErr);
-                // Truncate giant base64 to prevent Firestore crash (>1MB)
-                if (att.url.length > 800 * 1024) {
-                  const placeholder = att.type === 'video'
-                    ? 'https://www.w3schools.com/html/mov_bbb.mp4'
-                    : 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&q=80&w=800';
-                  att.url = placeholder;
-                  if (updatedPost.mediaUrl.startsWith('data:')) {
-                    updatedPost.mediaUrl = placeholder;
-                  }
+                  updatedPost.mediaUrl = placeholder;
                 }
               }
             }
           }
         }
-
-        const cleanedPost = cleanFirestoreData(updatedPost);
-        await setDoc(doc(db, 'newsfeed', postId), cleanedPost, { merge: true });
-        return { postId, ...updatedPost };
-      } catch (e) {
-        console.warn('Firestore updateNewsfeedPost failed, falling back:', e);
       }
+
+      const cleanedPost = cleanFirestoreData(updatedPost);
+      await setDoc(doc(db, 'newsfeed', postId), cleanedPost, { merge: true });
+      return { postId, ...updatedPost };
     }
 
     // 2. Local REST API Server
@@ -226,12 +214,8 @@ export const newsfeedService = {
     const { deleteDoc } = require('firebase/firestore');
     // 1. Firebase Firestore
     if (!isDemoMode && db) {
-      try {
-        await deleteDoc(doc(db, 'newsfeed', postId));
-        return { postId };
-      } catch (e) {
-        console.warn('Firestore deleteNewsfeedPost failed, falling back:', e);
-      }
+      await deleteDoc(doc(db, 'newsfeed', postId));
+      return { postId };
     }
 
     // 2. Local REST API Server
@@ -260,24 +244,21 @@ export const newsfeedService = {
   toggleReaction: async (postId: string, userId: string, reactionType: 'like' | 'love'): Promise<any> => {
     // 1. Firebase Firestore
     if (!isDemoMode && db) {
-      try {
-        const { getDoc, doc, setDoc } = require('firebase/firestore');
-        const docRef = doc(db, 'newsfeed', postId);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          const reactions = data.reactions || {};
-          if (reactions[userId] === reactionType) {
-            delete reactions[userId]; // Toggle off
-          } else {
-            reactions[userId] = reactionType; // Toggle on or switch
-          }
-          await setDoc(docRef, { reactions }, { merge: true });
-          return { postId, reactions };
+      const { getDoc, doc, setDoc } = require('firebase/firestore');
+      const docRef = doc(db, 'newsfeed', postId);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        const reactions = data.reactions || {};
+        if (reactions[userId] === reactionType) {
+          delete reactions[userId]; // Toggle off
+        } else {
+          reactions[userId] = reactionType; // Toggle on or switch
         }
-      } catch (e) {
-        console.warn('Firestore toggleReaction failed, falling back:', e);
+        await setDoc(docRef, { reactions }, { merge: true });
+        return { postId, reactions };
       }
+      return null;
     }
 
     // 2. Sandbox
@@ -311,20 +292,17 @@ export const newsfeedService = {
 
     // 1. Firebase Firestore
     if (!isDemoMode && db) {
-      try {
-        const { getDoc, doc, setDoc } = require('firebase/firestore');
-        const docRef = doc(db, 'newsfeed', postId);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          const comments = data.comments || [];
-          comments.push(newComment);
-          await setDoc(docRef, { comments }, { merge: true });
-          return { postId, comments };
-        }
-      } catch (e) {
-        console.warn('Firestore addComment failed, falling back:', e);
+      const { getDoc, doc, setDoc } = require('firebase/firestore');
+      const docRef = doc(db, 'newsfeed', postId);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        const comments = data.comments || [];
+        comments.push(newComment);
+        await setDoc(docRef, { comments }, { merge: true });
+        return { postId, comments };
       }
+      return null;
     }
 
     // 2. Sandbox
@@ -342,24 +320,21 @@ export const newsfeedService = {
   editComment: async (postId: string, commentId: string, newText: string): Promise<any> => {
     // 1. Firebase Firestore
     if (!isDemoMode && db) {
-      try {
-        const { getDoc, doc, setDoc } = require('firebase/firestore');
-        const docRef = doc(db, 'newsfeed', postId);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          const comments = data.comments || [];
-          const idx = comments.findIndex((c: any) => c.commentId === commentId);
-          if (idx > -1) {
-            comments[idx].text = newText;
-            comments[idx].updatedAt = new Date().toISOString();
-            await setDoc(docRef, { comments }, { merge: true });
-            return { postId, comments };
-          }
+      const { getDoc, doc, setDoc } = require('firebase/firestore');
+      const docRef = doc(db, 'newsfeed', postId);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        const comments = data.comments || [];
+        const idx = comments.findIndex((c: any) => c.commentId === commentId);
+        if (idx > -1) {
+          comments[idx].text = newText;
+          comments[idx].updatedAt = new Date().toISOString();
+          await setDoc(docRef, { comments }, { merge: true });
+          return { postId, comments };
         }
-      } catch (e) {
-        console.warn('Firestore editComment failed, falling back:', e);
       }
+      return null;
     }
 
     // 2. Sandbox
@@ -380,20 +355,17 @@ export const newsfeedService = {
   deleteComment: async (postId: string, commentId: string): Promise<any> => {
     // 1. Firebase Firestore
     if (!isDemoMode && db) {
-      try {
-        const { getDoc, doc, setDoc } = require('firebase/firestore');
-        const docRef = doc(db, 'newsfeed', postId);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          const comments = data.comments || [];
-          const filtered = comments.filter((c: any) => c.commentId !== commentId);
-          await setDoc(docRef, { comments: filtered }, { merge: true });
-          return { postId, comments: filtered };
-        }
-      } catch (e) {
-        console.warn('Firestore deleteComment failed, falling back:', e);
+      const { getDoc, doc, setDoc } = require('firebase/firestore');
+      const docRef = doc(db, 'newsfeed', postId);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        const comments = data.comments || [];
+        const filtered = comments.filter((c: any) => c.commentId !== commentId);
+        await setDoc(docRef, { comments: filtered }, { merge: true });
+        return { postId, comments: filtered };
       }
+      return null;
     }
 
     // 2. Sandbox

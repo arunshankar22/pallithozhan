@@ -1,0 +1,552 @@
+const { parseBody, sendJson, INITIAL_DB } = require('./db');
+
+async function handleApiRoutes(req, res, pathname, method, dbData, writeDb, urlObj) {
+  // GET /api/health
+  if (pathname === '/api/health' && method === 'GET') {
+    sendJson(res, 200, { status: 'healthy', database: 'connected', version: '1.0.0' });
+    return true;
+  }
+
+  // GET /api/reset
+  if (pathname === '/api/reset' && method === 'POST') {
+    writeDb(INITIAL_DB);
+    sendJson(res, 200, { message: 'Database reset to seed defaults successfully.' });
+    return true;
+  }
+
+  // GET /api/users
+  if (pathname === '/api/users' && method === 'GET') {
+    sendJson(res, 200, dbData.users);
+    return true;
+  }
+
+  // GET /api/users/:uid (Get single user profile)
+  if (pathname.startsWith('/api/users/') && method === 'GET') {
+    const uid = pathname.split('/').pop();
+    const user = dbData.users.find(u => u.uid === uid);
+    if (user) {
+      sendJson(res, 200, user);
+    } else {
+      sendJson(res, 404, { error: 'User not found' });
+    }
+    return true;
+  }
+
+  // POST /api/users (Create new user profile)
+  if (pathname === '/api/users' && method === 'POST') {
+    const body = await parseBody(req);
+    const newUser = {
+      schoolId: 'school_main',
+      languagePreference: 'ta',
+      associatedStudents: [],
+      phone: '',
+      ...body,
+      uid: body.uid || `user_${Date.now()}`
+    };
+    
+    const exists = dbData.users.some(u => u.email && newUser.email && u.email.toLowerCase() === newUser.email.toLowerCase() && u.uid !== newUser.uid);
+    if (exists) {
+      sendJson(res, 400, { error: 'Email already registered!' });
+      return true;
+    }
+
+    dbData.users.push(newUser);
+    writeDb(dbData);
+    sendJson(res, 201, newUser);
+    return true;
+  }
+
+  // PUT /api/users/:uid (Update user profile)
+  if (pathname.startsWith('/api/users/') && method === 'PUT') {
+    const uid = pathname.split('/').pop();
+    const body = await parseBody(req);
+    const idx = dbData.users.findIndex(u => u.uid === uid);
+    if (idx > -1) {
+      dbData.users[idx] = { ...dbData.users[idx], ...body };
+      writeDb(dbData);
+      sendJson(res, 200, dbData.users[idx]);
+    } else {
+      sendJson(res, 404, { error: 'User not found' });
+    }
+    return true;
+  }
+
+  // DELETE /api/users/:uid (Delete user profile)
+  if (pathname.startsWith('/api/users/') && method === 'DELETE') {
+    const uid = pathname.split('/').pop();
+    dbData.users = dbData.users.filter(u => u.uid !== uid);
+    writeDb(dbData);
+    sendJson(res, 200, { message: 'User deleted successfully' });
+    return true;
+  }
+
+  // GET /api/classes
+  if (pathname === '/api/classes' && method === 'GET') {
+    sendJson(res, 200, dbData.classes);
+    return true;
+  }
+
+  // GET /api/classes/:classId (Get single class details)
+  if (pathname.startsWith('/api/classes/') && method === 'GET') {
+    const classId = pathname.split('/').pop();
+    const cls = dbData.classes.find(c => c.classId === classId);
+    if (cls) {
+      sendJson(res, 200, cls);
+    } else {
+      sendJson(res, 404, { error: 'Class not found' });
+    }
+    return true;
+  }
+
+  // POST /api/classes (Create new class)
+  if (pathname === '/api/classes' && method === 'POST') {
+    const body = await parseBody(req);
+    const teacherIds = body.teacherIds || (body.teacherId ? [body.teacherId] : []);
+    const newClass = {
+      classId: body.classId || `class_${Date.now()}`,
+      className: body.className,
+      teacherId: teacherIds[0] || '',
+      teacherIds: teacherIds,
+      studentIds: body.studentIds || [],
+      volunteerIds: body.volunteerIds || []
+    };
+    dbData.classes.push(newClass);
+    writeDb(dbData);
+    sendJson(res, 201, newClass);
+    return true;
+  }
+
+  // PUT /api/classes/:classId (Update class details)
+  if (pathname.startsWith('/api/classes/') && method === 'PUT') {
+    const classId = pathname.split('/').pop();
+    const body = await parseBody(req);
+    const idx = dbData.classes.findIndex(c => c.classId === classId);
+    if (idx > -1) {
+      dbData.classes[idx] = { ...dbData.classes[idx], ...body };
+      writeDb(dbData);
+      sendJson(res, 200, dbData.classes[idx]);
+    } else {
+      sendJson(res, 404, { error: 'Class not found' });
+    }
+    return true;
+  }
+
+  // DELETE /api/classes/:classId (Delete class)
+  if (pathname.startsWith('/api/classes/') && method === 'DELETE') {
+    const classId = pathname.split('/').pop();
+    dbData.classes = dbData.classes.filter(c => c.classId !== classId);
+    writeDb(dbData);
+    sendJson(res, 200, { message: 'Class deleted successfully' });
+    return true;
+  }
+
+  // GET /api/newsfeed
+  if (pathname === '/api/newsfeed' && method === 'GET') {
+    const sorted = [...dbData.newsfeed].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    sendJson(res, 200, sorted);
+    return true;
+  }
+
+  // POST /api/newsfeed
+  if (pathname === '/api/newsfeed' && method === 'POST') {
+    const body = await parseBody(req);
+    const newPost = {
+      postId: `post_${Date.now()}`,
+      title: body.title,
+      content: body.content,
+      mediaUrl: body.mediaUrl || '',
+      mediaType: body.mediaType || 'image',
+      drivePath: body.drivePath,
+      mediaAttachments: body.mediaAttachments,
+      authorName: body.authorName || 'Staff',
+      createdAt: new Date().toISOString()
+    };
+    dbData.newsfeed.push(newPost);
+    writeDb(dbData);
+    sendJson(res, 201, newPost);
+    return true;
+  }
+
+  // PUT /api/newsfeed
+  if (pathname === '/api/newsfeed' && method === 'PUT') {
+    const body = await parseBody(req);
+    const { postId, title, content, mediaUrl, mediaType, drivePath, mediaAttachments } = body;
+    const idx = dbData.newsfeed.findIndex(p => p.postId === postId);
+    if (idx > -1) {
+      dbData.newsfeed[idx] = {
+        ...dbData.newsfeed[idx],
+        title: title || dbData.newsfeed[idx].title,
+        content: content || dbData.newsfeed[idx].content,
+        mediaUrl: mediaUrl !== undefined ? mediaUrl : dbData.newsfeed[idx].mediaUrl,
+        mediaType: mediaType !== undefined ? mediaType : dbData.newsfeed[idx].mediaType,
+        drivePath: drivePath !== undefined ? drivePath : dbData.newsfeed[idx].drivePath,
+        mediaAttachments: mediaAttachments !== undefined ? mediaAttachments : dbData.newsfeed[idx].mediaAttachments,
+      };
+      writeDb(dbData);
+      sendJson(res, 200, dbData.newsfeed[idx]);
+    } else {
+      sendJson(res, 404, { error: 'Post not found' });
+    }
+    return true;
+  }
+
+  // DELETE /api/newsfeed
+  if (pathname === '/api/newsfeed' && method === 'DELETE') {
+    const body = await parseBody(req);
+    const { postId } = body;
+    const idx = dbData.newsfeed.findIndex(p => p.postId === postId);
+    if (idx > -1) {
+      const deleted = dbData.newsfeed.splice(idx, 1)[0];
+      writeDb(dbData);
+      sendJson(res, 200, deleted);
+    } else {
+      sendJson(res, 404, { error: 'Post not found' });
+    }
+    return true;
+  }
+
+  // GET /api/homework
+  if (pathname === '/api/homework' && method === 'GET') {
+    const classId = urlObj.searchParams.get('classId');
+    const filtered = classId ? dbData.homework.filter(h => h.classId === classId) : dbData.homework;
+    sendJson(res, 200, filtered);
+    return true;
+  }
+
+  // POST /api/homework
+  if (pathname === '/api/homework' && method === 'POST') {
+    const body = await parseBody(req);
+    const newHw = {
+      homeworkId: `hw_${Date.now()}`,
+      classId: body.classId,
+      title: body.title,
+      description: body.description,
+      dueDate: body.dueDate || new Date(Date.now() + 3600000 * 24).toISOString(),
+      createdByName: body.createdByName || 'Teacher',
+      submissions: {}
+    };
+    dbData.homework.push(newHw);
+    writeDb(dbData);
+    sendJson(res, 201, newHw);
+    return true;
+  }
+
+  // POST /api/homework/submit (Toggle Submission)
+  if (pathname === '/api/homework/submit' && method === 'POST') {
+    const body = await parseBody(req);
+    const { homeworkId, studentId, attachments } = body;
+    const hw = dbData.homework.find(h => h.homeworkId === homeworkId);
+    if (hw) {
+      if (!hw.submissions) hw.submissions = {};
+      const current = hw.submissions[studentId];
+      const isCurrentlyCompleted = current === true || (current && typeof current === 'object' && current.completed === true);
+      
+      if (attachments !== undefined) {
+        hw.submissions[studentId] = {
+          completed: attachments.length > 0 || (current && typeof current === 'object' && current.completed === true),
+          mediaAttachments: attachments,
+          submittedAt: new Date().toISOString()
+        };
+      } else {
+        hw.submissions[studentId] = {
+          completed: !isCurrentlyCompleted,
+          mediaAttachments: isCurrentlyCompleted ? [] : (current?.mediaAttachments || []),
+          submittedAt: new Date().toISOString()
+        };
+      }
+      writeDb(dbData);
+      sendJson(res, 200, hw);
+    } else {
+      sendJson(res, 404, { error: 'Homework task not found.' });
+    }
+    return true;
+  }
+
+  // PUT /api/homework
+  if (pathname === '/api/homework' && method === 'PUT') {
+    const body = await parseBody(req);
+    const { homeworkId, classId, title, description, dueDate, createdByName, submissions } = body;
+    const idx = dbData.homework.findIndex(h => h.homeworkId === homeworkId);
+    if (idx > -1) {
+      dbData.homework[idx] = {
+        ...dbData.homework[idx],
+        classId: classId || dbData.homework[idx].classId,
+        title: title || dbData.homework[idx].title,
+        description: description || dbData.homework[idx].description,
+        dueDate: dueDate || dbData.homework[idx].dueDate,
+        createdByName: createdByName || dbData.homework[idx].createdByName,
+        submissions: submissions !== undefined ? submissions : dbData.homework[idx].submissions
+      };
+      writeDb(dbData);
+      sendJson(res, 200, dbData.homework[idx]);
+    } else {
+      sendJson(res, 404, { error: 'Homework task not found.' });
+    }
+    return true;
+  }
+
+  // DELETE /api/homework
+  if (pathname === '/api/homework' && method === 'DELETE') {
+    const body = await parseBody(req);
+    const { homeworkId } = body;
+    const idx = dbData.homework.findIndex(h => h.homeworkId === homeworkId);
+    if (idx > -1) {
+      const deleted = dbData.homework.splice(idx, 1)[0];
+      writeDb(dbData);
+      sendJson(res, 200, deleted);
+    } else {
+      sendJson(res, 404, { error: 'Homework task not found.' });
+    }
+    return true;
+  }
+
+  // GET /api/attendance
+  if (pathname === '/api/attendance' && method === 'GET') {
+    sendJson(res, 200, dbData.attendance);
+    return true;
+  }
+
+  // POST /api/attendance/save
+  if (pathname === '/api/attendance/save' && method === 'POST') {
+    const body = await parseBody(req);
+    const existingIndex = dbData.attendance.findIndex(a => a.classId === body.classId && a.date === body.date);
+    
+    const record = {
+      recordId: existingIndex > -1 ? dbData.attendance[existingIndex].recordId : `rec_${Date.now()}`,
+      approved: false,
+      ...body
+    };
+
+    if (existingIndex > -1) {
+      dbData.attendance[existingIndex] = record;
+    } else {
+      dbData.attendance.push(record);
+    }
+
+    // Sync with pending approvals
+    dbData.pending_approvals = dbData.pending_approvals.filter(a => !(a.classId === body.classId && a.date === body.date && a.status === 'pending'));
+
+    Object.keys(body.rolls).forEach(uId => {
+      if (body.rolls[uId] === 'absent') {
+        const studentObj = dbData.users.find(u => u.uid === uId);
+        if (studentObj && studentObj.role === 'student') {
+          dbData.pending_approvals.push({
+            approvalId: `app_${Date.now()}_${uId}`,
+            classId: body.classId,
+            date: body.date,
+            markedBy: body.markedBy,
+            markedByName: body.markedByName || 'Teacher',
+            studentId: uId,
+            studentName: studentObj.fullName,
+            parentUid: 'parent_1',
+            status: 'pending'
+          });
+        }
+      }
+    });
+
+    writeDb(dbData);
+    sendJson(res, 200, record);
+    return true;
+  }
+
+  // GET /api/attendance/pending
+  if (pathname === '/api/attendance/pending' && method === 'GET') {
+    const pending = dbData.pending_approvals.filter(a => a.status === 'pending');
+    sendJson(res, 200, pending);
+    return true;
+  }
+
+  // GET /api/attendance/approvals
+  if (pathname === '/api/attendance/approvals' && method === 'GET') {
+    sendJson(res, 200, dbData.pending_approvals);
+    return true;
+  }
+
+  // POST /api/attendance/approve
+  if (pathname === '/api/attendance/approve' && method === 'POST') {
+    const body = await parseBody(req);
+    const { approvalId } = body;
+    const appIndex = dbData.pending_approvals.findIndex(a => a.approvalId === approvalId);
+    
+    if (appIndex > -1) {
+      dbData.pending_approvals[appIndex].status = 'approved';
+      const app = dbData.pending_approvals[appIndex];
+
+      // Update overall attendance record approved state
+      const attIndex = dbData.attendance.findIndex(a => a.classId === app.classId && a.date === app.date);
+      if (attIndex > -1) {
+        dbData.attendance[attIndex].approved = true;
+      }
+
+      // Push alert
+      dbData.pushed_alerts.push({
+        alertId: `alert_${Date.now()}`,
+        parentUid: app.parentUid,
+        title: 'Absence Alert / வருகை அறிவிப்பு',
+        body: `${app.studentName} was marked absent today in ${app.markedByName}'s class. Absence has been authorized by Administration.`,
+        createdAt: new Date().toISOString()
+      });
+
+      writeDb(dbData);
+      sendJson(res, 200, app);
+    } else {
+      sendJson(res, 404, { error: 'Pending approval record not found.' });
+    }
+    return true;
+  }
+
+  // GET /api/messages
+  if (pathname === '/api/messages' && method === 'GET') {
+    const chatId = urlObj.searchParams.get('chatId');
+    const filtered = chatId ? dbData.messages.filter(m => m.chatId === chatId) : dbData.messages;
+    sendJson(res, 200, filtered.sort((a, b) => a.createdAt.localeCompare(b.createdAt)));
+    return true;
+  }
+
+  // POST /api/messages
+  if (pathname === '/api/messages' && method === 'POST') {
+    const body = await parseBody(req);
+    const newMsg = {
+      messageId: `msg_${Date.now()}`,
+      chatId: body.chatId,
+      senderId: body.senderId,
+      text: body.text,
+      createdAt: new Date().toISOString()
+    };
+    dbData.messages.push(newMsg);
+    writeDb(dbData);
+    sendJson(res, 201, newMsg);
+    return true;
+  }
+
+  // GET /api/events
+  if (pathname === '/api/events' && method === 'GET') {
+    sendJson(res, 200, dbData.events);
+    return true;
+  }
+
+  // POST /api/events
+  if (pathname === '/api/events' && method === 'POST') {
+    const body = await parseBody(req);
+    const newEvent = {
+      eventId: `evt_${Date.now()}`,
+      title: body.title,
+      description: body.description,
+      startDate: body.startDate || new Date().toISOString(),
+      endDate: body.endDate || new Date(Date.now() + 3600000 * 2).toISOString()
+    };
+    dbData.events.push(newEvent);
+    writeDb(dbData);
+    sendJson(res, 201, newEvent);
+    return true;
+  }
+
+  // PUT /api/events
+  if (pathname === '/api/events' && method === 'PUT') {
+    const body = await parseBody(req);
+    const { eventId, title, description, startDate, endDate } = body;
+    const idx = dbData.events.findIndex(e => e.eventId === eventId);
+    if (idx > -1) {
+      dbData.events[idx] = {
+        ...dbData.events[idx],
+        title: title || dbData.events[idx].title,
+        description: description || dbData.events[idx].description,
+        startDate: startDate || dbData.events[idx].startDate,
+        endDate: endDate || dbData.events[idx].endDate
+      };
+      writeDb(dbData);
+      sendJson(res, 200, dbData.events[idx]);
+    } else {
+      sendJson(res, 404, { error: 'Event not found.' });
+    }
+    return true;
+  }
+
+  // DELETE /api/events
+  if (pathname === '/api/events' && method === 'DELETE') {
+    const body = await parseBody(req);
+    const { eventId } = body;
+    const idx = dbData.events.findIndex(e => e.eventId === eventId);
+    if (idx > -1) {
+      const deleted = dbData.events.splice(idx, 1)[0];
+      writeDb(dbData);
+      sendJson(res, 200, deleted);
+    } else {
+      sendJson(res, 404, { error: 'Event not found.' });
+    }
+    return true;
+  }
+
+  // GET /api/schooldates
+  if (pathname === '/api/schooldates' && method === 'GET') {
+    sendJson(res, 200, dbData.schooldates || []);
+    return true;
+  }
+
+  // POST /api/schooldates/generate
+  if (pathname === '/api/schooldates/generate' && method === 'POST') {
+    const body = await parseBody(req);
+    const { dates } = body;
+    
+    if (!Array.isArray(dbData.schooldates)) {
+      dbData.schooldates = [];
+    }
+
+    dates.forEach(newDate => {
+      const idx = dbData.schooldates.findIndex(d => d.dateId === newDate.dateId);
+      if (idx > -1) {
+        dbData.schooldates[idx] = newDate;
+      } else {
+        dbData.schooldates.push(newDate);
+      }
+    });
+
+    writeDb(dbData);
+    sendJson(res, 200, dbData.schooldates);
+    return true;
+  }
+
+  // POST /api/schooldates/toggle-override
+  if (pathname === '/api/schooldates/toggle-override' && method === 'POST') {
+    const body = await parseBody(req);
+    const { dateId, isHoliday, holidayName } = body;
+    
+    const idx = dbData.schooldates.findIndex(d => d.dateId === dateId);
+    if (idx > -1) {
+      dbData.schooldates[idx].isHoliday = isHoliday;
+      dbData.schooldates[idx].holidayName = holidayName;
+      writeDb(dbData);
+      sendJson(res, 200, dbData.schooldates[idx]);
+    } else {
+      sendJson(res, 404, { error: 'School date not found.' });
+    }
+    return true;
+  }
+
+  // POST /api/schooldates/custom
+  if (pathname === '/api/schooldates/custom' && method === 'POST') {
+    const newDate = await parseBody(req);
+    
+    if (!Array.isArray(dbData.schooldates)) {
+      dbData.schooldates = [];
+    }
+
+    const idx = dbData.schooldates.findIndex(d => d.dateId === newDate.dateId);
+    if (idx > -1) {
+      dbData.schooldates[idx] = newDate;
+    } else {
+      dbData.schooldates.push(newDate);
+    }
+
+    writeDb(dbData);
+    sendJson(res, 200, newDate);
+    return true;
+  }
+
+  return false;
+}
+
+module.exports = {
+  handleApiRoutes
+};

@@ -21,24 +21,20 @@ export const classService = {
   getClasses: async (): Promise<any[]> => {
     // 1. Firebase Firestore
     if (!isDemoMode && db) {
-      try {
-        const querySnapshot = await getDocs(collection(db, 'classes'));
-        const classesList: any[] = [];
-        querySnapshot.forEach((doc) => {
-          classesList.push({ classId: doc.id, ...doc.data() });
-        });
-        
-        if (classesList.length === 0) {
-          for (const c of DEFAULT_CLASSES) {
-            const { classId, ...classDetails } = c;
-            await setDoc(doc(db, 'classes', classId), classDetails);
-            classesList.push(c);
-          }
+      const querySnapshot = await getDocs(collection(db, 'classes'));
+      const classesList: any[] = [];
+      querySnapshot.forEach((doc) => {
+        classesList.push({ classId: doc.id, ...doc.data() });
+      });
+      
+      if (classesList.length === 0) {
+        for (const c of DEFAULT_CLASSES) {
+          const { classId, ...classDetails } = c;
+          await setDoc(doc(db, 'classes', classId), classDetails);
+          classesList.push(c);
         }
-        return classesList;
-      } catch (e) {
-        console.warn('Firestore getClasses failed, falling back:', e);
       }
+      return classesList;
     }
 
     // 2. Local REST API Server
@@ -93,15 +89,12 @@ export const classService = {
   getClass: async (classId: string): Promise<any | null> => {
     // 1. Firebase Firestore
     if (!isDemoMode && db) {
-      try {
-        const docRef = doc(db, 'classes', classId);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          return { classId: docSnap.id, ...docSnap.data() };
-        }
-      } catch (e) {
-        console.warn('Firestore getClass failed, falling back:', e);
+      const docRef = doc(db, 'classes', classId);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        return { classId: docSnap.id, ...docSnap.data() };
       }
+      return null;
     }
 
     // 2. Local REST API Server
@@ -131,13 +124,9 @@ export const classService = {
 
     // 1. Firebase Firestore
     if (!isDemoMode && db) {
-      try {
-        const { classId: omitted, ...details } = newClass;
-        await setDoc(doc(db, 'classes', classId), details);
-        return newClass;
-      } catch (e) {
-        console.warn('Firestore createClass failed, falling back:', e);
-      }
+      const { classId: omitted, ...details } = newClass;
+      await setDoc(doc(db, 'classes', classId), details);
+      return newClass;
     }
 
     // 2. Local REST API Server
@@ -162,14 +151,10 @@ export const classService = {
   updateClass: async (classId: string, data: any): Promise<any> => {
     // 1. Firebase Firestore
     if (!isDemoMode && db) {
-      try {
-        const docRef = doc(db, 'classes', classId);
-        await setDoc(docRef, data, { merge: true });
-        const docSnap = await getDoc(docRef);
-        return { classId, ...docSnap.data() };
-      } catch (e) {
-        console.warn('Firestore updateClass failed, falling back:', e);
-      }
+      const docRef = doc(db, 'classes', classId);
+      await setDoc(docRef, data, { merge: true });
+      const docSnap = await getDoc(docRef);
+      return { classId, ...docSnap.data() };
     }
 
     // 2. Local REST API Server
@@ -198,11 +183,8 @@ export const classService = {
   deleteClass: async (classId: string): Promise<void> => {
     // 1. Firebase Firestore
     if (!isDemoMode && db) {
-      try {
-        await deleteDoc(doc(db, 'classes', classId));
-      } catch (e) {
-        console.warn('Firestore deleteClass failed, falling back:', e);
-      }
+      await deleteDoc(doc(db, 'classes', classId));
+      return;
     }
 
     // 2. Local REST API Server

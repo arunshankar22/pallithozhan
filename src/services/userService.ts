@@ -121,23 +121,19 @@ export const userService = {
   getUsers: async (): Promise<any[]> => {
     // 1. Firebase Firestore
     if (!isDemoMode && db) {
-      try {
-        const querySnapshot = await getDocs(collection(db, 'users'));
-        const usersList: any[] = [];
-        querySnapshot.forEach((doc) => {
-          usersList.push({ uid: doc.id, ...doc.data() });
-        });
-        
-        if (usersList.length === 0) {
-          for (const u of DEFAULT_USERS) {
-            await userService.createUser(u);
-            usersList.push(u);
-          }
+      const querySnapshot = await getDocs(collection(db, 'users'));
+      const usersList: any[] = [];
+      querySnapshot.forEach((doc) => {
+        usersList.push({ uid: doc.id, ...doc.data() });
+      });
+      
+      if (usersList.length === 0) {
+        for (const u of DEFAULT_USERS) {
+          await userService.createUser(u);
+          usersList.push(u);
         }
-        return usersList;
-      } catch (e) {
-        console.warn('Firestore getUsers failed, falling back:', e);
       }
+      return usersList;
     }
 
     // 2. Local REST API Server
@@ -179,15 +175,12 @@ export const userService = {
   getUser: async (uid: string): Promise<any | null> => {
     // 1. Firebase Firestore
     if (!isDemoMode && db) {
-      try {
-        const docRef = doc(db, 'users', uid);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          return { uid: docSnap.id, ...docSnap.data() };
-        }
-      } catch (e) {
-        console.warn('Firestore getUser failed, falling back:', e);
+      const docRef = doc(db, 'users', uid);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        return { uid: docSnap.id, ...docSnap.data() };
       }
+      return null;
     }
 
     // 2. Local REST API Server
@@ -216,13 +209,9 @@ export const userService = {
 
     // 1. Firebase Firestore
     if (!isDemoMode && db) {
-      try {
-        const { uid: omitted, ...details } = newUser;
-        await setDoc(doc(db, 'users', uid), details);
-        return newUser;
-      } catch (e) {
-        console.warn('Firestore createUser failed, falling back:', e);
-      }
+      const { uid: omitted, ...details } = newUser;
+      await setDoc(doc(db, 'users', uid), details);
+      return newUser;
     }
 
     // 2. Local REST API Server
@@ -247,14 +236,10 @@ export const userService = {
   updateUser: async (uid: string, data: any): Promise<any> => {
     // 1. Firebase Firestore
     if (!isDemoMode && db) {
-      try {
-        const docRef = doc(db, 'users', uid);
-        await setDoc(docRef, data, { merge: true });
-        const updatedSnap = await getDoc(docRef);
-        return { uid, ...updatedSnap.data() };
-      } catch (e) {
-        console.warn('Firestore updateUser failed, falling back:', e);
-      }
+      const docRef = doc(db, 'users', uid);
+      await setDoc(docRef, data, { merge: true });
+      const updatedSnap = await getDoc(docRef);
+      return { uid, ...updatedSnap.data() };
     }
 
     // 2. Local REST API Server
@@ -283,11 +268,8 @@ export const userService = {
   deleteUser: async (uid: string): Promise<void> => {
     // 1. Firebase Firestore
     if (!isDemoMode && db) {
-      try {
-        await deleteDoc(doc(db, 'users', uid));
-      } catch (e) {
-        console.warn('Firestore deleteUser failed, falling back:', e);
-      }
+      await deleteDoc(doc(db, 'users', uid));
+      return;
     }
 
     // 2. Local REST API Server

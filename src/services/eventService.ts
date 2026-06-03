@@ -10,6 +10,16 @@ export const DEFAULT_EVENTS = [
     description: { en: 'Traditional cultural performances, speech, and sweet distribution.', ta: 'பாரம்பரிய கலை நிகழ்ச்சிகள், பேச்சுப்போட்டி மற்றும் இனிப்புகள் வழங்குதல்.' },
     startDate: new Date(Date.now() + 3600000 * 120).toISOString(),
     endDate: new Date(Date.now() + 3600000 * 124).toISOString()
+  },
+  {
+    eventId: 'sess_1',
+    type: 'session',
+    title: { en: 'Level 3', ta: 'நிலை 3' },
+    description: { en: 'Topic: Nature & Elements in Tamil Literature', ta: 'தலைப்பு: தமிழ் இலக்கியத்தில் இயற்கையும் ஐம்பூதங்களும்' },
+    timeEn: 'Saturday @ 2:00 PM',
+    timeTa: 'சனிக்கிழமை @ 2:00 PM',
+    startDate: new Date().toISOString(),
+    endDate: new Date().toISOString()
   }
 ];
 
@@ -26,24 +36,20 @@ export const eventService = {
   getEvents: async (): Promise<any[]> => {
     // 1. Firebase Firestore
     if (!isDemoMode && db) {
-      try {
-        const querySnapshot = await getDocs(collection(db, 'events'));
-        const eventsList: any[] = [];
-        querySnapshot.forEach((doc) => {
-          eventsList.push({ eventId: doc.id, ...doc.data() });
-        });
-        
-        if (eventsList.length === 0) {
-          for (const e of DEFAULT_EVENTS) {
-            const { eventId, ...details } = e;
-            await setDoc(doc(db, 'events', eventId), details);
-            eventsList.push(e);
-          }
+      const querySnapshot = await getDocs(collection(db, 'events'));
+      const eventsList: any[] = [];
+      querySnapshot.forEach((doc) => {
+        eventsList.push({ eventId: doc.id, ...doc.data() });
+      });
+      
+      if (eventsList.length === 0) {
+        for (const e of DEFAULT_EVENTS) {
+          const { eventId, ...details } = e;
+          await setDoc(doc(db, 'events', eventId), details);
+          eventsList.push(e);
         }
-        return eventsList;
-      } catch (e) {
-        console.warn('Firestore getEvents failed, falling back:', e);
       }
+      return eventsList;
     }
 
     // 2. Local REST API Server
@@ -70,13 +76,9 @@ export const eventService = {
 
     // 1. Firebase Firestore
     if (!isDemoMode && db) {
-      try {
-        const { eventId: omitted, ...details } = newEvent;
-        await setDoc(doc(db, 'events', eventId), details);
-        return newEvent;
-      } catch (e) {
-        console.warn('Firestore createEvent failed, falling back:', e);
-      }
+      const { eventId: omitted, ...details } = newEvent;
+      await setDoc(doc(db, 'events', eventId), details);
+      return newEvent;
     }
 
     // 2. Local REST API Server
@@ -101,14 +103,10 @@ export const eventService = {
   updateEvent: async (eventId: string, data: any): Promise<any> => {
     // 1. Firebase Firestore
     if (!isDemoMode && db) {
-      try {
-        const docRef = doc(db, 'events', eventId);
-        await setDoc(docRef, data, { merge: true });
-        const updatedSnap = await getDoc(docRef);
-        return { eventId, ...updatedSnap.data() };
-      } catch (e) {
-        console.warn('Firestore updateEvent failed, falling back:', e);
-      }
+      const docRef = doc(db, 'events', eventId);
+      await setDoc(docRef, data, { merge: true });
+      const updatedSnap = await getDoc(docRef);
+      return { eventId, ...updatedSnap.data() };
     }
 
     // 2. Local REST API Server
@@ -138,12 +136,8 @@ export const eventService = {
     const { deleteDoc } = require('firebase/firestore');
     // 1. Firebase Firestore
     if (!isDemoMode && db) {
-      try {
-        await deleteDoc(doc(db, 'events', eventId));
-        return { eventId };
-      } catch (e) {
-        console.warn('Firestore deleteEvent failed, falling back:', e);
-      }
+      await deleteDoc(doc(db, 'events', eventId));
+      return { eventId };
     }
 
     // 2. Local REST API Server

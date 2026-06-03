@@ -8,7 +8,7 @@ import {
   Platform,
   Image
 } from 'react-native';
-import { Plus, BookOpen, CheckCircle, Clock, Trash2, Edit, Mic, Square } from 'lucide-react-native';
+import { Plus, BookOpen, CheckCircle, Clock, Trash2, Edit, Mic, Square, Upload, Video, Image as ImageIcon } from 'lucide-react-native';
 import { ThemedText } from '@/components/themed-text';
 import { TabProps } from '@/app/sharedTypes';
 import { styles } from '@/app/styles';
@@ -17,6 +17,7 @@ import { autoTranslate } from '@/services/translator';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { Spacing } from '@/constants/theme';
+import { ThirukkuralPracticeGuide } from '@/components/ThirukkuralPracticeGuide';
 
 export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId }: TabProps) {
   const [homework, setHomework] = useState<any[]>([]);
@@ -25,7 +26,122 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
   const [users, setUsers] = useState<any[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingHwId, setEditingHwId] = useState<string | null>(null);
-  
+  const [learnTabMode, setLearnTabMode] = useState<'courses' | 'games'>('courses');
+  const [uploadingHwId, setUploadingHwId] = useState<string | null>(null);
+
+  const handleUploadSubmissionFile = (homeworkId: string) => {
+    const studentId = activeStudentId || (user?.role === 'parent' ? (user.associatedStudents?.[0] || 'student_1') : (user?.uid || 'student_1'));
+    
+    if (Platform.OS === 'web') {
+      try {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*,video/*';
+        input.multiple = true;
+        
+        input.onchange = async (e: any) => {
+          const files = e.target.files;
+          if (files && files.length > 0) {
+            const filesCount = files.length;
+            const newAttachments: any[] = [];
+            let loadedCount = 0;
+            
+            setUploadingHwId(homeworkId);
+            
+            for (let i = 0; i < filesCount; i++) {
+              const file = files[i];
+              const reader = new FileReader();
+              const isVideo = file.type ? file.type.startsWith('video/') : /\.(mp4|mov|avi|mkv|webm)$/i.test(file.name);
+              const resolvedType = isVideo ? 'video' : 'image';
+              
+              reader.onload = async () => {
+                newAttachments.push({
+                  name: file.name,
+                  type: resolvedType,
+                  url: reader.result as string
+                });
+                
+                loadedCount++;
+                if (loadedCount === filesCount) {
+                  try {
+                    const hwItem = homework.find(h => h.homeworkId === homeworkId);
+                    const existingSub = hwItem?.submissions?.[studentId];
+                    const existingFiles = (existingSub && typeof existingSub === 'object' && existingSub.mediaAttachments) || [];
+                    
+                    const mergedAttachments = [...existingFiles, ...newAttachments];
+                    
+                    if (mockDb.submitHomework) {
+                      await mockDb.submitHomework(homeworkId, studentId, mergedAttachments);
+                    } else {
+                      await mockDb.toggleHomeworkSubmission(homeworkId, studentId);
+                    }
+                    showToast(`Successfully uploaded ${filesCount} file(s) for your child's homework!`, 'success');
+                    loadData();
+                  } catch (err) {
+                    showToast('Failed to save homework attachment.', 'error');
+                  } finally {
+                    setUploadingHwId(null);
+                  }
+                }
+              };
+              reader.readAsDataURL(file);
+            }
+          }
+        };
+        input.click();
+      } catch (error) {
+        showToast('Failed to open file picker.', 'error');
+      }
+    } else {
+      setUploadingHwId(homeworkId);
+      setTimeout(async () => {
+        const simAttachment = {
+          name: `simulated_homework_${Date.now()}.jpg`,
+          type: 'image',
+          url: 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?auto=format&fit=crop&q=80&w=800'
+        };
+        
+        try {
+          const hwItem = homework.find(h => h.homeworkId === homeworkId);
+          const existingSub = hwItem?.submissions?.[studentId];
+          const existingFiles = (existingSub && typeof existingSub === 'object' && existingSub.mediaAttachments) || [];
+          
+          if (mockDb.submitHomework) {
+            await mockDb.submitHomework(homeworkId, studentId, [...existingFiles, simAttachment]);
+          } else {
+            await mockDb.toggleHomeworkSubmission(homeworkId, studentId);
+          }
+          showToast('Uploaded simulated homework image successfully!', 'success');
+          loadData();
+        } catch (err) {
+          showToast('Failed to save homework attachment.', 'error');
+        } finally {
+          setUploadingHwId(null);
+        }
+      }, 800);
+    }
+  };
+
+  const handleRemoveSubmissionFile = async (homeworkId: string, fileIndex: number) => {
+    const studentId = activeStudentId || (user?.role === 'parent' ? (user.associatedStudents?.[0] || 'student_1') : (user?.uid || 'student_1'));
+    try {
+      const hwItem = homework.find(h => h.homeworkId === homeworkId);
+      const existingSub = hwItem?.submissions?.[studentId];
+      if (existingSub && typeof existingSub === 'object' && existingSub.mediaAttachments) {
+        const updatedFiles = [...existingSub.mediaAttachments];
+        updatedFiles.splice(fileIndex, 1);
+        
+        if (mockDb.submitHomework) {
+          await mockDb.submitHomework(homeworkId, studentId, updatedFiles);
+        }
+        showToast('Attachment removed.', 'warning');
+        loadData();
+      }
+    } catch (err) {
+      showToast('Failed to remove attachment.', 'error');
+    }
+  };
+
   // Form states
   const [selectedClassId, setSelectedClassId] = useState('');
   const [titleEn, setTitleEn] = useState('');
@@ -473,177 +589,526 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
         </View>
       )}
 
-      {/* Homework Cards Grid */}
-      <View style={{ flex: 1 }}>
-        <View style={styles.homeworkGrid}>
-          {filteredHomework.map((item) => {
-            const title = i18n.language === 'ta' ? item.title.ta : item.title.en;
-            const desc = i18n.language === 'ta' ? item.description.ta : item.description.en;
-            
-            const studentId = activeStudentId || (user?.role === 'parent' ? (user.associatedStudents?.[0] || 'student_1') : (user?.uid || 'student_1'));
-            
-            // Fix submission unclick persistence counting:
-            const completedUids = Object.keys(item.submissions || {}).filter(uid => item.submissions[uid]);
-            const isCompleted = completedUids.includes(studentId);
+      {/* My Courses / Games switcher for Parents and Students */}
+      {['parent', 'student'].includes(user?.role || '') && (
+        <View style={{
+          flexDirection: 'row',
+          backgroundColor: '#ebf5fa',
+          padding: 4,
+          borderRadius: 12,
+          borderWidth: 0.5,
+          borderColor: colors.border,
+          marginBottom: Spacing.three
+        }}>
+          <Pressable
+            onPress={() => setLearnTabMode('courses')}
+            style={{
+              flex: 1,
+              paddingVertical: 8,
+              borderRadius: 10,
+              backgroundColor: learnTabMode === 'courses' ? colors.cardBg : 'transparent',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexDirection: 'row',
+              gap: 6
+            }}
+          >
+            <BookOpen size={14} color={learnTabMode === 'courses' ? colors.primary : colors.textSecondary} />
+            <ThemedText style={{ fontSize: 12, fontWeight: '700', color: learnTabMode === 'courses' ? colors.primary : colors.textSecondary }}>
+              My Courses / பாடங்கள்
+            </ThemedText>
+          </Pressable>
+          <Pressable
+            onPress={() => setLearnTabMode('games')}
+            style={{
+              flex: 1,
+              paddingVertical: 8,
+              borderRadius: 10,
+              backgroundColor: learnTabMode === 'games' ? colors.cardBg : 'transparent',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexDirection: 'row',
+              gap: 6
+            }}
+          >
+            <CheckCircle size={14} color={learnTabMode === 'games' ? colors.primary : colors.textSecondary} />
+            <ThemedText style={{ fontSize: 12, fontWeight: '700', color: learnTabMode === 'games' ? colors.primary : colors.textSecondary }}>
+              Interactive Games / விளையாட்டுகள்
+            </ThemedText>
+          </Pressable>
+        </View>
+      )}
 
-            // Resolve student names who completed it:
-            const completedNames = completedUids
-              .map(uid => users.find(u => u.uid === uid)?.fullName)
-              .filter(Boolean)
-              .join(', ');
+      {/* Featured Book Goldfish Card for courses mode */}
+      {['parent', 'student'].includes(user?.role || '') && learnTabMode === 'courses' && (
+        <View style={{
+          borderRadius: 18,
+          borderWidth: 1,
+          borderColor: '#F0E5CC',
+          backgroundColor: '#FFFDF9',
+          padding: Spacing.three,
+          flexDirection: 'row',
+          gap: 12,
+          shadowColor: colors.shadowColor,
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.03,
+          shadowRadius: 8,
+          elevation: 2,
+          marginBottom: Spacing.three
+        }}>
+          <Image
+            source={{ uri: 'https://images.unsplash.com/photo-1522069169874-c58ec4b76be5?auto=format&fit=crop&q=80&w=300' }}
+            style={{ width: 80, height: 80, borderRadius: 12 }}
+            resizeMode="cover"
+          />
+          <View style={{ flex: 1, justifyContent: 'space-between' }}>
+            <View style={{ gap: 2 }}>
+              <View style={{ alignSelf: 'flex-start', backgroundColor: '#FFF0ED', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                <ThemedText style={{ color: colors.primary, fontSize: 8, fontWeight: '800' }}>FEATURED READER</ThemedText>
+              </View>
+              <ThemedText style={{ fontSize: 14, fontWeight: '800', color: colors.text }}>
+                தங்கமீன் சாகசம் (The Goldfish Adventure)
+              </ThemedText>
+              <ThemedText style={{ fontSize: 11, color: colors.textSecondary }} numberOfLines={2}>
+                Develop Tamil sentence construction skills using narrative fables.
+              </ThemedText>
+            </View>
+            
+            <View style={{ gap: 4, marginTop: 6 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <ThemedText style={{ fontSize: 10, color: colors.textSecondary }}>Curriculum Progress</ThemedText>
+                <ThemedText style={{ fontSize: 10, fontWeight: '700', color: colors.secondary }}>60%</ThemedText>
+              </View>
+              <View style={{ height: 6, width: '100%', backgroundColor: colors.border, borderRadius: 3, overflow: 'hidden' }}>
+                <View style={{ height: '100%', width: '60%', backgroundColor: colors.secondary, borderRadius: 3 }} />
+              </View>
+            </View>
+          </View>
+        </View>
+      )}
 
-            return (
-              <View key={item.homeworkId} style={[styles.homeworkCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
-                <View style={styles.homeworkHeaderRow}>
-                  <View style={[styles.classBadge, { backgroundColor: colors.secondaryLight }]}>
-                    <ThemedText style={[styles.classBadgeText, { color: colors.secondary }]}>
-                      {classNames[item.classId] || 'Main Class'}
-                    </ThemedText>
-                  </View>
-                  
-                  <View style={{ flexDirection: 'row', gap: Spacing.two, alignItems: 'center' }}>
-                    <View style={styles.dueDateBadge}>
-                      <Clock size={12} color={colors.textSecondary} />
-                      <ThemedText style={[styles.dueDateText, { color: colors.textSecondary }]}>
-                        Due: {new Date(item.dueDate).toLocaleDateString(i18n.language === 'ta' ? 'ta-IN' : 'en-US')}
+      {/* Interactive Games list for games mode */}
+      {['parent', 'student'].includes(user?.role || '') && learnTabMode === 'games' ? (
+        <View style={{ gap: Spacing.three, marginBottom: Spacing.four }}>
+          <ThemedText style={{ fontSize: 15, fontWeight: '800', color: colors.text }}>
+            🎮 Educational Games / கல்வி விளையாட்டுகள்
+          </ThemedText>
+          
+          <View style={{ gap: 12 }}>
+            {[
+              {
+                title: 'Tamil Alphabet Memory Match',
+                titleTa: 'எழுத்து ஜோடி விளையாட்டு',
+                desc: 'Match consonants and vowels to clear the board and earn points.',
+                icon: '🧩',
+                points: '120 XP'
+              },
+              {
+                title: 'Vocabulary Quiz: Nature Words',
+                titleTa: 'சொற்களஞ்சியம்: இயற்கை',
+                desc: 'Translate words relating to nature, rivers, and trees into Tamil.',
+                icon: '🌳',
+                points: '150 XP'
+              },
+              {
+                title: 'Pronunciation Audio Challenge',
+                titleTa: 'ஒலிப்புப் பயிற்சிச் சவால்',
+                desc: 'Listen to native pronunciations and record yours to match scores.',
+                icon: '🎤',
+                points: '200 XP'
+              }
+            ].map((game, i) => (
+              <View
+                key={i}
+                style={{
+                  padding: Spacing.three,
+                  borderRadius: 16,
+                  backgroundColor: colors.cardBg,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 12
+                }}
+              >
+                <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: colors.backgroundSelected || '#ebf5fa', justifyContent: 'center', alignItems: 'center' }}>
+                  <ThemedText style={{ fontSize: 20 }}>{game.icon}</ThemedText>
+                </View>
+                
+                <View style={{ flex: 1, gap: 2 }}>
+                  <ThemedText style={{ fontSize: 13, fontWeight: '800', color: colors.text }}>
+                    {game.title}
+                  </ThemedText>
+                  <ThemedText style={{ fontSize: 11, color: colors.secondary, fontWeight: '700' }}>
+                    {game.titleTa}
+                  </ThemedText>
+                  <ThemedText style={{ fontSize: 11, color: colors.textSecondary }}>
+                    {game.desc}
+                  </ThemedText>
+                </View>
+                
+                <Pressable
+                  onPress={() => showToast(`Launching ${game.title}! Get ready to learn.`, 'success')}
+                  style={({ pressed }) => [
+                    {
+                      backgroundColor: colors.primary,
+                      paddingVertical: 8,
+                      paddingHorizontal: 12,
+                      borderRadius: 10,
+                      opacity: pressed ? 0.9 : 1
+                    }
+                  ]}
+                >
+                  <ThemedText style={{ color: '#FFF', fontSize: 11, fontWeight: '700' }}>
+                    Play ({game.points})
+                  </ThemedText>
+                </Pressable>
+              </View>
+            ))}
+          </View>
+        </View>
+      ) : (
+        /* Homework Cards Grid */
+        <View style={{ flex: 1 }}>
+          {['parent', 'student'].includes(user?.role || '') && filteredHomework.length > 0 && (
+            <ThemedText style={{ fontSize: 14, fontWeight: '800', color: colors.text, marginBottom: Spacing.two }}>
+              📋 Assigned Homework Tasks / வீட்டுப்பாடம்
+            </ThemedText>
+          )}
+          <View style={styles.homeworkGrid}>
+            {filteredHomework.map((item) => {
+              const title = i18n.language === 'ta' ? item.title.ta : item.title.en;
+              const desc = i18n.language === 'ta' ? item.description.ta : item.description.en;
+              
+              const studentId = activeStudentId || (user?.role === 'parent' ? (user.associatedStudents?.[0] || 'student_1') : (user?.uid || 'student_1'));
+              const childProfile = users.find(u => u.uid === studentId);
+              const studentName = childProfile?.fullName || 'Student';
+              const sub = item.submissions?.[studentId];
+              const subFiles = (sub && typeof sub === 'object' && sub.mediaAttachments) || [];
+              
+              // Fix submission unclick persistence counting:
+              const completedUids = Object.keys(item.submissions || {}).filter(uid => {
+                const sSub = item.submissions[uid];
+                return sSub === true || (sSub && typeof sSub === 'object' && sSub.completed === true);
+              });
+              const isCompleted = completedUids.includes(studentId);
+
+              // Resolve student names who completed it:
+              const completedNames = completedUids
+                .map(uid => users.find(u => u.uid === uid)?.fullName)
+                .filter(Boolean)
+                .join(', ');
+
+              return (
+                <View key={item.homeworkId} style={[styles.homeworkCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+                  <View style={styles.homeworkHeaderRow}>
+                    <View style={[styles.classBadge, { backgroundColor: colors.secondaryLight }]}>
+                      <ThemedText style={[styles.classBadgeText, { color: colors.secondary }]}>
+                        {classNames[item.classId] || 'Main Class'}
                       </ThemedText>
                     </View>
-
-                    {['admin', 'teacher'].includes(user?.role || '') && (
-                      <View style={{ flexDirection: 'row', gap: 6 }}>
-                        <Pressable onPress={() => handleStartEditHomework(item)} style={{ padding: 4 }}>
-                          <Edit size={14} color={colors.primary} />
-                        </Pressable>
-                        <Pressable onPress={() => handleDeleteHomework(item.homeworkId)} style={{ padding: 4 }}>
-                          <Trash2 size={14} color={colors.danger} />
-                        </Pressable>
+                    
+                    <View style={{ flexDirection: 'row', gap: Spacing.two, alignItems: 'center' }}>
+                      <View style={styles.dueDateBadge}>
+                        <Clock size={12} color={colors.textSecondary} />
+                        <ThemedText style={[styles.dueDateText, { color: colors.textSecondary }]}>
+                          Due: {new Date(item.dueDate).toLocaleDateString(i18n.language === 'ta' ? 'ta-IN' : 'en-US')}
+                        </ThemedText>
                       </View>
-                    )}
+
+                      {['admin', 'teacher'].includes(user?.role || '') && (
+                        <View style={{ flexDirection: 'row', gap: 6 }}>
+                          <Pressable onPress={() => handleStartEditHomework(item)} style={{ padding: 4 }}>
+                            <Edit size={14} color={colors.primary} />
+                          </Pressable>
+                          <Pressable onPress={() => handleDeleteHomework(item.homeworkId)} style={{ padding: 4 }}>
+                            <Trash2 size={14} color={colors.danger} />
+                          </Pressable>
+                        </View>
+                      )}
+                    </View>
                   </View>
-                </View>
 
-                <ThemedText style={styles.homeworkTitle}>{title}</ThemedText>
-                <ThemedText style={[styles.homeworkDesc, { color: colors.text }]}>{desc}</ThemedText>
-                
-                {/* Voice Guide Audio Player */}
-                {item.voiceUrl && (
-                  <View style={{ marginVertical: 8 }}>
-                    <ThemedText style={{ fontSize: 11, fontWeight: '700', color: colors.secondary, marginBottom: 4 }}>
-                      🔊 Teacher Voice Guide / ஆசிரியர் குரல் வழிமுறை:
-                    </ThemedText>
-                    <AudioPlayer voiceUrl={item.voiceUrl} colors={colors} />
-                  </View>
-                )}
+                  <ThemedText style={styles.homeworkTitle}>{title}</ThemedText>
+                  <ThemedText style={[styles.homeworkDesc, { color: colors.text }]}>{desc}</ThemedText>
+                  
+                  {/* Voice Guide Audio Player */}
+                  {item.voiceUrl && (
+                    <View style={{ marginVertical: 8 }}>
+                      <ThemedText style={{ fontSize: 11, fontWeight: '700', color: colors.secondary, marginBottom: 4 }}>
+                        🔊 Teacher Voice Guide / ஆசிரியர் குரல் வழிமுறை:
+                      </ThemedText>
+                      <AudioPlayer voiceUrl={item.voiceUrl} colors={colors} />
+                    </View>
+                  )}
 
-                {/* Media Attachment Display (Supports multiple attachments!) */}
-                {((item.mediaAttachments && item.mediaAttachments.length > 0) || item.mediaUrl) && (
-                  <View style={{ marginVertical: 8, gap: 10 }}>
-                    {/* Backward compatibility fallback */}
-                    {(!item.mediaAttachments || item.mediaAttachments.length === 0) && item.mediaUrl && (
-                      <View>
-                        {item.mediaType === 'image' ? (
-                          <Image
-                            source={{ uri: item.mediaUrl }}
-                            style={{ width: '100%', height: 280, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: '#0a0a0a' }}
-                            resizeMode="contain"
-                          />
-                        ) : (
-                          <View style={{ width: '100%', borderRadius: 12, backgroundColor: '#000', overflow: 'hidden' }}>
-                            {Platform.OS === 'web' ? (
-                              <video 
-                                src={item.mediaUrl} 
-                                controls 
-                                style={{ width: '100%', maxHeight: 280, display: 'block', objectFit: 'contain' }}
-                              />
-                            ) : (
-                              <View style={{ padding: 24, alignItems: 'center', gap: 8 }}>
-                                <ThemedText style={{ color: '#FFF', fontWeight: 'bold' }}>📹 Play Video Attachment</ThemedText>
-                                <ThemedText style={{ color: '#AAA', fontSize: 11 }}>{item.mediaName || 'Attached Video'}</ThemedText>
-                              </View>
-                            )}
-                          </View>
-                        )}
-                      </View>
-                    )}
-
-                    {/* Multiple attachments renderer */}
-                    {item.mediaAttachments && item.mediaAttachments.length > 0 && (
-                      <View style={{ gap: 10 }}>
-                        {item.mediaAttachments.map((media: any, idx: number) => {
-                          const fileUrl = media.url || media.data;
-                          return (
-                            <View key={idx}>
-                              {media.type === 'image' ? (
-                                <Image
-                                  source={{ uri: fileUrl }}
-                                  style={{ width: '100%', height: 280, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: '#0a0a0a' }}
-                                  resizeMode="contain"
+                  {/* Media Attachment Display (Supports multiple attachments!) */}
+                  {((item.mediaAttachments && item.mediaAttachments.length > 0) || item.mediaUrl) && (
+                    <View style={{ marginVertical: 8, gap: 10 }}>
+                      {/* Backward compatibility fallback */}
+                      {(!item.mediaAttachments || item.mediaAttachments.length === 0) && item.mediaUrl && (
+                        <View>
+                          {item.mediaType === 'image' ? (
+                            <Image
+                              source={{ uri: item.mediaUrl }}
+                              style={{ width: '100%', height: 280, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: '#0a0a0a' }}
+                              resizeMode="contain"
+                            />
+                          ) : (
+                            <View style={{ width: '100%', borderRadius: 12, backgroundColor: '#000', overflow: 'hidden' }}>
+                              {Platform.OS === 'web' ? (
+                                <video 
+                                  src={item.mediaUrl} 
+                                  controls 
+                                  style={{ width: '100%', maxHeight: 280, display: 'block', objectFit: 'contain' }}
                                 />
                               ) : (
-                                <View style={{ width: '100%', borderRadius: 12, backgroundColor: '#000', overflow: 'hidden' }}>
-                                  {Platform.OS === 'web' ? (
-                                    <video 
-                                      src={fileUrl} 
-                                      controls 
-                                      style={{ width: '100%', maxHeight: 280, display: 'block', objectFit: 'contain' }}
-                                    />
-                                  ) : (
-                                    <View style={{ padding: 24, alignItems: 'center', gap: 8 }}>
-                                      <ThemedText style={{ color: '#FFF', fontWeight: 'bold' }}>📹 Play Video Attachment</ThemedText>
-                                      <ThemedText style={{ color: '#AAA', fontSize: 11 }}>{media.name || 'Attached Video'}</ThemedText>
-                                    </View>
-                                  )}
+                                <View style={{ padding: 24, alignItems: 'center', gap: 8 }}>
+                                  <ThemedText style={{ color: '#FFF', fontWeight: 'bold' }}>📹 Play Video Attachment</ThemedText>
+                                  <ThemedText style={{ color: '#AAA', fontSize: 11 }}>{item.mediaName || 'Attached Video'}</ThemedText>
                                 </View>
                               )}
                             </View>
-                          );
-                        })}
+                          )}
+                        </View>
+                      )}
+
+                      {/* Multiple attachments renderer */}
+                      {item.mediaAttachments && item.mediaAttachments.length > 0 && (
+                        <View style={{ gap: 10 }}>
+                          {item.mediaAttachments.map((media: any, idx: number) => {
+                            const fileUrl = media.url || media.data;
+                            return (
+                              <View key={idx}>
+                                {media.type === 'image' ? (
+                                  <Image
+                                    source={{ uri: fileUrl }}
+                                    style={{ width: '100%', height: 280, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: '#0a0a0a' }}
+                                    resizeMode="contain"
+                                  />
+                                ) : (
+                                  <View style={{ width: '100%', borderRadius: 12, backgroundColor: '#000', overflow: 'hidden' }}>
+                                    {Platform.OS === 'web' ? (
+                                      <video 
+                                        src={fileUrl} 
+                                        controls 
+                                        style={{ width: '100%', maxHeight: 280, display: 'block', objectFit: 'contain' }}
+                                      />
+                                    ) : (
+                                      <View style={{ padding: 24, alignItems: 'center', gap: 8 }}>
+                                        <ThemedText style={{ color: '#FFF', fontWeight: 'bold' }}>📹 Play Video Attachment</ThemedText>
+                                        <ThemedText style={{ color: '#AAA', fontSize: 11 }}>{media.name || 'Attached Video'}</ThemedText>
+                                      </View>
+                                    )}
+                                  </View>
+                                )}
+                              </View>
+                            );
+                          })}
+                        </View>
+                      )}
+                    </View>
+                  )}
+
+                  <ThemedText style={[styles.homeworkAuthor, { color: colors.textSecondary }]}>
+                    Posted by: {item.createdByName}
+                  </ThemedText>
+
+                  {(() => {
+                    const isThirukkuralTask = item.homeworkId === 'hw_1' || 
+                      item.title?.en?.toLowerCase().includes('thirukkural') || 
+                      item.title?.ta?.includes('திருக்குறள்');
+                    
+                    return isThirukkuralTask ? (
+                      <ThirukkuralPracticeGuide colors={colors} i18n={i18n} showToast={showToast} />
+                    ) : null;
+                  })()}
+
+                  {/* Submissions interactive checklist */}
+                  {['parent', 'student'].includes(user?.role || '') && (
+                    <View style={{ gap: Spacing.two, marginTop: Spacing.two }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.background, padding: 8, borderRadius: 12, borderWidth: 0.5, borderColor: colors.border }}>
+                        <ThemedText style={{ fontSize: 12, fontWeight: '700', color: colors.textSecondary }}>
+                          👦 {i18n.language === 'ta' ? 'மாணவர்:' : 'Child/Student:'} <ThemedText style={{ color: colors.text, fontWeight: '800' }}>{studentName}</ThemedText>
+                        </ThemedText>
+                        
+                        <Pressable
+                          onPress={() => handleToggleSub(item.homeworkId)}
+                          style={[
+                            styles.completedButton,
+                            {
+                              backgroundColor: isCompleted ? colors.secondaryLight : colors.background,
+                              borderColor: isCompleted ? colors.secondary : colors.border,
+                              marginTop: 0,
+                              alignSelf: 'auto',
+                              paddingVertical: 6,
+                              paddingHorizontal: 12
+                            }
+                          ]}
+                        >
+                          <CheckCircle size={14} color={isCompleted ? colors.secondary : colors.textSecondary} style={{ marginRight: 4 }} />
+                          <ThemedText style={[styles.completedButtonText, { color: isCompleted ? colors.secondary : colors.text, fontSize: 11 }]}>
+                            {isCompleted ? (i18n.language === 'ta' ? 'முடிந்தது' : 'Completed') : (i18n.language === 'ta' ? 'முடிவடையவில்லை' : 'Mark Completed')}
+                          </ThemedText>
+                        </Pressable>
                       </View>
-                    )}
-                  </View>
-                )}
 
-                <ThemedText style={[styles.homeworkAuthor, { color: colors.textSecondary }]}>
-                  Posted by: {item.createdByName}
-                </ThemedText>
+                      {/* File Upload Manager */}
+                      <View style={{ 
+                        backgroundColor: colors.cardBg, 
+                        borderWidth: 1, 
+                        borderColor: colors.border, 
+                        borderRadius: 16, 
+                        padding: 12, 
+                        gap: 8 
+                      }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <ThemedText style={{ fontSize: 12, fontWeight: '700', color: colors.text }}>
+                            📎 {i18n.language === 'ta' ? 'வீட்டுப்பாடப் கோப்புகள் (படங்கள்/வீடியோக்கள்):' : 'Homework Attachments (Photos/Videos):'}
+                          </ThemedText>
+                          {uploadingHwId === item.homeworkId ? (
+                            <ActivityIndicator size="small" color={colors.primary} />
+                          ) : (
+                            <Pressable 
+                              onPress={() => handleUploadSubmissionFile(item.homeworkId)}
+                              style={{ 
+                                flexDirection: 'row', 
+                                alignItems: 'center', 
+                                gap: 4, 
+                                backgroundColor: colors.primary, 
+                                paddingHorizontal: 10, 
+                                paddingVertical: 5, 
+                                borderRadius: 8 
+                              }}
+                            >
+                              <Upload size={12} color="#FFF" />
+                              <ThemedText style={{ color: '#FFF', fontSize: 10, fontWeight: '700' }}>
+                                {i18n.language === 'ta' ? 'கோப்பை இணைக்கவும்' : 'Upload File'}
+                              </ThemedText>
+                            </Pressable>
+                          )}
+                        </View>
 
-                {/* Submissions interactive checklist */}
-                {['parent', 'student'].includes(user?.role || '') && (
-                  <Pressable
-                    onPress={() => handleToggleSub(item.homeworkId)}
-                    style={[
-                      styles.completedButton,
-                      {
-                        backgroundColor: isCompleted ? colors.secondaryLight : colors.background,
-                        borderColor: isCompleted ? colors.secondary : colors.border
-                      }
-                    ]}
-                  >
-                    <CheckCircle size={16} color={isCompleted ? colors.secondary : colors.textSecondary} />
-                    <ThemedText style={[styles.completedButtonText, { color: isCompleted ? colors.secondary : colors.text }]}>
-                      {isCompleted ? 'Completed / வீட்டுப்பாடம் முடிக்கப்பட்டது' : 'Mark Completed / செய்ததாகக் குறிக்கவும்'}
-                    </ThemedText>
-                  </Pressable>
-                )}
+                        {/* List of uploaded files */}
+                        {subFiles.length > 0 ? (
+                          <View style={{ gap: 6, marginTop: 4 }}>
+                            {subFiles.map((file: any, index: number) => (
+                              <View 
+                                key={index} 
+                                style={{ 
+                                  flexDirection: 'row', 
+                                  alignItems: 'center', 
+                                  justifyContent: 'space-between', 
+                                  backgroundColor: colors.background, 
+                                  padding: 8, 
+                                  borderRadius: 8, 
+                                  borderWidth: 0.5, 
+                                  borderColor: colors.border 
+                                }}
+                              >
+                                <Pressable
+                                  onPress={() => {
+                                    if (file.url && Platform.OS === 'web') {
+                                      window.open(file.url, '_blank');
+                                    } else {
+                                      showToast(`Viewing simulated attachment: ${file.name}`, 'success');
+                                    }
+                                  }}
+                                  style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 10 }}
+                                >
+                                  {file.type === 'video' ? (
+                                    <Video size={14} color={colors.secondary} />
+                                  ) : (
+                                    <ImageIcon size={14} color={colors.secondary} />
+                                  )}
+                                  <ThemedText numberOfLines={1} style={{ fontSize: 11, color: colors.text, flex: 1 }}>
+                                    {file.name}
+                                  </ThemedText>
+                                </Pressable>
+                                <Pressable 
+                                  onPress={() => handleRemoveSubmissionFile(item.homeworkId, index)}
+                                  style={{ padding: 4 }}
+                                >
+                                  <Trash2 size={13} color={colors.danger} />
+                                </Pressable>
+                              </View>
+                            ))}
+                          </View>
+                        ) : (
+                          <ThemedText style={{ fontSize: 11, color: colors.textSecondary, fontStyle: 'italic', paddingVertical: 4 }}>
+                            {i18n.language === 'ta' ? 'கோப்புகள் எதுவும் இணைக்கப்படவில்லை. புகைப்படங்கள் அல்லது வீடியோக்களைப் பதிவேற்றவும்.' : 'No files uploaded yet. Add photos or videos of the homework.'}
+                          </ThemedText>
+                        )}
+                      </View>
+                    </View>
+                  )}
 
-                {/* Completed names display for teachers/admins */}
-                {['admin', 'teacher', 'volunteer'].includes(user?.role || '') && (
-                  <View style={[styles.teacherStatusCard, { backgroundColor: colors.background, borderColor: colors.border, gap: 4, marginTop: Spacing.one }]}>
-                    <ThemedText style={[styles.teacherStatusText, { color: colors.textSecondary }]}>
-                      Submission tracking: **{completedUids.length} student(s)** marked as complete.
-                    </ThemedText>
-                    {completedUids.length > 0 && (
-                      <ThemedText style={{ fontSize: 11, color: colors.secondary, fontWeight: '700', marginTop: 2 }}>
-                        ✅ Completed by / முடித்தவர்கள்: <ThemedText style={{ fontWeight: '500', color: colors.text }}>{completedNames}</ThemedText>
+                  {/* Completed names display for teachers/admins */}
+                  {['admin', 'teacher', 'volunteer'].includes(user?.role || '') && (
+                    <View style={[styles.teacherStatusCard, { backgroundColor: colors.background, borderColor: colors.border, gap: 4, marginTop: Spacing.one }]}>
+                      <ThemedText style={[styles.teacherStatusText, { color: colors.textSecondary }]}>
+                        Submission tracking: **{completedUids.length} student(s)** marked as complete.
                       </ThemedText>
-                    )}
-                  </View>
-                )}
-              </View>
-            );
-          })}
+                      {completedUids.length > 0 ? (
+                        <View style={{ gap: 6, marginTop: 4 }}>
+                          {completedUids.map(uid => {
+                            const sProfile = users.find(u => u.uid === uid);
+                            const sSub = item.submissions?.[uid];
+                            const sFiles = (sSub && typeof sSub === 'object' && sSub.mediaAttachments) || [];
+                            return (
+                              <View key={uid} style={{ borderTopWidth: 0.5, borderColor: colors.border, paddingTop: 6, marginTop: 2 }}>
+                                <ThemedText style={{ fontSize: 11, fontWeight: '700', color: colors.text }}>
+                                  👤 {sProfile?.fullName || 'Student'}: {sFiles.length > 0 ? `${sFiles.length} file(s) uploaded` : 'No files uploaded (Legacy/Direct Check)'}
+                                </ThemedText>
+                                {sFiles.length > 0 && (
+                                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+                                    {sFiles.map((file: any, fIdx: number) => (
+                                      <Pressable
+                                        key={fIdx}
+                                        onPress={() => {
+                                          if (file.url && Platform.OS === 'web') {
+                                            window.open(file.url, '_blank');
+                                          } else {
+                                            showToast(`Viewing simulated attachment ${file.name}`, 'success');
+                                          }
+                                        }}
+                                        style={{
+                                          paddingHorizontal: 8,
+                                          paddingVertical: 4,
+                                          backgroundColor: colors.surfaceContainerLow || '#ebf5fa',
+                                          borderRadius: 6,
+                                          borderWidth: 0.5,
+                                          borderColor: colors.border,
+                                          flexDirection: 'row',
+                                          alignItems: 'center',
+                                          gap: 4
+                                        }}
+                                      >
+                                        {file.type === 'video' ? <Video size={10} color={colors.primary} /> : <ImageIcon size={10} color={colors.primary} />}
+                                        <ThemedText style={{ fontSize: 9, color: colors.primary, fontWeight: '700' }}>
+                                          {file.name.length > 15 ? `${file.name.substring(0, 12)}...` : file.name}
+                                        </ThemedText>
+                                      </Pressable>
+                                    ))}
+                                  </View>
+                                )}
+                              </View>
+                            );
+                          })}
+                        </View>
+                      ) : (
+                        <ThemedText style={{ fontSize: 11, color: colors.textSecondary, fontStyle: 'italic' }}>
+                          {i18n.language === 'ta' ? 'இதுவரை மாணவர்கள் யாரும் வீட்டுப்பாடம் சமர்ப்பிக்கவில்லை.' : 'No student submissions yet.'}
+                        </ThemedText>
+                      )}
+                    </View>
+                  )}
+                </View>
+              );
+            })}
+          </View>
         </View>
-      </View>
+      )}
     </View>
   );
 }

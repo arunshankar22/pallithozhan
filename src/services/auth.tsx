@@ -15,6 +15,7 @@ export interface UserProfile {
   languagePreference: string;
   associatedStudents?: string[];
   requirePasswordChange?: boolean;
+  profilePicture?: string;
 }
 
 interface AuthContextType {
@@ -23,7 +24,7 @@ interface AuthContextType {
   register: (profile: Omit<UserProfile, 'uid' | 'schoolId'>, password?: string) => Promise<UserProfile>;
   logout: () => Promise<void>;
   updateLanguage: (lang: string) => void;
-  updateProfile: (fullName: string, phone: string) => Promise<void>;
+  updateProfile: (fullName: string, phone: string, profilePicture?: string) => Promise<void>;
   updateAuthPassword: (newPassword: string) => Promise<void>;
   isLoading: boolean;
 }
@@ -219,11 +220,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const updateProfile = async (fullName: string, phone: string): Promise<void> => {
+  const updateProfile = async (fullName: string, phone: string, profilePicture?: string): Promise<void> => {
     if (user) {
-      const updated = { ...user, fullName, phone };
+      const updatedData: any = { fullName, phone };
+      if (profilePicture !== undefined) {
+        updatedData.profilePicture = profilePicture;
+      }
+      const updated = { ...user, ...updatedData };
       setUser(updated);
-      await mockDb.updateUser(user.uid, { fullName, phone });
+      await mockDb.updateUser(user.uid, updatedData);
     }
   };
 

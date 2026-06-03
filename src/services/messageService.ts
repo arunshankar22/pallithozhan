@@ -16,18 +16,14 @@ export const messageService = {
   getMessages: async (chatId: string): Promise<any[]> => {
     // 1. Firebase Firestore
     if (!isDemoMode && db) {
-      try {
-        const messagesRef = collection(db, 'messages');
-        const q = query(messagesRef, where('chatId', '==', chatId));
-        const querySnapshot = await getDocs(q);
-        const list: any[] = [];
-        querySnapshot.forEach((doc) => {
-          list.push({ messageId: doc.id, ...doc.data() });
-        });
-        return list.sort((a: any, b: any) => a.createdAt.localeCompare(b.createdAt));
-      } catch (e) {
-        console.warn('Firestore getMessages failed, falling back:', e);
-      }
+      const messagesRef = collection(db, 'messages');
+      const q = query(messagesRef, where('chatId', '==', chatId));
+      const querySnapshot = await getDocs(q);
+      const list: any[] = [];
+      querySnapshot.forEach((doc) => {
+        list.push({ messageId: doc.id, ...doc.data() });
+      });
+      return list.sort((a: any, b: any) => a.createdAt.localeCompare(b.createdAt));
     }
 
     // 2. Local REST API Server
@@ -58,13 +54,9 @@ export const messageService = {
 
     // 1. Firebase Firestore
     if (!isDemoMode && db) {
-      try {
-        const { messageId: omitted, ...details } = newMsg;
-        await setDoc(doc(db, 'messages', messageId), details);
-        return newMsg;
-      } catch (e) {
-        console.warn('Firestore sendMessage failed, falling back:', e);
-      }
+      const { messageId: omitted, ...details } = newMsg;
+      await setDoc(doc(db, 'messages', messageId), details);
+      return newMsg;
     }
 
     // 2. Local REST API Server

@@ -40,24 +40,20 @@ export const schoolDateService = {
   getSchoolDates: async (): Promise<SchoolDate[]> => {
     // 1. Firebase Firestore
     if (!isDemoMode && db) {
-      try {
-        const querySnapshot = await getDocs(collection(db, 'schooldates'));
-        const datesList: SchoolDate[] = [];
-        querySnapshot.forEach((doc) => {
-          datesList.push({ dateId: doc.id, ...doc.data() } as SchoolDate);
-        });
-        
-        if (datesList.length === 0) {
-          for (const d of DEFAULT_SCHOOL_DATES) {
-            const { dateId, ...details } = d;
-            await setDoc(doc(db, 'schooldates', dateId), details);
-            datesList.push(d);
-          }
+      const querySnapshot = await getDocs(collection(db, 'schooldates'));
+      const datesList: SchoolDate[] = [];
+      querySnapshot.forEach((doc) => {
+        datesList.push({ dateId: doc.id, ...doc.data() } as SchoolDate);
+      });
+      
+      if (datesList.length === 0) {
+        for (const d of DEFAULT_SCHOOL_DATES) {
+          const { dateId, ...details } = d;
+          await setDoc(doc(db, 'schooldates', dateId), details);
+          datesList.push(d);
         }
-        return datesList.sort((a, b) => a.date.localeCompare(b.date));
-      } catch (e) {
-        console.warn('Firestore getSchoolDates failed, falling back:', e);
       }
+      return datesList.sort((a, b) => a.date.localeCompare(b.date));
     }
 
     // 2. Local REST API Server
@@ -143,14 +139,11 @@ export const schoolDateService = {
 
     // 1. Firebase Firestore
     if (!isDemoMode && db) {
-      try {
-        for (const sd of generated) {
-          const { dateId, ...details } = sd;
-          await setDoc(doc(db, 'schooldates', dateId), details);
-        }
-      } catch (e) {
-        console.warn('Firestore generateTermDates failed:', e);
+      for (const sd of generated) {
+        const { dateId, ...details } = sd;
+        await setDoc(doc(db, 'schooldates', dateId), details);
       }
+      return generated.sort((a, b) => a.date.localeCompare(b.date));
     }
 
     // 2. Local REST API Server
@@ -186,11 +179,13 @@ export const schoolDateService = {
 
     // 1. Firebase Firestore
     if (!isDemoMode && db) {
-      try {
-        await setDoc(doc(db, 'schooldates', dateId), patch, { merge: true });
-      } catch (e) {
-        console.warn('Firestore toggleHolidayOverride failed:', e);
+      const docRef = doc(db, 'schooldates', dateId);
+      await setDoc(docRef, patch, { merge: true });
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        return { dateId, ...docSnap.data() } as SchoolDate;
       }
+      return null;
     }
 
     // 2. Local REST API Server
@@ -227,12 +222,9 @@ export const schoolDateService = {
 
     // 1. Firebase Firestore
     if (!isDemoMode && db) {
-      try {
-        const { dateId, ...details } = newDate;
-        await setDoc(doc(db, 'schooldates', dateId), details);
-      } catch (e) {
-        console.warn('Firestore addCustomDate failed:', e);
-      }
+      const { dateId, ...details } = newDate;
+      await setDoc(doc(db, 'schooldates', dateId), details);
+      return newDate;
     }
 
     // 2. Local REST API Server

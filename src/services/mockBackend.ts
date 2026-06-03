@@ -56,12 +56,14 @@ export const mockDb = {
   updateHomework: homeworkService.updateHomework,
   deleteHomework: homeworkService.deleteHomework,
   toggleHomeworkSubmission: homeworkService.toggleHomeworkSubmission,
+  submitHomework: homeworkService.submitHomework,
 
   // --- ATTENDANCE ---
   getAttendance: attendanceService.getAttendance,
   getAttendanceRecord: attendanceService.getAttendanceRecord,
   saveAttendance: attendanceService.saveAttendance,
   getPendingApprovals: attendanceService.getPendingApprovals,
+  getApprovals: attendanceService.getApprovals,
   approveAbsence: attendanceService.approveAbsence,
   getPushedAlerts: attendanceService.getPushedAlerts,
   getStudentAttendance: attendanceService.getStudentAttendance,

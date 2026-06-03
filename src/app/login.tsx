@@ -20,7 +20,7 @@ export default function LoginScreen({ onNavigateToRegister }: LoginScreenProps) 
   const colors = Colors[scheme === 'unspecified' || !scheme ? 'light' : scheme];
 
   const [activeBranch, setActiveBranch] = useState(
-    typeof window !== 'undefined' ? localStorage.getItem('pallithozhan_active_branch') || 'main' : 'main'
+    typeof window !== 'undefined' ? localStorage.getItem('pallithozhan_active_branch') || 'parramatta' : 'parramatta'
   );
 
   const handleBranchChange = (branchKey: string) => {
@@ -154,9 +154,9 @@ export default function LoginScreen({ onNavigateToRegister }: LoginScreenProps) 
             <ThemedText style={styles.inputLabel}>Select Branch / பள்ளிக் கிளை</ThemedText>
             <View style={{ flexDirection: 'row', gap: 6, marginTop: 6 }}>
               {[
-                { key: 'main', label: 'Main' },
                 { key: 'parramatta', label: 'Parramatta' },
-                { key: 'sevenhills', label: 'Seven Hills' }
+                { key: 'sevenhills', label: 'Seven Hills' },
+                { key: 'blacktown', label: 'Blacktown' }
               ].map(br => {
                 const isSel = activeBranch === br.key;
                 return (

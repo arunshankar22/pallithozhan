@@ -28,24 +28,20 @@ export const homeworkService = {
   getHomework: async (classId?: string): Promise<any[]> => {
     // 1. Firebase Firestore
     if (!isDemoMode && db) {
-      try {
-        const querySnapshot = await getDocs(collection(db, 'homework'));
-        const hwList: any[] = [];
-        querySnapshot.forEach((doc) => {
-          hwList.push({ homeworkId: doc.id, ...doc.data() });
-        });
-        
-        if (hwList.length === 0) {
-          for (const h of DEFAULT_HOMEWORK) {
-            const { homeworkId, ...details } = h;
-            await setDoc(doc(db, 'homework', homeworkId), details);
-            hwList.push(h);
-          }
+      const querySnapshot = await getDocs(collection(db, 'homework'));
+      const hwList: any[] = [];
+      querySnapshot.forEach((doc) => {
+        hwList.push({ homeworkId: doc.id, ...doc.data() });
+      });
+      
+      if (hwList.length === 0) {
+        for (const h of DEFAULT_HOMEWORK) {
+          const { homeworkId, ...details } = h;
+          await setDoc(doc(db, 'homework', homeworkId), details);
+          hwList.push(h);
         }
-        return classId ? hwList.filter((h: any) => h.classId === classId) : hwList;
-      } catch (e) {
-        console.warn('Firestore getHomework failed, falling back:', e);
       }
+      return classId ? hwList.filter((h: any) => h.classId === classId) : hwList;
     }
 
     // 2. Local REST API Server
@@ -80,62 +76,58 @@ export const homeworkService = {
 
     // 1. Firebase Firestore
     if (!isDemoMode && db) {
-      try {
-        const { ref, uploadString, getDownloadURL } = require('firebase/storage');
-        const { storage } = require('./firebase');
+      const { ref, uploadString, getDownloadURL } = require('firebase/storage');
+      const { storage } = require('./firebase');
 
-        // Upload Voice Guide if present in Base64
-        if (storage && newHw.voiceUrl && newHw.voiceUrl.startsWith('data:')) {
-          try {
-            console.log('Uploading homework voice guide to Firebase Storage...');
-            const voiceRef = ref(storage, `homework/${homeworkId}_voice.mp3`);
-            await uploadString(voiceRef, newHw.voiceUrl, 'data_url');
-            const downloadUrl = await getDownloadURL(voiceRef);
-            newHw.voiceUrl = downloadUrl;
-            console.log('Voice guide uploaded successfully:', downloadUrl);
-          } catch (voiceErr) {
-            console.warn('Voice guide upload failed:', voiceErr);
-          }
+      // Upload Voice Guide if present in Base64
+      if (storage && newHw.voiceUrl && newHw.voiceUrl.startsWith('data:')) {
+        try {
+          console.log('Uploading homework voice guide to Firebase Storage...');
+          const voiceRef = ref(storage, `homework/${homeworkId}_voice.mp3`);
+          await uploadString(voiceRef, newHw.voiceUrl, 'data_url');
+          const downloadUrl = await getDownloadURL(voiceRef);
+          newHw.voiceUrl = downloadUrl;
+          console.log('Voice guide uploaded successfully:', downloadUrl);
+        } catch (voiceErr) {
+          console.warn('Voice guide upload failed:', voiceErr);
         }
+      }
 
-        if (storage && newHw.mediaAttachments && newHw.mediaAttachments.length > 0) {
-          for (let i = 0; i < newHw.mediaAttachments.length; i++) {
-            const att = newHw.mediaAttachments[i];
-            if (att.url && att.url.startsWith('data:')) {
-              try {
-                console.log(`Uploading homework attachment ${att.name} to Firebase Storage...`);
-                const fileRef = ref(storage, `homework/${homeworkId}_${i}_${att.name}`);
-                await uploadString(fileRef, att.url, 'data_url');
-                const downloadUrl = await getDownloadURL(fileRef);
-                att.url = downloadUrl;
-                
+      if (storage && newHw.mediaAttachments && newHw.mediaAttachments.length > 0) {
+        for (let i = 0; i < newHw.mediaAttachments.length; i++) {
+          const att = newHw.mediaAttachments[i];
+          if (att.url && att.url.startsWith('data:')) {
+            try {
+              console.log(`Uploading homework attachment ${att.name} to Firebase Storage...`);
+              const fileRef = ref(storage, `homework/${homeworkId}_${i}_${att.name}`);
+              await uploadString(fileRef, att.url, 'data_url');
+              const downloadUrl = await getDownloadURL(fileRef);
+              att.url = downloadUrl;
+              
+              if (newHw.mediaUrl.startsWith('data:')) {
+                newHw.mediaUrl = downloadUrl;
+              }
+              console.log(`Successfully uploaded homework file. Download URL: ${downloadUrl}`);
+            } catch (storageErr) {
+              console.warn(`Firebase Storage upload failed for ${att.name}:`, storageErr);
+              if (att.url.length > 800 * 1024) {
+                const placeholder = att.type === 'video'
+                  ? 'https://www.w3schools.com/html/mov_bbb.mp4'
+                  : 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&q=80&w=800';
+                att.url = placeholder;
                 if (newHw.mediaUrl.startsWith('data:')) {
-                  newHw.mediaUrl = downloadUrl;
-                }
-                console.log(`Successfully uploaded homework file. Download URL: ${downloadUrl}`);
-              } catch (storageErr) {
-                console.warn(`Firebase Storage upload failed for ${att.name}:`, storageErr);
-                if (att.url.length > 800 * 1024) {
-                  const placeholder = att.type === 'video'
-                    ? 'https://www.w3schools.com/html/mov_bbb.mp4'
-                    : 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&q=80&w=800';
-                  att.url = placeholder;
-                  if (newHw.mediaUrl.startsWith('data:')) {
-                    newHw.mediaUrl = placeholder;
-                  }
+                  newHw.mediaUrl = placeholder;
                 }
               }
             }
           }
         }
-
-        const { homeworkId: omitted, ...details } = newHw;
-        const cleanedDetails = cleanFirestoreData(details);
-        await setDoc(doc(db, 'homework', homeworkId), cleanedDetails);
-        return newHw;
-      } catch (e) {
-        console.warn('Firestore createHomework failed, falling back:', e);
       }
+
+      const { homeworkId: omitted, ...details } = newHw;
+      const cleanedDetails = cleanFirestoreData(details);
+      await setDoc(doc(db, 'homework', homeworkId), cleanedDetails);
+      return newHw;
     }
 
     // 2. Local REST API Server
@@ -160,19 +152,23 @@ export const homeworkService = {
   toggleHomeworkSubmission: async (homeworkId: string, studentId: string): Promise<any> => {
     // 1. Firebase Firestore
     if (!isDemoMode && db) {
-      try {
-        const docRef = doc(db, 'homework', homeworkId);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          const submissions = data.submissions || {};
-          submissions[studentId] = !submissions[studentId];
-          await setDoc(docRef, { submissions }, { merge: true });
-          return { homeworkId, ...data, submissions };
-        }
-      } catch (e) {
-        console.warn('Firestore toggleHomeworkSubmission failed, falling back:', e);
+      const docRef = doc(db, 'homework', homeworkId);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        const submissions = data.submissions || {};
+        const current = submissions[studentId];
+        const isCurrentlyCompleted = current === true || (current && typeof current === 'object' && current.completed === true);
+
+        submissions[studentId] = {
+          completed: !isCurrentlyCompleted,
+          mediaAttachments: isCurrentlyCompleted ? [] : (current?.mediaAttachments || []),
+          submittedAt: new Date().toISOString()
+        };
+        await setDoc(docRef, { submissions }, { merge: true });
+        return { homeworkId, ...data, submissions };
       }
+      return null;
     }
 
     // 2. Local REST API Server
@@ -192,7 +188,64 @@ export const homeworkService = {
     const hw = hwList.find((h: any) => h.homeworkId === homeworkId);
     if (hw) {
       if (!hw.submissions) hw.submissions = {};
-      hw.submissions[studentId] = !hw.submissions[studentId];
+      const current = hw.submissions[studentId];
+      const isCurrentlyCompleted = current === true || (current && typeof current === 'object' && current.completed === true);
+
+      hw.submissions[studentId] = {
+        completed: !isCurrentlyCompleted,
+        mediaAttachments: isCurrentlyCompleted ? [] : (current?.mediaAttachments || []),
+        submittedAt: new Date().toISOString()
+      };
+      setLocalStorageItem('homework', hwList);
+    }
+    return hw;
+  },
+
+  submitHomework: async (homeworkId: string, studentId: string, attachments?: any[]): Promise<any> => {
+    const isCompleted = true;
+    const cleanAttachments = attachments || [];
+
+    // 1. Firebase Firestore
+    if (!isDemoMode && db) {
+      const docRef = doc(db, 'homework', homeworkId);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        const submissions = data.submissions || {};
+        
+        submissions[studentId] = {
+          completed: isCompleted,
+          mediaAttachments: cleanAttachments,
+          submittedAt: new Date().toISOString()
+        };
+        await setDoc(docRef, { submissions }, { merge: true });
+        return { homeworkId, ...data, submissions };
+      }
+      return null;
+    }
+
+    // 2. Local REST API Server
+    if (isServerOnline) {
+      try {
+        const res = await fetch(`${API_URL}/homework/submit`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ homeworkId, studentId, attachments: cleanAttachments })
+        });
+        if (res.ok) return await res.json();
+      } catch (e) { /* fallback */ }
+    }
+
+    // 3. Sandbox
+    const hwList = getLocalStorageItem('homework', DEFAULT_HOMEWORK);
+    const hw = hwList.find((h: any) => h.homeworkId === homeworkId);
+    if (hw) {
+      if (!hw.submissions) hw.submissions = {};
+      hw.submissions[studentId] = {
+        completed: isCompleted,
+        mediaAttachments: cleanAttachments,
+        submittedAt: new Date().toISOString()
+      };
       setLocalStorageItem('homework', hwList);
     }
     return hw;
@@ -202,63 +255,59 @@ export const homeworkService = {
 
     // 1. Firebase Firestore
     if (!isDemoMode && db) {
-      try {
-        const { ref, uploadString, getDownloadURL } = require('firebase/storage');
-        const { storage } = require('./firebase');
+      const { ref, uploadString, getDownloadURL } = require('firebase/storage');
+      const { storage } = require('./firebase');
 
-        // Upload Voice Guide if present in Base64
-        if (storage && updatedHw.voiceUrl && updatedHw.voiceUrl.startsWith('data:')) {
-          try {
-            console.log('Uploading updated homework voice guide to Firebase Storage...');
-            const voiceRef = ref(storage, `homework/${homeworkId}_voice.mp3`);
-            await uploadString(voiceRef, updatedHw.voiceUrl, 'data_url');
-            const downloadUrl = await getDownloadURL(voiceRef);
-            updatedHw.voiceUrl = downloadUrl;
-            console.log('Updated voice guide uploaded successfully:', downloadUrl);
-          } catch (voiceErr) {
-            console.warn('Voice guide upload failed:', voiceErr);
-          }
+      // Upload Voice Guide if present in Base64
+      if (storage && updatedHw.voiceUrl && updatedHw.voiceUrl.startsWith('data:')) {
+        try {
+          console.log('Uploading updated homework voice guide to Firebase Storage...');
+          const voiceRef = ref(storage, `homework/${homeworkId}_voice.mp3`);
+          await uploadString(voiceRef, updatedHw.voiceUrl, 'data_url');
+          const downloadUrl = await getDownloadURL(voiceRef);
+          updatedHw.voiceUrl = downloadUrl;
+          console.log('Updated voice guide uploaded successfully:', downloadUrl);
+        } catch (voiceErr) {
+          console.warn('Voice guide upload failed:', voiceErr);
         }
+      }
 
-        if (storage && updatedHw.mediaAttachments && updatedHw.mediaAttachments.length > 0) {
-          for (let i = 0; i < updatedHw.mediaAttachments.length; i++) {
-            const att = updatedHw.mediaAttachments[i];
-            if (att.url && att.url.startsWith('data:')) {
-              try {
-                console.log(`Uploading updated homework attachment ${att.name} to Firebase Storage...`);
-                const fileRef = ref(storage, `homework/${homeworkId}_${i}_${att.name}`);
-                await uploadString(fileRef, att.url, 'data_url');
-                const downloadUrl = await getDownloadURL(fileRef);
-                att.url = downloadUrl;
-                
+      if (storage && updatedHw.mediaAttachments && updatedHw.mediaAttachments.length > 0) {
+        for (let i = 0; i < updatedHw.mediaAttachments.length; i++) {
+          const att = updatedHw.mediaAttachments[i];
+          if (att.url && att.url.startsWith('data:')) {
+            try {
+              console.log(`Uploading updated homework attachment ${att.name} to Firebase Storage...`);
+              const fileRef = ref(storage, `homework/${homeworkId}_${i}_${att.name}`);
+              await uploadString(fileRef, att.url, 'data_url');
+              const downloadUrl = await getDownloadURL(fileRef);
+              att.url = downloadUrl;
+              
+              if (updatedHw.mediaUrl && updatedHw.mediaUrl.startsWith('data:')) {
+                updatedHw.mediaUrl = downloadUrl;
+              }
+              console.log(`Successfully uploaded homework file. Download URL: ${downloadUrl}`);
+            } catch (storageErr) {
+              console.warn(`Firebase Storage upload failed for ${att.name}:`, storageErr);
+              if (att.url.length > 800 * 1024) {
+                const placeholder = att.type === 'video'
+                  ? 'https://www.w3schools.com/html/mov_bbb.mp4'
+                  : 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&q=80&w=800';
+                att.url = placeholder;
                 if (updatedHw.mediaUrl && updatedHw.mediaUrl.startsWith('data:')) {
-                  updatedHw.mediaUrl = downloadUrl;
-                }
-                console.log(`Successfully uploaded homework file. Download URL: ${downloadUrl}`);
-              } catch (storageErr) {
-                console.warn(`Firebase Storage upload failed for ${att.name}:`, storageErr);
-                if (att.url.length > 800 * 1024) {
-                  const placeholder = att.type === 'video'
-                    ? 'https://www.w3schools.com/html/mov_bbb.mp4'
-                    : 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&q=80&w=800';
-                  att.url = placeholder;
-                  if (updatedHw.mediaUrl && updatedHw.mediaUrl.startsWith('data:')) {
-                    updatedHw.mediaUrl = placeholder;
-                  }
+                  updatedHw.mediaUrl = placeholder;
                 }
               }
             }
           }
         }
-
-        const docRef = doc(db, 'homework', homeworkId);
-        const cleanedHw = cleanFirestoreData(updatedHw);
-        await setDoc(docRef, cleanedHw, { merge: true });
-        const updatedSnap = await getDoc(docRef);
-        return { homeworkId, ...updatedSnap.data() };
-      } catch (e) {
-        console.warn('Firestore updateHomework failed, falling back:', e);
       }
+
+      const docRef = doc(db, 'homework', homeworkId);
+      const cleanedHw = cleanFirestoreData(updatedHw);
+      await setDoc(docRef, cleanedHw, { merge: true });
+      const updatedSnap = await getDoc(docRef);
+      return { homeworkId, ...updatedSnap.data() };
     }
 
     // 2. Local REST API Server
@@ -288,12 +337,8 @@ export const homeworkService = {
     const { deleteDoc } = require('firebase/firestore');
     // 1. Firebase Firestore
     if (!isDemoMode && db) {
-      try {
-        await deleteDoc(doc(db, 'homework', homeworkId));
-        return { homeworkId };
-      } catch (e) {
-        console.warn('Firestore deleteHomework failed, falling back:', e);
-      }
+      await deleteDoc(doc(db, 'homework', homeworkId));
+      return { homeworkId };
     }
 
     // 2. Local REST API Server
