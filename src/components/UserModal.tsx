@@ -39,7 +39,7 @@ export function UserModal({
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [role, setRole] = useState<'teacher' | 'volunteer' | 'parent' | 'student'>('student');
+  const [role, setRole] = useState<'admin' | 'teacher' | 'volunteer' | 'parent' | 'student'>('student');
   const [languagePreference, setLanguagePreference] = useState<'ta' | 'en'>('ta');
 
   // Student specific states
@@ -377,7 +377,7 @@ export function UserModal({
               <View style={styles.formGroup}>
                 <ThemedText style={styles.formLabel}>Role Assignment / பொறுப்பு</ThemedText>
                 <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
-                  {['teacher', 'volunteer', 'parent', 'student'].map((r) => {
+                  {['admin', 'teacher', 'volunteer', 'parent', 'student'].map((r) => {
                     const isSel = role === r;
                     return (
                       <Pressable

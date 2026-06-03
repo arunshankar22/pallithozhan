@@ -529,7 +529,7 @@ export default function HomeScreen() {
 
   const mainNavItems = [
     { key: 'newsfeed', label: t('nav.newsfeed') || 'Home', labelTa: 'முகப்பு', icon: Newspaper },
-    { key: 'homework', label: t('nav.homework') || 'Learn', labelTa: 'கற்றல்', icon: BookOpen },
+    ...(user?.role !== 'volunteer' ? [{ key: 'homework', label: t('nav.homework') || 'Learn', labelTa: 'கற்றல்', icon: BookOpen }] : []),
     thirdTab,
     { key: 'profile', label: 'Profile', labelTa: 'சுயவிவரம்', icon: UserIcon },
   ] as any;
@@ -683,7 +683,8 @@ export default function HomeScreen() {
     const activeStudentName = user?.fullName || 'Student';
     
     const progressPct = user?.role === 'admin' ? dashboardStats.admin.progressPct :
-                        (user?.role === 'teacher' || user?.role === 'volunteer') ? dashboardStats.teacher.progressPct :
+                        user?.role === 'volunteer' ? Math.round(Math.min(dashboardStats.teacher.attendanceTaken / 5, 1.0) * 100) :
+                        user?.role === 'teacher' ? dashboardStats.teacher.progressPct :
                         user?.role === 'parent' ? dashboardStats.parent.progressPct : dashboardStats.student.progressPct;
 
     const borderTopColorVal = progressPct > 0 ? '#FFF' : 'rgba(255, 255, 255, 0.25)';
@@ -735,13 +736,15 @@ export default function HomeScreen() {
               <View style={{ gap: 4, flex: 1, marginRight: 10 }}>
                 <ThemedText style={{ color: '#FFF', fontSize: 13, fontWeight: '700' }}>
                   {user?.role === 'admin' ? (i18n.language === 'ta' ? 'அங்கீகாரங்கள் நிலுவையில்' : 'Pending Tasks & Approvals') :
-                   (user?.role === 'teacher' || user?.role === 'volunteer') ? (i18n.language === 'ta' ? 'கற்பித்தல் கடமைகள் முன்னேற்றம்' : 'Teaching Duties Progress') :
+                   user?.role === 'volunteer' ? (i18n.language === 'ta' ? 'தன்னார்வலர் கடமைகள் முன்னேற்றம்' : 'Volunteer Duties Progress') :
+                   user?.role === 'teacher' ? (i18n.language === 'ta' ? 'கற்பித்தல் கடமைகள் முன்னேற்றம்' : 'Teaching Duties Progress') :
                    user?.role === 'parent' ? (i18n.language === 'ta' ? 'குழந்தைகளின் வீட்டுப்பாடம்' : "Children's Homework Progress") :
                    (i18n.language === 'ta' ? 'இந்த வார முன்னேற்றம்' : "This Week's Lesson Progress")}
                 </ThemedText>
                 <ThemedText style={{ color: 'rgba(255, 255, 255, 0.85)', fontSize: 11, fontWeight: '500', lineHeight: 15 }}>
                   {user?.role === 'admin' ? (i18n.language === 'ta' ? `${dashboardStats.admin.pendingCount} வருகைப்பதிவு தாள்கள் அங்கீகரிக்கப்பட வேண்டும்` : `${dashboardStats.admin.pendingCount} Attendance sheet(s) pending approval`) :
-                   (user?.role === 'teacher' || user?.role === 'volunteer') ? (i18n.language === 'ta' ? `வீட்டுப்பாடம்: ${dashboardStats.teacher.homeworkGiven}/5 | தேர்வுகள்: ${dashboardStats.teacher.resultsReviewed}/5 | வருகை: ${dashboardStats.teacher.attendanceTaken}/5` : `Homework Given: ${dashboardStats.teacher.homeworkGiven}/5 | Results Reviewed: ${dashboardStats.teacher.resultsReviewed}/5 | Attendance Taken: ${dashboardStats.teacher.attendanceTaken}/5`) :
+                   user?.role === 'volunteer' ? (i18n.language === 'ta' ? `வருகை: ${dashboardStats.teacher.attendanceTaken}/5` : `Attendance Taken: ${dashboardStats.teacher.attendanceTaken}/5`) :
+                   user?.role === 'teacher' ? (i18n.language === 'ta' ? `வீட்டுப்பாடம்: ${dashboardStats.teacher.homeworkGiven}/5 | தேர்வுகள்: ${dashboardStats.teacher.resultsReviewed}/5 | வருகை: ${dashboardStats.teacher.attendanceTaken}/5` : `Homework Given: ${dashboardStats.teacher.homeworkGiven}/5 | Results Reviewed: ${dashboardStats.teacher.resultsReviewed}/5 | Attendance Taken: ${dashboardStats.teacher.attendanceTaken}/5`) :
                    user?.role === 'parent' ? (i18n.language === 'ta' ? `${dashboardStats.parent.completedCount}/${dashboardStats.parent.totalCount} வீட்டுப்பாடங்கள் முடிக்கப்பட்டது` : `${dashboardStats.parent.completedCount} out of ${dashboardStats.parent.totalCount} homework tasks completed by your children`) :
                    (i18n.language === 'ta' ? `${dashboardStats.student.completedCount} பாடங்கள் முடிக்கப்பட்டது` : `${dashboardStats.student.completedCount} Lessons completed`)}
                 </ThemedText>
@@ -761,9 +764,7 @@ export default function HomeScreen() {
                 alignItems: 'center'
               }}>
                 <ThemedText style={{ color: '#FFF', fontSize: 10, fontWeight: '800' }}>
-                  {user?.role === 'admin' ? `${dashboardStats.admin.progressPct}%` :
-                   (user?.role === 'teacher' || user?.role === 'volunteer') ? `${dashboardStats.teacher.progressPct}%` :
-                   user?.role === 'parent' ? `${dashboardStats.parent.progressPct}%` : `${dashboardStats.student.progressPct}%`}
+                  {progressPct}%
                 </ThemedText>
               </View>
             </View>
@@ -773,9 +774,7 @@ export default function HomeScreen() {
               <View style={{ height: 6, width: '100%', backgroundColor: 'rgba(255, 255, 255, 0.2)', borderRadius: 3, overflow: 'hidden' }}>
                 <View style={{ 
                   height: '100%', 
-                  width: user?.role === 'admin' ? `${dashboardStats.admin.progressPct}%` :
-                         (user?.role === 'teacher' || user?.role === 'volunteer') ? `${dashboardStats.teacher.progressPct}%` :
-                         user?.role === 'parent' ? `${dashboardStats.parent.progressPct}%` : `${dashboardStats.student.progressPct}%`, 
+                  width: `${progressPct}%`, 
                   backgroundColor: '#FFF', 
                   borderRadius: 3 
                 }} />
@@ -876,7 +875,7 @@ export default function HomeScreen() {
               )}
             </View>
           </View>
-        ) : (
+        ) : user?.role !== 'volunteer' ? (
           <View style={{ gap: Spacing.two }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <CalendarIcon size={16} color={colors.secondary} />
@@ -919,7 +918,7 @@ export default function HomeScreen() {
               </View>
             </View>
           </View>
-        )}
+        ) : null}
 
         {/* Quick Actions Grid */}
         <View style={{ gap: Spacing.two }}>
@@ -1399,7 +1398,7 @@ export default function HomeScreen() {
   const navItems = [
     { key: 'newsfeed', label: t('nav.newsfeed'), icon: Newspaper, roles: ['admin', 'teacher', 'volunteer', 'parent', 'student'] },
     { key: 'attendance', label: t('nav.attendance'), icon: CheckSquare, roles: ['admin', 'teacher', 'volunteer', 'parent'] },
-    { key: 'homework', label: t('nav.homework'), icon: BookOpen, roles: ['admin', 'teacher', 'volunteer', 'parent', 'student'] },
+    { key: 'homework', label: t('nav.homework'), icon: BookOpen, roles: ['admin', 'teacher', 'parent', 'student'] },
     { key: 'messages', label: t('nav.messages'), icon: MessageSquare, roles: ['admin', 'teacher', 'volunteer', 'parent'] },
     { key: 'calendar', label: t('nav.calendar'), icon: CalendarIcon, roles: ['admin', 'teacher', 'volunteer', 'parent', 'student'] },
     { key: 'reports', label: t('nav.reports'), icon: BarChart3, roles: ['admin', 'teacher'] },
