@@ -3,14 +3,18 @@ import {
   View,
   ScrollView,
   Pressable,
-  ActivityIndicator
+  ActivityIndicator,
+  Platform
 } from 'react-native';
 import { AlertTriangle, CheckCircle, Clock } from 'lucide-react-native';
 import { ThemedText } from '@/components/themed-text';
 import { TabProps } from '@/app/sharedTypes';
 import { styles } from '@/app/styles';
 import { mockDb } from '@/services/mockBackend';
+import { attendanceService } from '@/services/attendanceService';
+import { spreadsheetService } from '@/services/spreadsheetService';
 import { Spacing } from '@/constants/theme';
+import * as XLSX from 'xlsx';
 
 export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentId }: TabProps) {
   const [classes, setClasses] = useState<any[]>([]);
@@ -20,6 +24,11 @@ export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentI
   const [saving, setSaving] = useState(false);
   const [pendingApprovals, setPendingApprovals] = useState<any[]>([]);
   
+  // Custom Export Modal States
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportTerm, setExportTerm] = useState<'all' | '1' | '2' | '3' | '4' | 'selected'>('all');
+  const [exportFormat, setExportFormat] = useState<'csv' | 'xlsx'>('xlsx');
+
   // Custom School Session Dates States
   const [schoolDates, setSchoolDates] = useState<any[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>('');
@@ -176,6 +185,336 @@ export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentI
     const pending = await mockDb.getPendingApprovals();
     setPendingApprovals(pending);
     showToast('Absence Alert Authorized! SMS push alert triggered to Parent.', 'success');
+  };
+
+  const handleExportDownload = async () => {
+    try {
+      setShowExportModal(false);
+      showToast('Preparing attendance export sheet...', 'success');
+
+      const { list, className, schoolDates: allDates, attendanceRecords } = await attendanceService.exportAttendanceData(selectedClassId);
+
+      if (list.length === 0) {
+        showToast('No students/staff found to export attendance.', 'warning');
+        return;
+      }
+
+      let filteredDates = [...allDates];
+      if (exportTerm === 'selected') {
+        filteredDates = allDates.filter(sd => sd.date === selectedDate);
+      } else if (exportTerm !== 'all') {
+        const termNum = parseInt(exportTerm, 10);
+        filteredDates = allDates.filter(sd => sd.term === termNum);
+      }
+
+      if (filteredDates.length === 0) {
+        showToast('No matching class dates found for the selected scope.', 'warning');
+        return;
+      }
+
+      const csvContent = spreadsheetService.formatAttendanceCSV(
+        list,
+        selectedClassId,
+        className,
+        filteredDates,
+        attendanceRecords
+      );
+
+      const isStaff = selectedClassId === 'staff_attendance';
+      const cleanClassName = className.replace(/[^a-zA-Z0-9_\s-]/g, '').replace(/\s+/g, '_');
+      const filename = `${isStaff ? 'Staff' : 'Student'}_Attendance_${cleanClassName}_Term_${exportTerm}_${new Date().toISOString().split('T')[0]}`;
+
+      if (exportFormat === 'csv') {
+        spreadsheetService.triggerFileDownload(csvContent, `${filename}.csv`, showToast);
+      } else {
+        const workbook = XLSX.read(csvContent, { type: 'string' });
+        const binary = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+        
+        if (Platform.OS === 'web') {
+          const blob = new Blob([binary], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.setAttribute('download', `${filename}.xlsx`);
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+        } else {
+          showToast('Excel export only supported on web.', 'warning');
+        }
+      }
+
+      showToast('Attendance sheet downloaded successfully!', 'success');
+    } catch (err) {
+      console.error('Export download failed:', err);
+      showToast('Failed to export attendance sheet.', 'error');
+    }
+  };
+
+  const handleOpenImport = () => {
+    if (Platform.OS === 'web') {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.csv,.tsv,.txt,.xlsx,.xls';
+      input.onchange = async (e: any) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        showToast(`Reading file ${file.name}...`, 'success');
+        const reader = new FileReader();
+
+        const fileExt = file.name.split('.').pop()?.toLowerCase();
+        if (fileExt === 'xlsx' || fileExt === 'xls') {
+          reader.onload = async (event: any) => {
+            try {
+              const arrayBuffer = event.target.result;
+              const tsvText = spreadsheetService.parseExcelToText(arrayBuffer);
+              if (!tsvText) {
+                showToast('Failed to read Excel worksheet data.', 'error');
+                return;
+              }
+              await processImportedAttendance(tsvText);
+            } catch (err) {
+              console.error('Excel import failed:', err);
+              showToast('Failed to process Excel file.', 'error');
+            }
+          };
+          reader.readAsArrayBuffer(file);
+        } else {
+          reader.onload = async (event: any) => {
+            try {
+              const text = event.target.result;
+              await processImportedAttendance(text);
+            } catch (err) {
+              console.error('CSV import failed:', err);
+              showToast('Failed to process CSV file.', 'error');
+            }
+          };
+          reader.readAsText(file);
+        }
+      };
+      input.click();
+    } else {
+      showToast('Import only supported in web environment.', 'warning');
+    }
+  };
+
+  const processImportedAttendance = async (tsvText: string) => {
+    try {
+      const { records, error } = spreadsheetService.parseAttendanceCSV(tsvText);
+      if (error) {
+        showToast(error, 'error');
+        return;
+      }
+
+      if (records.length === 0) {
+        showToast('No valid attendance records found in sheet.', 'warning');
+        return;
+      }
+
+      showToast('Updating database with sheet logs...', 'success');
+      const { updatedCount, datesCount } = await attendanceService.importAttendanceData(
+        selectedClassId,
+        records,
+        user
+      );
+
+      showToast(`Successfully imported rolls for ${updatedCount} entries across ${datesCount} dates!`, 'success');
+
+      if (selectedClassId && selectedDate) {
+        const currentSelectedDate = selectedDate;
+        setSelectedDate('');
+        setTimeout(() => setSelectedDate(currentSelectedDate), 50);
+      }
+
+      const pending = await mockDb.getPendingApprovals();
+      setPendingApprovals(pending);
+    } catch (err: any) {
+      console.error('Process import failed:', err);
+      showToast(`Import failed: ${err.message || err}`, 'error');
+    }
+  };
+
+  const renderExportModal = () => {
+    if (!showExportModal) return null;
+
+    return (
+      <View style={{
+        position: Platform.OS === 'web' ? 'fixed' : 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 1000,
+        padding: 16
+      }}>
+        <View style={{
+          width: '100%',
+          maxWidth: 450,
+          backgroundColor: colors.cardBg,
+          borderRadius: 20,
+          borderWidth: 1,
+          borderColor: colors.border,
+          padding: 24,
+          gap: 20
+        }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <ThemedText style={{ fontSize: 18, fontWeight: '800', color: colors.text }}>
+              Export Attendance / வருகைப்பதிவு
+            </ThemedText>
+            <Pressable onPress={() => setShowExportModal(false)} style={{ padding: 4 }}>
+              <ThemedText style={{ fontSize: 18, color: colors.textSecondary, fontWeight: '700' }}>✕</ThemedText>
+            </Pressable>
+          </View>
+
+          {/* Scope selection */}
+          <View style={{ gap: 8 }}>
+            <ThemedText style={{ fontSize: 13, fontWeight: '700', color: colors.textSecondary }}>
+              Select Date Scope / தேதிகள் வரம்பு:
+            </ThemedText>
+            <View style={{ gap: 8 }}>
+              <Pressable
+                onPress={() => setExportTerm('all')}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 10,
+                  padding: 12,
+                  borderRadius: 10,
+                  backgroundColor: exportTerm === 'all' ? colors.primaryLight : colors.background,
+                  borderWidth: 1,
+                  borderColor: exportTerm === 'all' ? colors.primary : colors.border
+                }}
+              >
+                <ThemedText style={{ fontSize: 13, fontWeight: '600', color: exportTerm === 'all' ? colors.primary : colors.text }}>
+                  📅 Export All Session Dates / அனைத்து நாட்களும்
+                </ThemedText>
+              </Pressable>
+
+              {selectedDate ? (
+                <Pressable
+                  onPress={() => setExportTerm('selected')}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 10,
+                    padding: 12,
+                    borderRadius: 10,
+                    backgroundColor: exportTerm === 'selected' ? colors.primaryLight : colors.background,
+                    borderWidth: 1,
+                    borderColor: exportTerm === 'selected' ? colors.primary : colors.border
+                  }}
+                >
+                  <ThemedText style={{ fontSize: 13, fontWeight: '600', color: exportTerm === 'selected' ? colors.primary : colors.text }}>
+                    🎯 Selected Date Only / இந்த தேதி மட்டும்: {selectedDate}
+                  </ThemedText>
+                </Pressable>
+              ) : null}
+
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                {['1', '2', '3', '4'].map(tNum => (
+                  <Pressable
+                    key={tNum}
+                    onPress={() => setExportTerm(tNum as any)}
+                    style={{
+                      flex: 1,
+                      minWidth: '45%',
+                      alignItems: 'center',
+                      padding: 12,
+                      borderRadius: 10,
+                      backgroundColor: exportTerm === tNum ? colors.primaryLight : colors.background,
+                      borderWidth: 1,
+                      borderColor: exportTerm === tNum ? colors.primary : colors.border
+                    }}
+                  >
+                    <ThemedText style={{ fontSize: 12, fontWeight: '600', color: exportTerm === tNum ? colors.primary : colors.text }}>
+                      Term {tNum} / டேர்ம் {tNum}
+                    </ThemedText>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          </View>
+
+          {/* Format selection */}
+          <View style={{ gap: 8 }}>
+            <ThemedText style={{ fontSize: 13, fontWeight: '700', color: colors.textSecondary }}>
+              Select File Format / கோப்பு வடிவம்:
+            </ThemedText>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <Pressable
+                onPress={() => setExportFormat('xlsx')}
+                style={{
+                  flex: 1,
+                  alignItems: 'center',
+                  padding: 12,
+                  borderRadius: 10,
+                  backgroundColor: exportFormat === 'xlsx' ? colors.secondaryLight : colors.background,
+                  borderWidth: 1,
+                  borderColor: exportFormat === 'xlsx' ? colors.secondary : colors.border
+                }}
+              >
+                <ThemedText style={{ fontSize: 13, fontWeight: '700', color: exportFormat === 'xlsx' ? colors.secondary : colors.text }}>
+                  📊 Excel (.xlsx)
+                </ThemedText>
+              </Pressable>
+
+              <Pressable
+                onPress={() => setExportFormat('csv')}
+                style={{
+                  flex: 1,
+                  alignItems: 'center',
+                  padding: 12,
+                  borderRadius: 10,
+                  backgroundColor: exportFormat === 'csv' ? colors.secondaryLight : colors.background,
+                  borderWidth: 1,
+                  borderColor: exportFormat === 'csv' ? colors.secondary : colors.border
+                }}
+              >
+                <ThemedText style={{ fontSize: 13, fontWeight: '700', color: exportFormat === 'csv' ? colors.secondary : colors.text }}>
+                  📄 CSV Text
+                </ThemedText>
+              </Pressable>
+            </View>
+          </View>
+
+          {/* Action buttons */}
+          <View style={{ flexDirection: 'row', gap: 12, marginTop: 8 }}>
+            <Pressable
+              onPress={() => setShowExportModal(false)}
+              style={{
+                flex: 1,
+                alignItems: 'center',
+                padding: 12,
+                borderRadius: 12,
+                backgroundColor: colors.background,
+                borderWidth: 1,
+                borderColor: colors.border
+              }}
+            >
+              <ThemedText style={{ fontWeight: '700', color: colors.textSecondary }}>Cancel</ThemedText>
+            </Pressable>
+
+            <Pressable
+              onPress={handleExportDownload}
+              style={{
+                flex: 2,
+                alignItems: 'center',
+                padding: 12,
+                borderRadius: 12,
+                backgroundColor: colors.primary
+              }}
+            >
+              <ThemedText style={{ fontWeight: '700', color: '#FFF' }}>Download</ThemedText>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    );
   };
 
   // Parent Dashboard View for Attendance
@@ -461,9 +800,46 @@ export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentI
             {/* Student lists to toggle present / absent / late */}
             {selectedClassId && studentList.length > 0 ? (
               <View style={styles.studentListWrapper}>
-                <ThemedText style={styles.listHeaderTitle}>
-                  {selectedClassId === 'staff_attendance' ? 'Active Staff Roll (Choose Status)' : 'Active Student Roll (Choose Status)'}
-                </ThemedText>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.two, flexWrap: 'wrap', gap: 10 }}>
+                  <ThemedText style={styles.listHeaderTitle}>
+                    {selectedClassId === 'staff_attendance' ? 'Active Staff Roll (Choose Status)' : 'Active Student Roll (Choose Status)'}
+                  </ThemedText>
+                  
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <Pressable
+                      onPress={handleOpenImport}
+                      style={{
+                        paddingHorizontal: 12,
+                        paddingVertical: 6,
+                        borderRadius: 8,
+                        backgroundColor: colors.primaryLight,
+                        borderWidth: 1,
+                        borderColor: colors.primary,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 4
+                      }}
+                    >
+                      <ThemedText style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>📥 Import CSV/Excel</ThemedText>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => setShowExportModal(true)}
+                      style={{
+                        paddingHorizontal: 12,
+                        paddingVertical: 6,
+                        borderRadius: 8,
+                        backgroundColor: colors.secondaryLight,
+                        borderWidth: 1,
+                        borderColor: colors.secondary,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 4
+                      }}
+                    >
+                      <ThemedText style={{ fontSize: 11, fontWeight: '700', color: colors.secondary }}>📤 Export CSV/Excel</ThemedText>
+                    </Pressable>
+                  </View>
+                </View>
                 
                 {studentList.map((student) => {
                   const status = rolls[student.uid] || 'present';
@@ -541,6 +917,7 @@ export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentI
         )}
 
       </View>
+      {renderExportModal()}
     </View>
   );
 }

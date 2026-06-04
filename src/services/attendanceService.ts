@@ -391,5 +391,222 @@ export const attendanceService = {
       }
       return null;
     }).filter(Boolean);
+  },
+
+  exportAttendanceData: async (classId: string): Promise<{ list: any[]; className: string; schoolDates: any[]; attendanceRecords: any[] }> => {
+    let list: any[] = [];
+    let className = 'Class';
+    let schoolDates: any[] = [];
+    let attendanceRecords: any[] = [];
+
+    // 1. Fetch school dates directly
+    if (!isDemoMode && db) {
+      const datesSnapshot = await getDocs(collection(db, 'schooldates'));
+      datesSnapshot.forEach((doc) => {
+        schoolDates.push({ dateId: doc.id, ...doc.data() });
+      });
+    } else {
+      schoolDates = getLocalStorageItem('schooldates', []);
+    }
+    schoolDates.sort((a, b) => a.date.localeCompare(b.date));
+
+    // 2. Fetch attendance records directly
+    if (!isDemoMode && db) {
+      const attSnapshot = await getDocs(collection(db, 'attendance'));
+      attSnapshot.forEach((doc) => {
+        const data = doc.data();
+        if (data.classId === classId) {
+          attendanceRecords.push({ recordId: doc.id, ...data });
+        }
+      });
+    } else {
+      const attList = getLocalStorageItem('attendance', []);
+      attendanceRecords = attList.filter((a: any) => a.classId === classId);
+    }
+
+    // 3. Fetch class and user list to construct student/staff names
+    if (classId === 'staff_attendance') {
+      className = 'Staff Attendance';
+      let allUsers: any[] = [];
+      if (!isDemoMode && db) {
+        const usersSnapshot = await getDocs(collection(db, 'users'));
+        usersSnapshot.forEach((doc) => {
+          allUsers.push({ uid: doc.id, ...doc.data() });
+        });
+      } else {
+        allUsers = getLocalStorageItem('users', []);
+      }
+      list = allUsers.filter((u: any) => u.role === 'teacher' || u.role === 'volunteer');
+    } else {
+      let clsData: any = null;
+      if (!isDemoMode && db) {
+        const docRef = doc(db, 'classes', classId);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          clsData = { classId: docSnap.id, ...docSnap.data() };
+        }
+      } else {
+        const classesList = getLocalStorageItem('classes', []);
+        clsData = classesList.find((c: any) => c.classId === classId) || null;
+      }
+
+      if (clsData) {
+        className = clsData.className || 'Class';
+        const studentIds = clsData.studentIds || [];
+        const volunteerIds = clsData.volunteerIds || [];
+        const combinedIds = [...studentIds, ...volunteerIds];
+
+        let allUsers: any[] = [];
+        if (!isDemoMode && db) {
+          const usersSnapshot = await getDocs(collection(db, 'users'));
+          usersSnapshot.forEach((doc) => {
+            allUsers.push({ uid: doc.id, ...doc.data() });
+          });
+        } else {
+          allUsers = getLocalStorageItem('users', []);
+        }
+
+        list = combinedIds.map(uid => allUsers.find(u => u.uid === uid)).filter(Boolean);
+      }
+    }
+
+    return { list, className, schoolDates, attendanceRecords };
+  },
+
+  importAttendanceData: async (
+    classId: string,
+    parsedRecords: any[], // array of { userId: string, userName: string, rolls: { [date]: 'present'|'absent' } }
+    currentUser: any
+  ): Promise<{ updatedCount: number; datesCount: number }> => {
+    // 1. Load users to match names if ID is blank
+    let allUsers: any[] = [];
+    if (!isDemoMode && db) {
+      const usersSnapshot = await getDocs(collection(db, 'users'));
+      usersSnapshot.forEach((doc) => {
+        allUsers.push({ uid: doc.id, ...doc.data() });
+      });
+    } else {
+      allUsers = getLocalStorageItem('users', []);
+    }
+
+    // 2. Identify the active list of users in this class/staff
+    let activeList: any[] = [];
+    if (classId === 'staff_attendance') {
+      activeList = allUsers.filter((u: any) => u.role === 'teacher' || u.role === 'volunteer');
+    } else {
+      let clsData: any = null;
+      if (!isDemoMode && db) {
+        const docRef = doc(db, 'classes', classId);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          clsData = { classId: docSnap.id, ...docSnap.data() };
+        }
+      } else {
+        const classesList = getLocalStorageItem('classes', []);
+        clsData = classesList.find((c: any) => c.classId === classId) || null;
+      }
+      if (clsData) {
+        const studentIds = clsData.studentIds || [];
+        const volunteerIds = clsData.volunteerIds || [];
+        const combinedIds = [...studentIds, ...volunteerIds];
+        activeList = combinedIds.map(uid => allUsers.find(u => u.uid === uid)).filter(Boolean);
+      }
+    }
+
+    // 3. Create a map to resolve sheet records to our database UIDs
+    const matchedUids: Record<string, string> = {}; // sheet identity -> uid
+    parsedRecords.forEach(rec => {
+      let matchedUser = null;
+      // Match by ID if present and exists in database
+      if (rec.userId) {
+        matchedUser = allUsers.find((u: any) => u.uid === rec.userId);
+      }
+      // If not matched, try matching by Full Name (case-insensitive)
+      if (!matchedUser && rec.userName) {
+        const lowerName = rec.userName.toLowerCase().trim();
+        matchedUser = allUsers.find((u: any) => u.fullName.toLowerCase().trim() === lowerName);
+      }
+      if (matchedUser) {
+        matchedUids[rec.userId || rec.userName] = matchedUser.uid;
+      }
+    });
+
+    // 4. Group rolls by Date
+    // Grouped structure: date -> { [uid]: 'present' | 'absent' | 'late' }
+    const rollsByDate: Record<string, Record<string, 'present' | 'absent' | 'late'>> = {};
+    parsedRecords.forEach(rec => {
+      const identity = rec.userId || rec.userName;
+      const uid = matchedUids[identity];
+      if (!uid) return; // user not in database
+
+      Object.keys(rec.rolls).forEach(date => {
+        if (!rollsByDate[date]) {
+          rollsByDate[date] = {};
+        }
+        rollsByDate[date][uid] = rec.rolls[date];
+      });
+    });
+
+    const datesToSave = Object.keys(rollsByDate);
+    if (datesToSave.length === 0) {
+      return { updatedCount: 0, datesCount: 0 };
+    }
+
+    // 5. Save rolls date-by-date
+    let updatedCount = 0;
+    for (const date of datesToSave) {
+      // Get existing rolls for this date/class
+      let existingRecord: any = null;
+      if (!isDemoMode && db) {
+        const docId = `${classId}_${date}`;
+        const docRef = doc(db, 'attendance', docId);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          existingRecord = { recordId: docSnap.id, ...docSnap.data() };
+        }
+      } else {
+        const attList = getLocalStorageItem('attendance', []);
+        existingRecord = attList.find((a: any) => a.classId === classId && a.date === date) || null;
+      }
+
+      // Start with existing rolls, fallback to present for all active list members
+      const mergedRolls: Record<string, 'present' | 'absent' | 'late'> = {};
+      activeList.forEach(item => {
+        if (existingRecord && existingRecord.rolls && existingRecord.rolls[item.uid]) {
+          mergedRolls[item.uid] = existingRecord.rolls[item.uid];
+        } else {
+          mergedRolls[item.uid] = 'present';
+        }
+      });
+
+      // Merge new rolls from the imported sheet
+      let hasChanges = false;
+      const newRollsForDate = rollsByDate[date];
+      Object.keys(newRollsForDate).forEach(uid => {
+        // Ensure the matched user is actually in this class/staff list
+        if (activeList.some(item => item.uid === uid)) {
+          if (mergedRolls[uid] !== newRollsForDate[uid]) {
+            mergedRolls[uid] = newRollsForDate[uid];
+            hasChanges = true;
+          }
+        }
+      });
+
+      // If rolls were updated or didn't exist yet, save
+      if (hasChanges || !existingRecord) {
+        const saveRecord = {
+          classId,
+          date,
+          markedBy: currentUser?.uid || 'admin_1',
+          markedByName: currentUser?.fullName || 'Administrator',
+          markedByRole: currentUser?.role || 'admin',
+          rolls: mergedRolls
+        };
+        await attendanceService.saveAttendance(saveRecord);
+        updatedCount += Object.keys(newRollsForDate).length;
+      }
+    }
+
+    return { updatedCount, datesCount: datesToSave.length };
   }
 };

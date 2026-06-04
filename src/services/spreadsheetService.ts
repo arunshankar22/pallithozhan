@@ -511,5 +511,166 @@ export const spreadsheetService = {
     });
 
     return csvRows.join('\r\n');
+  },
+
+  /**
+   * Converts Excel worksheets to TSV text
+   */
+  parseExcelToText: (arrayBuffer: ArrayBuffer): string => {
+    try {
+      const data = new Uint8Array(arrayBuffer);
+      const workbook = XLSX.read(data, { type: 'array' });
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      if (!worksheet) return '';
+      return XLSX.utils.sheet_to_txt(worksheet);
+    } catch (e) {
+      console.warn('Excel parse failed:', e);
+      return '';
+    }
+  },
+
+  /**
+   * Formats attendance data for class or staff list into a tab-delimited string
+   */
+  formatAttendanceCSV: (
+    list: any[],
+    classId: string,
+    className: string,
+    schoolDates: any[],
+    attendanceRecords: any[]
+  ): string => {
+    const isStaff = classId === 'staff_attendance';
+    const firstHeaders = isStaff
+      ? ['Volunteer ID', 'Volunteer Name', 'Volunteer Type', 'Class Name']
+      : ['Student ID', 'Student Name', 'Class Name'];
+
+    const dateHeaders = schoolDates.map(sd => {
+      const termDates = schoolDates.filter((d: any) => d.term === sd.term).sort((a: any, b: any) => a.date.localeCompare(b.date));
+      const weekIndex = termDates.findIndex((d: any) => d.date === sd.date);
+      const weekNum = weekIndex !== -1 ? weekIndex + 1 : 1;
+      return `${sd.date} (W${weekNum}, Term ${sd.term})`;
+    });
+
+    const headers = [...firstHeaders, ...dateHeaders];
+    const csvRows = [headers.join('\t')];
+
+    const rollsLookup: Record<string, Record<string, string>> = {};
+    attendanceRecords.forEach(rec => {
+      if (rec.rolls) {
+        rollsLookup[rec.date] = rec.rolls;
+      }
+    });
+
+    list.forEach(item => {
+      const row: string[] = [];
+      if (isStaff) {
+        row.push(item.uid || '');
+        row.push(item.fullName || '');
+        const roleStr = item.role ? item.role.charAt(0).toUpperCase() + item.role.slice(1) : 'Volunteer';
+        row.push(roleStr);
+        row.push(item.stage || className || 'Staff');
+      } else {
+        row.push(item.uid || '');
+        row.push(item.fullName || '');
+        row.push(className || '');
+      }
+
+      schoolDates.forEach(sd => {
+        const dateVal = sd.date;
+        const status = rollsLookup[dateVal]?.[item.uid];
+        if (status === 'present') {
+          row.push(isStaff ? '✔️' : '1');
+        } else if (status === 'absent') {
+          row.push(isStaff ? '❌' : '0');
+        } else if (status === 'late') {
+          row.push('late');
+        } else {
+          row.push('-');
+        }
+      });
+
+      const cleanedRow = row.map(val => {
+        const str = String(val).replace(/"/g, '""');
+        return str.includes('\t') || str.includes('\n') || str.includes('"') ? `"${str}"` : str;
+      });
+
+      csvRows.push(cleanedRow.join('\t'));
+    });
+
+    return csvRows.join('\r\n');
+  },
+
+  /**
+   * Parses CSV/TSV attendance marking sheet back into records
+   */
+  parseAttendanceCSV: (
+    text: string
+  ): { records: any[]; error: string } => {
+    const lines = spreadsheetService.splitLines(text);
+    if (lines.length === 0) {
+      return { records: [], error: 'File is empty.' };
+    }
+
+    const firstLine = lines[0];
+    const delimiter = firstLine.includes('\t') ? '\t' : ',';
+    const headers = spreadsheetService.parseRow(firstLine, delimiter).map(h => h.trim());
+
+    // Locate basic ID & Name columns
+    const idIdx = headers.findIndex(h => h.toLowerCase().includes('id'));
+    const nameIdx = headers.findIndex(h => h.toLowerCase().includes('name'));
+
+    if (nameIdx === -1) {
+      return { records: [], error: 'Could not find Name column in headers.' };
+    }
+
+    // Find date columns (match YYYY-MM-DD at the start of column)
+    const dateColumns: { date: string; colIdx: number }[] = [];
+    headers.forEach((header, idx) => {
+      const match = /^(\d{4}-\d{2}-\d{2})/.exec(header);
+      if (match) {
+        dateColumns.push({
+          date: match[1],
+          colIdx: idx
+        });
+      }
+    });
+
+    if (dateColumns.length === 0) {
+      return { records: [], error: 'No date columns (YYYY-MM-DD) found in spreadsheet.' };
+    }
+
+    const records: any[] = [];
+
+    for (let i = 1; i < lines.length; i++) {
+      const cells = spreadsheetService.parseRow(lines[i], delimiter);
+      if (cells.length === 0 || !lines[i].trim()) continue;
+
+      const userId = idIdx !== -1 ? cells[idIdx]?.trim() : '';
+      const userName = cells[nameIdx]?.trim();
+      if (!userName) continue;
+
+      const rolls: Record<string, 'present' | 'absent' | 'late'> = {};
+      dateColumns.forEach(dc => {
+        const val = cells[dc.colIdx]?.trim().toLowerCase();
+        if (!val || val === '-' || val === '') return;
+
+        if (['1', '✔️', 'present', 'p', 'yes', 'y'].includes(val)) {
+          rolls[dc.date] = 'present';
+        } else if (['0', '❌', 'absent', 'a', 'no', 'n'].includes(val)) {
+          rolls[dc.date] = 'absent';
+        } else if (['late', 'l', '0.5'].includes(val)) {
+          rolls[dc.date] = 'late';
+        }
+      });
+
+      records.push({
+        userId,
+        userName,
+        rolls
+      });
+    }
+
+    return { records, error: '' };
   }
 };
