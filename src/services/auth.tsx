@@ -4,6 +4,17 @@ import { isDemoMode, auth as fbAuth } from './firebase';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updatePassword as fbUpdatePassword } from 'firebase/auth';
 import { mockDb } from './mockBackend';
 
+export const BRANCH_SCHOOL_MAPPING: Record<string, string> = {
+  'parramatta': 'balarmalar parramatta branch',
+  'sevenhills': 'balarmalar seven hills branch',
+  'blacktown': 'balarmalar blacktown branch'
+};
+
+export const getSchoolIdFromBranch = (branchKey: string | null): string => {
+  if (!branchKey) return 'balarmalar parramatta branch';
+  return BRANCH_SCHOOL_MAPPING[branchKey.toLowerCase()] || 'balarmalar parramatta branch';
+};
+
 // Define the shape of our User Profile
 export interface UserProfile {
   uid: string;
@@ -125,7 +136,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               fullName: fbUser.displayName || email.split('@')[0],
               role: role,
               phone: fbUser.phoneNumber || '',
-              schoolId: 'school_main',
+              schoolId: typeof window !== 'undefined' ? 
+                getSchoolIdFromBranch(localStorage.getItem('pallithozhan_active_branch')) : 
+                'balarmalar parramatta branch',
               languagePreference: 'en'
             };
             
@@ -183,7 +196,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const register = async (profile: Omit<UserProfile, 'uid' | 'schoolId'>, password?: string): Promise<UserProfile> => {
     try {
-      const schoolId = 'school_main'; // default base school, scalable to multi-school
+      const activeBranch = typeof window !== 'undefined' ? localStorage.getItem('pallithozhan_active_branch') || 'parramatta' : 'parramatta';
+      const schoolId = getSchoolIdFromBranch(activeBranch);
       if (isDemoMode) {
         const users = await mockDb.getUsers();
         const existing = users.find((u: any) => u.email.toLowerCase() === profile.email.toLowerCase());

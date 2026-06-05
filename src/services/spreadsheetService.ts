@@ -540,7 +540,7 @@ export const spreadsheetService = {
     schoolDates: any[],
     attendanceRecords: any[]
   ): string => {
-    const isStaff = classId === 'staff_attendance';
+    const isStaff = classId === 'teacher_attendance' || classId === 'volunteer_attendance' || classId === 'staff_attendance';
     const firstHeaders = isStaff
       ? ['Volunteer ID', 'Volunteer Name', 'Volunteer Type', 'Class Name']
       : ['Student ID', 'Student Name', 'Class Name'];
@@ -585,6 +585,93 @@ export const spreadsheetService = {
           row.push(isStaff ? '❌' : '0');
         } else if (status === 'late') {
           row.push('late');
+        } else {
+          row.push('-');
+        }
+      });
+
+      const cleanedRow = row.map(val => {
+        const str = String(val).replace(/"/g, '""');
+        return str.includes('\t') || str.includes('\n') || str.includes('"') ? `"${str}"` : str;
+      });
+
+      csvRows.push(cleanedRow.join('\t'));
+    });
+
+    return csvRows.join('\r\n');
+  },
+
+  /**
+   * Formats global bulk attendance data into a tab-delimited string
+   */
+  formatBulkAttendanceCSV: (
+    users: any[],
+    schoolDates: any[],
+    attendanceRecords: any[]
+  ): string => {
+    const firstHeaders = ['User ID', 'User Name', 'User Role', 'Assigned Class'];
+    
+    const dateHeaders = schoolDates.map(sd => {
+      const termDates = schoolDates.filter((d: any) => d.term === sd.term).sort((a: any, b: any) => a.date.localeCompare(b.date));
+      const weekIndex = termDates.findIndex((d: any) => d.date === sd.date);
+      const weekNum = weekIndex !== -1 ? weekIndex + 1 : 1;
+      return `${sd.date} (W${weekNum}, Term ${sd.term})`;
+    });
+
+    const headers = [...firstHeaders, ...dateHeaders];
+    const csvRows = [headers.join('\t')];
+
+    const rollsLookup: Record<string, Record<string, Record<string, string>>> = {};
+    attendanceRecords.forEach(rec => {
+      if (!rollsLookup[rec.date]) {
+        rollsLookup[rec.date] = {};
+      }
+      rollsLookup[rec.date][rec.classId] = rec.rolls || {};
+    });
+
+    users.forEach(user => {
+      const row: string[] = [];
+      row.push(user.uid || '');
+      row.push(user.fullName || '');
+      const roleStr = user.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : '';
+      row.push(roleStr);
+      row.push(user.assignedClass || 'Unassigned');
+
+      schoolDates.forEach(sd => {
+        const dateVal = sd.date;
+        let status: string | undefined;
+
+        if (user.role === 'student') {
+          const userClassId = user.classId;
+          if (userClassId) {
+            status = rollsLookup[dateVal]?.[userClassId]?.[user.uid];
+          }
+          if (!status) {
+            for (const classId of Object.keys(rollsLookup[dateVal] || {})) {
+              if (rollsLookup[dateVal][classId][user.uid]) {
+                status = rollsLookup[dateVal][classId][user.uid];
+                break;
+              }
+            }
+          }
+        } else {
+          status = rollsLookup[dateVal]?.[ 'staff_attendance' ]?.[user.uid] ||
+                   rollsLookup[dateVal]?.[ 'teacher_attendance' ]?.[user.uid] ||
+                   rollsLookup[dateVal]?.[ 'volunteer_attendance' ]?.[user.uid];
+          if (!status) {
+            for (const classId of Object.keys(rollsLookup[dateVal] || {})) {
+              if (rollsLookup[dateVal][classId][user.uid]) {
+                status = rollsLookup[dateVal][classId][user.uid];
+                break;
+              }
+            }
+          }
+        }
+
+        if (status === 'present' || status === 'late') {
+          row.push(user.role === 'student' ? '1' : '✔️');
+        } else if (status === 'absent') {
+          row.push(user.role === 'student' ? '0' : '❌');
         } else {
           row.push('-');
         }

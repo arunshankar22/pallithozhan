@@ -67,6 +67,8 @@ export const mockDb = {
   approveAbsence: attendanceService.approveAbsence,
   getPushedAlerts: attendanceService.getPushedAlerts,
   getStudentAttendance: attendanceService.getStudentAttendance,
+  exportBulkAttendanceData: attendanceService.exportBulkAttendanceData,
+  importBulkAttendanceData: attendanceService.importBulkAttendanceData,
 
   // --- SCHOOL DATES ---
   getSchoolDates: schoolDateService.getSchoolDates,
@@ -95,13 +97,13 @@ export const mockDb = {
     const tempAuth = getAuth(tempApp);
 
     const defaultUsers = [
-      { uid: 'admin_1', email: 'admin@example.com', fullName: 'Arun Pandian', role: 'admin', phone: '+91 98765 43210', schoolId: 'school_main', languagePreference: 'ta' },
-      { uid: 'teacher_1', email: 'teacher@example.com', fullName: 'Suresh Kumar', role: 'teacher', phone: '+91 87654 32109', schoolId: 'school_main', languagePreference: 'ta' },
-      { uid: 'volunteer_1', email: 'volunteer@example.com', fullName: 'Meena Ramasamy', role: 'volunteer', phone: '+91 76543 21098', schoolId: 'school_main', languagePreference: 'en' },
-      { uid: 'parent_1', email: 'parent@example.com', fullName: 'Karthik Raja', role: 'parent', phone: '+91 65432 10987', schoolId: 'school_main', languagePreference: 'ta', associatedStudents: ['student_1'] },
-      { uid: 'student_1', email: 'student@example.com', fullName: 'Deepak Karthik', role: 'student', phone: '', schoolId: 'school_main', languagePreference: 'ta' },
-      { uid: 'student_2', email: 'student2@example.com', fullName: 'Abinaya Sundar', role: 'student', phone: '', schoolId: 'school_main', languagePreference: 'ta' },
-      { uid: 'student_3', email: 'student3@example.com', fullName: 'Ganesh Mani', role: 'student', phone: '', schoolId: 'school_main', languagePreference: 'en' }
+      { uid: 'admin_1', email: 'admin@example.com', fullName: 'Arun Pandian', role: 'admin', phone: '+91 98765 43210', schoolId: 'balarmalar parramatta branch', languagePreference: 'ta' },
+      { uid: 'teacher_1', email: 'teacher@example.com', fullName: 'Suresh Kumar', role: 'teacher', phone: '+91 87654 32109', schoolId: 'balarmalar parramatta branch', languagePreference: 'ta' },
+      { uid: 'volunteer_1', email: 'volunteer@example.com', fullName: 'Meena Ramasamy', role: 'volunteer', phone: '+91 76543 21098', schoolId: 'balarmalar parramatta branch', languagePreference: 'en' },
+      { uid: 'parent_1', email: 'parent@example.com', fullName: 'Karthik Raja', role: 'parent', phone: '+91 65432 10987', schoolId: 'balarmalar parramatta branch', languagePreference: 'ta', associatedStudents: ['student_1'] },
+      { uid: 'student_1', email: 'student@example.com', fullName: 'Deepak Karthik', role: 'student', phone: '', schoolId: 'balarmalar parramatta branch', languagePreference: 'ta' },
+      { uid: 'student_2', email: 'student2@example.com', fullName: 'Abinaya Sundar', role: 'student', phone: '', schoolId: 'balarmalar parramatta branch', languagePreference: 'ta' },
+      { uid: 'student_3', email: 'student3@example.com', fullName: 'Ganesh Mani', role: 'student', phone: '', schoolId: 'balarmalar parramatta branch', languagePreference: 'en' }
     ];
 
     const defaultClasses = [

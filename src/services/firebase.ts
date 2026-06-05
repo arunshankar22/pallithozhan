@@ -14,27 +14,25 @@ export const firebaseConfig = {
   appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID || ""
 };
 
-const isConfigured = !!firebaseConfig.apiKey && firebaseConfig.apiKey !== "" && !firebaseConfig.apiKey.includes("PLACEHOLDER");
+const isConfigured = true;
 
 let app;
 let auth: any;
 let db: any;
 let storage: any;
 
-if (isConfigured) {
-  try {
-    app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-    auth = getAuth(app);
-    db = initializeFirestore(app, {
-      experimentalForceLongPolling: true
-    }, 'pallithozhandb');
-    storage = getStorage(app);
-    storage.maxUploadRetryTime = 2000; // Fail-fast on network/CORS blocks (2s limit)
-    storage.maxOperationRetryTime = 2000;  // Fail-fast on general operations (2s limit)
-  } catch (error) {
-    console.warn("Failed to initialize production Firebase, falling back to local demo mode:", error);
-  }
+try {
+  app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+  auth = getAuth(app);
+  db = initializeFirestore(app, {
+    experimentalForceLongPolling: true
+  }, 'pallithozhandb');
+  storage = getStorage(app);
+  storage.maxUploadRetryTime = 2000; // Fail-fast on network/CORS blocks (2s limit)
+  storage.maxOperationRetryTime = 2000;  // Fail-fast on general operations (2s limit)
+} catch (error) {
+  console.error("Failed to initialize production Firebase:", error);
 }
 
-export const isDemoMode = !isConfigured || !app;
+export const isDemoMode = false; // Always connect to actual Firestore, not local mock DB
 export { auth, db, storage };

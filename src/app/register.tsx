@@ -97,7 +97,15 @@ export default function RegisterScreen({ onNavigateToLogin }: RegisterScreenProp
           <View style={{ backgroundColor: colors.primaryLight, padding: 8, borderRadius: 12, marginBottom: Spacing.three, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
             <UserCircle2 size={14} color={colors.primary} />
             <ThemedText style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>
-              Branch: {(typeof window !== 'undefined' ? localStorage.getItem('pallithozhan_active_branch') || 'main' : 'main').toUpperCase()}
+              Branch: {(() => {
+                const activeBranch = typeof window !== 'undefined' ? localStorage.getItem('pallithozhan_active_branch') || 'parramatta' : 'parramatta';
+                const branchLabels: Record<string, string> = {
+                  'parramatta': 'Parramatta',
+                  'sevenhills': 'Seven Hills',
+                  'blacktown': 'Blacktown'
+                };
+                return (branchLabels[activeBranch] || activeBranch).toUpperCase();
+              })()}
             </ThemedText>
           </View>
 

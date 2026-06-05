@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { StyleSheet, View, TextInput, Pressable, useColorScheme, ActivityIndicator, Image, ScrollView, Platform } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { useAuth } from '@/services/auth';
+import { useAuth, getSchoolIdFromBranch } from '@/services/auth';
 import { Colors, Spacing } from '@/constants/theme';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -14,7 +14,7 @@ interface LoginScreenProps {
 
 export default function LoginScreen({ onNavigateToRegister }: LoginScreenProps) {
   const { t, i18n } = useTranslation();
-  const { login, updateLanguage } = useAuth();
+  const { login, logout, updateLanguage } = useAuth();
   const scheme = useColorScheme();
   const colors = Colors[scheme === 'unspecified' || !scheme ? 'light' : scheme];
 
@@ -42,7 +42,24 @@ export default function LoginScreen({ onNavigateToRegister }: LoginScreenProps) 
     setErrorMsg('');
     setLoading(true);
     try {
-      await login(eEmail, ePassword);
+      const loggedUser = await login(eEmail, ePassword);
+      const expectedSchoolId = getSchoolIdFromBranch(activeBranch);
+      if (expectedSchoolId && loggedUser && loggedUser.schoolId && loggedUser.role !== 'admin') {
+        const userSchoolLower = loggedUser.schoolId.toLowerCase().trim();
+        const expectedSchoolLower = expectedSchoolId.toLowerCase().trim();
+        if (userSchoolLower !== expectedSchoolLower) {
+          await logout();
+          const branchLabels: Record<string, string> = {
+            'balarmalar parramatta branch': 'Parramatta',
+            'balarmalar seven hills branch': 'Seven Hills',
+            'balarmalar blacktown branch': 'Blacktown'
+          };
+          const userBranchLabel = branchLabels[userSchoolLower] || loggedUser.schoolId;
+          const selectedBranchLabel = branchLabels[expectedSchoolLower] || activeBranch;
+          setErrorMsg(`Login failed: This account is registered under the "${userBranchLabel}" branch, not the selected branch.`);
+          return;
+        }
+      }
     } catch (e: any) {
       setErrorMsg(e.message || 'Login failed');
     } finally {

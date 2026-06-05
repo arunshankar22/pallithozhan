@@ -4,14 +4,14 @@ import { collection, doc, getDoc, getDocs, setDoc, deleteDoc, updateDoc } from '
 import { getLocalStorageItem, setLocalStorageItem, API_URL, isServerOnline } from './dbCommon';
 
 export const DEFAULT_USERS = [
-  { uid: 'admin_1', email: 'admin@example.com', fullName: 'Arun Pandian', role: 'admin', phone: '+91 98765 43210', schoolId: 'school_main', languagePreference: 'ta' },
+  { uid: 'admin_1', email: 'admin@example.com', fullName: 'Arun Pandian', role: 'admin', phone: '+91 98765 43210', schoolId: 'balarmalar parramatta branch', languagePreference: 'ta' },
   { 
     uid: 'teacher_1', 
     email: 'teacher@example.com', 
     fullName: 'Suresh Kumar', 
     role: 'teacher', 
     phone: '+91 87654 32109', 
-    schoolId: 'school_main', 
+    schoolId: 'balarmalar parramatta branch', 
     languagePreference: 'ta',
     stage: 'Year 1',
     wwcNumber: 'WWC3171639E',
@@ -28,7 +28,7 @@ export const DEFAULT_USERS = [
     fullName: 'Meena Ramasamy', 
     role: 'volunteer', 
     phone: '+91 76543 21098', 
-    schoolId: 'school_main', 
+    schoolId: 'balarmalar parramatta branch', 
     languagePreference: 'en',
     stage: 'Year 2',
     wwcNumber: 'WWC3213370V',
@@ -39,14 +39,14 @@ export const DEFAULT_USERS = [
     effectiveFrom: '2026-03-28 08:39:08',
     effectiveTo: ''
   },
-  { uid: 'parent_1', email: 'parent@example.com', fullName: 'Karthik Raja', role: 'parent', phone: '+91 65432 10987', schoolId: 'school_main', languagePreference: 'ta', associatedStudents: ['student_1'], parentVolunteer: true },
+  { uid: 'parent_1', email: 'parent@example.com', fullName: 'Karthik Raja', role: 'parent', phone: '+91 65432 10987', schoolId: 'balarmalar parramatta branch', languagePreference: 'ta', associatedStudents: ['student_1'], parentVolunteer: true },
   { 
     uid: 'student_1', 
     email: 'student@example.com', 
     fullName: 'Deepak Karthik', 
     role: 'student', 
     phone: '', 
-    schoolId: 'school_main', 
+    schoolId: 'balarmalar parramatta branch', 
     languagePreference: 'ta',
     fullNameTamil: 'தீபக் கார்த்திக்',
     gender: 'Male',
@@ -68,7 +68,7 @@ export const DEFAULT_USERS = [
     fullName: 'Abinaya Sundar', 
     role: 'student', 
     phone: '', 
-    schoolId: 'school_main', 
+    schoolId: 'balarmalar parramatta branch', 
     languagePreference: 'ta',
     fullNameTamil: 'அபிநயா சுந்தர்',
     gender: 'Female',
@@ -90,7 +90,7 @@ export const DEFAULT_USERS = [
     fullName: 'Ganesh Mani', 
     role: 'student', 
     phone: '', 
-    schoolId: 'school_main', 
+    schoolId: 'balarmalar parramatta branch', 
     languagePreference: 'en',
     fullNameTamil: 'கணேஷ் மணி',
     gender: 'Male',
@@ -199,7 +199,17 @@ export const userService = {
   createUser: async (user: any): Promise<any> => {
     const uid = user.uid || `user_${Date.now()}`;
     const newUser = {
-      schoolId: 'school_main',
+      schoolId: typeof window !== 'undefined' ? (
+        (() => {
+          const activeBranch = localStorage.getItem('pallithozhan_active_branch') || 'parramatta';
+          const branchMapping: Record<string, string> = {
+            'parramatta': 'balarmalar parramatta branch',
+            'sevenhills': 'balarmalar seven hills branch',
+            'blacktown': 'balarmalar blacktown branch'
+          };
+          return branchMapping[activeBranch] || 'balarmalar parramatta branch';
+        })()
+      ) : 'balarmalar parramatta branch',
       languagePreference: 'ta',
       associatedStudents: [],
       phone: '',

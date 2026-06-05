@@ -5,9 +5,9 @@ export let isServerOnline = false;
 
 export const getActiveBranch = (): string => {
   if (typeof window === 'undefined' || typeof window.localStorage === 'undefined') {
-    return 'main';
+    return 'parramatta';
   }
-  return localStorage.getItem('pallithozhan_active_branch') || 'main';
+  return localStorage.getItem('pallithozhan_active_branch') || 'parramatta';
 };
 
 // Check if live Node.js REST API server is running

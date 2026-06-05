@@ -15,6 +15,7 @@ import { attendanceService } from '@/services/attendanceService';
 import { spreadsheetService } from '@/services/spreadsheetService';
 import { Spacing } from '@/constants/theme';
 import * as XLSX from 'xlsx';
+import { isDemoMode } from '@/services/firebase';
 
 export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentId }: TabProps) {
   const [classes, setClasses] = useState<any[]>([]);
@@ -32,6 +33,7 @@ export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentI
   // Custom School Session Dates States
   const [schoolDates, setSchoolDates] = useState<any[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>('');
+  const [selectedTerm, setSelectedTerm] = useState<'all' | '1' | '2' | '3' | '4'>('all');
 
   // Parent Dashboard States
   const [pushedAlerts, setPushedAlerts] = useState<any[]>([]);
@@ -74,6 +76,20 @@ export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentI
     load();
   }, []);
 
+  // Auto-select first date of the selected term when term filter changes
+  useEffect(() => {
+    if (schoolDates.length > 0) {
+      const filtered = schoolDates.filter(sd => selectedTerm === 'all' || String(sd.term) === selectedTerm);
+      const activeFiltered = filtered.filter(sd => !sd.isHoliday);
+      if (activeFiltered.length > 0) {
+        const exists = activeFiltered.some(sd => sd.date === selectedDate);
+        if (!exists) {
+          setSelectedDate(activeFiltered[0].date);
+        }
+      }
+    }
+  }, [selectedTerm, schoolDates, selectedDate]);
+
   // Load parent dashboard details asynchronously if user is parent
   useEffect(() => {
     if (user?.role === 'parent') {
@@ -107,10 +123,16 @@ export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentI
         let list: any[] = [];
         let existingRecord = null;
 
-        if (selectedClassId === 'staff_attendance') {
+        if (selectedClassId === 'teacher_attendance' || selectedClassId === 'volunteer_attendance' || selectedClassId === 'staff_attendance') {
           const allUsers = await mockDb.getUsers();
-          list = allUsers.filter(u => u.role === 'teacher' || u.role === 'volunteer');
-          existingRecord = await mockDb.getAttendanceRecord('staff_attendance', selectedDate);
+          if (selectedClassId === 'teacher_attendance') {
+            list = allUsers.filter(u => u.role === 'teacher');
+          } else if (selectedClassId === 'volunteer_attendance') {
+            list = allUsers.filter(u => u.role === 'volunteer' || u.role === 'admin');
+          } else {
+            list = allUsers.filter(u => u.role === 'teacher' || u.role === 'volunteer' || u.role === 'admin');
+          }
+          existingRecord = await mockDb.getAttendanceRecord(selectedClassId, selectedDate);
         } else {
           const cls = await mockDb.getClass(selectedClassId);
           if (cls) {
@@ -220,7 +242,7 @@ export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentI
         attendanceRecords
       );
 
-      const isStaff = selectedClassId === 'staff_attendance';
+      const isStaff = selectedClassId === 'teacher_attendance' || selectedClassId === 'volunteer_attendance' || selectedClassId === 'staff_attendance';
       const cleanClassName = className.replace(/[^a-zA-Z0-9_\s-]/g, '').replace(/\s+/g, '_');
       const filename = `${isStaff ? 'Staff' : 'Student'}_Attendance_${cleanClassName}_Term_${exportTerm}_${new Date().toISOString().split('T')[0]}`;
 
@@ -648,10 +670,20 @@ export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentI
 
   return (
     <View style={styles.tabContentWrapper}>
-      <ThemedText style={styles.sectionTitle}>{t('attendance.title')}</ThemedText>
-      <ThemedText style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>
-        Attendance logs and real-time alerts
-      </ThemedText>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: Spacing.two }}>
+        <View>
+          <ThemedText style={styles.sectionTitle}>{t('attendance.title')}</ThemedText>
+          <ThemedText style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>
+            Attendance logs and real-time alerts
+          </ThemedText>
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: isDemoMode ? '#EA533015' : '#4CAF5015', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, borderWidth: 1, borderColor: isDemoMode ? colors.danger : colors.secondary }}>
+          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: isDemoMode ? colors.danger : colors.secondary }} />
+          <ThemedText style={{ fontSize: 11, fontWeight: '700', color: isDemoMode ? colors.danger : colors.secondary }}>
+            {isDemoMode ? 'Sandbox Fallback' : 'Firestore Production DB'}
+          </ThemedText>
+        </View>
+      </View>
 
       <View style={{ flex: 1, gap: Spacing.three }}>
         {/* Admin Approval Section (Only for Admins) */}
@@ -676,7 +708,7 @@ export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentI
                     <View style={styles.queueTextDetails}>
                       <ThemedText style={styles.queueStudentName}>{item.studentName}</ThemedText>
                       <ThemedText style={[styles.queueClassDetails, { color: colors.textSecondary }]}>
-                        {item.classId === 'staff_attendance'
+                        {(item.classId === 'teacher_attendance' || item.classId === 'volunteer_attendance' || item.classId === 'staff_attendance')
                           ? `Marked ABSENT (Staff) by ${item.markedByName} today`
                           : `Marked ABSENT in ${item.markedByName}'s class today`}
                       </ThemedText>
@@ -727,18 +759,34 @@ export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentI
                 );
               })}
               <Pressable
-                key="staff_attendance"
-                onPress={() => setSelectedClassId('staff_attendance')}
+                key="teacher_attendance"
+                onPress={() => setSelectedClassId('teacher_attendance')}
                 style={[
                   styles.classChip,
                   {
-                    backgroundColor: selectedClassId === 'staff_attendance' ? colors.primaryLight : colors.background,
-                    borderColor: selectedClassId === 'staff_attendance' ? colors.primary : colors.border
+                    backgroundColor: selectedClassId === 'teacher_attendance' ? colors.primaryLight : colors.background,
+                    borderColor: selectedClassId === 'teacher_attendance' ? colors.primary : colors.border
                   }
                 ]}
               >
-                <ThemedText style={[styles.classChipText, { color: selectedClassId === 'staff_attendance' ? colors.primary : colors.text }]}>
-                  👥 Staff Attendance / ஊழியர்கள் வருகை
+                <ThemedText style={[styles.classChipText, { color: selectedClassId === 'teacher_attendance' ? colors.primary : colors.text }]}>
+                  👥 Teacher Attendance / ஆசிரியர்கள் வருகை
+                </ThemedText>
+              </Pressable>
+
+              <Pressable
+                key="volunteer_attendance"
+                onPress={() => setSelectedClassId('volunteer_attendance')}
+                style={[
+                  styles.classChip,
+                  {
+                    backgroundColor: selectedClassId === 'volunteer_attendance' ? colors.primaryLight : colors.background,
+                    borderColor: selectedClassId === 'volunteer_attendance' ? colors.primary : colors.border
+                  }
+                ]}
+              >
+                <ThemedText style={[styles.classChipText, { color: selectedClassId === 'volunteer_attendance' ? colors.primary : colors.text }]}>
+                  🤝 Volunteer Attendance / தன்னார்வலர்கள் வருகை
                 </ThemedText>
               </Pressable>
             </View>
@@ -746,9 +794,45 @@ export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentI
             {/* Session Date Selector */}
             {selectedClassId ? (
               <View style={{ marginBottom: Spacing.three }}>
+                
+                {/* Term Filter Segment Selector */}
+                <View style={{ marginBottom: Spacing.two }}>
+                  <ThemedText style={[styles.formInputLabel, { marginBottom: 6 }]}>Filter by Term / பருவம் வாரியாக வடிகட்டுக</ThemedText>
+                  <View style={{ flexDirection: 'row', gap: 6 }}>
+                    {[
+                      { key: 'all', label: 'All' },
+                      { key: '1', label: 'Term 1' },
+                      { key: '2', label: 'Term 2' },
+                      { key: '3', label: 'Term 3' },
+                      { key: '4', label: 'Term 4' }
+                    ].map(tObj => {
+                      const isSel = selectedTerm === tObj.key;
+                      return (
+                        <Pressable
+                          key={tObj.key}
+                          onPress={() => setSelectedTerm(tObj.key as any)}
+                          style={{
+                            flex: 1,
+                            paddingVertical: 6,
+                            borderRadius: 8,
+                            borderWidth: 1,
+                            borderColor: isSel ? colors.primary : colors.border,
+                            backgroundColor: isSel ? colors.primaryLight : 'transparent',
+                            alignItems: 'center'
+                          }}
+                        >
+                          <ThemedText style={{ fontSize: 11, fontWeight: '700', color: isSel ? colors.primary : colors.text }}>
+                            {tObj.label}
+                          </ThemedText>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
+
                 <ThemedText style={styles.formInputLabel}>Select Session Date / வகுப்பு நாள் தேர்வு செய்க</ThemedText>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: Spacing.two, paddingVertical: 4 }}>
-                  {schoolDates.map((sd) => {
+                  {schoolDates.filter(sd => selectedTerm === 'all' || String(sd.term) === selectedTerm).map((sd) => {
                     const isSel = selectedDate === sd.date;
                     const isHoliday = sd.isHoliday;
                     return (
@@ -802,7 +886,7 @@ export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentI
               <View style={styles.studentListWrapper}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.two, flexWrap: 'wrap', gap: 10 }}>
                   <ThemedText style={styles.listHeaderTitle}>
-                    {selectedClassId === 'staff_attendance' ? 'Active Staff Roll (Choose Status)' : 'Active Student Roll (Choose Status)'}
+                    {(selectedClassId === 'teacher_attendance' || selectedClassId === 'volunteer_attendance' || selectedClassId === 'staff_attendance') ? 'Active Staff Roll (Choose Status)' : 'Active Student Roll (Choose Status)'}
                   </ThemedText>
                   
                   <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -874,18 +958,6 @@ export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentI
                         >
                           <ThemedText style={[styles.rollBtnText, { color: status === 'absent' ? colors.primary : colors.textSecondary }]}>
                             {t('attendance.absent')}
-                          </ThemedText>
-                        </Pressable>
-
-                        <Pressable
-                          onPress={() => handleMarkRoll(student.uid, 'late')}
-                          style={[
-                            styles.rollButton,
-                            status === 'late' && { backgroundColor: colors.accent + '20', borderColor: colors.accent }
-                          ]}
-                        >
-                          <ThemedText style={[styles.rollBtnText, { color: status === 'late' ? colors.accent : colors.textSecondary }]}>
-                            {t('attendance.late')}
                           </ThemedText>
                         </Pressable>
                       </View>

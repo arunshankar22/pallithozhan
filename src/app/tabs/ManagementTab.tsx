@@ -18,6 +18,7 @@ import { Spacing } from '@/constants/theme';
 import { spreadsheetService } from '@/services/spreadsheetService';
 import { UserModal } from '@/components/UserModal';
 import { UserBulkBar } from '@/components/UserBulkBar';
+import * as XLSX from 'xlsx';
 
 export function ManagementTab({ user, colors, t, showToast, i18n }: TabProps) {
   const { width: windowWidth } = Dimensions.get('window');
@@ -82,6 +83,14 @@ export function ManagementTab({ user, colors, t, showToast, i18n }: TabProps) {
   const [importLogs, setImportLogs] = useState<string[]>([]);
   const [importing, setImporting] = useState(false);
 
+  // Bulk Attendance Import & Export States
+  const [bulkTerm, setBulkTerm] = useState<'all' | '1' | '2' | '3' | '4'>('all');
+  const [bulkFormat, setBulkFormat] = useState<'csv' | 'xlsx'>('xlsx');
+  const [bulkImporting, setBulkImporting] = useState(false);
+  const [bulkImportText, setBulkImportText] = useState('');
+  const [bulkImportLogs, setBulkImportLogs] = useState<string[]>([]);
+  const [bulkImportPreview, setBulkImportPreview] = useState<any[]>([]);
+
   useEffect(() => {
     if (!importText.trim()) {
       setImportPreview([]);
@@ -98,6 +107,17 @@ export function ManagementTab({ user, colors, t, showToast, i18n }: TabProps) {
       setImportPreview([]);
     }
   }, [importText, importRole]);
+
+  useEffect(() => {
+    if (!bulkImportText.trim()) {
+      setBulkImportPreview([]);
+      return;
+    }
+    const parsed = spreadsheetService.parseAttendanceCSV(bulkImportText);
+    if (!parsed.error) {
+      setBulkImportPreview(parsed.records);
+    }
+  }, [bulkImportText]);
 
   const triggerFileDownload = (content: string, filename: string) => {
     spreadsheetService.triggerFileDownload(content, filename, showToast);
@@ -166,6 +186,118 @@ export function ManagementTab({ user, colors, t, showToast, i18n }: TabProps) {
       showToast(`${role === 'teacher' ? 'Teachers' : 'Volunteers'} exported successfully!`, 'success');
     } catch (e) {
       showToast(`Failed to export ${role}s.`, 'error');
+    }
+  };
+
+  const triggerBulkFileUpload = () => {
+    if (Platform.OS === 'web') {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.xlsx,.xls,.csv,.tsv,.txt';
+      input.onchange = (event: any) => {
+        const file = event.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
+          
+          reader.onload = (e) => {
+            let text = '';
+            if (isExcel) {
+              text = spreadsheetService.parseExcelToText(e.target?.result as ArrayBuffer);
+            } else {
+              text = e.target?.result as string;
+            }
+            setBulkImportText(text);
+            
+            const parsed = spreadsheetService.parseAttendanceCSV(text);
+            if (parsed.error) {
+              showToast(parsed.error, 'error');
+            } else {
+              setBulkImportPreview(parsed.records);
+              showToast(`Parsed ${parsed.records.length} bulk attendance rows successfully! Check preview below.`, 'success');
+            }
+          };
+          
+          if (isExcel) {
+            reader.readAsArrayBuffer(file);
+          } else {
+            reader.readAsText(file);
+          }
+        }
+      };
+      input.click();
+    } else {
+      showToast('File uploads only supported in web environment.', 'warning');
+    }
+  };
+
+  const handleExportBulkAttendance = async () => {
+    try {
+      showToast('Preparing bulk attendance export...', 'success');
+      const { list, schoolDates, attendanceRecords } = await mockDb.exportBulkAttendanceData(bulkTerm);
+
+      if (list.length === 0) {
+        showToast('No active users found to export attendance.', 'warning');
+        return;
+      }
+      if (schoolDates.length === 0) {
+        showToast('No calendar dates found for the selected scope.', 'warning');
+        return;
+      }
+
+      const csvContent = spreadsheetService.formatBulkAttendanceCSV(list, schoolDates, attendanceRecords);
+      const filename = `Bulk_Attendance_Term_${bulkTerm}_${new Date().toISOString().split('T')[0]}`;
+
+      if (bulkFormat === 'csv') {
+        triggerFileDownload(csvContent, `${filename}.csv`);
+      } else {
+        const workbook = XLSX.read(csvContent, { type: 'string' });
+        const binary = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+        
+        if (Platform.OS === 'web') {
+          const blob = new Blob([binary], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.setAttribute('download', `${filename}.xlsx`);
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+        } else {
+          showToast('Excel export only supported on web.', 'warning');
+        }
+      }
+
+      showToast('Bulk attendance sheet downloaded successfully!', 'success');
+    } catch (err) {
+      console.error('Bulk export failed:', err);
+      showToast('Failed to export bulk attendance.', 'error');
+    }
+  };
+
+  const handleExecuteBulkImport = async () => {
+    if (bulkImportPreview.length === 0) return;
+    setBulkImporting(true);
+    const logs: string[] = [];
+    setBulkImportLogs(logs);
+
+    const onProgressLog = (line: string) => {
+      logs.push(line);
+      setBulkImportLogs([...logs]);
+    };
+
+    try {
+      const result = await mockDb.importBulkAttendanceData(bulkImportPreview, user, onProgressLog);
+      showToast(`Successfully imported rolls for ${result.updatedCount} entries across ${result.datesCount} dates!`, 'success');
+      setBulkImportText('');
+      setBulkImportPreview([]);
+      refreshData();
+    } catch (e: any) {
+      onProgressLog(`❌ Bulk import failed: ${e.message || e}`);
+      showToast('Bulk import failed. Check logs.', 'error');
+    } finally {
+      setBulkImporting(false);
     }
   };
 
@@ -1512,12 +1644,12 @@ export function ManagementTab({ user, colors, t, showToast, i18n }: TabProps) {
         </View>
       ) : (
         /* IMPORT_EXPORT SUB-TAB */
-        <View style={{ flex: 1, gap: Spacing.three }}>
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ gap: Spacing.three, paddingBottom: 30 }}>
           <View style={{ flexDirection: 'row', gap: Spacing.two, borderBottomWidth: 1, borderColor: colors.border, paddingBottom: 10 }}>
             <ThemedText style={{ fontSize: 16, fontWeight: '800', color: colors.primary }}>📤 Spreadsheet Bulk Utilities / விரிதாள் தரவு மேலாண்மை</ThemedText>
           </View>
 
-          <View style={{ flexDirection: isLargeScreen ? 'row' : 'column', gap: Spacing.three, flex: 1 }}>
+          <View style={{ flexDirection: isLargeScreen ? 'row' : 'column', gap: Spacing.three }}>
             
             {/* LEFT SECTION: IMPORT BOARD */}
             <View style={[{ padding: 20, borderRadius: 16, borderWidth: 1, backgroundColor: colors.cardBg, borderColor: colors.border, flex: 1, gap: 12 }]}>
@@ -1673,7 +1805,153 @@ export function ManagementTab({ user, colors, t, showToast, i18n }: TabProps) {
             </View>
 
           </View>
-        </View>
+
+          {/* BULK ATTENDANCE SECTION */}
+          <View style={[{ padding: 20, borderRadius: 16, borderWidth: 1, backgroundColor: colors.cardBg, borderColor: colors.border, gap: 16 }]}>
+            <View style={{ borderBottomWidth: 1, borderColor: colors.border, paddingBottom: 8 }}>
+              <ThemedText style={{ fontSize: 15, fontWeight: '700', color: colors.primary }}>📅 Bulk Attendance Data Tools / தொகுதி வருகைப்பதிவு மேலாண்மை</ThemedText>
+              <ThemedText style={{ fontSize: 11, color: colors.textSecondary, marginTop: 4 }}>
+                Export and import attendance sheets globally for all terms or by specific term, for all students, teachers, volunteers, and admins.
+              </ThemedText>
+            </View>
+
+            <View style={{ flexDirection: isLargeScreen ? 'row' : 'column', gap: 24 }}>
+              {/* Export Attendance Column */}
+              <View style={{ flex: 1, gap: 12 }}>
+                <ThemedText style={{ fontSize: 13, fontWeight: '700', color: colors.secondary }}>📤 Export Bulk Attendance</ThemedText>
+                
+                {/* Term Select */}
+                <View style={{ gap: 6 }}>
+                  <ThemedText style={{ fontSize: 11, fontWeight: '600' }}>Select Calendar Scope:</ThemedText>
+                  <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
+                    {[
+                      { key: 'all', label: 'All Terms' },
+                      { key: '1', label: 'Term 1' },
+                      { key: '2', label: 'Term 2' },
+                      { key: '3', label: 'Term 3' },
+                      { key: '4', label: 'Term 4' }
+                    ].map(t => {
+                      const isSel = bulkTerm === t.key;
+                      return (
+                        <Pressable
+                          key={t.key}
+                          onPress={() => setBulkTerm(t.key as any)}
+                          style={[
+                            { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, minWidth: 70, alignItems: 'center' },
+                            isSel ? { backgroundColor: colors.primary, borderColor: colors.primary } : { backgroundColor: 'transparent', borderColor: colors.border }
+                          ]}
+                        >
+                          <ThemedText style={{ color: isSel ? '#FFF' : colors.text, fontSize: 10, fontWeight: '700' }}>{t.label}</ThemedText>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
+
+                {/* Format Select */}
+                <View style={{ gap: 6 }}>
+                  <ThemedText style={{ fontSize: 11, fontWeight: '600' }}>Export Format:</ThemedText>
+                  <View style={{ flexDirection: 'row', gap: 10 }}>
+                    {[
+                      { key: 'xlsx', label: 'Excel Spreadsheet (.xlsx)' },
+                      { key: 'csv', label: 'Tab-Separated Values (.csv / .tsv)' }
+                    ].map(f => {
+                      const isSel = bulkFormat === f.key;
+                      return (
+                        <Pressable
+                          key={f.key}
+                          onPress={() => setBulkFormat(f.key as any)}
+                          style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
+                        >
+                          <View style={{ width: 14, height: 14, borderRadius: 7, borderWidth: 2, borderColor: colors.secondary, justifyContent: 'center', alignItems: 'center' }}>
+                            {isSel && <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.secondary }} />}
+                          </View>
+                          <ThemedText style={{ fontSize: 11 }}>{f.label}</ThemedText>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
+
+                <Pressable
+                  onPress={handleExportBulkAttendance}
+                  style={({ pressed }) => [
+                    { backgroundColor: colors.secondary, paddingVertical: 10, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginTop: 10 },
+                    { opacity: pressed ? 0.9 : 1 }
+                  ]}
+                >
+                  <ThemedText style={{ color: '#FFF', fontWeight: '700', fontSize: 12 }}>📥 Download Bulk Attendance Spreadsheet</ThemedText>
+                </Pressable>
+              </View>
+
+              {/* Vertical line divider for web */}
+              {isLargeScreen && <View style={{ width: 1, backgroundColor: colors.border }} />}
+
+              {/* Import Attendance Column */}
+              <View style={{ flex: 1, gap: 12 }}>
+                <ThemedText style={{ fontSize: 13, fontWeight: '700', color: colors.secondary }}>📥 Import Bulk Attendance</ThemedText>
+                
+                <View style={{ gap: 6 }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <ThemedText style={{ fontSize: 11, fontWeight: '600' }}>Upload sheet file or paste cells:</ThemedText>
+                    <Pressable
+                      onPress={triggerBulkFileUpload}
+                      style={{ backgroundColor: colors.secondaryLight, borderWidth: 1, borderColor: colors.secondary, paddingVertical: 4, paddingHorizontal: 10, borderRadius: 6 }}
+                    >
+                      <ThemedText style={{ fontSize: 10, fontWeight: '700', color: colors.secondary }}>📁 Choose File (.csv, .xlsx)</ThemedText>
+                    </Pressable>
+                  </View>
+
+                  <TextInput
+                    style={[styles.formTextArea, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background, minHeight: 100, fontSize: 10, fontFamily: Platform.OS === 'web' ? 'monospace' : 'default' }]}
+                    multiline
+                    placeholder="Paste attendance spreadsheet columns (User ID, User Name, Assigned Class, and Dates) here..."
+                    placeholderTextColor={colors.textSecondary}
+                    value={bulkImportText}
+                    onChangeText={setBulkImportText}
+                  />
+                </View>
+
+                {bulkImportPreview.length > 0 ? (
+                  <View style={{ gap: 6 }}>
+                    <ThemedText style={{ fontSize: 11, fontWeight: '700', color: colors.secondary }}>
+                      👀 Ready to Import: {bulkImportPreview.length} user rows matched
+                    </ThemedText>
+
+                    <Pressable
+                      onPress={handleExecuteBulkImport}
+                      disabled={bulkImporting}
+                      style={({ pressed }) => [
+                        { backgroundColor: colors.primary, paddingVertical: 10, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+                        { opacity: pressed || bulkImporting ? 0.9 : 1 }
+                      ]}
+                    >
+                      {bulkImporting ? (
+                        <ActivityIndicator size="small" color="#FFF" />
+                      ) : (
+                        <ThemedText style={{ color: '#FFF', fontWeight: '700', fontSize: 12 }}>🚀 Confirm & Save Bulk Attendance</ThemedText>
+                      )}
+                    </Pressable>
+                  </View>
+                ) : null}
+
+                {/* Bulk Import logs panel */}
+                {bulkImportLogs.length > 0 && (
+                  <View style={{ gap: 4 }}>
+                    <ThemedText style={{ fontSize: 10, fontWeight: '700' }}>⚙️ Import Process Logs:</ThemedText>
+                    <ScrollView style={{ height: 100, backgroundColor: '#1e1e1e', borderRadius: 8, padding: 8, borderWidth: 1, borderColor: '#333' }}>
+                      {bulkImportLogs.map((log, idx) => (
+                        <ThemedText key={idx} style={{ color: log.startsWith('❌') ? '#ff6b6b' : log.startsWith('⚠️') ? '#ffd23f' : log.startsWith('✅') ? '#51cf66' : '#dcdcdc', fontSize: 9, fontFamily: Platform.OS === 'web' ? 'monospace' : 'default', marginBottom: 2 }}>
+                          {log}
+                        </ThemedText>
+                      ))}
+                    </ScrollView>
+                  </View>
+                )}
+              </View>
+            </View>
+          </View>
+        </ScrollView>
       )}
 
       {/* ==================== USER MODAL FORM ==================== */}
