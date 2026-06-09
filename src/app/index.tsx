@@ -8,7 +8,8 @@ import {
   Platform,
   Image,
   TextInput,
-  ActivityIndicator
+  ActivityIndicator,
+  Alert
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/services/auth';
@@ -33,8 +34,11 @@ import {
   Lock,
   Shield,
   MapPin,
-  ArrowLeft
+  ArrowLeft,
+  Edit,
+  Trash2
 } from 'lucide-react-native';
+
 
 // Modular Tabs
 import { NewsfeedTab } from '@/app/tabs/NewsfeedTab';
@@ -119,7 +123,8 @@ export default function HomeScreen() {
   const { t, i18n } = useTranslation();
   const { user, logout, updateLanguage, updateAuthPassword } = useAuth();
   const scheme = useColorScheme();
-  const colors = Colors[scheme === 'unspecified' || !scheme ? 'light' : scheme];
+  const theme = scheme === 'dark' ? 'dark' : 'light';
+  const colors = Colors[theme];
 
   // Layout Tab State
   const [activeTab, setActiveTab] = useState<'newsfeed' | 'attendance' | 'homework' | 'messages' | 'calendar' | 'reports' | 'management' | 'profile' | 'schools' | 'full-newsfeed' | 'students'>('newsfeed');
@@ -137,6 +142,7 @@ export default function HomeScreen() {
   // Home Dashboard & Schools view states
   const [newsPosts, setNewsPosts] = useState<any[]>([]);
   const [selectedPost, setSelectedPost] = useState<any | null>(null);
+  const [dashboardEditPost, setDashboardEditPost] = useState<any | null>(null);
   const [enrolmentModalVisible, setEnrolmentModalVisible] = useState(false);
   const [schoolsSearch, setSchoolsSearch] = useState('');
   const [schoolsViewMode, setSchoolsViewMode] = useState<'list' | 'map'>('list');
@@ -436,8 +442,8 @@ export default function HomeScreen() {
           }
         ];
         if (typeof window !== 'undefined' && window.localStorage) {
-          const branch = localStorage.getItem('pallithozhan_active_branch') || 'parramatta';
-          localStorage.setItem(`pallithozhan_${branch}_pending_approvals`, JSON.stringify(seedItems));
+          const branch = window.localStorage.getItem('pallithozhan_active_branch') || 'parramatta';
+          window.localStorage.setItem(`pallithozhan_${branch}_pending_approvals`, JSON.stringify(seedItems));
         }
       }
 
@@ -680,6 +686,40 @@ export default function HomeScreen() {
     const nextLang = i18n.language === 'ta' ? 'en' : 'ta';
     updateLanguage(nextLang);
     showToast(nextLang === 'ta' ? 'தமிழ் மொழிக்கு மாற்றப்பட்டது' : 'Switched to English', 'success');
+  };
+
+  const handleDashboardDeletePost = async (postId: string) => {
+    const performDelete = async () => {
+      try {
+        await mockDb.deleteNewsfeedPost(postId);
+        showToast('Announcement removed.', 'success');
+        const allNews = await mockDb.getNewsfeed();
+        setNewsPosts(allNews);
+      } catch (e) {
+        showToast('Failed to delete announcement.', 'error');
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      const ok = window.confirm('Are you sure you want to delete this announcement?');
+      if (ok) {
+        performDelete();
+      }
+    } else {
+      Alert.alert(
+        'Delete Announcement',
+        'Are you sure you want to delete this announcement?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Delete', style: 'destructive', onPress: performDelete }
+        ]
+      );
+    }
+  };
+
+  const handleDashboardEditPost = (post: any) => {
+    setDashboardEditPost(post);
+    setActiveTab('full-newsfeed');
   };
 
   const renderHomeDashboard = () => {
@@ -1036,6 +1076,27 @@ export default function HomeScreen() {
                       </ThemedText>
                     </View>
 
+                    {['admin', 'teacher', 'volunteer'].includes(user?.role || '') && (
+                      <View style={{
+                        position: 'absolute',
+                        top: 10,
+                        right: 10,
+                        flexDirection: 'row',
+                        gap: 6,
+                        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                        paddingHorizontal: 6,
+                        paddingVertical: 4,
+                        borderRadius: 8
+                      }}>
+                        <Pressable onPress={() => handleDashboardEditPost(post)} style={{ padding: 2 }}>
+                          <Edit size={12} color="#FFF" />
+                        </Pressable>
+                        <Pressable onPress={() => handleDashboardDeletePost(post.postId)} style={{ padding: 2 }}>
+                          <Trash2 size={12} color="#FF8E8E" />
+                        </Pressable>
+                      </View>
+                    )}
+
                     <View style={{ padding: 12, gap: 6 }}>
                       <ThemedText style={{ fontSize: 13, fontWeight: '700', color: colors.text }} numberOfLines={1}>
                         {titleText}
@@ -1366,7 +1427,13 @@ export default function HomeScreen() {
       case 'newsfeed':
         return renderHomeDashboard();
       case 'full-newsfeed':
-        return <NewsfeedTab {...props} />;
+        return (
+          <NewsfeedTab 
+            {...props} 
+            dashboardEditPost={dashboardEditPost} 
+            clearDashboardEditPost={() => setDashboardEditPost(null)} 
+          />
+        );
       case 'attendance':
         return <AttendanceTab {...props} />;
       case 'homework':
@@ -1421,7 +1488,7 @@ export default function HomeScreen() {
 
   // Sidebar Logo using the official brand blossomed-flower logo and showing active branch next to parramatta in english and tamil
   const BalarMalarBranchLogo = ({ size = 26 }: { size?: number }) => {
-    const activeBranch = typeof window !== 'undefined' ? localStorage.getItem('pallithozhan_active_branch') || 'parramatta' : 'parramatta';
+    const activeBranch = typeof window !== 'undefined' && typeof window.localStorage !== 'undefined' ? window.localStorage.getItem('pallithozhan_active_branch') || 'parramatta' : 'parramatta';
     const branchNames: Record<string, { en: string, ta: string }> = {
       parramatta: { en: 'Parramatta Branch', ta: 'பரமட்டா கிளை' },
       sevenhills: { en: 'Seven Hills Branch', ta: 'செவன் ஹில்ஸ் கிளை' },
@@ -1586,13 +1653,25 @@ export default function HomeScreen() {
           <View style={[styles.mobileHeader, getGlassStyle(colors.cardBg, 0.75, 20), { borderBottomWidth: 1, borderColor: colors.border }]}>
             <BalarMalarBranchLogo size={24} />
             <View style={styles.headerRightActions}>
-              <Pressable onPress={() => setActiveTab('profile')} style={styles.headerIconButton}>
+              <Pressable 
+                onPress={() => setActiveTab('profile')} 
+                style={styles.headerIconButton}
+                hitSlop={{ top: 12, bottom: 12, left: 10, right: 10 }}
+              >
                 <UserIcon size={18} color={activeTab === 'profile' ? colors.primary : colors.text} />
               </Pressable>
-              <Pressable onPress={toggleLanguage} style={styles.headerIconButton}>
+              <Pressable 
+                onPress={toggleLanguage} 
+                style={styles.headerIconButton}
+                hitSlop={{ top: 12, bottom: 12, left: 10, right: 10 }}
+              >
                 <Languages size={18} color={colors.text} />
               </Pressable>
-              <Pressable onPress={logout} style={styles.headerIconButton}>
+              <Pressable 
+                onPress={logout} 
+                style={styles.headerIconButton}
+                hitSlop={{ top: 12, bottom: 12, left: 10, right: 10 }}
+              >
                 <LogOut size={18} color={colors.danger} />
               </Pressable>
             </View>
@@ -1601,7 +1680,7 @@ export default function HomeScreen() {
       ) : null}
 
       {/* MAIN CONTAINER CONTENT VIEW */}
-      <View style={styles.contentPane}>
+      <View style={[styles.contentPane, !isLargeScreen && { paddingTop: 64 }]}>
         {user?.role === 'parent' && studentProfiles.length > 1 && (
           <View style={[styles.childSwitcherContainer, getGlassStyle(colors.cardBg, 0.75, 10), { borderColor: colors.border }]}>
             <ThemedText style={styles.switcherLabel}>👦 Select Child / குழந்தையைத் தேர்ந்தெடுக்கவும்:</ThemedText>
@@ -2063,11 +2142,63 @@ export default function HomeScreen() {
             </ScrollView>
 
             {/* Close button at bottom */}
-            <View style={{ padding: Spacing.four, borderTopWidth: 1, borderTopColor: colors.border }}>
+            <View style={{ padding: Spacing.four, borderTopWidth: 1, borderTopColor: colors.border, flexDirection: 'row', gap: 10 }}>
+              {['admin', 'teacher', 'volunteer'].includes(user?.role || '') && (
+                <>
+                  <Pressable
+                    onPress={() => {
+                      const post = selectedPost;
+                      setSelectedPost(null);
+                      handleDashboardEditPost(post);
+                    }}
+                    style={({ pressed }) => [
+                      {
+                        flex: 1,
+                        borderWidth: 1,
+                        borderColor: colors.primary,
+                        paddingVertical: 12,
+                        borderRadius: 12,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexDirection: 'row',
+                        gap: 6,
+                        opacity: pressed ? 0.9 : 1
+                      }
+                    ]}
+                  >
+                    <Edit size={14} color={colors.primary} />
+                    <ThemedText style={{ color: colors.primary, fontWeight: '700', fontSize: 13 }}>Edit</ThemedText>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => {
+                      const postId = selectedPost.postId;
+                      setSelectedPost(null);
+                      handleDashboardDeletePost(postId);
+                    }}
+                    style={({ pressed }) => [
+                      {
+                        flex: 1,
+                        backgroundColor: colors.danger,
+                        paddingVertical: 12,
+                        borderRadius: 12,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexDirection: 'row',
+                        gap: 6,
+                        opacity: pressed ? 0.9 : 1
+                      }
+                    ]}
+                  >
+                    <Trash2 size={14} color="#FFF" />
+                    <ThemedText style={{ color: '#FFF', fontWeight: '700', fontSize: 13 }}>Delete</ThemedText>
+                  </Pressable>
+                </>
+              )}
               <Pressable
                 onPress={() => setSelectedPost(null)}
                 style={({ pressed }) => [
                   {
+                    flex: 1,
                     backgroundColor: colors.primary,
                     paddingVertical: 12,
                     borderRadius: 12,
@@ -2078,7 +2209,7 @@ export default function HomeScreen() {
                 ]}
               >
                 <ThemedText style={{ color: '#FFF', fontWeight: '700', fontSize: 13 }}>
-                  Close Announcement
+                  Close
                 </ThemedText>
               </Pressable>
             </View>

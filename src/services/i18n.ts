@@ -12,6 +12,7 @@ const deviceLanguage = locales && locales[0] ? locales[0].languageCode : 'en';
 i18n
   .use(initReactI18next)
   .init({
+    compatibilityJSON: 'v3',
     resources: {
       en: { translation: en },
       ta: { translation: ta }

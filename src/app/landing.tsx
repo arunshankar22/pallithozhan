@@ -34,10 +34,11 @@ interface LandingScreenProps {
 export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
   const { t, i18n } = useTranslation();
   const scheme = useColorScheme();
-  const colors = Colors[scheme === 'unspecified' || !scheme ? 'light' : scheme];
+  const theme = scheme === 'dark' ? 'dark' : 'light';
+  const colors = Colors[theme];
 
   const [activeBranch, setActiveBranch] = useState(
-    typeof window !== 'undefined' ? localStorage.getItem('pallithozhan_active_branch') || 'parramatta' : 'parramatta'
+    typeof window !== 'undefined' && typeof window.localStorage !== 'undefined' ? window.localStorage.getItem('pallithozhan_active_branch') || 'parramatta' : 'parramatta'
   );
   const [portalVisible, setPortalVisible] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
@@ -58,8 +59,8 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
 
   const handleSelectBranch = (branchKey: string) => {
     setActiveBranch(branchKey);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('pallithozhan_active_branch', branchKey);
+    if (typeof window !== 'undefined' && typeof window.localStorage !== 'undefined') {
+      window.localStorage.setItem('pallithozhan_active_branch', branchKey);
     }
   };
 
@@ -170,13 +171,17 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
           })
         }
       ]}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-          <Image 
-            source={require('../../assets/images/balarmalar_logo.png')} 
-            style={{ width: 80, height: 24, resizeMode: 'contain' }} 
-          />
-          {/* Vertical Separator */}
-          <View style={{ width: 1, height: 16, backgroundColor: colors.border, marginHorizontal: 2 }} />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          {isLargeScreen && (
+            <>
+              <Image 
+                source={require('../../assets/images/balarmalar_logo.png')} 
+                style={{ width: 80, height: 24, resizeMode: 'contain' }} 
+              />
+              {/* Vertical Separator */}
+              <View style={{ width: 1, height: 16, backgroundColor: colors.border, marginHorizontal: 2 }} />
+            </>
+          )}
           
           <Image 
             source={require('../../assets/images/pallithozhan_logo.png')} 
@@ -191,7 +196,7 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
           <Pressable onPress={toggleLanguage} style={[styles.langBadge, { backgroundColor: colors.background, borderColor: colors.border }]}>
             <Languages size={14} color={colors.primary} />
             <ThemedText style={styles.langText}>
-              {i18n.language === 'ta' ? 'English' : 'தமிழ்'}
+              {isLargeScreen ? (i18n.language === 'ta' ? 'English' : 'தமிழ்') : (i18n.language === 'ta' ? 'EN' : 'தமிழ்')}
             </ThemedText>
           </Pressable>
 
@@ -205,8 +210,10 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
               }
             ]}
           >
-            <Shield size={14} color="#FFF" style={{ marginRight: 6 }} />
-            <ThemedText style={styles.portalButtonText}>Portal / Login</ThemedText>
+            {isLargeScreen && <Shield size={14} color="#FFF" style={{ marginRight: 6 }} />}
+            <ThemedText style={styles.portalButtonText}>
+              {isLargeScreen ? 'Portal / Login' : 'Login'}
+            </ThemedText>
           </Pressable>
         </View>
       </View>
@@ -281,7 +288,9 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
                   styles.featureCard, 
                   { 
                     backgroundColor: colors.cardBg, 
-                    borderColor: colors.border
+                    borderColor: colors.border,
+                    flex: isLargeScreen ? 1 : undefined,
+                    width: isLargeScreen ? undefined : '100%'
                   }
                 ]}>
                   <View style={[styles.featureIconContainer, { backgroundColor: item.color + '15' }]}>
@@ -324,7 +333,9 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
                     { 
                       backgroundColor: stage.bgColor || colors.cardBg, 
                       borderColor: stage.borderColor || colors.border,
-                      borderWidth: 1
+                      borderWidth: 1,
+                      flex: isLargeScreen ? 1 : undefined,
+                      width: isLargeScreen ? '48%' : '100%'
                     }
                   ]}
                 >

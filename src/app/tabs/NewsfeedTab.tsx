@@ -8,7 +8,8 @@ import {
   ActivityIndicator,
   Platform,
   Dimensions,
-  Image
+  Image,
+  Alert
 } from 'react-native';
 import {
   Newspaper,
@@ -68,7 +69,19 @@ const HERO_SLIDES = [
   }
 ];
 
-export function NewsfeedTab({ user, colors, t, showToast, i18n, activeStudentId }: TabProps) {
+export function NewsfeedTab({ 
+  user, 
+  colors, 
+  t, 
+  showToast, 
+  i18n, 
+  activeStudentId,
+  dashboardEditPost,
+  clearDashboardEditPost
+}: TabProps & {
+  dashboardEditPost?: any;
+  clearDashboardEditPost?: () => void;
+}) {
   const [posts, setPosts] = useState<any[]>([]);
   const [commentTextMap, setCommentTextMap] = useState<Record<string, string>>({});
   const [editingCommentIdMap, setEditingCommentIdMap] = useState<Record<string, string>>({});
@@ -139,6 +152,15 @@ export function NewsfeedTab({ user, colors, t, showToast, i18n, activeStudentId 
     const savedEmail = getLocalStorageItem('drive_email', '');
     setConnectedDriveEmail(savedEmail);
   }, []);
+
+  useEffect(() => {
+    if (dashboardEditPost) {
+      handleStartEditPost(dashboardEditPost);
+      if (clearDashboardEditPost) {
+        clearDashboardEditPost();
+      }
+    }
+  }, [dashboardEditPost]);
 
   // Autoscroll post attachments carousels (every 5 seconds)
   useEffect(() => {
@@ -356,14 +378,30 @@ export function NewsfeedTab({ user, colors, t, showToast, i18n, activeStudentId 
   };
 
   const handleDeletePost = async (postId: string) => {
-    const ok = Platform.OS !== 'web' || window.confirm('Are you sure you want to delete this announcement?');
-    if (!ok) return;
-    try {
-      await mockDb.deleteNewsfeedPost(postId);
-      showToast('Announcement removed.', 'success');
-      loadFeedData();
-    } catch (e) {
-      showToast('Failed to delete announcement.', 'error');
+    const performDelete = async () => {
+      try {
+        await mockDb.deleteNewsfeedPost(postId);
+        showToast('Announcement removed.', 'success');
+        loadFeedData();
+      } catch (e) {
+        showToast('Failed to delete announcement.', 'error');
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      const ok = window.confirm('Are you sure you want to delete this announcement?');
+      if (ok) {
+        performDelete();
+      }
+    } else {
+      Alert.alert(
+        'Delete Announcement',
+        'Are you sure you want to delete this announcement?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Delete', style: 'destructive', onPress: performDelete }
+        ]
+      );
     }
   };
 
@@ -486,7 +524,7 @@ export function NewsfeedTab({ user, colors, t, showToast, i18n, activeStudentId 
           </ThemedText>
         </View>
 
-        {['admin', 'teacher'].includes(user?.role || '') && (
+        {['admin', 'teacher', 'volunteer'].includes(user?.role || '') && (
           <Pressable
             onPress={() => {
               setEditingPostId('');
@@ -897,7 +935,7 @@ export function NewsfeedTab({ user, colors, t, showToast, i18n, activeStudentId 
                     </ThemedText>
                   </View>
 
-                  {['admin', 'teacher'].includes(user?.role || '') && (
+                  {['admin', 'teacher', 'volunteer'].includes(user?.role || '') && (
                     <View style={{ flexDirection: 'row', gap: 6 }}>
                       <Pressable onPress={() => handleStartEditPost(post)} style={{ padding: 4 }}>
                         <Edit size={14} color={colors.primary} />

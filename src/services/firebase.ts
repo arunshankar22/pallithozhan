@@ -3,18 +3,36 @@ import { getAuth } from 'firebase/auth';
 import { initializeFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
-// In production, these should be placed in environment variables.
-// If missing, the app gracefully falls back to a fully-featured mock local database.
+// Resolve the Firestore database ID & Storage Bucket
+// Local development and Vercel preview connect to staging resources
+// Vercel Production and EAS Production builds connect to production resources
+let defaultDbId = 'pallithozhandb';
+let defaultStorageBucket = 'pallithozhan.firebasestorage.app';
+
+if (typeof window !== 'undefined' && window.location) {
+  const hostname = window.location.hostname;
+  if (
+    hostname && (
+      hostname === 'pallithozhan.vercel.app' || 
+      (hostname.includes('balarmalar.nsw.edu.au') && !hostname.includes('dev') && !hostname.includes('preview'))
+    )
+  ) {
+    defaultDbId = 'pallithozhan-prod-db';
+    defaultStorageBucket = 'gs://pallithozhan-prod';
+  }
+}
+
+export const databaseId = process.env.EXPO_PUBLIC_FIREBASE_FIRESTORE_DATABASE_ID || defaultDbId;
+export const storageBucketId = process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET || defaultStorageBucket;
+
 export const firebaseConfig = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY || "",
   authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN || "",
   projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID || "",
-  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET || "",
+  storageBucket: storageBucketId,
   messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "",
   appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID || ""
 };
-
-const isConfigured = true;
 
 let app;
 let auth: any;
@@ -26,8 +44,8 @@ try {
   auth = getAuth(app);
   db = initializeFirestore(app, {
     experimentalForceLongPolling: true
-  }, 'pallithozhandb');
-  storage = getStorage(app);
+  }, databaseId);
+  storage = getStorage(app, storageBucketId);
   storage.maxUploadRetryTime = 2000; // Fail-fast on network/CORS blocks (2s limit)
   storage.maxOperationRetryTime = 2000;  // Fail-fast on general operations (2s limit)
 } catch (error) {

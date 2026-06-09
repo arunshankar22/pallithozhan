@@ -16,16 +16,17 @@ export default function LoginScreen({ onNavigateToRegister }: LoginScreenProps) 
   const { t, i18n } = useTranslation();
   const { login, logout, updateLanguage } = useAuth();
   const scheme = useColorScheme();
-  const colors = Colors[scheme === 'unspecified' || !scheme ? 'light' : scheme];
+  const theme = scheme === 'dark' ? 'dark' : 'light';
+  const colors = Colors[theme];
 
   const [activeBranch, setActiveBranch] = useState(
-    typeof window !== 'undefined' ? localStorage.getItem('pallithozhan_active_branch') || 'parramatta' : 'parramatta'
+    typeof window !== 'undefined' && typeof window.localStorage !== 'undefined' ? window.localStorage.getItem('pallithozhan_active_branch') || 'parramatta' : 'parramatta'
   );
 
   const handleBranchChange = (branchKey: string) => {
     setActiveBranch(branchKey);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('pallithozhan_active_branch', branchKey);
+    if (typeof window !== 'undefined' && typeof window.localStorage !== 'undefined') {
+      window.localStorage.setItem('pallithozhan_active_branch', branchKey);
     }
   };
 

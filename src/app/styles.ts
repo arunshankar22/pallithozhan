@@ -164,14 +164,14 @@ export const styles = StyleSheet.create({
   headerRightActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.three,
+    gap: Spacing.two,
   },
   headerIconButton: {
-    padding: 4,
+    padding: 12,
   },
   mobileScrollContent: {
     padding: Spacing.three,
-    paddingTop: 80,
+    paddingTop: Spacing.three,
     paddingBottom: 110,
   },
   mobileTabBar: {
@@ -219,6 +219,7 @@ export const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 26,
     fontWeight: '800',
+    lineHeight: 32,
   },
   sectionSubtitle: {
     fontSize: 13,

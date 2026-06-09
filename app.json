@@ -2,23 +2,26 @@
   "expo": {
     "name": "Pallithozhan",
     "slug": "Pallithozhan",
+    "newArchEnabled": false,
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "pallithozhan",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon",
-      "bundleIdentifier": "com.anonymous.Pallithozhan"
+      "icon": "./assets/images/icon.png",
+      "bundleIdentifier": "com.anonymous.Pallithozhan",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "backgroundColor": "#ffffff",
+        "foregroundImage": "./assets/images/android-icon-foreground.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.anonymous.Pallithozhan"
     },
     "web": {
       "output": "single",
@@ -43,6 +46,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "4f364168-b1b9-4187-834f-65c15ffdd727"
+      }
     }
   }
 }

@@ -199,7 +199,7 @@ export const userService = {
   createUser: async (user: any): Promise<any> => {
     const uid = user.uid || `user_${Date.now()}`;
     const newUser = {
-      schoolId: typeof window !== 'undefined' ? (
+      schoolId: typeof window !== 'undefined' && typeof localStorage !== 'undefined' ? (
         (() => {
           const activeBranch = localStorage.getItem('pallithozhan_active_branch') || 'parramatta';
           const branchMapping: Record<string, string> = {

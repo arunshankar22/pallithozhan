@@ -34,6 +34,7 @@ export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentI
   const [schoolDates, setSchoolDates] = useState<any[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [selectedTerm, setSelectedTerm] = useState<'all' | '1' | '2' | '3' | '4'>('all');
+  const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString());
 
   // Parent Dashboard States
   const [pushedAlerts, setPushedAlerts] = useState<any[]>([]);
@@ -76,19 +77,29 @@ export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentI
     load();
   }, []);
 
-  // Auto-select first date of the selected term when term filter changes
+  // Auto-select first date of the selected term/year when filter changes
   useEffect(() => {
     if (schoolDates.length > 0) {
-      const filtered = schoolDates.filter(sd => selectedTerm === 'all' || String(sd.term) === selectedTerm);
+      const filtered = schoolDates.filter(sd => 
+        (selectedTerm === 'all' || String(sd.term) === selectedTerm) &&
+        (selectedYear === 'all' || sd.date.startsWith(selectedYear))
+      );
       const activeFiltered = filtered.filter(sd => !sd.isHoliday);
       if (activeFiltered.length > 0) {
         const exists = activeFiltered.some(sd => sd.date === selectedDate);
         if (!exists) {
-          setSelectedDate(activeFiltered[0].date);
+          // Prefer current academic year dates
+          const currentYear = new Date().getFullYear().toString();
+          const currentYearDates = activeFiltered.filter(sd => sd.date.startsWith(currentYear));
+          if (currentYearDates.length > 0) {
+            setSelectedDate(currentYearDates[0].date);
+          } else {
+            setSelectedDate(activeFiltered[0].date);
+          }
         }
       }
     }
-  }, [selectedTerm, schoolDates, selectedDate]);
+  }, [selectedTerm, selectedYear, schoolDates, selectedDate]);
 
   // Load parent dashboard details asynchronously if user is parent
   useEffect(() => {
@@ -795,6 +806,39 @@ export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentI
             {selectedClassId ? (
               <View style={{ marginBottom: Spacing.three }}>
                 
+                {/* Year Filter Segment Selector */}
+                <View style={{ marginBottom: Spacing.two }}>
+                  <ThemedText style={[styles.formInputLabel, { marginBottom: 6 }]}>Filter by Year / ஆண்டு வாரியாக வடிகட்டுக</ThemedText>
+                  <View style={{ flexDirection: 'row', gap: 6 }}>
+                    {[
+                      { key: 'all', label: 'All' },
+                      { key: '2026', label: '2026' },
+                      { key: '2025', label: '2025' }
+                    ].map(yObj => {
+                      const isSel = selectedYear === yObj.key;
+                      return (
+                        <Pressable
+                          key={yObj.key}
+                          onPress={() => setSelectedYear(yObj.key)}
+                          style={{
+                            flex: 1,
+                            paddingVertical: 6,
+                            borderRadius: 8,
+                            borderWidth: 1,
+                            borderColor: isSel ? colors.primary : colors.border,
+                            backgroundColor: isSel ? colors.primaryLight : 'transparent',
+                            alignItems: 'center'
+                          }}
+                        >
+                          <ThemedText style={{ fontSize: 11, fontWeight: '700', color: isSel ? colors.primary : colors.text }}>
+                            {yObj.label}
+                          </ThemedText>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
+
                 {/* Term Filter Segment Selector */}
                 <View style={{ marginBottom: Spacing.two }}>
                   <ThemedText style={[styles.formInputLabel, { marginBottom: 6 }]}>Filter by Term / பருவம் வாரியாக வடிகட்டுக</ThemedText>
@@ -832,7 +876,10 @@ export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentI
 
                 <ThemedText style={styles.formInputLabel}>Select Session Date / வகுப்பு நாள் தேர்வு செய்க</ThemedText>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: Spacing.two, paddingVertical: 4 }}>
-                  {schoolDates.filter(sd => selectedTerm === 'all' || String(sd.term) === selectedTerm).map((sd) => {
+                  {schoolDates.filter(sd => 
+                    (selectedTerm === 'all' || String(sd.term) === selectedTerm) &&
+                    (selectedYear === 'all' || sd.date.startsWith(selectedYear))
+                  ).map((sd) => {
                     const isSel = selectedDate === sd.date;
                     const isHoliday = sd.isHoliday;
                     return (

@@ -49,7 +49,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
 
   const resolveUserProfile = (profile: any): UserProfile => {
-    const storedOverride = typeof window !== 'undefined' ? localStorage.getItem(`active_role_${profile.uid}`) : null;
+    const storedOverride = typeof window !== 'undefined' && typeof window.localStorage !== 'undefined' ? window.localStorage.getItem(`active_role_${profile.uid}`) : null;
     return {
       ...profile,
       originalRole: profile.originalRole || profile.role,
@@ -63,7 +63,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLoading(true);
       if (isDemoMode) {
         // Look for existing session in localStorage
-        const storedUid = typeof window !== 'undefined' ? localStorage.getItem('pallithozhan_session_uid') : null;
+        const storedUid = typeof window !== 'undefined' && typeof window.localStorage !== 'undefined' ? window.localStorage.getItem('pallithozhan_session_uid') : null;
         if (storedUid) {
           const profile = await mockDb.getUser(storedUid);
           if (profile) {
@@ -106,8 +106,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const resolved = resolveUserProfile(matched);
         setUser(resolved);
         i18n.changeLanguage(resolved.languagePreference);
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('pallithozhan_session_uid', resolved.uid);
+        if (typeof window !== 'undefined' && typeof window.localStorage !== 'undefined') {
+          window.localStorage.setItem('pallithozhan_session_uid', resolved.uid);
         }
         return resolved;
       } else {
@@ -136,8 +136,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               fullName: fbUser.displayName || email.split('@')[0],
               role: role,
               phone: fbUser.phoneNumber || '',
-              schoolId: typeof window !== 'undefined' ? 
-                getSchoolIdFromBranch(localStorage.getItem('pallithozhan_active_branch')) : 
+              schoolId: typeof window !== 'undefined' && typeof window.localStorage !== 'undefined' ? 
+                getSchoolIdFromBranch(window.localStorage.getItem('pallithozhan_active_branch')) : 
                 'balarmalar parramatta branch',
               languagePreference: 'en'
             };
@@ -196,7 +196,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const register = async (profile: Omit<UserProfile, 'uid' | 'schoolId'>, password?: string): Promise<UserProfile> => {
     try {
-      const activeBranch = typeof window !== 'undefined' ? localStorage.getItem('pallithozhan_active_branch') || 'parramatta' : 'parramatta';
+      const activeBranch = typeof window !== 'undefined' && typeof window.localStorage !== 'undefined' ? window.localStorage.getItem('pallithozhan_active_branch') || 'parramatta' : 'parramatta';
       const schoolId = getSchoolIdFromBranch(activeBranch);
       if (isDemoMode) {
         const users = await mockDb.getUsers();
@@ -215,8 +215,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const resolved = resolveUserProfile(created);
         setUser(resolved);
         i18n.changeLanguage(resolved.languagePreference);
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('pallithozhan_session_uid', resolved.uid);
+        if (typeof window !== 'undefined' && typeof window.localStorage !== 'undefined') {
+          window.localStorage.setItem('pallithozhan_session_uid', resolved.uid);
         }
         return resolved;
       } else {
@@ -243,13 +243,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     setIsLoading(true);
-    if (user && typeof window !== 'undefined') {
-      localStorage.removeItem(`active_role_${user.uid}`);
+    if (user && typeof window !== 'undefined' && typeof window.localStorage !== 'undefined') {
+      window.localStorage.removeItem(`active_role_${user.uid}`);
     }
     if (isDemoMode) {
       setUser(null);
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('pallithozhan_session_uid');
+      if (typeof window !== 'undefined' && typeof window.localStorage !== 'undefined') {
+        window.localStorage.removeItem('pallithozhan_session_uid');
       }
     } else {
       await fbAuth.signOut();
@@ -311,8 +311,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (user) {
       const updated = { ...user, role: newRole };
       setUser(updated);
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(`active_role_${user.uid}`, newRole);
+      if (typeof window !== 'undefined' && typeof window.localStorage !== 'undefined') {
+        window.localStorage.setItem(`active_role_${user.uid}`, newRole);
       }
     }
   };

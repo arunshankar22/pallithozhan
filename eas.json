@@ -1,0 +1,40 @@
+{
+  "cli": {
+    "version": ">= 15.0.0"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal"
+    },
+    "preview": {
+      "distribution": "internal",
+      "ios": {
+        "simulator": true
+      },
+      "env": {
+        "EXPO_PUBLIC_FIREBASE_FIRESTORE_DATABASE_ID": "pallithozhandb",
+        "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "pallithozhan.firebasestorage.app"
+      }
+    },
+    "preview-device": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_FIREBASE_FIRESTORE_DATABASE_ID": "pallithozhandb",
+        "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "pallithozhan.firebasestorage.app"
+      }
+    },
+    "production": {
+      "env": {
+        "EXPO_PUBLIC_FIREBASE_FIRESTORE_DATABASE_ID": "pallithozhan-prod-db",
+        "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "gs://pallithozhan-prod"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

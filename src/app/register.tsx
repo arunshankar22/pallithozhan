@@ -15,7 +15,8 @@ export default function RegisterScreen({ onNavigateToLogin }: RegisterScreenProp
   const { t, i18n } = useTranslation();
   const { register, updateLanguage } = useAuth();
   const scheme = useColorScheme();
-  const colors = Colors[scheme === 'unspecified' || !scheme ? 'light' : scheme];
+  const theme = scheme === 'dark' ? 'dark' : 'light';
+  const colors = Colors[theme];
 
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -98,7 +99,7 @@ export default function RegisterScreen({ onNavigateToLogin }: RegisterScreenProp
             <UserCircle2 size={14} color={colors.primary} />
             <ThemedText style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>
               Branch: {(() => {
-                const activeBranch = typeof window !== 'undefined' ? localStorage.getItem('pallithozhan_active_branch') || 'parramatta' : 'parramatta';
+                const activeBranch = typeof window !== 'undefined' && typeof window.localStorage !== 'undefined' ? window.localStorage.getItem('pallithozhan_active_branch') || 'parramatta' : 'parramatta';
                 const branchLabels: Record<string, string> = {
                   'parramatta': 'Parramatta',
                   'sevenhills': 'Seven Hills',

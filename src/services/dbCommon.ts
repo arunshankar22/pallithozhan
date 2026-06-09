@@ -7,13 +7,16 @@ export const getActiveBranch = (): string => {
   if (typeof window === 'undefined' || typeof window.localStorage === 'undefined') {
     return 'parramatta';
   }
-  return localStorage.getItem('pallithozhan_active_branch') || 'parramatta';
+  return window.localStorage.getItem('pallithozhan_active_branch') || 'parramatta';
 };
 
 // Check if live Node.js REST API server is running
 export const checkServerStatus = async (): Promise<boolean> => {
   try {
-    const res = await fetch(`${API_URL}/health`, { method: 'GET', signal: AbortSignal.timeout(1000) });
+    const signal = typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal
+      ? (AbortSignal as any).timeout(1000)
+      : undefined;
+    const res = await fetch(`${API_URL}/health`, { method: 'GET', signal });
     const data = await res.json();
     isServerOnline = data && data.status === 'healthy';
     return isServerOnline;
@@ -33,7 +36,12 @@ if (typeof window !== 'undefined') {
       if (url.startsWith(API_URL) && !url.includes('?branch=') && !url.includes('&branch=')) {
         const branch = getActiveBranch();
         const separator = url.includes('?') ? '&' : '?';
-        return originalFetch(new Request(`${url}${separator}branch=${branch}`, req), init);
+        if (typeof Request !== 'undefined') {
+          return originalFetch(new Request(`${url}${separator}branch=${branch}`, req), init);
+        } else {
+          req.url = `${url}${separator}branch=${branch}`;
+          return originalFetch(req, init);
+        }
       }
       return originalFetch(input, init);
     } else {
@@ -60,7 +68,7 @@ export const getLocalStorageItem = (key: string, defaultValue: any) => {
   }
   try {
     const branch = getActiveBranch();
-    const data = localStorage.getItem(`pallithozhan_${branch}_${key}`);
+    const data = window.localStorage.getItem(`pallithozhan_${branch}_${key}`);
     return data ? JSON.parse(data) : defaultValue;
   } catch (e) {
     return defaultValue;
@@ -73,7 +81,7 @@ export const setLocalStorageItem = (key: string, value: any) => {
   }
   try {
     const branch = getActiveBranch();
-    localStorage.setItem(`pallithozhan_${branch}_${key}`, JSON.stringify(value));
+    window.localStorage.setItem(`pallithozhan_${branch}_${key}`, JSON.stringify(value));
   } catch (e) {
     // Ignore
   }
