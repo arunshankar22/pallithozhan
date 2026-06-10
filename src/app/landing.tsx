@@ -605,7 +605,7 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
         <View style={styles.modalBackdrop}>
           <Pressable style={styles.modalBackdropClickable} onPress={() => setPortalVisible(false)} />
           <KeyboardAvoidingView 
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             style={[
               styles.modalCard, 
               { 

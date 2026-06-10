@@ -23,7 +23,8 @@ if (typeof window !== 'undefined' && window.location) {
 }
 
 export const databaseId = process.env.EXPO_PUBLIC_FIREBASE_FIRESTORE_DATABASE_ID || defaultDbId;
-export const storageBucketId = process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET || defaultStorageBucket;
+const rawStorageBucket = process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET || defaultStorageBucket;
+export const storageBucketId = rawStorageBucket.startsWith('gs://') ? rawStorageBucket.substring(5) : rawStorageBucket;
 
 export const firebaseConfig = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY || "",

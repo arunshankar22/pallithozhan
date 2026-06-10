@@ -1715,71 +1715,80 @@ export default function HomeScreen() {
 
       {/* MAIN CONTAINER CONTENT VIEW */}
       <View style={[styles.contentPane, !isLargeScreen && { paddingTop: 64 + topOffset }]}>
-        {user?.role === 'parent' && studentProfiles.length > 1 && (
-          <View style={[styles.childSwitcherContainer, getGlassStyle(colors.cardBg, 0.75, 10), { borderColor: colors.border }]}>
-            <ThemedText style={styles.switcherLabel}>👦 Select Child / குழந்தையைத் தேர்ந்தெடுக்கவும்:</ThemedText>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.switcherScroll}>
-              {studentProfiles.map((student) => {
-                const isActive = activeStudentId === student.uid;
-                const studentClass = classes.find(c => c.studentIds && c.studentIds.includes(student.uid));
-                return (
-                  <Pressable
-                    key={student.uid}
-                    onPress={() => {
-                      setActiveStudentId(student.uid);
-                      showToast(`Switched active child to ${student.fullName}!`, 'success');
-                    }}
-                    style={[
-                      styles.switcherTab,
-                      isActive ? { backgroundColor: colors.primary, borderColor: colors.primary } : { backgroundColor: colors.background, borderColor: colors.border }
-                    ]}
-                  >
-                    <ThemedText style={[styles.switcherTabText, isActive ? { color: '#FFF', fontWeight: '700' } : { color: colors.text }]}>
-                      👧 {student.fullName} ({studentClass ? studentClass.className.split(' - ')[0] : 'No Class'})
-                    </ThemedText>
-                  </Pressable>
-                );
-              })}
+        {(() => {
+          const renderHeaderOptions = () => (
+            <>
+              {user?.role === 'parent' && studentProfiles.length > 1 && (
+                <View style={[styles.childSwitcherContainer, getGlassStyle(colors.cardBg, 0.75, 10), { borderColor: colors.border }]}>
+                  <ThemedText style={styles.switcherLabel}>👦 Select Child / குழந்தையைத் தேர்ந்தெடுக்கவும்:</ThemedText>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.switcherScroll}>
+                    {studentProfiles.map((student) => {
+                      const isActive = activeStudentId === student.uid;
+                      const studentClass = classes.find(c => c.studentIds && c.studentIds.includes(student.uid));
+                      return (
+                        <Pressable
+                          key={student.uid}
+                          onPress={() => {
+                            setActiveStudentId(student.uid);
+                            showToast(`Switched active child to ${student.fullName}!`, 'success');
+                          }}
+                          style={[
+                            styles.switcherTab,
+                            isActive ? { backgroundColor: colors.primary, borderColor: colors.primary } : { backgroundColor: colors.background, borderColor: colors.border }
+                          ]}
+                        >
+                          <ThemedText style={[styles.switcherTabText, isActive ? { color: '#FFF', fontWeight: '700' } : { color: colors.text }]}>
+                            👧 {student.fullName} ({studentClass ? studentClass.className.split(' - ')[0] : 'No Class'})
+                          </ThemedText>
+                        </Pressable>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+              )}
+              {isSubTab && (
+                <Pressable
+                  onPress={() => setActiveTab('newsfeed')}
+                  style={({ pressed }) => [
+                    {
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 8,
+                      paddingHorizontal: isLargeScreen ? Spacing.four : 0,
+                      paddingTop: Spacing.two,
+                      paddingBottom: Spacing.four,
+                      opacity: pressed ? 0.7 : 1,
+                      alignSelf: 'flex-start',
+                    }
+                  ]}
+                >
+                  <ArrowLeft size={16} color={colors.primary} />
+                  <ThemedText style={{ color: colors.primary, fontWeight: '700', fontSize: 13 }}>
+                    {i18n.language === 'ta' ? 'முகப்பு பக்கத்திற்குத் திரும்பு' : 'Back to Dashboard'}
+                  </ThemedText>
+                </Pressable>
+              )}
+            </>
+          );
+
+          return ['attendance', 'management', 'messages'].includes(activeTab) ? (
+            <View style={{ flex: 1, paddingHorizontal: isLargeScreen ? Spacing.five : Spacing.three, paddingTop: Spacing.three }}>
+              {renderHeaderOptions()}
+              {renderContent()}
+            </View>
+          ) : (
+            <ScrollView 
+              style={{ flex: 1 }}
+              contentContainerStyle={isLargeScreen ? styles.scrollContent : [
+                styles.mobileScrollContent, 
+                { paddingBottom: 80 + (insets.bottom || 0) + 20 }
+              ]}
+            >
+              {renderHeaderOptions()}
+              {renderContent()}
             </ScrollView>
-          </View>
-        )}
-        {isSubTab && (
-          <Pressable
-            onPress={() => setActiveTab('newsfeed')}
-            style={({ pressed }) => [
-              {
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 8,
-                paddingHorizontal: isLargeScreen ? Spacing.four : Spacing.three,
-                paddingTop: Spacing.two,
-                paddingBottom: Spacing.two,
-                opacity: pressed ? 0.7 : 1,
-                alignSelf: 'flex-start',
-              }
-            ]}
-          >
-            <ArrowLeft size={16} color={colors.primary} />
-            <ThemedText style={{ color: colors.primary, fontWeight: '700', fontSize: 13 }}>
-              {i18n.language === 'ta' ? 'முகப்பு பக்கத்திற்குத் திரும்பு' : 'Back to Dashboard'}
-            </ThemedText>
-          </Pressable>
-        )}
-        {['attendance', 'management', 'messages'].includes(activeTab) ? (
-          <View style={{ flex: 1 }}>
-            {renderContent()}
-          </View>
-        ) : (
-          <ScrollView 
-            style={{ flex: 1 }}
-            contentContainerStyle={isLargeScreen ? styles.scrollContent : [
-              styles.mobileScrollContent, 
-              { paddingBottom: 80 + (insets.bottom || 0) + 20 }
-            ]}
-          >
-            {renderContent()}
-          </ScrollView>
-        )}
+          );
+        })()}
       </View>
 
       {/* MOBILE BOTTOM NAVIGATION TAB BAR */}
