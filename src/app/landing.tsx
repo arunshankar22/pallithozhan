@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { StyleSheet, View, ScrollView, Pressable, useColorScheme, Platform, Dimensions, Image } from 'react-native';
+import { StyleSheet, View, ScrollView, Pressable, useColorScheme, Platform, Dimensions, Image, KeyboardAvoidingView } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, MaxContentWidth } from '@/constants/theme';
@@ -603,19 +603,22 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
       {portalVisible && (
         <View style={styles.modalBackdrop}>
           <Pressable style={styles.modalBackdropClickable} onPress={() => setPortalVisible(false)} />
-          <View style={[
-            styles.modalCard, 
-            { 
-              backgroundColor: scheme === 'dark' ? 'rgba(19, 21, 18, 0.92)' : 'rgba(253, 252, 247, 0.95)', 
-              borderColor: colors.border,
-              ...Platform.select({
-                web: {
-                  backdropFilter: 'blur(30px)',
-                  WebkitBackdropFilter: 'blur(30px)',
-                }
-              })
-            }
-          ]}>
+          <KeyboardAvoidingView 
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={[
+              styles.modalCard, 
+              { 
+                backgroundColor: scheme === 'dark' ? 'rgba(19, 21, 18, 0.92)' : 'rgba(253, 252, 247, 0.95)', 
+                borderColor: colors.border,
+                ...Platform.select({
+                  web: {
+                    backdropFilter: 'blur(30px)',
+                    WebkitBackdropFilter: 'blur(30px)',
+                  }
+                })
+              }
+            ]}
+          >
             <View style={[styles.modalHeader, { borderColor: colors.border }]}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                 <Image 
@@ -636,7 +639,7 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
               <ThemedText style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>Active Center: {activeBranchName.toUpperCase()}</ThemedText>
             </View>
 
-            <ScrollView contentContainerStyle={styles.modalScroll}>
+            <ScrollView contentContainerStyle={styles.modalScroll} keyboardShouldPersistTaps="handled">
               {authMode === 'login' ? (
                 <LoginScreen 
                   onNavigateToRegister={() => setAuthMode('register')} 
@@ -647,7 +650,7 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
                 />
               )}
             </ScrollView>
-          </View>
+          </KeyboardAvoidingView>
         </View>
       )}
     </View>
@@ -1096,8 +1099,7 @@ const styles = StyleSheet.create({
   modalCard: {
     width: '90%',
     maxWidth: 500,
-    height: '85%',
-    maxHeight: 700,
+    maxHeight: '85%',
     borderRadius: 24,
     borderWidth: 1,
     overflow: 'hidden',

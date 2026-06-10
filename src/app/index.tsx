@@ -9,7 +9,8 @@ import {
   Image,
   TextInput,
   ActivityIndicator,
-  Alert
+  Alert,
+  Linking
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -1650,9 +1651,18 @@ export default function HomeScreen() {
 
       {/* MOBILE CONTAINER */}
       {!isLargeScreen ? (
-        <View style={styles.mobileWrapperHeader}>
+        <View style={[styles.mobileWrapperHeader, { height: 64 + (insets.top || 0) }]}>
           {/* Mobile Header */}
-          <View style={[styles.mobileHeader, getGlassStyle(colors.cardBg, 0.75, 20), { borderBottomWidth: 1, borderColor: colors.border }]}>
+          <View style={[
+            styles.mobileHeader, 
+            getGlassStyle(colors.cardBg, 0.75, 20), 
+            { 
+              borderBottomWidth: 1, 
+              borderColor: colors.border,
+              height: 64 + (insets.top || 0),
+              paddingTop: Spacing.three + (insets.top || 0)
+            }
+          ]}>
             <BalarMalarBranchLogo size={24} />
             <View style={styles.headerRightActions}>
               <Pressable 
@@ -1682,7 +1692,7 @@ export default function HomeScreen() {
       ) : null}
 
       {/* MAIN CONTAINER CONTENT VIEW */}
-      <View style={[styles.contentPane, !isLargeScreen && { paddingTop: 64 }]}>
+      <View style={[styles.contentPane, !isLargeScreen && { paddingTop: 64 + (insets.top || 0) }]}>
         {user?.role === 'parent' && studentProfiles.length > 1 && (
           <View style={[styles.childSwitcherContainer, getGlassStyle(colors.cardBg, 0.75, 10), { borderColor: colors.border }]}>
             <ThemedText style={styles.switcherLabel}>👦 Select Child / குழந்தையைத் தேர்ந்தெடுக்கவும்:</ThemedText>
@@ -2089,10 +2099,17 @@ export default function HomeScreen() {
                                 style={{ width: '100%', maxHeight: 300, display: 'block', objectFit: 'contain' }}
                               />
                             ) : (
-                              <View style={{ padding: 24, alignItems: 'center' }}>
-                                <ThemedText style={{ color: '#FFF', fontWeight: 'bold' }}>📹 Play Video Attachment</ThemedText>
-                                <ThemedText style={{ color: '#AAA', fontSize: 10, marginTop: 4 }}>{media.name || 'Attached Video'}</ThemedText>
-                              </View>
+                              <Pressable 
+                                onPress={() => Linking.openURL(media.url)}
+                                style={({ pressed }) => [
+                                  { padding: 24, alignItems: 'center', opacity: pressed ? 0.7 : 1 }
+                                ]}
+                              >
+                                <ThemedText style={{ color: '#FFF', fontWeight: 'bold', fontSize: 14 }}>📹 Play Video Attachment</ThemedText>
+                                <ThemedText style={{ color: '#AAA', fontSize: 10, marginTop: 6, textAlign: 'center' }}>
+                                  {media.name || 'Click to play in player'}
+                                </ThemedText>
+                              </Pressable>
                             )
                           ) : (
                             <Image

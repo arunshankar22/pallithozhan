@@ -9,7 +9,8 @@ import {
   Platform,
   Dimensions,
   Image,
-  Alert
+  Alert,
+  Linking
 } from 'react-native';
 import {
   Newspaper,
@@ -990,9 +991,18 @@ export function NewsfeedTab({
                                         style={{ width: '100%', height: '100%', objectFit: 'contain' }} 
                                       />
                                     ) : (
-                                      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                                        <ThemedText style={{ color: '#FFF' }}>📹 Simulated Video File</ThemedText>
-                                      </View>
+                                      <Pressable 
+                                        onPress={() => Linking.openURL(fileUrl)}
+                                        style={({ pressed }) => [
+                                          styles.simulatedImage,
+                                          { backgroundColor: '#000', flex: 1, padding: 24, justifyContent: 'center', alignItems: 'center', opacity: pressed ? 0.8 : 1 }
+                                        ]}
+                                      >
+                                        <ThemedText style={{ color: '#FFF', fontWeight: 'bold', fontSize: 14 }}>📹 Play Video Attachment</ThemedText>
+                                        <ThemedText style={{ color: '#AAA', fontSize: 10, marginTop: 6, textAlign: 'center', paddingHorizontal: 12 }} numberOfLines={1}>
+                                          {media.name || 'Click to play'}
+                                        </ThemedText>
+                                      </Pressable>
                                     )}
                                   </View>
                                 ) : (
@@ -1004,9 +1014,11 @@ export function NewsfeedTab({
                                         style={{ width: '100%', height: '100%', objectFit: 'contain' }} 
                                       />
                                     ) : (
-                                      <View style={[styles.simulatedImage, { backgroundColor: colors.background }]}>
-                                        <ThemedText style={styles.simulatedImageText}>📷 Slide {idx + 1}</ThemedText>
-                                      </View>
+                                      <Image
+                                        source={{ uri: fileUrl }}
+                                        style={{ width: '100%', height: '100%' }}
+                                        resizeMode="cover"
+                                      />
                                     )}
                                   </View>
                                 )}
@@ -1050,7 +1062,7 @@ export function NewsfeedTab({
                       // Single mediaUrl fallback (backward compatibility)
                       <View style={{ flex: 1 }}>
                         {post.mediaType === 'video' ? (
-                          <View style={[styles.simulatedImage, { backgroundColor: '#000', flex: 1 }]}>
+                          <View style={{ backgroundColor: '#000', flex: 1 }}>
                             {Platform.OS === 'web' ? (
                               <video 
                                 src={post.mediaUrl} 
@@ -1058,7 +1070,18 @@ export function NewsfeedTab({
                                 style={{ width: '100%', height: '100%', objectFit: 'contain' }} 
                               />
                             ) : (
-                              <ThemedText style={{ color: '#FFF' }}>📹 Simulated Video File playing</ThemedText>
+                              <Pressable 
+                                onPress={() => Linking.openURL(post.mediaUrl)}
+                                style={({ pressed }) => [
+                                  styles.simulatedImage,
+                                  { backgroundColor: '#000', flex: 1, padding: 24, justifyContent: 'center', alignItems: 'center', opacity: pressed ? 0.8 : 1 }
+                                ]}
+                              >
+                                <ThemedText style={{ color: '#FFF', fontWeight: 'bold', fontSize: 14 }}>📹 Play Video Attachment</ThemedText>
+                                <ThemedText style={{ color: '#AAA', fontSize: 10, marginTop: 6, textAlign: 'center', paddingHorizontal: 12 }} numberOfLines={1}>
+                                  {post.mediaName || 'Click to play'}
+                                </ThemedText>
+                              </Pressable>
                             )}
                           </View>
                         ) : (
@@ -1070,9 +1093,11 @@ export function NewsfeedTab({
                                 style={{ width: '100%', height: '100%', objectFit: 'contain' }} 
                               />
                             ) : (
-                              <View style={[styles.simulatedImage, { backgroundColor: colors.background }]}>
-                                <ThemedText style={styles.simulatedImageText}>📷 Image: {post.mediaUrl.substring(0, 40)}...</ThemedText>
-                              </View>
+                              <Image
+                                source={{ uri: post.mediaUrl }}
+                                style={{ width: '100%', height: '100%' }}
+                                resizeMode="cover"
+                              />
                             )}
                           </View>
                         )}

@@ -60,261 +60,254 @@ export default function RegisterScreen({ onNavigateToLogin }: RegisterScreenProp
   ] as const;
 
   return (
-    <ScrollView contentContainerStyle={styles.scrollContainer} style={{ backgroundColor: colors.background }}>
-      <ThemedView type="background" style={[styles.container, { backgroundColor: colors.background }]}>
-        
-        {/* Language Selection Header */}
-        <View style={styles.headerActionRow}>
-          <Pressable onPress={toggleLanguage} style={[styles.langBadge, { backgroundColor: colors.backgroundElement, borderColor: colors.border }]}>
-            <Languages size={14} color={colors.primary} />
-            <ThemedText style={styles.langText}>
-              {i18n.language === 'ta' ? 'English' : 'தமிழ் பதிப்பு'}
-            </ThemedText>
-          </Pressable>
+    <View style={[styles.container, { backgroundColor: 'transparent', width: '100%', padding: 0 }]}>
+      
+      {/* Language Selection Header */}
+      <View style={styles.headerActionRow}>
+        <Pressable onPress={toggleLanguage} style={[styles.langBadge, { backgroundColor: colors.backgroundElement, borderColor: colors.border }]}>
+          <Languages size={14} color={colors.primary} />
+          <ThemedText style={styles.langText}>
+            {i18n.language === 'ta' ? 'English' : 'தமிழ் பதிப்பு'}
+          </ThemedText>
+        </Pressable>
+      </View>
+
+      {/* Register Card */}
+      <View style={[
+        styles.card, 
+        { 
+          backgroundColor: scheme === 'dark' ? 'rgba(26, 30, 25, 0.65)' : 'rgba(255, 255, 255, 0.55)', 
+          borderColor: scheme === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(255, 255, 255, 0.5)',
+          shadowColor: colors.shadowColor, 
+          shadowOpacity: colors.shadowOpacity,
+          ...Platform.select({
+            web: {
+              backdropFilter: 'blur(16px)',
+              WebkitBackdropFilter: 'blur(16px)',
+              boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.05)',
+            }
+          })
+        }
+      ]}>
+        <Image 
+          source={require('../../assets/images/balarmalar_logo.png')} 
+          style={{ width: 220, height: 60, resizeMode: 'contain', alignSelf: 'center', marginBottom: Spacing.two }} 
+        />
+
+        <View style={{ backgroundColor: colors.primaryLight, padding: 8, borderRadius: 12, marginBottom: Spacing.three, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+          <UserCircle2 size={14} color={colors.primary} />
+          <ThemedText style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>
+            Branch: {(() => {
+              const activeBranch = typeof window !== 'undefined' && typeof window.localStorage !== 'undefined' ? window.localStorage.getItem('pallithozhan_active_branch') || 'parramatta' : 'parramatta';
+              const branchLabels: Record<string, string> = {
+                'parramatta': 'Parramatta',
+                'sevenhills': 'Seven Hills',
+                'blacktown': 'Blacktown'
+              };
+              return (branchLabels[activeBranch] || activeBranch).toUpperCase();
+            })()}
+          </ThemedText>
         </View>
 
-        {/* Register Card */}
+        <ThemedText style={[styles.cardHeader, { color: colors.text, marginBottom: 2 }]}>
+          Create Account
+        </ThemedText>
+        <ThemedText style={[styles.cardSubtitle, { color: colors.textSecondary }]}>
+          Sign up to access your branch dashboard
+        </ThemedText>
+
+        {errorMsg ? (
+          <View style={[styles.errorContainer, { backgroundColor: colors.danger + '15' }]}>
+            <ThemedText style={[styles.errorText, { color: colors.danger }]}>{errorMsg}</ThemedText>
+          </View>
+        ) : null}
+
+        {/* Full Name */}
+        <View style={styles.inputLabelContainer}>
+          <ThemedText style={styles.inputLabel}>Full Name / முழு பெயர்</ThemedText>
+        </View>
         <View style={[
-          styles.card, 
+          styles.inputWrapper, 
           { 
-            backgroundColor: scheme === 'dark' ? 'rgba(26, 30, 25, 0.65)' : 'rgba(255, 255, 255, 0.55)', 
-            borderColor: scheme === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(255, 255, 255, 0.5)',
-            shadowColor: colors.shadowColor, 
-            shadowOpacity: colors.shadowOpacity,
-            ...Platform.select({
-              web: {
-                backdropFilter: 'blur(16px)',
-                WebkitBackdropFilter: 'blur(16px)',
-                boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.05)',
-              }
-            })
+            backgroundColor: scheme === 'dark' ? 'rgba(19, 21, 18, 0.45)' : 'rgba(253, 252, 247, 0.5)', 
+            borderColor: scheme === 'dark' ? 'rgba(255, 255, 255, 0.06)' : 'rgba(234, 83, 48, 0.15)'
           }
         ]}>
-          <Image 
-            source={require('../../assets/images/balarmalar_logo.png')} 
-            style={{ width: 220, height: 60, resizeMode: 'contain', alignSelf: 'center', marginBottom: Spacing.two }} 
+          <User size={18} color={colors.textSecondary} style={styles.inputIcon} />
+          <TextInput
+            style={[styles.input, { color: colors.text }]}
+            placeholder="e.g. Arun Kumar"
+            placeholderTextColor={colors.textSecondary}
+            value={fullName}
+            onChangeText={setFullName}
           />
+        </View>
 
-          <View style={{ backgroundColor: colors.primaryLight, padding: 8, borderRadius: 12, marginBottom: Spacing.three, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-            <UserCircle2 size={14} color={colors.primary} />
-            <ThemedText style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>
-              Branch: {(() => {
-                const activeBranch = typeof window !== 'undefined' && typeof window.localStorage !== 'undefined' ? window.localStorage.getItem('pallithozhan_active_branch') || 'parramatta' : 'parramatta';
-                const branchLabels: Record<string, string> = {
-                  'parramatta': 'Parramatta',
-                  'sevenhills': 'Seven Hills',
-                  'blacktown': 'Blacktown'
-                };
-                return (branchLabels[activeBranch] || activeBranch).toUpperCase();
-              })()}
-            </ThemedText>
-          </View>
+        {/* Email Address */}
+        <View style={styles.inputLabelContainer}>
+          <ThemedText style={styles.inputLabel}>{t('auth.email')}</ThemedText>
+        </View>
+        <View style={[
+          styles.inputWrapper, 
+          { 
+            backgroundColor: scheme === 'dark' ? 'rgba(19, 21, 18, 0.45)' : 'rgba(253, 252, 247, 0.5)', 
+            borderColor: scheme === 'dark' ? 'rgba(255, 255, 255, 0.06)' : 'rgba(234, 83, 48, 0.15)'
+          }
+        ]}>
+          <Mail size={18} color={colors.textSecondary} style={styles.inputIcon} />
+          <TextInput
+            style={[styles.input, { color: colors.text }]}
+            placeholder="e.g. parent@example.com"
+            placeholderTextColor={colors.textSecondary}
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+          />
+        </View>
 
-          <ThemedText style={styles.cardHeader}>{t('auth.register')}</ThemedText>
-          <ThemedText style={[styles.cardSubtitle, { color: colors.textSecondary }]}>Create your account for school updates</ThemedText>
-          
-          {errorMsg ? (
-            <View style={[styles.errorContainer, { backgroundColor: colors.danger + '15' }]}>
-              <ThemedText style={[styles.errorText, { color: colors.danger }]}>{errorMsg}</ThemedText>
-            </View>
-          ) : null}
+        {/* Password */}
+        <View style={styles.inputLabelContainer}>
+          <ThemedText style={styles.inputLabel}>{t('auth.password')}</ThemedText>
+        </View>
+        <View style={[
+          styles.inputWrapper, 
+          { 
+            backgroundColor: scheme === 'dark' ? 'rgba(19, 21, 18, 0.45)' : 'rgba(253, 252, 247, 0.5)', 
+            borderColor: scheme === 'dark' ? 'rgba(255, 255, 255, 0.06)' : 'rgba(234, 83, 48, 0.15)'
+          }
+        ]}>
+          <Lock size={18} color={colors.textSecondary} style={styles.inputIcon} />
+          <TextInput
+            style={[styles.input, { color: colors.text }]}
+            placeholder="••••••••"
+            placeholderTextColor={colors.textSecondary}
+            secureTextEntry
+            value={password}
+            onChangeText={setPassword}
+            autoCapitalize="none"
+          />
+        </View>
 
-          {/* Full Name Input */}
-          <View style={styles.inputLabelContainer}>
-            <ThemedText style={styles.inputLabel}>{t('auth.fullName')} *</ThemedText>
-          </View>
-          <View style={[
-            styles.inputWrapper, 
-            { 
-              backgroundColor: scheme === 'dark' ? 'rgba(19, 21, 18, 0.45)' : 'rgba(253, 252, 247, 0.5)', 
-              borderColor: scheme === 'dark' ? 'rgba(255, 255, 255, 0.06)' : 'rgba(234, 83, 48, 0.15)',
-              ...Platform.select({
-                web: {
-                  backdropFilter: 'blur(4px)',
-                  WebkitBackdropFilter: 'blur(4px)',
-                  transition: 'all 0.2s ease',
-                }
-              })
-            }
-          ]}>
-            <User size={18} color={colors.textSecondary} style={styles.inputIcon} />
-            <TextInput
-              style={[styles.input, { color: colors.text }]}
-              placeholder="e.g. Anbarasan Sundar"
-              placeholderTextColor={colors.textSecondary}
-              value={fullName}
-              onChangeText={setFullName}
-            />
-          </View>
+        {/* Phone Number */}
+        <View style={styles.inputLabelContainer}>
+          <ThemedText style={styles.inputLabel}>Mobile / அலைபேசி எண்</ThemedText>
+        </View>
+        <View style={[
+          styles.inputWrapper, 
+          { 
+            backgroundColor: scheme === 'dark' ? 'rgba(19, 21, 18, 0.45)' : 'rgba(253, 252, 247, 0.5)', 
+            borderColor: scheme === 'dark' ? 'rgba(255, 255, 255, 0.06)' : 'rgba(234, 83, 48, 0.15)'
+          }
+        ]}>
+          <Phone size={18} color={colors.textSecondary} style={styles.inputIcon} />
+          <TextInput
+            style={[styles.input, { color: colors.text }]}
+            placeholder="e.g. 0412 345 678"
+            placeholderTextColor={colors.textSecondary}
+            value={phone}
+            onChangeText={setPhone}
+            keyboardType="phone-pad"
+          />
+        </View>
 
-          {/* Email Input */}
-          <View style={styles.inputLabelContainer}>
-            <ThemedText style={styles.inputLabel}>{t('auth.email')} *</ThemedText>
-          </View>
-          <View style={[
-            styles.inputWrapper, 
-            { 
-              backgroundColor: scheme === 'dark' ? 'rgba(19, 21, 18, 0.45)' : 'rgba(253, 252, 247, 0.5)', 
-              borderColor: scheme === 'dark' ? 'rgba(255, 255, 255, 0.06)' : 'rgba(234, 83, 48, 0.15)',
-              ...Platform.select({
-                web: {
-                  backdropFilter: 'blur(4px)',
-                  WebkitBackdropFilter: 'blur(4px)',
-                  transition: 'all 0.2s ease',
-                }
-              })
-            }
-          ]}>
-            <Mail size={18} color={colors.textSecondary} style={styles.inputIcon} />
-            <TextInput
-              style={[styles.input, { color: colors.text }]}
-              placeholder="e.g. anbu@example.com"
-              placeholderTextColor={colors.textSecondary}
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-            />
-          </View>
-
-          {/* Password Input */}
-          <View style={styles.inputLabelContainer}>
-            <ThemedText style={styles.inputLabel}>{t('auth.password')} *</ThemedText>
-          </View>
-          <View style={[
-            styles.inputWrapper, 
-            { 
-              backgroundColor: scheme === 'dark' ? 'rgba(19, 21, 18, 0.45)' : 'rgba(253, 252, 247, 0.5)', 
-              borderColor: scheme === 'dark' ? 'rgba(255, 255, 255, 0.06)' : 'rgba(234, 83, 48, 0.15)',
-              ...Platform.select({
-                web: {
-                  backdropFilter: 'blur(4px)',
-                  WebkitBackdropFilter: 'blur(4px)',
-                  transition: 'all 0.2s ease',
-                }
-              })
-            }
-          ]}>
-            <Lock size={18} color={colors.textSecondary} style={styles.inputIcon} />
-            <TextInput
-              style={[styles.input, { color: colors.text }]}
-              placeholder="Min. 6 characters"
-              placeholderTextColor={colors.textSecondary}
-              secureTextEntry
-              value={password}
-              onChangeText={setPassword}
-              autoCapitalize="none"
-            />
-          </View>
-
-          {/* Phone Number Input */}
-          <View style={styles.inputLabelContainer}>
-            <ThemedText style={styles.inputLabel}>{t('auth.phone')}</ThemedText>
-          </View>
-          <View style={[
-            styles.inputWrapper, 
-            { 
-              backgroundColor: scheme === 'dark' ? 'rgba(19, 21, 18, 0.45)' : 'rgba(253, 252, 247, 0.5)', 
-              borderColor: scheme === 'dark' ? 'rgba(255, 255, 255, 0.06)' : 'rgba(234, 83, 48, 0.15)',
-              ...Platform.select({
-                web: {
-                  backdropFilter: 'blur(4px)',
-                  WebkitBackdropFilter: 'blur(4px)',
-                  transition: 'all 0.2s ease',
-                }
-              })
-            }
-          ]}>
-            <Phone size={18} color={colors.textSecondary} style={styles.inputIcon} />
-            <TextInput
-              style={[styles.input, { color: colors.text }]}
-              placeholder="e.g. +91 98765 43210"
-              placeholderTextColor={colors.textSecondary}
-              value={phone}
-              onChangeText={setPhone}
-              keyboardType="phone-pad"
-            />
-          </View>
-
-          {/* Role Selection Container */}
-          <View style={styles.inputLabelContainer}>
-            <ThemedText style={styles.inputLabel}>{t('auth.roleSelection')}</ThemedText>
-          </View>
+        {/* Role Segment */}
+        <View style={{ marginBottom: Spacing.three }}>
+          <ThemedText style={[styles.inputLabel, { marginBottom: Spacing.two }]}>
+            I am registering as / நான் பதிவு செய்வது:
+          </ThemedText>
           <View style={styles.roleGrid}>
-            {roles.map((item) => {
-              const isSelected = role === item.key;
+            {roles.map(r => {
+              const isSel = role === r.key;
               return (
                 <Pressable
-                  key={item.key}
-                  onPress={() => setRole(item.key)}
+                  key={r.key}
+                  onPress={() => setRole(r.key)}
                   style={[
                     styles.roleCard,
                     {
-                      backgroundColor: isSelected ? colors.primaryLight : colors.background,
-                      borderColor: isSelected ? colors.primary : colors.border
+                      borderColor: isSel ? colors.primary : colors.border,
+                      backgroundColor: isSel ? colors.primaryLight : 'transparent'
                     }
                   ]}
                 >
                   <View style={styles.roleRow}>
-                    <UserCircle2 size={16} color={isSelected ? colors.primary : colors.textSecondary} />
-                    <ThemedText style={[styles.roleLabel, { color: isSelected ? colors.primary : colors.text }]}>
-                      {item.label}
+                    <View style={{
+                      width: 14,
+                      height: 14,
+                      borderRadius: 7,
+                      borderWidth: 1.5,
+                      borderColor: isSel ? colors.primary : colors.textSecondary,
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      marginRight: 4
+                    }}>
+                      {isSel && (
+                        <View style={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: 4,
+                          backgroundColor: colors.primary
+                        }} />
+                      )}
+                    </View>
+                    <ThemedText style={[styles.roleLabel, { color: isSel ? colors.primary : colors.text }]}>
+                      {r.label}
                     </ThemedText>
                   </View>
                   <ThemedText style={[styles.roleDesc, { color: colors.textSecondary }]}>
-                    {item.desc}
+                    {r.desc}
                   </ThemedText>
                 </Pressable>
               );
             })}
           </View>
-
-          {/* Register Button */}
-          <Pressable 
-            onPress={handleRegister} 
-            style={({ pressed }) => [
-              styles.submitButton, 
-              { 
-                backgroundColor: colors.primary, 
-                opacity: pressed ? 0.9 : 1,
-                ...Platform.select({
-                  web: {
-                    backdropFilter: 'blur(8px)',
-                    WebkitBackdropFilter: 'blur(8px)',
-                    boxShadow: '0 8px 24px rgba(234, 83, 48, 0.25)',
-                    borderWidth: 1,
-                    borderColor: 'rgba(255, 255, 255, 0.25)',
-                  }
-                })
-              }
-            ]}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator size="small" color="#FFF" />
-            ) : (
-              <View style={styles.buttonTextRow}>
-                <ThemedText style={styles.submitButtonText}>{t('auth.register')}</ThemedText>
-                <ArrowRight size={16} color="#FFF" style={{ marginLeft: 6 }} />
-              </View>
-            )}
-          </Pressable>
-
-          {/* Login Redirect */}
-          <View style={styles.loginPromptRow}>
-            <ThemedText style={[styles.loginPromptText, { color: colors.textSecondary }]}>
-              {t('auth.haveAccount')}
-            </ThemedText>
-            <Pressable onPress={onNavigateToLogin}>
-              <ThemedText style={[styles.loginLink, { color: colors.primary }]}>
-                {t('auth.login')}
-              </ThemedText>
-            </Pressable>
-          </View>
         </View>
 
-      </ThemedView>
-    </ScrollView>
+        {/* Submit */}
+        <Pressable 
+          onPress={handleRegister} 
+          style={({ pressed }) => [
+            styles.submitButton, 
+            { 
+              backgroundColor: colors.primary, 
+              opacity: pressed ? 0.9 : 1,
+              ...Platform.select({
+                web: {
+                  backdropFilter: 'blur(8px)',
+                  WebkitBackdropFilter: 'blur(8px)',
+                  boxShadow: '0 8px 24px rgba(234, 83, 48, 0.25)',
+                  borderWidth: 1,
+                  borderColor: 'rgba(255, 255, 255, 0.25)',
+                }
+              })
+            }
+          ]}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator size="small" color="#FFF" />
+          ) : (
+            <View style={styles.buttonTextRow}>
+              <ThemedText style={styles.submitButtonText}>{t('auth.register')}</ThemedText>
+              <ArrowRight size={16} color="#FFF" style={{ marginLeft: 6 }} />
+            </View>
+          )}
+        </Pressable>
+
+        {/* Login Redirect */}
+        <View style={styles.loginPromptRow}>
+          <ThemedText style={[styles.loginPromptText, { color: colors.textSecondary }]}>
+            {t('auth.haveAccount')}
+          </ThemedText>
+          <Pressable onPress={onNavigateToLogin}>
+            <ThemedText style={[styles.loginLink, { color: colors.primary }]}>
+              {t('auth.login')}
+            </ThemedText>
+          </Pressable>
+        </View>
+      </View>
+    </View>
   );
 }
 
