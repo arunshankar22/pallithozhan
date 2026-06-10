@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { StyleSheet, View, ScrollView, Pressable, useColorScheme, Platform, Dimensions, Image } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, MaxContentWidth } from '@/constants/theme';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -36,6 +37,7 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
   const scheme = useColorScheme();
   const theme = scheme === 'dark' ? 'dark' : 'light';
   const colors = Colors[theme];
+  const insets = useSafeAreaInsets();
 
   const [activeBranch, setActiveBranch] = useState(
     typeof window !== 'undefined' && typeof window.localStorage !== 'undefined' ? window.localStorage.getItem('pallithozhan_active_branch') || 'parramatta' : 'parramatta'
@@ -156,7 +158,6 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      {/* HEADER NAVBAR */}
       <View style={[
         styles.headbar, 
         { 
@@ -167,6 +168,10 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
             web: {
               backdropFilter: 'blur(20px)',
               WebkitBackdropFilter: 'blur(20px)',
+            },
+            default: {
+              height: 60 + (insets.top || 0),
+              paddingTop: insets.top,
             }
           })
         }
@@ -1122,5 +1127,6 @@ const styles = StyleSheet.create({
   },
   modalScroll: {
     padding: Spacing.two,
+    paddingBottom: 40,
   },
 });

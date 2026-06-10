@@ -13,7 +13,7 @@ import { styles } from '@/app/styles';
 import { mockDb } from '@/services/mockBackend';
 import { Spacing } from '@/constants/theme';
 
-export function MessagesTab({ user, colors, t, showToast, i18n }: TabProps) {
+export function MessagesTab({ user, colors, t, showToast, i18n, insets }: TabProps) {
   const { width: windowWidth } = Dimensions.get('window');
   const isLargeScreen = windowWidth >= 768;
 
@@ -174,7 +174,7 @@ export function MessagesTab({ user, colors, t, showToast, i18n }: TabProps) {
   );
 
   return (
-    <View style={styles.tabContentWrapper}>
+    <View style={[styles.tabContentWrapper, { flex: 1, padding: isLargeScreen ? Spacing.four : Spacing.three }]}>
       <ThemedText style={styles.sectionTitle}>{t('messaging.title')}</ThemedText>
       <ThemedText style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>
         Real-time Balar Malar parent-teacher message box

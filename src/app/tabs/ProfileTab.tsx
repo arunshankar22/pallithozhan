@@ -469,13 +469,13 @@ export function ProfileTab({ user, colors, t, showToast, i18n, logout }: TabProp
               borderBottomWidth: 1,
               borderColor: colors.border
             }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, marginRight: 8 }}>
                 <Shield size={18} color={colors.primary} />
-                <View style={{ gap: 2 }}>
-                  <ThemedText style={{ fontSize: 13, fontWeight: '700', color: colors.text }}>
+                <View style={{ gap: 2, flex: 1 }}>
+                  <ThemedText style={{ fontSize: 13, fontWeight: '700', color: colors.text }} numberOfLines={1}>
                     Switch View Role / பொறுப்பை மாற்று
                   </ThemedText>
-                  <ThemedText style={{ fontSize: 11, color: colors.textSecondary }}>
+                  <ThemedText style={{ fontSize: 11, color: colors.textSecondary }} numberOfLines={2}>
                     {user?.role === 'parent' 
                       ? `Viewing as Parent (Switch back to ${user?.originalRole?.toUpperCase()})` 
                       : `Viewing as ${user?.role?.toUpperCase()} (Switch to Parent View)`}
@@ -548,13 +548,13 @@ export function ProfileTab({ user, colors, t, showToast, i18n, logout }: TabProp
             borderBottomWidth: 1,
             borderColor: colors.border
           }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, marginRight: 8 }}>
               <Languages size={18} color={colors.textSecondary} />
-              <View style={{ gap: 2 }}>
-                <ThemedText style={{ fontSize: 13, fontWeight: '700', color: colors.text }}>
+              <View style={{ gap: 2, flex: 1 }}>
+                <ThemedText style={{ fontSize: 13, fontWeight: '700', color: colors.text }} numberOfLines={1}>
                   Language / மொழி
                 </ThemedText>
-                <ThemedText style={{ fontSize: 11, color: colors.textSecondary }}>
+                <ThemedText style={{ fontSize: 11, color: colors.textSecondary }} numberOfLines={1}>
                   App interface setting
                 </ThemedText>
               </View>

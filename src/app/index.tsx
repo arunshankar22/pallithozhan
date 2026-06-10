@@ -12,6 +12,7 @@ import {
   Alert
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/services/auth';
 import { mockDb } from '@/services/mockBackend';
 import { isDemoMode } from '@/services/firebase';
@@ -125,6 +126,7 @@ export default function HomeScreen() {
   const scheme = useColorScheme();
   const theme = scheme === 'dark' ? 'dark' : 'light';
   const colors = Colors[theme];
+  const insets = useSafeAreaInsets();
 
   // Layout Tab State
   const [activeTab, setActiveTab] = useState<'newsfeed' | 'attendance' | 'homework' | 'messages' | 'calendar' | 'reports' | 'management' | 'profile' | 'schools' | 'full-newsfeed' | 'students'>('newsfeed');
@@ -1422,7 +1424,7 @@ export default function HomeScreen() {
   };
 
   const renderContent = () => {
-    const props = { user, colors, t, showToast, i18n, activeStudentId };
+    const props = { user, colors, t, showToast, i18n, activeStudentId, insets };
     switch (activeTab) {
       case 'newsfeed':
         return renderHomeDashboard();
@@ -1439,13 +1441,13 @@ export default function HomeScreen() {
       case 'homework':
         return <HomeworkTab {...props} />;
       case 'messages':
-        return <MessagesTab user={user} colors={colors} t={t} showToast={showToast} i18n={i18n} />;
+        return <MessagesTab {...props} />;
       case 'calendar':
         return <CalendarTab {...props} />;
       case 'reports':
-        return <ReportsTab user={user} colors={colors} t={t} showToast={showToast} i18n={i18n} />;
+        return <ReportsTab {...props} />;
       case 'management':
-        return <ManagementTab user={user} colors={colors} t={t} showToast={showToast} i18n={i18n} />;
+        return <ManagementTab {...props} />;
       case 'schools':
         return renderSchoolsTab();
       case 'students':
@@ -1459,7 +1461,7 @@ export default function HomeScreen() {
           />
         );
       case 'profile':
-        return <ProfileTab user={user} colors={colors} t={t} showToast={showToast} i18n={i18n} logout={logout} />;
+        return <ProfileTab {...props} logout={logout} />;
       default:
         return renderHomeDashboard();
     }
@@ -1731,14 +1733,35 @@ export default function HomeScreen() {
             </ThemedText>
           </Pressable>
         )}
-        <ScrollView contentContainerStyle={isLargeScreen ? styles.scrollContent : styles.mobileScrollContent}>
-          {renderContent()}
-        </ScrollView>
+        {['attendance', 'management', 'messages'].includes(activeTab) ? (
+          <View style={{ flex: 1 }}>
+            {renderContent()}
+          </View>
+        ) : (
+          <ScrollView 
+            style={{ flex: 1 }}
+            contentContainerStyle={isLargeScreen ? styles.scrollContent : [
+              styles.mobileScrollContent, 
+              { paddingBottom: 80 + (insets.bottom || 0) + 20 }
+            ]}
+          >
+            {renderContent()}
+          </ScrollView>
+        )}
       </View>
 
       {/* MOBILE BOTTOM NAVIGATION TAB BAR */}
       {!isLargeScreen ? (
-        <View style={[styles.mobileTabBar, getGlassStyle(colors.cardBg, 0.75, 20), { borderTopWidth: 1, borderColor: colors.border }]}>
+        <View style={[
+          styles.mobileTabBar, 
+          getGlassStyle(colors.cardBg, 0.75, 20), 
+          { 
+            borderTopWidth: 1, 
+            borderColor: colors.border,
+            height: 80 + Math.max(0, (insets.bottom || 0) - 10),
+            paddingBottom: Spacing.two + (insets.bottom || 0)
+          }
+        ]}>
           {mainNavItems.map((item: any) => {
             const isActive = (item.key === 'newsfeed' && isHomeActive) || (activeTab === item.key);
             const Icon = item.icon;

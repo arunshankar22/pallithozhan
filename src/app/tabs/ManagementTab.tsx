@@ -20,7 +20,7 @@ import { UserModal } from '@/components/UserModal';
 import { UserBulkBar } from '@/components/UserBulkBar';
 import * as XLSX from 'xlsx';
 
-export function ManagementTab({ user, colors, t, showToast, i18n }: TabProps) {
+export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabProps) {
   const { width: windowWidth } = Dimensions.get('window');
   const isLargeScreen = windowWidth >= 768;
   const [subTab, setSubTab] = useState<'users' | 'classes' | 'calendar' | 'import_export'>('users');
@@ -815,7 +815,7 @@ export function ManagementTab({ user, colors, t, showToast, i18n }: TabProps) {
 
 
   return (
-    <View style={styles.tabContentWrapper}>
+    <View style={[styles.tabContentWrapper, { flex: 1, padding: isLargeScreen ? Spacing.four : Spacing.three }]}>
       <ThemedText style={styles.sectionTitle}>Portal Management / நிர்வாகக் குழு</ThemedText>
       <ThemedText style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>
         Manage registered roles, assign classes, and orchestrate parent-student linkages
@@ -976,7 +976,7 @@ export function ManagementTab({ user, colors, t, showToast, i18n }: TabProps) {
               No users found matching current filters.
             </ThemedText>
           ) : userViewMode === 'card' ? (
-            <ScrollView style={{ flex: 1 }}>
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: isLargeScreen ? Spacing.four : 80 + (insets?.bottom || 0) + 20 }}>
               <View style={{ gap: Spacing.two }}>
                 {filteredUsers.map((u) => {
                   const isChecked = !!selectedUserUids[u.uid];
@@ -1041,7 +1041,7 @@ export function ManagementTab({ user, colors, t, showToast, i18n }: TabProps) {
             </ScrollView>
           ) : (
             <View style={{ flex: 1, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.cardBg, overflow: 'hidden' }}>
-              <ScrollView style={{ flex: 1 }}>
+              <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: isLargeScreen ? Spacing.four : 80 + (insets?.bottom || 0) + 20 }}>
                 <ScrollView horizontal showsHorizontalScrollIndicator={true}>
                   <View style={{ flexDirection: 'column' }}>
                     {/* Header Row */}
@@ -1422,7 +1422,7 @@ export function ManagementTab({ user, colors, t, showToast, i18n }: TabProps) {
             </Pressable>
           </View>
 
-          <ScrollView style={{ flex: 1 }}>
+          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: isLargeScreen ? Spacing.four : 80 + (insets?.bottom || 0) + 20 }}>
             <View style={{ gap: Spacing.two }}>
               {classes.map((c) => {
                 const teacherNames = c.teacherIds && c.teacherIds.length > 0
@@ -1431,7 +1431,7 @@ export function ManagementTab({ user, colors, t, showToast, i18n }: TabProps) {
                 return (
                   <View key={c.classId} style={[{ padding: 16, borderRadius: 12, borderWidth: 1, backgroundColor: colors.cardBg, borderColor: colors.border }]}>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                      <View>
+                      <View style={{ flex: 1, marginRight: 12 }}>
                         <ThemedText style={{ fontSize: 16, fontWeight: '700', color: colors.primary }}>{c.className}</ThemedText>
                         <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>
                           👨‍🏫 Teachers: <ThemedText style={{ fontWeight: '700', color: colors.text }}>{teacherNames}</ThemedText>
@@ -1592,7 +1592,7 @@ export function ManagementTab({ user, colors, t, showToast, i18n }: TabProps) {
               {schoolDates.length === 0 ? (
                 <ThemedText style={{ fontStyle: 'italic', color: colors.textSecondary }}>No dates generated yet.</ThemedText>
               ) : (
-                <ScrollView style={{ flex: 1 }}>
+                <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: isLargeScreen ? Spacing.four : 80 + (insets?.bottom || 0) + 20 }}>
                   <View style={{ gap: 8 }}>
                     {schoolDates.map((sd) => {
                       return (
@@ -1644,7 +1644,7 @@ export function ManagementTab({ user, colors, t, showToast, i18n }: TabProps) {
         </View>
       ) : (
         /* IMPORT_EXPORT SUB-TAB */
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ gap: Spacing.three, paddingBottom: 30 }}>
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ gap: Spacing.three, paddingBottom: isLargeScreen ? Spacing.three : 80 + (insets?.bottom || 0) + 20 }}>
           <View style={{ flexDirection: 'row', gap: Spacing.two, borderBottomWidth: 1, borderColor: colors.border, paddingBottom: 10 }}>
             <ThemedText style={{ fontSize: 16, fontWeight: '800', color: colors.primary }}>📤 Spreadsheet Bulk Utilities / விரிதாள் தரவு மேலாண்மை</ThemedText>
           </View>

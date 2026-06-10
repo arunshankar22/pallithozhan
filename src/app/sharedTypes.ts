@@ -9,6 +9,7 @@ export interface TabProps {
   i18n: any;
   logout?: () => void;
   activeStudentId?: string;
+  insets?: any;
 }
 
 export interface DriveItem {

@@ -4,7 +4,8 @@ import {
   ScrollView,
   Pressable,
   ActivityIndicator,
-  Platform
+  Platform,
+  Dimensions
 } from 'react-native';
 import { AlertTriangle, CheckCircle, Clock } from 'lucide-react-native';
 import { ThemedText } from '@/components/themed-text';
@@ -17,7 +18,9 @@ import { Spacing } from '@/constants/theme';
 import * as XLSX from 'xlsx';
 import { isDemoMode } from '@/services/firebase';
 
-export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentId }: TabProps) {
+export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentId, insets }: TabProps) {
+  const { width: windowWidth } = Dimensions.get('window');
+  const isLargeScreen = windowWidth >= 768;
   const [classes, setClasses] = useState<any[]>([]);
   const [selectedClassId, setSelectedClassId] = useState('');
   const [studentList, setStudentList] = useState<any[]>([]);
@@ -553,13 +556,18 @@ export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentI
   // Parent Dashboard View for Attendance
   if (user?.role === 'parent') {
     return (
-      <View style={styles.tabContentWrapper}>
+      <View style={[styles.tabContentWrapper, { flex: 1 }]}>
         <ThemedText style={styles.sectionTitle}>{t('attendance.title')}</ThemedText>
         <ThemedText style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>
           Attendance logs and real-time alerts
         </ThemedText>
 
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: Spacing.four }}>
+        <ScrollView 
+          style={{ flex: 1 }} 
+          contentContainerStyle={{ 
+            paddingBottom: isLargeScreen ? Spacing.four : 80 + (insets?.bottom || 0) + 20 
+          }}
+        >
           <View style={{ gap: Spacing.three }}>
             {/* Alert Notification Bell section for Push Alerts */}
             <View style={[styles.alertsSection, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
@@ -680,7 +688,15 @@ export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentI
   }
 
   return (
-    <View style={styles.tabContentWrapper}>
+    <View style={{ flex: 1 }}>
+      <ScrollView 
+        style={{ flex: 1 }}
+        contentContainerStyle={{ 
+          padding: isLargeScreen ? Spacing.four : Spacing.three,
+          paddingBottom: isLargeScreen ? Spacing.four : 80 + (insets?.bottom || 0) + 20 
+        }}
+      >
+        <View style={styles.tabContentWrapper}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: Spacing.two }}>
         <View>
           <ThemedText style={styles.sectionTitle}>{t('attendance.title')}</ThemedText>
@@ -1035,7 +1051,9 @@ export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentI
           </View>
         )}
 
-      </View>
+        </View>
+        </View>
+      </ScrollView>
       {renderExportModal()}
     </View>
   );
