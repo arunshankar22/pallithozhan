@@ -640,7 +640,7 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
               <ThemedText style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>Active Center: {activeBranchName.toUpperCase()}</ThemedText>
             </View>
 
-            <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.modalScroll} keyboardShouldPersistTaps="handled">
+            <ScrollView style={{ flexShrink: 1 }} contentContainerStyle={styles.modalScroll} keyboardShouldPersistTaps="handled">
               {authMode === 'login' ? (
                 <LoginScreen 
                   onNavigateToRegister={() => setAuthMode('register')} 
