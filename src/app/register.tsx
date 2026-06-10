@@ -91,7 +91,7 @@ export default function RegisterScreen({ onNavigateToLogin }: RegisterScreenProp
       ]}>
         <Image 
           source={require('../../assets/images/balarmalar_logo.png')} 
-          style={{ width: 220, height: 60, resizeMode: 'contain', alignSelf: 'center', marginBottom: Spacing.two }} 
+          style={{ width: 180, height: 50, resizeMode: 'contain', alignSelf: 'center', marginBottom: Spacing.two }} 
         />
 
         <View style={{ backgroundColor: colors.primaryLight, padding: 8, borderRadius: 12, marginBottom: Spacing.three, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>

@@ -12,6 +12,7 @@ import {
   Alert,
   Linking
 } from 'react-native';
+import { openBrowserAsync } from 'expo-web-browser';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/services/auth';
@@ -128,6 +129,27 @@ export default function HomeScreen() {
   const theme = scheme === 'dark' ? 'dark' : 'light';
   const colors = Colors[theme];
   const insets = useSafeAreaInsets();
+  const topOffset = Platform.OS === 'android' ? (insets.top || 0) : 0;
+
+  const handlePlayVideo = async (url: string) => {
+    if (!url) return;
+    if (url.startsWith('data:')) {
+      Alert.alert(
+        'Offline Media',
+        'Offline/locally created videos require cloud syncing/internet connectivity to stream on mobile devices.'
+      );
+      return;
+    }
+    try {
+      await openBrowserAsync(url);
+    } catch (error) {
+      console.warn('WebBrowser failed, trying Linking fallback:', error);
+      Linking.openURL(url).catch((err) => {
+        console.error('Failed to open URL:', err);
+        Alert.alert('Error', 'Unable to play this video link.');
+      });
+    }
+  };
 
   // Layout Tab State
   const [activeTab, setActiveTab] = useState<'newsfeed' | 'attendance' | 'homework' | 'messages' | 'calendar' | 'reports' | 'management' | 'profile' | 'schools' | 'full-newsfeed' | 'students'>('newsfeed');
@@ -1651,7 +1673,7 @@ export default function HomeScreen() {
 
       {/* MOBILE CONTAINER */}
       {!isLargeScreen ? (
-        <View style={[styles.mobileWrapperHeader, { height: 64 + (insets.top || 0) }]}>
+        <View style={[styles.mobileWrapperHeader, { height: 64 + topOffset }]}>
           {/* Mobile Header */}
           <View style={[
             styles.mobileHeader, 
@@ -1659,8 +1681,8 @@ export default function HomeScreen() {
             { 
               borderBottomWidth: 1, 
               borderColor: colors.border,
-              height: 64 + (insets.top || 0),
-              paddingTop: Spacing.three + (insets.top || 0)
+              height: 64 + topOffset,
+              paddingTop: Spacing.three + topOffset
             }
           ]}>
             <BalarMalarBranchLogo size={24} />
@@ -1692,7 +1714,7 @@ export default function HomeScreen() {
       ) : null}
 
       {/* MAIN CONTAINER CONTENT VIEW */}
-      <View style={[styles.contentPane, !isLargeScreen && { paddingTop: 64 + (insets.top || 0) }]}>
+      <View style={[styles.contentPane, !isLargeScreen && { paddingTop: 64 + topOffset }]}>
         {user?.role === 'parent' && studentProfiles.length > 1 && (
           <View style={[styles.childSwitcherContainer, getGlassStyle(colors.cardBg, 0.75, 10), { borderColor: colors.border }]}>
             <ThemedText style={styles.switcherLabel}>👦 Select Child / குழந்தையைத் தேர்ந்தெடுக்கவும்:</ThemedText>
@@ -2100,7 +2122,7 @@ export default function HomeScreen() {
                               />
                             ) : (
                               <Pressable 
-                                onPress={() => Linking.openURL(media.url)}
+                                onPress={() => handlePlayVideo(media.url)}
                                 style={({ pressed }) => [
                                   { padding: 24, alignItems: 'center', opacity: pressed ? 0.7 : 1 }
                                 ]}

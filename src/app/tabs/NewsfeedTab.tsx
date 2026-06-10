@@ -12,6 +12,7 @@ import {
   Alert,
   Linking
 } from 'react-native';
+import { openBrowserAsync } from 'expo-web-browser';
 import {
   Newspaper,
   ThumbsUp,
@@ -84,6 +85,27 @@ export function NewsfeedTab({
   clearDashboardEditPost?: () => void;
 }) {
   const [posts, setPosts] = useState<any[]>([]);
+
+  const handlePlayVideo = async (url: string) => {
+    if (!url) return;
+    if (url.startsWith('data:')) {
+      Alert.alert(
+        'Offline Media',
+        'Offline/locally created videos require cloud syncing/internet connectivity to stream on mobile devices.'
+      );
+      return;
+    }
+    try {
+      await openBrowserAsync(url);
+    } catch (error) {
+      console.warn('WebBrowser failed, trying Linking fallback:', error);
+      Linking.openURL(url).catch((err) => {
+        console.error('Failed to open URL:', err);
+        Alert.alert('Error', 'Unable to play this video link.');
+      });
+    }
+  };
+
   const [commentTextMap, setCommentTextMap] = useState<Record<string, string>>({});
   const [editingCommentIdMap, setEditingCommentIdMap] = useState<Record<string, string>>({});
   const [editingCommentTextMap, setEditingCommentTextMap] = useState<Record<string, string>>({});
@@ -992,7 +1014,7 @@ export function NewsfeedTab({
                                       />
                                     ) : (
                                       <Pressable 
-                                        onPress={() => Linking.openURL(fileUrl)}
+                                        onPress={() => handlePlayVideo(fileUrl)}
                                         style={({ pressed }) => [
                                           styles.simulatedImage,
                                           { backgroundColor: '#000', flex: 1, padding: 24, justifyContent: 'center', alignItems: 'center', opacity: pressed ? 0.8 : 1 }
@@ -1071,7 +1093,7 @@ export function NewsfeedTab({
                               />
                             ) : (
                               <Pressable 
-                                onPress={() => Linking.openURL(post.mediaUrl)}
+                                onPress={() => handlePlayVideo(post.mediaUrl)}
                                 style={({ pressed }) => [
                                   styles.simulatedImage,
                                   { backgroundColor: '#000', flex: 1, padding: 24, justifyContent: 'center', alignItems: 'center', opacity: pressed ? 0.8 : 1 }

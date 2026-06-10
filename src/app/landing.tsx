@@ -38,6 +38,7 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
   const theme = scheme === 'dark' ? 'dark' : 'light';
   const colors = Colors[theme];
   const insets = useSafeAreaInsets();
+  const topOffset = Platform.OS === 'android' ? (insets.top || 0) : 0;
 
   const [activeBranch, setActiveBranch] = useState(
     typeof window !== 'undefined' && typeof window.localStorage !== 'undefined' ? window.localStorage.getItem('pallithozhan_active_branch') || 'parramatta' : 'parramatta'
@@ -170,8 +171,8 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
               WebkitBackdropFilter: 'blur(20px)',
             },
             default: {
-              height: 60 + (insets.top || 0),
-              paddingTop: insets.top,
+              height: 60 + topOffset,
+              paddingTop: topOffset,
             }
           })
         }
@@ -639,7 +640,7 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
               <ThemedText style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>Active Center: {activeBranchName.toUpperCase()}</ThemedText>
             </View>
 
-            <ScrollView contentContainerStyle={styles.modalScroll} keyboardShouldPersistTaps="handled">
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.modalScroll} keyboardShouldPersistTaps="handled">
               {authMode === 'login' ? (
                 <LoginScreen 
                   onNavigateToRegister={() => setAuthMode('register')} 

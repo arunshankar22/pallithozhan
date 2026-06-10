@@ -92,10 +92,14 @@ export default function LoginScreen({ onNavigateToRegister }: LoginScreenProps) 
       <View style={styles.brandWrapper}>
         <Image 
           source={require('../../assets/images/balarmalar_logo.png')} 
-          style={{ width: 220, height: 60, resizeMode: 'contain', marginBottom: Spacing.two }} 
+          style={{ width: 180, height: 50, resizeMode: 'contain', marginBottom: Spacing.two }} 
         />
         <ThemedText style={styles.titleText}>{t('appName')}</ThemedText>
-        <ThemedText style={[styles.subtitleText, { color: colors.textSecondary, marginBottom: 8 }]}>{t('tagline')}</ThemedText>
+        {Platform.OS === 'web' && (
+          <ThemedText style={[styles.subtitleText, { color: colors.textSecondary, marginBottom: 8 }]}>
+            {t('tagline')}
+          </ThemedText>
+        )}
         
 
       </View>
@@ -294,7 +298,7 @@ const styles = StyleSheet.create({
   },
   brandWrapper: {
     alignItems: 'center',
-    marginBottom: Spacing.four,
+    marginBottom: Spacing.two,
   },
   logoContainer: {
     width: 80,
@@ -310,7 +314,7 @@ const styles = StyleSheet.create({
     }),
   },
   titleText: {
-    fontSize: 32,
+    fontSize: 24,
     fontWeight: '800',
     textAlign: 'center',
   },
