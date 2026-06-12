@@ -113,7 +113,7 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
   const curriculumStages = [
     {
       stage: i18n.language === 'ta' ? 'தொடக்க நிலை' : 'Foundation Stage',
-      title: i18n.language === 'ta' ? 'அரும்பு, மொட்டு, மலர் (KG & Yr 1)' : 'அரும்பு, மொட்டு, மலர் (KG & Yr 1)',
+      title: i18n.language === 'ta' ? 'அரும்பு, மொட்டு, மலர் (KG & Yr 1)' : 'Arumbu, Mottu, Malar (KG & Yr 1)',
       desc: i18n.language === 'ta' 
         ? 'கதைகள், பாடல்கள் மூலம் தமிழ் எழுத்துக்கள் மற்றும் எளிய உரையாடல்களை விளையாட்டு முறையில் கற்றல்.' 
         : 'Introduction to basic letters, sounds and conversational Tamil through stories and songs.',
@@ -122,7 +122,7 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
     },
     {
       stage: i18n.language === 'ta' ? 'வகுப்பு நிலை 1-2' : 'Primary Stage',
-      title: i18n.language === 'ta' ? 'நிலை 1 - 2 (Years 1 - 4)' : 'நிலை 1 - 2 (Years 1 - 4)',
+      title: i18n.language === 'ta' ? 'நிலை 1 - 2 (Years 1 - 4)' : 'Level 1 - 2 (Years 1 - 4)',
       desc: i18n.language === 'ta' 
         ? 'வாசிப்புத் திறன், அடிப்படை எழுத்துத் திறன் மற்றும் எளிய வாக்கியங்களை அமைத்தல் ஆகியவற்றைப் பயிற்சி செய்தல்.' 
         : 'Building reading fluency and foundational writing skills with interactive exercises.',
@@ -133,7 +133,7 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
     },
     {
       stage: i18n.language === 'ta' ? 'வகுப்பு நிலை 3-4' : 'Intermediate Stage',
-      title: i18n.language === 'ta' ? 'நிலை 3 - 4 (Years 5 - 8)' : 'நிலை 3 - 4 (Years 5 - 8)',
+      title: i18n.language === 'ta' ? 'நிலை 3 - 4 (Years 5 - 8)' : 'Level 3 - 4 (Years 5 - 8)',
       desc: i18n.language === 'ta' 
         ? 'இலக்கிய நூல்கள் வாயிலாக தமிழ்ச் சொற்களஞ்சியத்தை வளர்த்தல் மற்றும் கூட்டு வாக்கியங்களை அமைத்தல்.' 
         : 'Deepening vocabulary and complex sentence structures through literary texts.',
@@ -144,7 +144,7 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
     },
     {
       stage: i18n.language === 'ta' ? 'மேல்நிலை வகுப்புகள்' : 'Advanced Stage',
-      title: i18n.language === 'ta' ? 'நிலை 5 - 6 (HS & Prep)' : 'நிலை 5 - 6 (HS & Prep)',
+      title: i18n.language === 'ta' ? 'நிலை 5 - 6 (HS & Prep)' : 'Level 5 - 6 (HS & Prep)',
       desc: i18n.language === 'ta' 
         ? 'தமிழ் இலக்கிய ஆய்வு, கவிதை நயம் மற்றும் நியூ சவுத் வேல்ஸ் HSC பொதுத் தேர்வுகளுக்கான சிறப்புப் பயிற்சி.' 
         : 'Advanced Tamil literature analysis, poetry, and exam preparation for the NSW HSC Tamil examination.',
