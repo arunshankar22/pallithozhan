@@ -28,6 +28,7 @@ export interface UserProfile {
   associatedStudents?: string[];
   requirePasswordChange?: boolean;
   profilePicture?: string;
+  parentVolunteer?: boolean;
 }
 
 interface AuthContextType {

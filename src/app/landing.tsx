@@ -25,6 +25,7 @@ import {
 } from 'lucide-react-native';
 import LoginScreen from './login';
 import RegisterScreen from './register';
+import WaitlistScreen from './waitlist';
 
 const { width: windowWidth } = Dimensions.get('window');
 
@@ -44,7 +45,7 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
     typeof window !== 'undefined' && typeof window.localStorage !== 'undefined' ? window.localStorage.getItem('pallithozhan_active_branch') || 'parramatta' : 'parramatta'
   );
   const [portalVisible, setPortalVisible] = useState(false);
-  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const [authMode, setAuthMode] = useState<'login' | 'register' | 'waitlist'>('login');
   const [isLargeScreen, setIsLargeScreen] = useState(windowWidth >= 768);
 
   React.useEffect(() => {
@@ -181,8 +182,14 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
           {isLargeScreen && (
             <>
               <Image 
-                source={require('../../assets/images/balarmalar_logo.png')} 
-                style={{ width: 80, height: 24, resizeMode: 'contain' }} 
+                source={scheme === 'dark' 
+                  ? require('../../assets/images/balarmalar_logo_dark.png') 
+                  : require('../../assets/images/balarmalar_logo.png')} 
+                style={{ 
+                  width: 100, 
+                  height: 28, 
+                  resizeMode: 'contain',
+                }} 
               />
               {/* Vertical Separator */}
               <View style={{ width: 1, height: 16, backgroundColor: colors.border, marginHorizontal: 2 }} />
@@ -271,13 +278,14 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
               </Pressable>
 
               <Pressable 
+                onPress={() => { setAuthMode('waitlist'); setPortalVisible(true); }}
                 style={({ pressed }) => [
                   styles.heroBtnSecondary,
                   { opacity: pressed ? 0.8 : 1 }
                 ]}
               >
                 <ThemedText style={[styles.heroBtnText, { color: '#FFF' }]}>
-                  {i18n.language === 'ta' ? 'மேலும் அறிய' : 'Learn More'}
+                  {i18n.language === 'ta' ? 'காத்திருப்புப் பட்டியல்' : 'Join Waitlist'}
                 </ThemedText>
               </Pressable>
             </View>
@@ -644,10 +652,18 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
               {authMode === 'login' ? (
                 <LoginScreen 
                   onNavigateToRegister={() => setAuthMode('register')} 
+                  onNavigateToWaitlist={() => setAuthMode('waitlist')}
                 />
-              ) : (
+              ) : authMode === 'register' ? (
                 <RegisterScreen 
                   onNavigateToLogin={() => setAuthMode('login')} 
+                  onNavigateToWaitlist={() => setAuthMode('waitlist')}
+                />
+              ) : (
+                <WaitlistScreen
+                  onSuccess={() => setPortalVisible(false)}
+                  onNavigateToLogin={() => setAuthMode('login')}
+                  onCancel={() => setPortalVisible(false)}
                 />
               )}
             </ScrollView>

@@ -9,9 +9,10 @@ import { User, Mail, Lock, Phone, Languages, UserCircle2, ArrowRight } from 'luc
 
 interface RegisterScreenProps {
   onNavigateToLogin: () => void;
+  onNavigateToWaitlist?: () => void;
 }
 
-export default function RegisterScreen({ onNavigateToLogin }: RegisterScreenProps) {
+export default function RegisterScreen({ onNavigateToLogin, onNavigateToWaitlist }: RegisterScreenProps) {
   const { t, i18n } = useTranslation();
   const { register, updateLanguage } = useAuth();
   const scheme = useColorScheme();
@@ -90,8 +91,16 @@ export default function RegisterScreen({ onNavigateToLogin }: RegisterScreenProp
         }
       ]}>
         <Image 
-          source={require('../../assets/images/balarmalar_logo.png')} 
-          style={{ width: 180, height: 50, resizeMode: 'contain', alignSelf: 'center', marginBottom: Spacing.two }} 
+          source={scheme === 'dark' 
+            ? require('../../assets/images/balarmalar_logo_dark.png') 
+            : require('../../assets/images/balarmalar_logo.png')} 
+          style={{ 
+            width: 180, 
+            height: 50, 
+            resizeMode: 'contain', 
+            alignSelf: 'center', 
+            marginBottom: Spacing.two
+          }} 
         />
 
         <View style={{ backgroundColor: colors.primaryLight, padding: 8, borderRadius: 12, marginBottom: Spacing.three, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
@@ -306,6 +315,20 @@ export default function RegisterScreen({ onNavigateToLogin }: RegisterScreenProp
             </ThemedText>
           </Pressable>
         </View>
+
+        {/* Waitlist Redirect */}
+        {onNavigateToWaitlist && (
+          <View style={[styles.loginPromptRow, { marginTop: 10 }]}>
+            <ThemedText style={[styles.loginPromptText, { color: colors.textSecondary }]}>
+              {i18n.language === 'ta' ? 'புதிய மாணவர் சேர்க்கை வேண்டுமா?' : 'Seeking enrollment?'}
+            </ThemedText>
+            <Pressable onPress={onNavigateToWaitlist}>
+              <ThemedText style={[styles.loginLink, { color: colors.secondary }]}>
+                {i18n.language === 'ta' ? 'காத்திருப்புப் பட்டியல்' : 'Join Waitlist'}
+              </ThemedText>
+            </Pressable>
+          </View>
+        )}
       </View>
     </View>
   );

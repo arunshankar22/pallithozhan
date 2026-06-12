@@ -21,7 +21,7 @@
   },
   "nav": {
     "home": "Home",
-    "newsfeed": "Newsfeed",
+    "newsfeed": "Home",
     "attendance": "Attendance",
     "homework": "Homework",
     "messages": "Messages",
@@ -55,7 +55,7 @@
     "approvalPending": "Absence alerts pending admin approval"
   },
   "newsfeed": {
-    "title": "School News",
+    "title": "Home",
     "postNew": "Post Announcement",
     "whatIsNew": "What's happening in school?",
     "postButton": "Post",

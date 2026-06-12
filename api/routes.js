@@ -544,6 +544,64 @@ async function handleApiRoutes(req, res, pathname, method, dbData, writeDb, urlO
     return true;
   }
 
+  // GET /api/waitlist
+  if (pathname === '/api/waitlist' && method === 'GET') {
+    const list = dbData.waitlist || [];
+    const sorted = [...list].sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
+    sendJson(res, 200, sorted);
+    return true;
+  }
+
+  // POST /api/waitlist/reset
+  if (pathname === '/api/waitlist/reset' && method === 'POST') {
+    const { DEFAULT_WAITLIST } = require('./db');
+    dbData.waitlist = JSON.parse(JSON.stringify(DEFAULT_WAITLIST));
+    writeDb(dbData);
+    sendJson(res, 200, { message: 'Waitlist reset successfully' });
+    return true;
+  }
+
+  // POST /api/waitlist
+  if (pathname === '/api/waitlist' && method === 'POST') {
+    const body = await parseBody(req);
+    const newRecord = {
+      ...body,
+      uid: body.uid || `waitlist_${Date.now()}`,
+      createdAt: body.createdAt || new Date().toISOString()
+    };
+    if (!dbData.waitlist) dbData.waitlist = [];
+    dbData.waitlist.push(newRecord);
+    writeDb(dbData);
+    sendJson(res, 201, newRecord);
+    return true;
+  }
+
+  // PUT /api/waitlist/:uid
+  if (pathname.startsWith('/api/waitlist/') && method === 'PUT') {
+    const uid = pathname.split('/').pop();
+    const body = await parseBody(req);
+    if (!dbData.waitlist) dbData.waitlist = [];
+    const idx = dbData.waitlist.findIndex(w => w.uid === uid);
+    if (idx > -1) {
+      dbData.waitlist[idx] = { ...dbData.waitlist[idx], ...body };
+      writeDb(dbData);
+      sendJson(res, 200, dbData.waitlist[idx]);
+    } else {
+      sendJson(res, 404, { error: 'Waitlist record not found' });
+    }
+    return true;
+  }
+
+  // DELETE /api/waitlist/:uid
+  if (pathname.startsWith('/api/waitlist/') && method === 'DELETE') {
+    const uid = pathname.split('/').pop();
+    if (!dbData.waitlist) dbData.waitlist = [];
+    dbData.waitlist = dbData.waitlist.filter(w => w.uid !== uid);
+    writeDb(dbData);
+    sendJson(res, 200, { message: 'Waitlist record deleted successfully' });
+    return true;
+  }
+
   return false;
 }
 

@@ -32,7 +32,7 @@ const DICTIONARY: Record<string, string> = {
   "competitions": "போட்டிகள்",
   "announcement": "அறிவிப்பு",
   "announcements": "அறிவிப்புகள்",
-  "newsfeed": "செய்தி ஓடை",
+  "newsfeed": "முகப்பு",
   
   // Verbs & Common Instructions
   "write": "எழுதுக",

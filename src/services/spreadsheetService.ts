@@ -105,7 +105,7 @@ export const spreadsheetService = {
   /**
    * Parses raw copy-pasted or file text string (CSV/TSV)
    */
-  parseSheetText: (text: string, role: 'student' | 'teacher' | 'volunteer'): { records: any[]; error: string } => {
+  parseSheetText: (text: string, role: 'student' | 'teacher' | 'volunteer' | 'waitlist'): { records: any[]; error: string } => {
     const lines = spreadsheetService.splitLines(text);
     if (lines.length === 0) {
       return { records: [], error: 'Sheet is empty or contains no active rows.' };
@@ -117,7 +117,7 @@ export const spreadsheetService = {
     
     // Auto-detect header row presence
     const hasHeader = firstRowCells.some(cell => 
-      ['given_name', 'name', 'email', 'student_email', 'wwc', 'dob', 'id', 'role'].includes(cell)
+      ['given_name', 'name', 'email', 'student_email', 'wwc', 'dob', 'id', 'role', 'school_code', 'request_date', 'request'].includes(cell)
     );
 
     const records: any[] = [];
@@ -130,6 +130,12 @@ export const spreadsheetService = {
         const required = ['given_name', 'family_name', 'student_email'];
         const missing = required.filter(r => !headers.includes(r));
         if (missing.length > 0 && !headers.includes('email')) {
+          return { records: [], error: `Missing required columns: ${missing.join(', ')}` };
+        }
+      } else if (role === 'waitlist') {
+        const required = ['given_name', 'parent1_name'];
+        const missing = required.filter(r => !headers.includes(r));
+        if (missing.length > 0 && !headers.includes('name')) {
           return { records: [], error: `Missing required columns: ${missing.join(', ')}` };
         }
       } else {
@@ -189,6 +195,46 @@ export const spreadsheetService = {
               volunteer: (rowObj.parent2_volunteer || '').toLowerCase() === 'yes',
             } : null,
           } as StudentParsedRecord);
+        } else if (role === 'waitlist') {
+          const givenName = rowObj.given_name || rowObj.name || '';
+          const familyName = rowObj.family_name || '';
+          const studentEmail = rowObj.student_email || '';
+          
+          if (!givenName && !familyName) continue;
+
+          records.push({
+            uid: rowObj.student_id || rowObj.uid || `waitlist_${Date.now()}_${i}`,
+            school_code: rowObj.school_code || 'BMPM',
+            year: rowObj.year || '2026',
+            student_id: rowObj.student_id || '',
+            student_email: studentEmail.toLowerCase(),
+            given_name: givenName,
+            middle_name: rowObj.middle_name || '',
+            family_name: familyName,
+            full_name_tamil: rowObj.full_name_tamil || '',
+            gender: rowObj.gender || '',
+            DATE_OF_BIRTH: rowObj.date_of_birth || rowObj.dob || rowObj['date of birth'] || '',
+            prev_bm_school_class: rowObj.prev_bm_school_class || '',
+            student_created: rowObj.student_created || new Date().toISOString().replace('T', ' ').substring(0, 19),
+            mainstream_school_name: rowObj.mainstream_school_name || '',
+            mainstream_school_class: rowObj.mainstream_school_class || '',
+            class_name: rowObj.class_name || '',
+            parent1_name: rowObj.parent1_name || '',
+            parent1_email: (rowObj.parent1_email || '').toLowerCase(),
+            parent1_mobile: rowObj.parent1_mobile || '',
+            parent1_volunteer: rowObj.parent1_volunteer || 'NO',
+            parent2_name: rowObj.parent2_name || '',
+            parent2_email: (rowObj.parent2_email || '').toLowerCase(),
+            parent2_mobile: rowObj.parent2_mobile || '',
+            parent2_volunteer: rowObj.parent2_volunteer || 'NO',
+            Purpose: rowObj.purpose || 'New Enrollment',
+            Request: rowObj.request || 'Online Form',
+            RequestDate: rowObj['request date'] || rowObj.request_date || new Date().toLocaleDateString('en-GB'),
+            OK_TO_ISSUE_BOOKS: rowObj.ok_to_issue_books || 'NO',
+            STATIONARY_ISSUED: rowObj.stationary_issued || 'NO',
+            BOOKS_ISSUED: rowObj.books_issued || 'NO',
+            createdAt: rowObj.created_at || new Date().toISOString()
+          });
         } else {
           const name = rowObj.name || '';
           const email = rowObj.email || '';
@@ -228,9 +274,9 @@ export const spreadsheetService = {
         let wwcExpiryDate = '';
         let effectiveFrom = '';
         let effectiveTo = '';
-        let parsedRole: 'teacher' | 'volunteer' | 'student' = role;
+        let parsedRole: 'teacher' | 'volunteer' | 'student' | 'waitlist' = role;
 
-        // Inline parent variables for student
+        // Inline parent variables for student/waitlist
         let p1Name = '';
         let p1Email = '';
         let p1Phone = '';
@@ -240,7 +286,7 @@ export const spreadsheetService = {
         let p2Phone = '';
         let p2Vol = false;
 
-        // Student inventory defaults
+        // Student/Waitlist inventory defaults
         let okToIssue = 'NO';
         let statIssued = 'NO';
         let bIssued = 'NO';
@@ -266,7 +312,7 @@ export const spreadsheetService = {
               cardLines.forEach((cline) => {
                 if (cline.includes('@')) {
                   email = cline.toLowerCase();
-                } else if (['teacher', 'volunteer', 'student'].includes(cline.toLowerCase())) {
+                } else if (['teacher', 'volunteer', 'student', 'waitlist'].includes(cline.toLowerCase())) {
                   parsedRole = cline.toLowerCase() as any;
                 } else if (/\d{4}-\d{2}-\d{2}/.test(cline) || /\d{4}\/\d{2}\/\d{2}/.test(cline) || (cline.includes('t') && cline.includes('z') || cline.includes(':'))) {
                   effectiveFrom = cline.replace(/t/i, ' ').replace(/\.000.+/i, '');
@@ -298,7 +344,7 @@ export const spreadsheetService = {
             if (!phone) phone = cell;
             else if (!p1Phone) p1Phone = cell;
             else if (!p2Phone) p2Phone = cell;
-          } else if (['teacher', 'volunteer', 'student'].includes(cell.toLowerCase())) {
+          } else if (['teacher', 'volunteer', 'student', 'waitlist'].includes(cell.toLowerCase())) {
             parsedRole = cell.toLowerCase() as any;
           } else {
             // Stage, child tags, names
@@ -338,6 +384,40 @@ export const spreadsheetService = {
             parent1: p1Name ? { fullName: p1Name, email: p1Email || `parent1_${i}@example.com`, phone: p1Phone, volunteer: p1Vol } : null,
             parent2: p2Name ? { fullName: p2Name, email: p2Email || `parent2_${i}@example.com`, phone: p2Phone, volunteer: p2Vol } : null,
           } as StudentParsedRecord);
+        } else if (role === 'waitlist') {
+          records.push({
+            uid: `waitlist_${Date.now()}_${i}`,
+            school_code: 'BMPM',
+            year: '2026',
+            student_id: '',
+            student_email: email,
+            given_name: name,
+            middle_name: '',
+            family_name: '',
+            full_name_tamil: tamilName,
+            gender: gender,
+            DATE_OF_BIRTH: dob,
+            prev_bm_school_class: prevClass,
+            student_created: studCreated || new Date().toISOString().replace('T', ' ').substring(0, 19),
+            mainstream_school_name: mainstreamSch,
+            mainstream_school_class: mainstreamGrade,
+            class_name: stage,
+            parent1_name: p1Name,
+            parent1_email: p1Email,
+            parent1_mobile: p1Phone,
+            parent1_volunteer: p1Vol ? 'YES' : 'NO',
+            parent2_name: p2Name,
+            parent2_email: p2Email,
+            parent2_mobile: p2Phone,
+            parent2_volunteer: p2Vol ? 'YES' : 'NO',
+            Purpose: 'New Enrollment',
+            Request: 'Online Form',
+            RequestDate: new Date().toLocaleDateString('en-GB'),
+            OK_TO_ISSUE_BOOKS: okToIssue,
+            STATIONARY_ISSUED: statIssued,
+            BOOKS_ISSUED: bIssued,
+            createdAt: new Date().toISOString()
+          });
         } else {
           records.push({
             uid,
@@ -364,7 +444,7 @@ export const spreadsheetService = {
   /**
    * Parses binary Excel files (.xlsx, .xls) using SheetJS
    */
-  parseExcelBinary: (arrayBuffer: ArrayBuffer, role: 'student' | 'teacher' | 'volunteer'): { records: any[]; error: string } => {
+  parseExcelBinary: (arrayBuffer: ArrayBuffer, role: 'student' | 'teacher' | 'volunteer' | 'waitlist'): { records: any[]; error: string } => {
     try {
       const data = new Uint8Array(arrayBuffer);
       const workbook = XLSX.read(data, { type: 'array' });
@@ -759,5 +839,64 @@ export const spreadsheetService = {
     }
 
     return { records, error: '' };
+  },
+
+  /**
+   * Formats waitlist records into a tab-delimited Excel/CSV structure
+   */
+  formatWaitlistCSV: (waitlist: any[]): string => {
+    const headers = [
+      'school_code', 'year', 'student_id', 'student_email', 'given_name', 'middle_name', 'family_name', 
+      'full_name_tamil', 'gender', 'DATE_OF_BIRTH', 'prev_bm_school_class', 'student_created', 
+      'mainstream_school_name', 'mainstream_school_class', 'class_name', 
+      'parent1_name', 'parent1_email', 'parent1_mobile', 'parent1_volunteer', 
+      'parent2_name', 'parent2_email', 'parent2_mobile', 'parent2_volunteer', 
+      'Purpose', 'Request', 'Request Date', 'OK_TO_ISSUE_BOOKS', 'STATIONARY_ISSUED', 'BOOKS_ISSUED'
+    ];
+
+    const csvRows = [headers.join('\t')];
+
+    waitlist.forEach(w => {
+      const row = [
+        w.school_code || 'BMPM',
+        w.year || '2026',
+        w.student_id || '',
+        w.student_email || '',
+        w.given_name || '',
+        w.middle_name || '',
+        w.family_name || '',
+        w.full_name_tamil || '',
+        w.gender || '',
+        w.DATE_OF_BIRTH || w.dob || '',
+        w.prev_bm_school_class || '',
+        w.student_created || '',
+        w.mainstream_school_name || '',
+        w.mainstream_school_class || '',
+        w.class_name || '',
+        w.parent1_name || '',
+        w.parent1_email || '',
+        w.parent1_mobile || '',
+        w.parent1_volunteer || 'NO',
+        w.parent2_name || '',
+        w.parent2_email || '',
+        w.parent2_mobile || '',
+        w.parent2_volunteer || 'NO',
+        w.Purpose || '',
+        w.Request || '',
+        w.RequestDate || w.Request_Date || '',
+        w.OK_TO_ISSUE_BOOKS || 'NO',
+        w.STATIONARY_ISSUED || 'NO',
+        w.BOOKS_ISSUED || 'NO'
+      ];
+
+      const cleanedRow = row.map(val => {
+        const str = String(val).replace(/"/g, '""');
+        return str.includes('\t') || str.includes('\n') || str.includes('"') ? `"${str}"` : str;
+      });
+
+      csvRows.push(cleanedRow.join('\t'));
+    });
+
+    return csvRows.join('\r\n');
   }
 };

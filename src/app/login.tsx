@@ -10,9 +10,10 @@ import { Mail, Lock, Languages, BookOpen } from 'lucide-react-native';
 
 interface LoginScreenProps {
   onNavigateToRegister: () => void;
+  onNavigateToWaitlist?: () => void;
 }
 
-export default function LoginScreen({ onNavigateToRegister }: LoginScreenProps) {
+export default function LoginScreen({ onNavigateToRegister, onNavigateToWaitlist }: LoginScreenProps) {
   const { t, i18n } = useTranslation();
   const { login, logout, updateLanguage } = useAuth();
   const scheme = useColorScheme();
@@ -91,8 +92,15 @@ export default function LoginScreen({ onNavigateToRegister }: LoginScreenProps) 
       {/* Brand Section */}
       <View style={styles.brandWrapper}>
         <Image 
-          source={require('../../assets/images/balarmalar_logo.png')} 
-          style={{ width: 180, height: 50, resizeMode: 'contain', marginBottom: Spacing.two }} 
+          source={scheme === 'dark' 
+            ? require('../../assets/images/balarmalar_logo_dark.png') 
+            : require('../../assets/images/balarmalar_logo.png')} 
+          style={{ 
+            width: 180, 
+            height: 50, 
+            resizeMode: 'contain', 
+            marginBottom: Spacing.two
+          }} 
         />
         <ThemedText style={styles.titleText}>{t('appName')}</ThemedText>
         {Platform.OS === 'web' && (
@@ -261,6 +269,20 @@ export default function LoginScreen({ onNavigateToRegister }: LoginScreenProps) 
             </ThemedText>
           </Pressable>
         </View>
+
+        {/* Waitlist Redirect */}
+        {onNavigateToWaitlist && (
+          <View style={[styles.signupPromptRow, { marginTop: 10 }]}>
+            <ThemedText style={[styles.signupPromptText, { color: colors.textSecondary }]}>
+              {i18n.language === 'ta' ? 'புதிய மாணவர் சேர்க்கை வேண்டுமா?' : 'Seeking enrollment?'}
+            </ThemedText>
+            <Pressable onPress={onNavigateToWaitlist}>
+              <ThemedText style={[styles.signupLink, { color: colors.secondary }]}>
+                {i18n.language === 'ta' ? 'காத்திருப்புப் பட்டியல்' : 'Join Waitlist'}
+              </ThemedText>
+            </Pressable>
+          </View>
+        )}
       </View>
 
     </View>

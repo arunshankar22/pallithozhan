@@ -8,6 +8,7 @@ import { homeworkService } from './homeworkService';
 import { messageService } from './messageService';
 import { eventService } from './eventService';
 import { schoolDateService } from './schoolDateService';
+import { waitlistService } from './waitlistService';
 import { checkServerStatus } from './dbCommon';
 
 // Export Presets and status checks
@@ -24,7 +25,14 @@ export const mockDb = {
     await messageService.reset();
     await eventService.reset();
     await schoolDateService.reset();
+    await waitlistService.reset();
   },
+
+  // --- WAITLIST CRUD ---
+  getWaitlist: waitlistService.getWaitlist,
+  submitWaitlist: waitlistService.submitWaitlist,
+  updateWaitlist: waitlistService.updateWaitlist,
+  deleteWaitlist: waitlistService.deleteWaitlist,
 
   // --- USERS CRUD ---
   getUsers: userService.getUsers,

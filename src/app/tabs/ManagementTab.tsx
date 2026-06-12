@@ -9,13 +9,14 @@ import {
   Dimensions,
   Platform
 } from 'react-native';
-import { Edit, Trash2, UserPlus, Plus, X, CheckCircle } from 'lucide-react-native';
+import { Edit, Trash2, UserPlus, Plus, X, CheckCircle, UserCheck } from 'lucide-react-native';
 import { ThemedText } from '@/components/themed-text';
 import { TabProps } from '@/app/sharedTypes';
 import { styles } from '@/app/styles';
 import { mockDb } from '@/services/mockBackend';
 import { Spacing } from '@/constants/theme';
 import { spreadsheetService } from '@/services/spreadsheetService';
+import { waitlistService } from '@/services/waitlistService';
 import { UserModal } from '@/components/UserModal';
 import { UserBulkBar } from '@/components/UserBulkBar';
 import * as XLSX from 'xlsx';
@@ -23,9 +24,13 @@ import * as XLSX from 'xlsx';
 export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabProps) {
   const { width: windowWidth } = Dimensions.get('window');
   const isLargeScreen = windowWidth >= 768;
-  const [subTab, setSubTab] = useState<'users' | 'classes' | 'calendar' | 'import_export'>('users');
+  const [subTab, setSubTab] = useState<'users' | 'classes' | 'calendar' | 'import_export' | 'waitlist'>('users');
   const [users, setUsers] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
+  const [waitlist, setWaitlist] = useState<any[]>([]);
+  const [waitlistSearchQuery, setWaitlistSearchQuery] = useState('');
+  const [editingWaitlist, setEditingWaitlist] = useState<any | null>(null);
+  const [waitlistModalVisible, setWaitlistModalVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   
   // Custom School Session Dates states
@@ -75,7 +80,7 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
   const [classStudents, setClassStudents] = useState<string[]>([]);
 
   // Excel / Spreadsheet Bulk Import & Export States
-  const [importRole, setImportRole] = useState<'student' | 'teacher' | 'volunteer'>('student');
+  const [importRole, setImportRole] = useState<'student' | 'teacher' | 'volunteer' | 'waitlist'>('student');
   const [importText, setImportText] = useState('');
   const [importPreview, setImportPreview] = useState<any[]>([]);
   const [importError, setImportError] = useState('');
@@ -174,6 +179,17 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
       showToast('Student database exported successfully!', 'success');
     } catch (e) {
       showToast('Failed to export students.', 'error');
+    }
+  };
+
+  const handleExportWaitlist = async () => {
+    try {
+      const dbWaitlist = await waitlistService.getWaitlist();
+      const csvContent = spreadsheetService.formatWaitlistCSV(dbWaitlist);
+      triggerFileDownload(csvContent, 'BMPM_Waitlist_Export.xls');
+      showToast('Waitlist database exported successfully!', 'success');
+    } catch (e) {
+      showToast('Failed to export waitlist.', 'error');
     }
   };
 
@@ -327,7 +343,21 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
         classUpdates[c.classId] = { ...c };
       });
 
-      if (importRole === 'student') {
+      if (importRole === 'waitlist') {
+        let waitlistImported = 0;
+        for (const record of importPreview) {
+          await waitlistService.submitWaitlist(record);
+          waitlistImported++;
+          logs.push(`✅ Waitlist record parsed & saved for student: ${record.given_name} ${record.family_name}`);
+        }
+        logs.push(`\n🎉 IMPORT COMPLETED SUCCESSFULLY!`);
+        logs.push(`✅ Waitlist Students Imported: ${waitlistImported}`);
+        setImportSuccess(true);
+        showToast(`Bulk waitlist import completed successfully!`, 'success');
+        await refreshData();
+        setImportText('');
+        return;
+      } else if (importRole === 'student') {
         for (const record of importPreview) {
           const existingStudent = dbUsers.find(u => u.uid === record.uid || u.email.toLowerCase() === record.email.toLowerCase());
           if (existingStudent) {
@@ -621,9 +651,11 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
       const uList = await mockDb.getUsers();
       const cList = await mockDb.getClasses();
       const dList = await mockDb.getSchoolDates();
+      const wList = await waitlistService.getWaitlist();
       setUsers(uList);
       setClasses(cList);
       setSchoolDates(dList);
+      setWaitlist(wList);
     } catch (e) {
       showToast('Failed to sync administrative portal data.', 'error');
     } finally {
@@ -728,6 +760,150 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
       showToast('Failed to delete selected users.', 'error');
     }
     setLoading(false);
+  };
+
+  const handleDeleteWaitlist = async (uid: string) => {
+    const confirmed = Platform.OS === 'web' ? window.confirm('Are you sure you want to delete this waitlist entry?') : true;
+    if (!confirmed) return;
+    try {
+      await waitlistService.deleteWaitlist(uid);
+      showToast('Waitlist entry has been deleted.', 'success');
+      refreshData();
+    } catch (e) {
+      showToast('Failed to delete waitlist entry.', 'error');
+    }
+  };
+
+  const handleToggleWaitlistCheck = async (uid: string, key: string, currentVal: string) => {
+    try {
+      const newVal = currentVal === 'YES' ? 'NO' : 'YES';
+      await waitlistService.updateWaitlist(uid, { [key]: newVal });
+      showToast('Status updated.', 'success');
+      refreshData();
+    } catch (e) {
+      showToast('Failed to update status.', 'error');
+    }
+  };
+
+  const handleAdmitWaitlist = async (w: any) => {
+    const confirmed = Platform.OS === 'web' ? window.confirm(`Admit ${w.given_name} ${w.family_name} to the active school directory?`) : true;
+    if (!confirmed) return;
+    
+    setLoading(true);
+    try {
+      const studentUid = w.student_id || `student_${Date.now()}`;
+      const studentUser = {
+        uid: studentUid,
+        fullName: `${w.given_name} ${w.family_name}`.trim(),
+        email: w.student_email || `${w.given_name.toLowerCase().replace(/\s+/g, '')}@balarmalar.nsw.edu.au`,
+        role: 'student' as const,
+        languagePreference: 'ta' as const,
+        fullNameTamil: w.full_name_tamil || '',
+        gender: w.gender || '',
+        dateOfBirth: w.DATE_OF_BIRTH || w.dob || '',
+        mainstreamSchoolName: w.mainstream_school_name || '',
+        mainstreamSchoolClass: w.mainstream_school_class || '',
+        className: w.class_name || '',
+        okToIssueBooks: w.OK_TO_ISSUE_BOOKS || 'NO',
+        stationaryIssued: w.STATIONARY_ISSUED || 'NO',
+        booksIssued: w.BOOKS_ISSUED || 'NO',
+        prevBmSchoolClass: w.prev_bm_school_class || '',
+        studentCreated: w.student_created || new Date().toISOString(),
+        effectiveFrom: new Date().toISOString(),
+        effectiveTo: ''
+      };
+
+      const dbUsers = await mockDb.getUsers();
+      
+      // Link Parent 1
+      if (w.parent1_email) {
+        const existingP1 = dbUsers.find(u => u.email.toLowerCase() === w.parent1_email.toLowerCase());
+        if (existingP1) {
+          const linked = existingP1.associatedStudents || [];
+          if (!linked.includes(studentUid)) {
+            await mockDb.updateUser(existingP1.uid, {
+              associatedStudents: [...linked, studentUid]
+            });
+          }
+        } else if (w.parent1_name) {
+          await mockDb.createUser({
+            fullName: w.parent1_name,
+            email: w.parent1_email.toLowerCase(),
+            phone: w.parent1_mobile || '',
+            role: 'parent',
+            languagePreference: 'ta',
+            associatedStudents: [studentUid],
+            parentVolunteer: w.parent1_volunteer === 'YES'
+          });
+        }
+      }
+
+      // Link Parent 2
+      if (w.parent2_email) {
+        const existingP2 = dbUsers.find(u => u.email.toLowerCase() === w.parent2_email.toLowerCase());
+        if (existingP2) {
+          const linked = existingP2.associatedStudents || [];
+          if (!linked.includes(studentUid)) {
+            await mockDb.updateUser(existingP2.uid, {
+              associatedStudents: [...linked, studentUid]
+            });
+          }
+        } else if (w.parent2_name) {
+          await mockDb.createUser({
+            fullName: w.parent2_name,
+            email: w.parent2_email.toLowerCase(),
+            phone: w.parent2_mobile || '',
+            role: 'parent',
+            languagePreference: 'ta',
+            associatedStudents: [studentUid],
+            parentVolunteer: w.parent2_volunteer === 'YES'
+          });
+        }
+      }
+
+      // Auto-enroll student in class
+      if (w.class_name) {
+        const dbClasses = await mockDb.getClasses();
+        const matchedClass = dbClasses.find(c => c.className.toLowerCase().includes(w.class_name.toLowerCase()));
+        if (matchedClass) {
+          const enrolled = matchedClass.studentIds || [];
+          if (!enrolled.includes(studentUid)) {
+            await mockDb.updateClass(matchedClass.classId, {
+              studentIds: [...enrolled, studentUid]
+            });
+          }
+        }
+      }
+
+      // Create student
+      await mockDb.createUser(studentUser);
+      
+      // Delete waitlist
+      await waitlistService.deleteWaitlist(w.uid);
+
+      showToast(`Successfully admitted ${w.given_name} as active student!`, 'success');
+      await refreshData();
+    } catch (e: any) {
+      showToast(`Failed to admit waitlist student: ${e.message || e}`, 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveWaitlistEdit = async (updatedRecord: any) => {
+    try {
+      if (editingWaitlist) {
+        await waitlistService.updateWaitlist(editingWaitlist.uid, updatedRecord);
+        showToast('Waitlist entry updated successfully.', 'success');
+      } else {
+        await waitlistService.submitWaitlist(updatedRecord);
+        showToast('Waitlist entry created successfully.', 'success');
+      }
+      setWaitlistModalVisible(false);
+      refreshData();
+    } catch (e) {
+      showToast('Failed to save waitlist entry.', 'error');
+    }
   };
 
   useEffect(() => {
@@ -873,6 +1049,19 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
         >
           <ThemedText style={{ color: subTab === 'import_export' ? '#FFF' : colors.text, fontWeight: '700', fontSize: 13 }}>
             📤 Import / Export
+          </ThemedText>
+        </Pressable>
+        <Pressable
+          onPress={() => setSubTab('waitlist')}
+          style={[
+            { paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20, borderWidth: 1 },
+            subTab === 'waitlist' 
+              ? { backgroundColor: colors.primary, borderColor: colors.primary } 
+              : { backgroundColor: 'transparent', borderColor: colors.border }
+          ]}
+        >
+          <ThemedText style={{ color: subTab === 'waitlist' ? '#FFF' : colors.text, fontWeight: '700', fontSize: 13 }}>
+            📝 Waitlist Directory
           </ThemedText>
         </Pressable>
       </View>
@@ -1482,167 +1671,186 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
         </View>
       ) : subTab === 'calendar' ? (
         /* CALENDAR SUB-TAB */
-        <View style={{ flex: 1 }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.two, flexWrap: 'wrap', gap: 6 }}>
-            <View>
-              <ThemedText style={{ fontSize: 15, fontWeight: '700' }}>School Attendance Sessions Calendar / பள்ளி நாட்காட்டி</ThemedText>
-              <ThemedText style={{ fontSize: 11, color: colors.textSecondary }}>Define school session dates, repeat schedules, and manage holiday overrides.</ThemedText>
-            </View>
-            <Pressable
-              onPress={() => setCustomDateModalVisible(true)}
-              style={({ pressed }) => [
-                { backgroundColor: colors.secondary, flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, gap: 4 },
-                { opacity: pressed ? 0.9 : 1 }
-              ]}
-            >
-              <Plus size={14} color="#FFF" />
-              <ThemedText style={{ color: '#FFF', fontSize: 12, fontWeight: '700' }}>Add Ad-hoc Date</ThemedText>
-            </Pressable>
-          </View>
-
-          <View style={{ flexDirection: isLargeScreen ? 'row' : 'column', gap: Spacing.three, flex: 1, marginTop: 4 }}>
-            {/* Date Generator Form Card */}
-            <View style={[{ padding: 16, borderRadius: 16, borderWidth: 1, backgroundColor: colors.cardBg, borderColor: colors.border, width: isLargeScreen ? '35%' : '100%', height: 'auto', gap: Spacing.two }]}>
-              <ThemedText style={{ fontSize: 14, fontWeight: '700', color: colors.primary }}>📅 Term Dates Schedule Generator</ThemedText>
-              
-              <View style={{ gap: Spacing.two, marginTop: 4 }}>
-                <View style={{ flexDirection: 'row', gap: Spacing.two }}>
-                  <View style={{ flex: 1 }}>
-                    <ThemedText style={{ fontSize: 11, fontWeight: '600', marginBottom: 2 }}>Year</ThemedText>
-                    <TextInput
-                      style={[styles.formInput, { color: colors.text, borderColor: colors.border, padding: 8 }]}
-                      value={genYear}
-                      onChangeText={setGenYear}
-                      placeholder="2026"
-                    />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <ThemedText style={{ fontSize: 11, fontWeight: '600', marginBottom: 2 }}>School Term</ThemedText>
-                    <TextInput
-                      style={[styles.formInput, { color: colors.text, borderColor: colors.border, padding: 8 }]}
-                      value={genTerm}
-                      onChangeText={setGenTerm}
-                      placeholder="1-4"
-                    />
-                  </View>
-                </View>
-
+        (() => {
+          const calendarContent = (
+            <View style={{ gap: Spacing.three }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.two, flexWrap: 'wrap', gap: 6 }}>
                 <View>
-                  <ThemedText style={{ fontSize: 11, fontWeight: '600', marginBottom: 4 }}>Repeating Pattern</ThemedText>
-                  <View style={{ flexDirection: 'row', gap: 6 }}>
-                    {[
-                      { key: 'saturdays', label: 'Saturdays only' },
-                      { key: 'weekdays', label: 'Mon to Fri Weekdays' }
-                    ].map((p) => {
-                      const isSel = genPattern === p.key;
-                      return (
-                        <Pressable
-                          key={p.key}
-                          onPress={() => setGenPattern(p.key as any)}
-                          style={[
-                            { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, flex: 1, alignItems: 'center' },
-                            isSel ? { backgroundColor: colors.primary, borderColor: colors.primary } : { backgroundColor: 'transparent', borderColor: colors.border }
-                          ]}
-                        >
-                          <ThemedText style={{ color: isSel ? '#FFF' : colors.text, fontSize: 11, fontWeight: '700' }}>
-                            {p.label}
-                          </ThemedText>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
+                  <ThemedText style={{ fontSize: 15, fontWeight: '700' }}>School Attendance Sessions Calendar / பள்ளி நாட்காட்டி</ThemedText>
+                  <ThemedText style={{ fontSize: 11, color: colors.textSecondary }}>Define school session dates, repeat schedules, and manage holiday overrides.</ThemedText>
                 </View>
-
-                <View style={{ flexDirection: 'row', gap: Spacing.two }}>
-                  <View style={{ flex: 1 }}>
-                    <ThemedText style={{ fontSize: 11, fontWeight: '600', marginBottom: 2 }}>Start Date</ThemedText>
-                    <TextInput
-                      style={[styles.formInput, { color: colors.text, borderColor: colors.border, padding: 8 }]}
-                      value={genStartDate}
-                      onChangeText={setGenStartDate}
-                      placeholder="YYYY-MM-DD"
-                    />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <ThemedText style={{ fontSize: 11, fontWeight: '600', marginBottom: 2 }}>End Date</ThemedText>
-                    <TextInput
-                      style={[styles.formInput, { color: colors.text, borderColor: colors.border, padding: 8 }]}
-                      value={genEndDate}
-                      onChangeText={setGenEndDate}
-                      placeholder="YYYY-MM-DD"
-                    />
-                  </View>
-                </View>
-
                 <Pressable
-                  onPress={handleGenerateCalendar}
+                  onPress={() => setCustomDateModalVisible(true)}
                   style={({ pressed }) => [
-                    { backgroundColor: colors.primary, borderRadius: 10, paddingVertical: 10, alignItems: 'center', justifyContent: 'center', marginTop: 8 },
+                    { backgroundColor: colors.secondary, flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, gap: 4 },
                     { opacity: pressed ? 0.9 : 1 }
                   ]}
                 >
-                  <ThemedText style={{ color: '#FFF', fontWeight: '700', fontSize: 13 }}>⚙️ Generate Term Schedule</ThemedText>
+                  <Plus size={14} color="#FFF" />
+                  <ThemedText style={{ color: '#FFF', fontSize: 12, fontWeight: '700' }}>Add Ad-hoc Date</ThemedText>
                 </Pressable>
               </View>
-            </View>
 
-            {/* School Session Dates Grid List */}
-            <View style={{ flex: 1, maxHeight: 420 }}>
-              <ThemedText style={{ fontSize: 13, fontWeight: '700', marginBottom: 8 }}>Generated Session Days ({schoolDates.length})</ThemedText>
-              {schoolDates.length === 0 ? (
-                <ThemedText style={{ fontStyle: 'italic', color: colors.textSecondary }}>No dates generated yet.</ThemedText>
-              ) : (
-                <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: isLargeScreen ? Spacing.four : 80 + (insets?.bottom || 0) + 20 }}>
-                  <View style={{ gap: 8 }}>
-                    {schoolDates.map((sd) => {
-                      return (
-                        <View key={sd.dateId} style={[{ padding: 10, borderRadius: 10, borderWidth: 1, backgroundColor: colors.cardBg, borderColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap', flex: 1 }}>
-                            <ThemedText style={{ fontSize: 14, fontWeight: '700', textDecorationLine: sd.isHoliday ? 'line-through' : 'none', color: sd.isHoliday ? colors.danger : colors.text }}>
-                              📅 {sd.date}
-                            </ThemedText>
-                            <View style={{ backgroundColor: sd.isHoliday ? colors.danger + '15' : colors.primaryLight, paddingVertical: 2, paddingHorizontal: 6, borderRadius: 4 }}>
-                              <ThemedText style={{ fontSize: 9, fontWeight: '700', color: sd.isHoliday ? colors.danger : colors.primary }}>
-                                {sd.isHoliday ? `HOLIDAY: ${sd.holidayName || 'Break'}` : `TERM ${sd.term} SESSION`}
+              <View style={{ flexDirection: isLargeScreen ? 'row' : 'column', gap: Spacing.three, marginTop: 4 }}>
+                {/* Date Generator Form Card */}
+                <View style={[{ padding: 16, borderRadius: 16, borderWidth: 1, backgroundColor: colors.cardBg, borderColor: colors.border, width: isLargeScreen ? '35%' : '100%', height: 'auto', gap: Spacing.two }]}>
+                  <ThemedText style={{ fontSize: 14, fontWeight: '700', color: colors.primary }}>📅 Term Dates Schedule Generator</ThemedText>
+                  
+                  <View style={{ gap: Spacing.two, marginTop: 4 }}>
+                    <View style={{ flexDirection: 'row', gap: Spacing.two }}>
+                      <View style={{ flex: 1 }}>
+                        <ThemedText style={{ fontSize: 11, fontWeight: '600', marginBottom: 2 }}>Year</ThemedText>
+                        <TextInput
+                          style={[styles.formInput, { color: colors.text, borderColor: colors.border, padding: 8 }]}
+                          value={genYear}
+                          onChangeText={setGenYear}
+                          placeholder="2026"
+                        />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <ThemedText style={{ fontSize: 11, fontWeight: '600', marginBottom: 2 }}>School Term</ThemedText>
+                        <TextInput
+                          style={[styles.formInput, { color: colors.text, borderColor: colors.border, padding: 8 }]}
+                          value={genTerm}
+                          onChangeText={setGenTerm}
+                          placeholder="1-4"
+                        />
+                      </View>
+                    </View>
+
+                    <View>
+                      <ThemedText style={{ fontSize: 11, fontWeight: '600', marginBottom: 4 }}>Repeating Pattern</ThemedText>
+                      <View style={{ flexDirection: 'row', gap: 6 }}>
+                        {[
+                          { key: 'saturdays', label: 'Saturdays only' },
+                          { key: 'weekdays', label: 'Mon to Fri Weekdays' }
+                        ].map((p) => {
+                          const isSel = genPattern === p.key;
+                          return (
+                            <Pressable
+                              key={p.key}
+                              onPress={() => setGenPattern(p.key as any)}
+                              style={[
+                                { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, flex: 1, alignItems: 'center' },
+                                isSel ? { backgroundColor: colors.primary, borderColor: colors.primary } : { backgroundColor: 'transparent', borderColor: colors.border }
+                              ]}
+                            >
+                              <ThemedText style={{ color: isSel ? '#FFF' : colors.text, fontSize: 11, fontWeight: '700' }}>
+                                {p.label}
                               </ThemedText>
-                            </View>
-                            {sd.customAdded && (
-                              <View style={{ backgroundColor: colors.secondaryLight, paddingVertical: 2, paddingHorizontal: 6, borderRadius: 4 }}>
-                                <ThemedText style={{ fontSize: 9, fontWeight: '700', color: colors.secondary }}>
-                                  AD-HOC
-                                </ThemedText>
-                              </View>
-                            )}
-                          </View>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                    </View>
 
-                          <Pressable
-                            onPress={() => {
-                              setHolidayDateId(sd.dateId);
-                              setIsHolidayStatus(!sd.isHoliday);
-                              setHolidayName(sd.holidayName || '');
-                              setHolidayModalVisible(true);
-                            }}
-                            style={[
-                              { paddingVertical: 4, paddingHorizontal: 10, borderRadius: 6, borderWidth: 1 },
-                              sd.isHoliday 
-                                ? { backgroundColor: colors.secondaryLight, borderColor: colors.secondary } 
-                                : { backgroundColor: colors.danger + '10', borderColor: colors.danger }
-                            ]}
-                          >
-                            <ThemedText style={{ fontSize: 10, fontWeight: '700', color: sd.isHoliday ? colors.secondary : colors.danger }}>
-                              {sd.isHoliday ? 'Activate Session' : 'Mark Holiday Override'}
-                            </ThemedText>
-                          </Pressable>
+                    <View style={{ flexDirection: 'row', gap: Spacing.two }}>
+                      <View style={{ flex: 1 }}>
+                        <ThemedText style={{ fontSize: 11, fontWeight: '600', marginBottom: 2 }}>Start Date</ThemedText>
+                        <TextInput
+                          style={[styles.formInput, { color: colors.text, borderColor: colors.border, padding: 8 }]}
+                          value={genStartDate}
+                          onChangeText={setGenStartDate}
+                          placeholder="YYYY-MM-DD"
+                        />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <ThemedText style={{ fontSize: 11, fontWeight: '600', marginBottom: 2 }}>End Date</ThemedText>
+                        <TextInput
+                          style={[styles.formInput, { color: colors.text, borderColor: colors.border, padding: 8 }]}
+                          value={genEndDate}
+                          onChangeText={setGenEndDate}
+                          placeholder="YYYY-MM-DD"
+                        />
+                      </View>
+                    </View>
+
+                    <Pressable
+                      onPress={handleGenerateCalendar}
+                      style={({ pressed }) => [
+                        { backgroundColor: colors.primary, borderRadius: 10, paddingVertical: 10, alignItems: 'center', justifyContent: 'center', marginTop: 8 },
+                        { opacity: pressed ? 0.9 : 1 }
+                      ]}
+                    >
+                      <ThemedText style={{ color: '#FFF', fontWeight: '700', fontSize: 13 }}>⚙️ Generate Term Schedule</ThemedText>
+                    </Pressable>
+                  </View>
+                </View>
+
+                {/* School Session Dates Grid List */}
+                <View style={isLargeScreen ? { flex: 1, maxHeight: 420 } : { flex: 1 }}>
+                  <ThemedText style={{ fontSize: 13, fontWeight: '700', marginBottom: 8 }}>Generated Session Days ({schoolDates.length})</ThemedText>
+                  {schoolDates.length === 0 ? (
+                    <ThemedText style={{ fontStyle: 'italic', color: colors.textSecondary }}>No dates generated yet.</ThemedText>
+                  ) : (
+                    (() => {
+                      const datesListContent = (
+                        <View style={{ gap: 8 }}>
+                          {schoolDates.map((sd) => (
+                            <View key={sd.dateId} style={[{ padding: 10, borderRadius: 10, borderWidth: 1, backgroundColor: colors.cardBg, borderColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap', flex: 1 }}>
+                                <ThemedText style={{ fontSize: 14, fontWeight: '700', textDecorationLine: sd.isHoliday ? 'line-through' : 'none', color: sd.isHoliday ? colors.danger : colors.text }}>
+                                  📅 {sd.date}
+                                </ThemedText>
+                                <View style={{ backgroundColor: sd.isHoliday ? colors.danger + '15' : colors.primaryLight, paddingVertical: 2, paddingHorizontal: 6, borderRadius: 4 }}>
+                                  <ThemedText style={{ fontSize: 9, fontWeight: '700', color: sd.isHoliday ? colors.danger : colors.primary }}>
+                                    {sd.isHoliday ? `HOLIDAY: ${sd.holidayName || 'Break'}` : `TERM ${sd.term} SESSION`}
+                                  </ThemedText>
+                                </View>
+                                {sd.customAdded && (
+                                  <View style={{ backgroundColor: colors.secondaryLight, paddingVertical: 2, paddingHorizontal: 6, borderRadius: 4 }}>
+                                    <ThemedText style={{ fontSize: 9, fontWeight: '700', color: colors.secondary }}>
+                                      AD-HOC
+                                    </ThemedText>
+                                  </View>
+                                )}
+                              </View>
+
+                              <Pressable
+                                onPress={() => {
+                                  setHolidayDateId(sd.dateId);
+                                  setIsHolidayStatus(!sd.isHoliday);
+                                  setHolidayName(sd.holidayName || '');
+                                  setHolidayModalVisible(true);
+                                }}
+                                style={[
+                                  { paddingVertical: 4, paddingHorizontal: 10, borderRadius: 6, borderWidth: 1 },
+                                  sd.isHoliday 
+                                    ? { backgroundColor: colors.secondaryLight, borderColor: colors.secondary } 
+                                    : { backgroundColor: colors.danger + '10', borderColor: colors.danger }
+                                ]}
+                              >
+                                <ThemedText style={{ fontSize: 10, fontWeight: '700', color: sd.isHoliday ? colors.secondary : colors.danger }}>
+                                  {sd.isHoliday ? 'Activate Session' : 'Mark Holiday Override'}
+                                </ThemedText>
+                              </Pressable>
+                            </View>
+                          ))}
                         </View>
                       );
-                    })}
-                  </View>
-                </ScrollView>
-              )}
+                      return isLargeScreen ? (
+                        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: Spacing.four }}>
+                          {datesListContent}
+                        </ScrollView>
+                      ) : (
+                        datesListContent
+                      );
+                    })()
+                  )}
+                </View>
+              </View>
             </View>
-          </View>
-        </View>
-      ) : (
+          );
+
+          return isLargeScreen ? (
+            <View style={{ flex: 1 }}>{calendarContent}</View>
+          ) : (
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 80 + (insets?.bottom || 0) + 20 }}>
+              {calendarContent}
+            </ScrollView>
+          );
+        })()
+      ) : subTab === 'import_export' ? (
         /* IMPORT_EXPORT SUB-TAB */
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ gap: Spacing.three, paddingBottom: isLargeScreen ? Spacing.three : 80 + (insets?.bottom || 0) + 20 }}>
           <View style={{ flexDirection: 'row', gap: Spacing.two, borderBottomWidth: 1, borderColor: colors.border, paddingBottom: 10 }}>
@@ -1660,7 +1868,8 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
                 {[
                   { key: 'student', label: 'Students & Parents' },
                   { key: 'teacher', label: 'Teachers' },
-                  { key: 'volunteer', label: 'Volunteers' }
+                  { key: 'volunteer', label: 'Volunteers' },
+                  { key: 'waitlist', label: 'Waitlist Students' }
                 ].map(r => {
                   const isSel = importRole === r.key;
                   return (
@@ -1687,6 +1896,8 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
                 <ThemedText style={{ fontSize: 10, color: colors.textSecondary, fontFamily: Platform.OS === 'web' ? 'monospace' : 'default' }}>
                   {importRole === 'student'
                     ? 'school_code, year, student_id, student_email, given_name, family_name, full_name_tamil, gender, DATE_OF_BIRTH, class_name, mainstream_school_name, mainstream_school_class, parent1_name, parent1_email, parent1_mobile, parent1_volunteer, parent2_name, parent2_email, parent2_mobile, parent2_volunteer'
+                    : importRole === 'waitlist'
+                    ? 'school_code, year, student_id, student_email, given_name, middle_name, family_name, full_name_tamil, gender, DATE_OF_BIRTH, prev_bm_school_class, student_created, mainstream_school_name, mainstream_school_class, class_name, parent1_name, parent1_email, parent1_mobile, parent1_volunteer, parent2_name, parent2_email, parent2_mobile, parent2_volunteer, Purpose, Request, Request Date, OK_TO_ISSUE_BOOKS, STATIONARY_ISSUED, BOOKS_ISSUED'
                     : 'id, school_code, name, stage, WWC, dob, WWC_verified, email, mobile_no, WWC_verified_Date, WWC_expiry_date'
                   }
                 </ThemedText>
@@ -1697,11 +1908,24 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
 
               {/* Import Text area & Upload Button */}
               <View style={{ gap: 6 }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <View style={{ 
+                  flexDirection: isLargeScreen ? 'row' : 'column', 
+                  justifyContent: 'space-between', 
+                  alignItems: isLargeScreen ? 'center' : 'flex-start',
+                  gap: 8 
+                }}>
                   <ThemedText style={{ fontSize: 11, fontWeight: '700' }}>Paste Spreadsheet Cells or Upload File:</ThemedText>
                   <Pressable
                     onPress={triggerFileUpload}
-                    style={{ backgroundColor: colors.secondaryLight, borderWidth: 1, borderColor: colors.secondary, paddingVertical: 4, paddingHorizontal: 10, borderRadius: 6 }}
+                    style={{ 
+                      backgroundColor: colors.secondaryLight, 
+                      borderWidth: 1, 
+                      borderColor: colors.secondary, 
+                      paddingVertical: 6, 
+                      paddingHorizontal: 12, 
+                      borderRadius: 8,
+                      alignSelf: isLargeScreen ? 'auto' : 'flex-start'
+                    }}
                   >
                     <ThemedText style={{ fontSize: 10, fontWeight: '700', color: colors.secondary }}>📁 Choose File (.csv, .txt)</ThemedText>
                   </Pressable>
@@ -1784,6 +2008,7 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
               <View style={{ gap: 10, marginTop: 4 }}>
                 {[
                   { label: 'Export Student Directory', desc: 'Students, mainstream details & parent linkages', onExport: handleExportStudents },
+                  { label: 'Export Waitlist Directory', desc: 'Waitlisted student registrations & parent profiles', onExport: handleExportWaitlist },
                   { label: 'Export Teacher Directory', desc: 'Teachers, WWC details & stage roles', onExport: () => handleExportStaff('teacher') },
                   { label: 'Export Volunteer Directory', desc: 'Volunteers, WWC verification & stages', onExport: () => handleExportStaff('volunteer') }
                 ].map((item, idx) => (
@@ -1952,6 +2177,211 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
             </View>
           </View>
         </ScrollView>
+      ) : (
+        /* WAITLIST SUB-TAB */
+        <View style={{ flex: 1 }}>
+          {/* Search and Action Bar */}
+          <View style={{ flexDirection: 'row', gap: Spacing.two, marginBottom: Spacing.two, flexWrap: 'wrap', alignItems: 'center' }}>
+            <TextInput
+              style={[styles.directPathInput, { color: colors.text, borderColor: colors.border, flex: 1, minWidth: 200 }]}
+              placeholder="Search waitlist students (name, email, parent details)..."
+              placeholderTextColor={colors.textSecondary}
+              value={waitlistSearchQuery}
+              onChangeText={setWaitlistSearchQuery}
+            />
+            <Pressable
+              onPress={() => {
+                setEditingWaitlist(null);
+                setWaitlistModalVisible(true);
+              }}
+              style={({ pressed }) => [
+                { backgroundColor: colors.primary, flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, gap: 4 },
+                { opacity: pressed ? 0.9 : 1 }
+              ]}
+            >
+              <UserPlus size={14} color="#FFF" />
+              <ThemedText style={{ color: '#FFF', fontSize: 12, fontWeight: '700' }}>Add Waitlist Entry</ThemedText>
+            </Pressable>
+          </View>
+
+          {/* Waitlist List/Table */}
+          {(() => {
+            const queryClean = waitlistSearchQuery.toLowerCase().trim();
+            const filteredWaitlist = waitlist.filter(w => {
+              if (!queryClean) return true;
+              return (
+                (w.given_name || '').toLowerCase().includes(queryClean) ||
+                (w.family_name || '').toLowerCase().includes(queryClean) ||
+                (w.student_email || '').toLowerCase().includes(queryClean) ||
+                (w.parent1_name || '').toLowerCase().includes(queryClean) ||
+                (w.parent1_email || '').toLowerCase().includes(queryClean) ||
+                (w.parent2_name || '').toLowerCase().includes(queryClean)
+              );
+            }).sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
+
+            if (filteredWaitlist.length === 0) {
+              return (
+                <ThemedText style={{ textAlign: 'center', marginVertical: Spacing.three, color: colors.textSecondary }}>
+                  No waitlisted students found.
+                </ThemedText>
+              );
+            }
+
+            const waitlistListContent = (
+              <View style={{ gap: Spacing.two }}>
+                {filteredWaitlist.map((w) => {
+                  return (
+                    <View key={w.uid} style={[{ padding: 16, borderRadius: 12, borderWidth: 1, backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+                      {/* Top row: Name & badge, purpose/request */}
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                        <View style={{ gap: 2 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                            <ThemedText style={{ fontSize: 16, fontWeight: '700' }}>
+                              {w.given_name} {w.family_name}
+                            </ThemedText>
+                            {w.full_name_tamil ? (
+                              <ThemedText style={{ fontSize: 13, color: colors.textSecondary }}>
+                                ({w.full_name_tamil})
+                              </ThemedText>
+                            ) : null}
+                            <View style={{ backgroundColor: colors.primaryLight, paddingVertical: 2, paddingHorizontal: 6, borderRadius: 4 }}>
+                              <ThemedText style={{ fontSize: 9, fontWeight: '700', color: colors.primary }}>
+                                WAITLIST
+                              </ThemedText>
+                            </View>
+                          </View>
+                          <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>
+                            Student ID: {w.student_id || 'Waitlisted'}  |  📧 Student Email: {w.student_email || 'Not provided'}  |  🎂 DOB: {w.DATE_OF_BIRTH || w.dob || 'Not provided'}  |  ⚧️ {w.gender || '-'}
+                          </ThemedText>
+                        </View>
+
+                        {/* Action buttons */}
+                        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                          {/* Promote/Admit Student button */}
+                          <Pressable
+                            onPress={() => handleAdmitWaitlist(w)}
+                            style={({ pressed }) => [
+                              { backgroundColor: colors.success || '#4CAF50', flexDirection: 'row', alignItems: 'center', paddingVertical: 6, paddingHorizontal: 10, borderRadius: 8, gap: 4 },
+                              { opacity: pressed ? 0.9 : 1 }
+                            ]}
+                          >
+                            <UserCheck size={14} color="#FFF" />
+                            <ThemedText style={{ color: '#FFF', fontSize: 11, fontWeight: '700' }}>Admit Student</ThemedText>
+                          </Pressable>
+                          
+                          <Pressable
+                            onPress={() => {
+                              setEditingWaitlist(w);
+                              setWaitlistModalVisible(true);
+                            }}
+                            style={{ padding: 6, borderRadius: 6, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border }}
+                          >
+                            <Edit size={14} color={colors.textSecondary} />
+                          </Pressable>
+
+                          <Pressable
+                            onPress={() => handleDeleteWaitlist(w.uid)}
+                            style={{ padding: 6, borderRadius: 6, backgroundColor: colors.primaryLight || '#FFE5E5', borderWidth: 1, borderColor: colors.danger || '#FF4D4D' }}
+                          >
+                            <Trash2 size={14} color={colors.danger || '#FF4D4D'} />
+                          </Pressable>
+                        </View>
+                      </View>
+
+                      {/* Mainstream School / Grade & Requested Class */}
+                      <View style={{ flexDirection: 'row', gap: 16, marginBottom: 10, flexWrap: 'wrap', backgroundColor: colors.background, padding: 8, borderRadius: 8 }}>
+                        <View style={{ flex: 1, minWidth: 150 }}>
+                          <ThemedText style={{ fontSize: 11, fontWeight: '700', color: colors.textSecondary }}>School Details</ThemedText>
+                          <ThemedText style={{ fontSize: 12, color: colors.text }}>
+                            🏫 Mainstream: {w.mainstream_school_name || '-'} ({w.mainstream_school_class || '-'})
+                          </ThemedText>
+                          <ThemedText style={{ fontSize: 12, color: colors.text }}>
+                            📚 Class Preference: {w.class_name || 'Not assigned'}
+                          </ThemedText>
+                        </View>
+                        
+                        <View style={{ flex: 1, minWidth: 150 }}>
+                          <ThemedText style={{ fontSize: 11, fontWeight: '700', color: colors.textSecondary }}>Request Details</ThemedText>
+                          <ThemedText style={{ fontSize: 12, color: colors.text }}>
+                            📅 Registered: {w.student_created || '-'}
+                          </ThemedText>
+                          <ThemedText style={{ fontSize: 12, color: colors.text }}>
+                            📥 Source: {w.Request || 'Online Form'} ({w.Purpose || 'New Enrollment'})
+                          </ThemedText>
+                        </View>
+                      </View>
+
+                      {/* Parents Information */}
+                      <View style={{ flexDirection: 'row', gap: 16, flexWrap: 'wrap', borderTopWidth: 1, borderColor: colors.border, paddingTop: 10 }}>
+                        <View style={{ flex: 1, minWidth: 200, gap: 2 }}>
+                          <ThemedText style={{ fontSize: 11, fontWeight: '700', color: colors.secondary }}>Parent 1 Details</ThemedText>
+                          <ThemedText style={{ fontSize: 12, fontWeight: '600' }}>{w.parent1_name || 'Not provided'}</ThemedText>
+                          {w.parent1_email ? <ThemedText style={{ fontSize: 11, color: colors.textSecondary }}>✉️ {w.parent1_email}</ThemedText> : null}
+                          {w.parent1_mobile ? <ThemedText style={{ fontSize: 11, color: colors.textSecondary }}>📞 {w.parent1_mobile}</ThemedText> : null}
+                          <ThemedText style={{ fontSize: 10, color: w.parent1_volunteer === 'YES' ? colors.success : colors.textSecondary, fontWeight: '600' }}>
+                            Volunteer: {w.parent1_volunteer || 'NO'}
+                          </ThemedText>
+                        </View>
+
+                        <View style={{ flex: 1, minWidth: 200, gap: 2 }}>
+                          <ThemedText style={{ fontSize: 11, fontWeight: '700', color: colors.secondary }}>Parent 2 Details</ThemedText>
+                          <ThemedText style={{ fontSize: 12, fontWeight: '600' }}>{w.parent2_name || 'Not provided'}</ThemedText>
+                          {w.parent2_email ? <ThemedText style={{ fontSize: 11, color: colors.textSecondary }}>✉️ {w.parent2_email}</ThemedText> : null}
+                          {w.parent2_mobile ? <ThemedText style={{ fontSize: 11, color: colors.textSecondary }}>📞 {w.parent2_mobile}</ThemedText> : null}
+                          <ThemedText style={{ fontSize: 10, color: w.parent2_volunteer === 'YES' ? colors.success : colors.textSecondary, fontWeight: '600' }}>
+                            Volunteer: {w.parent2_volunteer || 'NO'}
+                          </ThemedText>
+                        </View>
+                      </View>
+
+                      {/* Status Checkboxes row */}
+                      <View style={{ flexDirection: 'row', gap: 16, marginTop: 12, borderTopWidth: 1, borderColor: colors.border, paddingTop: 8, flexWrap: 'wrap' }}>
+                        {[
+                          { key: 'OK_TO_ISSUE_BOOKS', label: 'Books OK' },
+                          { key: 'STATIONARY_ISSUED', label: 'Stationary Issued' },
+                          { key: 'BOOKS_ISSUED', label: 'Books Issued' }
+                        ].map(chk => {
+                          const isChecked = w[chk.key] === 'YES';
+                          return (
+                            <Pressable
+                              key={chk.key}
+                              onPress={() => handleToggleWaitlistCheck(w.uid, chk.key, w[chk.key])}
+                              style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
+                            >
+                              <View style={{
+                                width: 14,
+                                height: 14,
+                                borderWidth: 1.5,
+                                borderColor: isChecked ? colors.secondary : colors.border,
+                                borderRadius: 3,
+                                backgroundColor: isChecked ? colors.secondary : 'transparent',
+                                justifyContent: 'center',
+                                alignItems: 'center'
+                              }}>
+                                {isChecked && <CheckCircle size={10} color="#FFF" />}
+                              </View>
+                              <ThemedText style={{ fontSize: 11, fontWeight: '600', color: colors.text }}>{chk.label}</ThemedText>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            );
+
+            return isLargeScreen ? (
+              <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: Spacing.four }}>
+                {waitlistListContent}
+              </ScrollView>
+            ) : (
+              <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 80 + (insets?.bottom || 0) + 20 }}>
+                {waitlistListContent}
+              </ScrollView>
+            );
+          })()}
+        </View>
       )}
 
       {/* ==================== USER MODAL FORM ==================== */}
@@ -2169,6 +2599,479 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
         </View>
       </Modal>
 
+      {/* ==================== WAITLIST MODAL FORM ==================== */}
+      <WaitlistFormModal
+        visible={waitlistModalVisible}
+        onClose={() => setWaitlistModalVisible(false)}
+        editingWaitlist={editingWaitlist}
+        colors={colors}
+        showToast={showToast}
+        onSave={handleSaveWaitlistEdit}
+      />
+
     </View>
+  );
+}
+
+interface WaitlistModalProps {
+  visible: boolean;
+  onClose: () => void;
+  editingWaitlist: any | null;
+  colors: any;
+  showToast: (msg: string, type?: 'success' | 'error' | 'warning') => void;
+  onSave: (record: any) => void;
+}
+
+function WaitlistFormModal({
+  visible,
+  onClose,
+  editingWaitlist,
+  colors,
+  showToast,
+  onSave
+}: WaitlistModalProps) {
+  const [activeTab, setActiveTab] = useState<'student' | 'parent1' | 'parent2' | 'request'>('student');
+
+  // Student states
+  const [givenName, setGivenName] = useState('');
+  const [middleName, setMiddleName] = useState('');
+  const [familyName, setFamilyName] = useState('');
+  const [fullNameTamil, setFullNameTamil] = useState('');
+  const [gender, setGender] = useState('');
+  const [dob, setDob] = useState('');
+  const [prevBmClass, setPrevBmClass] = useState('');
+  const [mainstreamName, setMainstreamName] = useState('');
+  const [mainstreamClass, setMainstreamClass] = useState('');
+  const [className, setClassName] = useState('');
+
+  // Parent 1 states
+  const [p1Name, setP1Name] = useState('');
+  const [p1Email, setP1Email] = useState('');
+  const [p1Mobile, setP1Mobile] = useState('');
+  const [p1Vol, setP1Vol] = useState('NO');
+
+  // Parent 2 states
+  const [p2Name, setP2Name] = useState('');
+  const [p2Email, setP2Email] = useState('');
+  const [p2Mobile, setP2Mobile] = useState('');
+  const [p2Vol, setP2Vol] = useState('NO');
+
+  // Request & Inventory states
+  const [purpose, setPurpose] = useState('New Enrollment');
+  const [request, setRequest] = useState('Online Form');
+  const [requestDate, setRequestDate] = useState('');
+  const [okBooks, setOkBooks] = useState('NO');
+  const [statIssued, setStatIssued] = useState('NO');
+  const [booksIssued, setBooksIssued] = useState('NO');
+
+  useEffect(() => {
+    if (editingWaitlist) {
+      setGivenName(editingWaitlist.given_name || '');
+      setMiddleName(editingWaitlist.middle_name || '');
+      setFamilyName(editingWaitlist.family_name || '');
+      setFullNameTamil(editingWaitlist.full_name_tamil || '');
+      setGender(editingWaitlist.gender || '');
+      setDob(editingWaitlist.DATE_OF_BIRTH || editingWaitlist.dob || '');
+      setPrevBmClass(editingWaitlist.prev_bm_school_class || '');
+      setMainstreamName(editingWaitlist.mainstream_school_name || '');
+      setMainstreamClass(editingWaitlist.mainstream_school_class || '');
+      setClassName(editingWaitlist.class_name || '');
+
+      setP1Name(editingWaitlist.parent1_name || '');
+      setP1Email(editingWaitlist.parent1_email || '');
+      setP1Mobile(editingWaitlist.parent1_mobile || '');
+      setP1Vol(editingWaitlist.parent1_volunteer || 'NO');
+
+      setP2Name(editingWaitlist.parent2_name || '');
+      setP2Email(editingWaitlist.parent2_email || '');
+      setP2Mobile(editingWaitlist.parent2_mobile || '');
+      setP2Vol(editingWaitlist.parent2_volunteer || 'NO');
+
+      setPurpose(editingWaitlist.Purpose || 'New Enrollment');
+      setRequest(editingWaitlist.Request || 'Online Form');
+      setRequestDate(editingWaitlist.RequestDate || editingWaitlist.Request_Date || '');
+      setOkBooks(editingWaitlist.OK_TO_ISSUE_BOOKS || 'NO');
+      setStatIssued(editingWaitlist.STATIONARY_ISSUED || 'NO');
+      setBooksIssued(editingWaitlist.BOOKS_ISSUED || 'NO');
+    } else {
+      setGivenName('');
+      setMiddleName('');
+      setFamilyName('');
+      setFullNameTamil('');
+      setGender('');
+      setDob('');
+      setPrevBmClass('');
+      setMainstreamName('');
+      setMainstreamClass('');
+      setClassName('');
+
+      setP1Name('');
+      setP1Email('');
+      setP1Mobile('');
+      setP1Vol('NO');
+
+      setP2Name('');
+      setP2Email('');
+      setP2Mobile('');
+      setP2Vol('NO');
+
+      setPurpose('New Enrollment');
+      setRequest('Online Form');
+      setRequestDate(new Date().toLocaleDateString('en-GB'));
+      setOkBooks('NO');
+      setStatIssued('NO');
+      setBooksIssued('NO');
+    }
+    setActiveTab('student');
+  }, [editingWaitlist, visible]);
+
+  const handleSave = () => {
+    if (!givenName.trim()) {
+      showToast('Student given name is required!', 'warning');
+      return;
+    }
+    if (p1Email.trim() && !p1Email.includes('@')) {
+      showToast('Parent 1 email is invalid!', 'warning');
+      return;
+    }
+    const record = {
+      given_name: givenName.trim(),
+      middle_name: middleName.trim(),
+      family_name: familyName.trim(),
+      full_name_tamil: fullNameTamil.trim(),
+      gender: gender.trim(),
+      DATE_OF_BIRTH: dob.trim(),
+      prev_bm_school_class: prevBmClass.trim(),
+      mainstream_school_name: mainstreamName.trim(),
+      mainstream_school_class: mainstreamClass.trim(),
+      class_name: className.trim(),
+      parent1_name: p1Name.trim(),
+      parent1_email: p1Email.trim().toLowerCase(),
+      parent1_mobile: p1Mobile.trim(),
+      parent1_volunteer: p1Vol.toUpperCase(),
+      parent2_name: p2Name.trim(),
+      parent2_email: p2Email.trim().toLowerCase(),
+      parent2_mobile: p2Mobile.trim(),
+      parent2_volunteer: p2Vol.toUpperCase(),
+      Purpose: purpose,
+      Request: request,
+      RequestDate: requestDate.trim() || new Date().toLocaleDateString('en-GB'),
+      OK_TO_ISSUE_BOOKS: okBooks.toUpperCase(),
+      STATIONARY_ISSUED: statIssued.toUpperCase(),
+      BOOKS_ISSUED: booksIssued.toUpperCase(),
+      createdAt: editingWaitlist?.createdAt || new Date().toISOString()
+    };
+    onSave(record);
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="slide">
+      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: Spacing.two }}>
+        <View style={[styles.driveModalContainer, { backgroundColor: colors.cardBg, borderColor: colors.border, width: '100%', maxWidth: 500, height: '85%' }]}>
+          <View style={styles.driveModalHeader}>
+            <ThemedText style={styles.driveModalTitle}>{editingWaitlist ? 'Configure Waitlisted Student' : 'Register Waitlist Student'}</ThemedText>
+            <Pressable onPress={onClose} style={{ padding: 4 }}>
+              <X size={20} color={colors.textSecondary} />
+            </Pressable>
+          </View>
+
+          {/* Tab Selection */}
+          <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderColor: colors.border, marginBottom: Spacing.two }}>
+            {[
+              { key: 'student', label: '👶 Student' },
+              { key: 'parent1', label: '👤 Parent 1' },
+              { key: 'parent2', label: '👤 Parent 2' },
+              { key: 'request', label: '⚙️ Request' }
+            ].map(t => {
+              const isAct = activeTab === t.key;
+              return (
+                <Pressable
+                  key={t.key}
+                  onPress={() => setActiveTab(t.key as any)}
+                  style={{ flex: 1, paddingVertical: 10, alignItems: 'center', borderBottomWidth: 2, borderColor: isAct ? colors.primary : 'transparent' }}
+                >
+                  <ThemedText style={{ fontSize: 12, fontWeight: '700', color: isAct ? colors.primary : colors.textSecondary }}>{t.label}</ThemedText>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          <ScrollView style={{ padding: Spacing.two }} contentContainerStyle={{ gap: Spacing.two }}>
+            {activeTab === 'student' && (
+              <>
+                <View style={styles.formGroup}>
+                  <ThemedText style={styles.formLabel}>Given Name / பெயர் *</ThemedText>
+                  <TextInput
+                    style={[styles.formInput, { color: colors.text, borderColor: colors.border }]}
+                    value={givenName}
+                    onChangeText={setGivenName}
+                    placeholder="e.g. Thashvika Sree"
+                    placeholderTextColor={colors.textSecondary}
+                  />
+                </View>
+                <View style={styles.formGroup}>
+                  <ThemedText style={styles.formLabel}>Middle Name / இடைப் பெயர்</ThemedText>
+                  <TextInput
+                    style={[styles.formInput, { color: colors.text, borderColor: colors.border }]}
+                    value={middleName}
+                    onChangeText={setMiddleName}
+                    placeholder=""
+                    placeholderTextColor={colors.textSecondary}
+                  />
+                </View>
+                <View style={styles.formGroup}>
+                  <ThemedText style={styles.formLabel}>Family Name / குடும்பப் பெயர்</ThemedText>
+                  <TextInput
+                    style={[styles.formInput, { color: colors.text, borderColor: colors.border }]}
+                    value={familyName}
+                    onChangeText={setFamilyName}
+                    placeholder="e.g. Mahesh"
+                    placeholderTextColor={colors.textSecondary}
+                  />
+                </View>
+                <View style={styles.formGroup}>
+                  <ThemedText style={styles.formLabel}>Full Name in Tamil / தமிழ் முழுப் பெயர்</ThemedText>
+                  <TextInput
+                    style={[styles.formInput, { color: colors.text, borderColor: colors.border }]}
+                    value={fullNameTamil}
+                    onChangeText={setFullNameTamil}
+                    placeholder="எ.கா. தஷ்விகா ஸ்ரீ"
+                    placeholderTextColor={colors.textSecondary}
+                  />
+                </View>
+                <View style={styles.formGroup}>
+                  <ThemedText style={styles.formLabel}>Gender / பாலினம்</ThemedText>
+                  <TextInput
+                    style={[styles.formInput, { color: colors.text, borderColor: colors.border }]}
+                    value={gender}
+                    onChangeText={setGender}
+                    placeholder="Female / Male"
+                    placeholderTextColor={colors.textSecondary}
+                  />
+                </View>
+                <View style={styles.formGroup}>
+                  <ThemedText style={styles.formLabel}>Date of Birth / பிறந்த தேதி (DD/MM/YYYY)</ThemedText>
+                  <TextInput
+                    style={[styles.formInput, { color: colors.text, borderColor: colors.border }]}
+                    value={dob}
+                    onChangeText={setDob}
+                    placeholder="e.g. 11/10/2018"
+                    placeholderTextColor={colors.textSecondary}
+                  />
+                </View>
+                <View style={styles.formGroup}>
+                  <ThemedText style={styles.formLabel}>Previous Balar Malar Class / முந்தைய வகுப்பு</ThemedText>
+                  <TextInput
+                    style={[styles.formInput, { color: colors.text, borderColor: colors.border }]}
+                    value={prevBmClass}
+                    onChangeText={setPrevBmClass}
+                    placeholder="e.g. Year 2"
+                    placeholderTextColor={colors.textSecondary}
+                  />
+                </View>
+                <View style={styles.formGroup}>
+                  <ThemedText style={styles.formLabel}>Mainstream School Name / பள்ளி பெயர்</ThemedText>
+                  <TextInput
+                    style={[styles.formInput, { color: colors.text, borderColor: colors.border }]}
+                    value={mainstreamName}
+                    onChangeText={setMainstreamName}
+                    placeholder="e.g. Westmead Public School"
+                    placeholderTextColor={colors.textSecondary}
+                  />
+                </View>
+                <View style={styles.formGroup}>
+                  <ThemedText style={styles.formLabel}>Mainstream School Class / பள்ளி வகுப்பு</ThemedText>
+                  <TextInput
+                    style={[styles.formInput, { color: colors.text, borderColor: colors.border }]}
+                    value={mainstreamClass}
+                    onChangeText={setMainstreamClass}
+                    placeholder="e.g. Year 3"
+                    placeholderTextColor={colors.textSecondary}
+                  />
+                </View>
+                <View style={styles.formGroup}>
+                  <ThemedText style={styles.formLabel}>Balar Malar Class Preference / வகுப்பு விருப்பம்</ThemedText>
+                  <TextInput
+                    style={[styles.formInput, { color: colors.text, borderColor: colors.border }]}
+                    value={className}
+                    onChangeText={setClassName}
+                    placeholder="e.g. Year 3"
+                    placeholderTextColor={colors.textSecondary}
+                  />
+                </View>
+              </>
+            )}
+
+            {activeTab === 'parent1' && (
+              <>
+                <View style={styles.formGroup}>
+                  <ThemedText style={styles.formLabel}>Parent 1 Full Name *</ThemedText>
+                  <TextInput
+                    style={[styles.formInput, { color: colors.text, borderColor: colors.border }]}
+                    value={p1Name}
+                    onChangeText={setP1Name}
+                    placeholder="Name"
+                    placeholderTextColor={colors.textSecondary}
+                  />
+                </View>
+                <View style={styles.formGroup}>
+                  <ThemedText style={styles.formLabel}>Parent 1 Email Address *</ThemedText>
+                  <TextInput
+                    style={[styles.formInput, { color: colors.text, borderColor: colors.border }]}
+                    value={p1Email}
+                    onChangeText={setP1Email}
+                    placeholder="Email"
+                    placeholderTextColor={colors.textSecondary}
+                    keyboardType="email-address"
+                  />
+                </View>
+                <View style={styles.formGroup}>
+                  <ThemedText style={styles.formLabel}>Parent 1 Mobile Number *</ThemedText>
+                  <TextInput
+                    style={[styles.formInput, { color: colors.text, borderColor: colors.border }]}
+                    value={p1Mobile}
+                    onChangeText={setP1Mobile}
+                    placeholder="Mobile"
+                    placeholderTextColor={colors.textSecondary}
+                    keyboardType="phone-pad"
+                  />
+                </View>
+                <View style={styles.formGroup}>
+                  <ThemedText style={styles.formLabel}>Parent 1 Volunteer Interest (YES / NO)</ThemedText>
+                  <TextInput
+                    style={[styles.formInput, { color: colors.text, borderColor: colors.border }]}
+                    value={p1Vol}
+                    onChangeText={setP1Vol}
+                    placeholder="YES or NO"
+                    placeholderTextColor={colors.textSecondary}
+                  />
+                </View>
+              </>
+            )}
+
+            {activeTab === 'parent2' && (
+              <>
+                <View style={styles.formGroup}>
+                  <ThemedText style={styles.formLabel}>Parent 2 Full Name</ThemedText>
+                  <TextInput
+                    style={[styles.formInput, { color: colors.text, borderColor: colors.border }]}
+                    value={p2Name}
+                    onChangeText={setP2Name}
+                    placeholder="Name"
+                    placeholderTextColor={colors.textSecondary}
+                  />
+                </View>
+                <View style={styles.formGroup}>
+                  <ThemedText style={styles.formLabel}>Parent 2 Email Address</ThemedText>
+                  <TextInput
+                    style={[styles.formInput, { color: colors.text, borderColor: colors.border }]}
+                    value={p2Email}
+                    onChangeText={setP2Email}
+                    placeholder="Email"
+                    placeholderTextColor={colors.textSecondary}
+                    keyboardType="email-address"
+                  />
+                </View>
+                <View style={styles.formGroup}>
+                  <ThemedText style={styles.formLabel}>Parent 2 Mobile Number</ThemedText>
+                  <TextInput
+                    style={[styles.formInput, { color: colors.text, borderColor: colors.border }]}
+                    value={p2Mobile}
+                    onChangeText={setP2Mobile}
+                    placeholder="Mobile"
+                    placeholderTextColor={colors.textSecondary}
+                    keyboardType="phone-pad"
+                  />
+                </View>
+                <View style={styles.formGroup}>
+                  <ThemedText style={styles.formLabel}>Parent 2 Volunteer Interest (YES / NO)</ThemedText>
+                  <TextInput
+                    style={[styles.formInput, { color: colors.text, borderColor: colors.border }]}
+                    value={p2Vol}
+                    onChangeText={setP2Vol}
+                    placeholder="YES or NO"
+                    placeholderTextColor={colors.textSecondary}
+                  />
+                </View>
+              </>
+            )}
+
+            {activeTab === 'request' && (
+              <>
+                <View style={styles.formGroup}>
+                  <ThemedText style={styles.formLabel}>Purpose / காரணம்</ThemedText>
+                  <TextInput
+                    style={[styles.formInput, { color: colors.text, borderColor: colors.border }]}
+                    value={purpose}
+                    onChangeText={setPurpose}
+                    placeholder="e.g. New Enrollment / Transfer"
+                    placeholderTextColor={colors.textSecondary}
+                  />
+                </View>
+                <View style={styles.formGroup}>
+                  <ThemedText style={styles.formLabel}>Request Method / சேர்க்கை வழி</ThemedText>
+                  <TextInput
+                    style={[styles.formInput, { color: colors.text, borderColor: colors.border }]}
+                    value={request}
+                    onChangeText={setRequest}
+                    placeholder="e.g. Online Form / Email / InPerson"
+                    placeholderTextColor={colors.textSecondary}
+                  />
+                </View>
+                <View style={styles.formGroup}>
+                  <ThemedText style={styles.formLabel}>Request Date / விண்ணப்பித்த தேதி</ThemedText>
+                  <TextInput
+                    style={[styles.formInput, { color: colors.text, borderColor: colors.border }]}
+                    value={requestDate}
+                    onChangeText={setRequestDate}
+                    placeholder="DD/MM/YYYY"
+                    placeholderTextColor={colors.textSecondary}
+                  />
+                </View>
+                <View style={styles.formGroup}>
+                  <ThemedText style={styles.formLabel}>OK to Issue Books (YES / NO)</ThemedText>
+                  <TextInput
+                    style={[styles.formInput, { color: colors.text, borderColor: colors.border }]}
+                    value={okBooks}
+                    onChangeText={setOkBooks}
+                    placeholder="YES or NO"
+                    placeholderTextColor={colors.textSecondary}
+                  />
+                </View>
+                <View style={styles.formGroup}>
+                  <ThemedText style={styles.formLabel}>Stationary Issued (YES / NO)</ThemedText>
+                  <TextInput
+                    style={[styles.formInput, { color: colors.text, borderColor: colors.border }]}
+                    value={statIssued}
+                    onChangeText={setStatIssued}
+                    placeholder="YES or NO"
+                    placeholderTextColor={colors.textSecondary}
+                  />
+                </View>
+                <View style={styles.formGroup}>
+                  <ThemedText style={styles.formLabel}>Books Issued (YES / NO)</ThemedText>
+                  <TextInput
+                    style={[styles.formInput, { color: colors.text, borderColor: colors.border }]}
+                    value={booksIssued}
+                    onChangeText={setBooksIssued}
+                    placeholder="YES or NO"
+                    placeholderTextColor={colors.textSecondary}
+                  />
+                </View>
+              </>
+            )}
+          </ScrollView>
+
+          <View style={styles.driveModalFooter}>
+            <Pressable onPress={onClose} style={[styles.formCancelButton, { borderColor: colors.border }]}>
+              <ThemedText>Cancel</ThemedText>
+            </Pressable>
+            <Pressable onPress={handleSave} style={[styles.formSubmitButton, { backgroundColor: colors.primary }]}>
+              <ThemedText style={{ color: '#FFF', fontWeight: '700' }}>Save Record</ThemedText>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    </Modal>
   );
 }

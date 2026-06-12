@@ -53,6 +53,7 @@ import { ReportsTab } from '@/app/tabs/ReportsTab';
 import { ManagementTab } from '@/app/tabs/ManagementTab';
 import { ProfileTab } from '@/app/tabs/ProfileTab';
 import { StudentsTab } from '@/app/tabs/StudentsTab';
+import WaitlistScreen from './waitlist';
 
 const { width: windowWidth } = Dimensions.get('window');
 
@@ -169,8 +170,28 @@ export default function HomeScreen() {
   const [selectedPost, setSelectedPost] = useState<any | null>(null);
   const [dashboardEditPost, setDashboardEditPost] = useState<any | null>(null);
   const [enrolmentModalVisible, setEnrolmentModalVisible] = useState(false);
+  const [waitlistModalVisible, setWaitlistModalVisible] = useState(false);
   const [schoolsSearch, setSchoolsSearch] = useState('');
   const [schoolsViewMode, setSchoolsViewMode] = useState<'list' | 'map'>('list');
+
+  // Upcoming Topic edit states
+  const [topicEditModalVisible, setTopicEditModalVisible] = useState(false);
+  const [selectedTopicClassId, setSelectedTopicClassId] = useState('');
+  const [upcomingTopicEn, setUpcomingTopicEn] = useState('');
+  const [upcomingTopicTa, setUpcomingTopicTa] = useState('');
+
+  useEffect(() => {
+    if (selectedTopicClassId) {
+      const cls = classes.find(c => c.classId === selectedTopicClassId);
+      if (cls) {
+        setUpcomingTopicEn(cls.upcomingTopicEn || '');
+        setUpcomingTopicTa(cls.upcomingTopicTa || '');
+      } else {
+        setUpcomingTopicEn('');
+        setUpcomingTopicTa('');
+      }
+    }
+  }, [selectedTopicClassId, classes]);
 
   // Dynamic dashboard statistics
   const [dashboardStats, setDashboardStats] = useState<{
@@ -324,7 +345,50 @@ export default function HomeScreen() {
         nextSessionLevel = userClassName;
       }
 
-      let nextSessionTopic = getDynamicTopic(nextSessionLevel, i18n.language);
+      let nextSessionTopic = '';
+      if (user) {
+        if (user.role === 'student') {
+          const studentClass = allClassList.find((c: any) => c.studentIds?.includes(user.uid));
+          if (studentClass) {
+            const tEn = studentClass.upcomingTopicEn || 'Weekly Tamil Class';
+            const tTa = studentClass.upcomingTopicTa || 'வாராந்திரத் தமிழ் வகுப்பு';
+            nextSessionTopic = i18n.language === 'ta' ? tTa : tEn;
+          }
+        } else if (user.role === 'parent' && user.associatedStudents && user.associatedStudents.length > 0) {
+          const childClasses = allClassList.filter((c: any) => 
+            c.studentIds?.some((id: string) => user.associatedStudents?.includes(id))
+          );
+          if (childClasses.length > 0) {
+            const topics = childClasses.map((c: any) => {
+              const tEn = c.upcomingTopicEn || 'Weekly Tamil Class';
+              const tTa = c.upcomingTopicTa || 'வாராந்திரத் தமிழ் வகுப்பு';
+              const val = i18n.language === 'ta' ? tTa : tEn;
+              if (childClasses.length > 1) {
+                return `${c.className}: ${val}`;
+              }
+              return val;
+            });
+            nextSessionTopic = topics.join(' / ');
+          }
+        } else if (user.role === 'teacher' || user.role === 'volunteer') {
+          if (userClasses.length > 0) {
+            const topics = userClasses.map((c: any) => {
+              const tEn = c.upcomingTopicEn || 'Weekly Tamil Class';
+              const tTa = c.upcomingTopicTa || 'வாராந்திரத் தமிழ் வகுப்பு';
+              const val = i18n.language === 'ta' ? tTa : tEn;
+              if (userClasses.length > 1) {
+                return `${c.className}: ${val}`;
+              }
+              return val;
+            });
+            nextSessionTopic = topics.join(' / ');
+          }
+        }
+      }
+      
+      if (!nextSessionTopic) {
+        nextSessionTopic = i18n.language === 'ta' ? 'வாராந்திரத் தமிழ் வகுப்பு' : 'Weekly Tamil Class';
+      }
 
       // 2. Resolve dynamic closest school date skipping holidays
       try {
@@ -580,6 +644,15 @@ export default function HomeScreen() {
         iconColor: colors.primary,
         onPress: () => setEnrolmentModalVisible(true)
       });
+      if (role === 'parent') {
+        actions.push({
+          label: i18n.language === 'ta' ? 'காத்திருப்புப் பட்டியல்' : 'Add Sibling',
+          icon: Users,
+          color: '#FFEFEA',
+          iconColor: colors.primary,
+          onPress: () => setWaitlistModalVisible(true)
+        });
+      }
       actions.push({
         label: i18n.language === 'ta' ? 'செயல்பாடுகள் / விளையாட்டுகள்' : 'Games',
         icon: BookOpen,
@@ -970,9 +1043,36 @@ export default function HomeScreen() {
                 <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>
                   {nextSession.time}
                 </ThemedText>
-                <ThemedText style={{ fontSize: 12, fontWeight: '600', color: colors.text, marginTop: 2 }}>
-                  {i18n.language === 'ta' ? `தலைப்பு: ${nextSession.topic}` : `Topic: ${nextSession.topic}`}
-                </ThemedText>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2, flexWrap: 'wrap' }}>
+                  <ThemedText style={{ fontSize: 12, fontWeight: '600', color: colors.text, flexShrink: 1 }}>
+                    {i18n.language === 'ta' ? `தலைப்பு: ${nextSession.topic}` : `Topic: ${nextSession.topic}`}
+                  </ThemedText>
+                  {((user?.role as any) === 'teacher' || (user?.role as any) === 'volunteer' || (user?.role as any) === 'admin') && (
+                    <Pressable
+                      onPress={() => {
+                        const editable = ((user?.role as any) === 'admin') 
+                          ? classes 
+                          : classes.filter((c: any) => 
+                              user?.uid && (c.teacherId === user.uid || c.teacherIds?.includes(user.uid) || c.volunteerIds?.includes(user.uid))
+                            );
+                        if (editable.length > 0) {
+                          setSelectedTopicClassId(editable[0].classId);
+                          setUpcomingTopicEn(editable[0].upcomingTopicEn || '');
+                          setUpcomingTopicTa(editable[0].upcomingTopicTa || '');
+                          setTopicEditModalVisible(true);
+                        } else {
+                          Alert.alert(
+                            i18n.language === 'ta' ? 'பிழை' : 'No Classes',
+                            i18n.language === 'ta' ? 'திருத்த வகுப்புகள் எதுவும் ஒதுக்கப்படவில்லை.' : 'You have no assigned classes to edit topics for.'
+                          );
+                        }
+                      }}
+                      style={{ marginLeft: 6, padding: 4 }}
+                    >
+                      <Edit size={12} color={colors.primary} />
+                    </Pressable>
+                  )}
+                </View>
               </View>
               <View style={{
                 width: 36,
@@ -1044,7 +1144,7 @@ export default function HomeScreen() {
         <View style={{ gap: Spacing.two }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
             <ThemedText style={{ fontSize: 14, fontWeight: '700', color: colors.text }}>
-              Latest News & Events
+              {i18n.language === 'ta' ? 'முகப்பு' : 'Home'}
             </ThemedText>
             <Pressable onPress={() => setActiveTab('full-newsfeed')}>
               <ThemedText style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>
@@ -1521,15 +1621,21 @@ export default function HomeScreen() {
     };
     const currentBranch = branchNames[activeBranch] || branchNames.parramatta;
 
-    const displayWidth = size * 2.8;
-    const displayHeight = size * 0.9;
+    const displayWidth = size * 3.6;
+    const displayHeight = size;
 
     return (
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         {/* Main BalarMalar text logo */}
         <Image 
-          source={require('../../assets/images/balarmalar_logo.png')} 
-          style={{ width: displayWidth, height: displayHeight, resizeMode: 'contain' }} 
+          source={scheme === 'dark' 
+            ? require('../../assets/images/balarmalar_logo_dark.png') 
+            : require('../../assets/images/balarmalar_logo.png')} 
+          style={{ 
+            width: displayWidth, 
+            height: displayHeight, 
+            resizeMode: 'contain'
+          }} 
         />
         
         {/* Divider line */}
@@ -1582,7 +1688,7 @@ export default function HomeScreen() {
       {/* DESKTOP SPLIT VIEW SIDEBAR */}
       {isLargeScreen ? (
         <View style={[styles.sidebar, getGlassStyle(colors.cardBg, 0.75, 20), { borderRightWidth: 1, borderColor: colors.border }]}>
-          <BalarMalarBranchLogo size={28} />
+          <BalarMalarBranchLogo size={32} />
 
           {/* Navigation Links */}
           <View style={styles.sidebarNav}>
@@ -1685,7 +1791,7 @@ export default function HomeScreen() {
               paddingTop: Spacing.three + topOffset
             }
           ]}>
-            <BalarMalarBranchLogo size={24} />
+            <BalarMalarBranchLogo size={26} />
             <View style={styles.headerRightActions}>
               <Pressable 
                 onPress={() => setActiveTab('profile')} 
@@ -2473,6 +2579,273 @@ export default function HomeScreen() {
               >
                 <ThemedText style={{ color: '#FFF', fontWeight: '700', fontSize: 13 }}>
                   Proceed to Enrol Online
+                </ThemedText>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* UPDATE UPCOMING TOPIC MODAL */}
+      {/* WAITLIST MODAL */}
+      {waitlistModalVisible && (
+        <View style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(19, 29, 33, 0.65)',
+          zIndex: 99990,
+          justifyContent: 'center',
+          alignItems: 'center',
+          padding: Spacing.four,
+          ...Platform.select({
+            web: {
+              backdropFilter: 'blur(12px)',
+              WebkitBackdropFilter: 'blur(12px)',
+            }
+          })
+        }}>
+          <View style={{
+            width: '100%',
+            maxWidth: 560,
+            maxHeight: '90%',
+            borderRadius: 24,
+            backgroundColor: colors.cardBg,
+            borderWidth: 1,
+            borderColor: colors.border,
+            shadowColor: colors.shadowColor,
+            shadowOffset: { width: 0, height: 12 },
+            shadowRadius: 24,
+            shadowOpacity: 0.15,
+            elevation: 10,
+            overflow: 'hidden'
+          }}>
+            <WaitlistScreen 
+              onSuccess={() => setWaitlistModalVisible(false)}
+              onCancel={() => setWaitlistModalVisible(false)}
+            />
+          </View>
+        </View>
+      )}
+
+      {topicEditModalVisible && (
+        <View style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(19, 29, 33, 0.65)',
+          zIndex: 99990,
+          justifyContent: 'center',
+          alignItems: 'center',
+          padding: Spacing.four,
+          ...Platform.select({
+            web: {
+              backdropFilter: 'blur(12px)',
+              WebkitBackdropFilter: 'blur(12px)',
+            }
+          })
+        }}>
+          <View style={{
+            width: '100%',
+            maxWidth: 480,
+            borderRadius: 24,
+            backgroundColor: colors.cardBg,
+            borderWidth: 1,
+            borderColor: colors.border,
+            shadowColor: colors.shadowColor,
+            shadowOffset: { width: 0, height: 12 },
+            shadowRadius: 24,
+            shadowOpacity: 0.15,
+            elevation: 10,
+            padding: Spacing.four,
+            gap: Spacing.three
+          }}>
+            {/* Modal Header */}
+            <View style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              borderBottomWidth: 1,
+              borderBottomColor: colors.border,
+              paddingBottom: Spacing.two
+            }}>
+              <View>
+                <ThemedText style={{ fontSize: 16, fontWeight: '800', color: colors.text }}>
+                  Update Upcoming Topic
+                </ThemedText>
+                <ThemedText style={{ fontSize: 12, color: colors.primary, fontWeight: '700' }}>
+                  அடுத்த வாரத் தலைப்புத் திருத்தம்
+                </ThemedText>
+              </View>
+              <Pressable
+                onPress={() => setTopicEditModalVisible(false)}
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 16,
+                  backgroundColor: colors.background,
+                  justifyContent: 'center',
+                  alignItems: 'center'
+                }}
+              >
+                <ThemedText style={{ fontSize: 18, color: colors.textSecondary, fontWeight: '700' }}>✕</ThemedText>
+              </Pressable>
+            </View>
+
+            {/* Modal Content */}
+            <ScrollView style={{ maxHeight: 350 }} contentContainerStyle={{ gap: Spacing.three }}>
+              {/* Class Selector if multiple classes exist */}
+              {(() => {
+                const editable = (user?.role === 'admin') 
+                  ? classes 
+                  : classes.filter((c: any) => 
+                      user?.uid && (c.teacherId === user.uid || c.teacherIds?.includes(user.uid) || c.volunteerIds?.includes(user.uid))
+                    );
+                if (editable.length <= 1) return null;
+                return (
+                  <View style={{ gap: 6 }}>
+                    <ThemedText style={{ fontSize: 12, fontWeight: '700', color: colors.textSecondary }}>
+                      Select Class / வகுப்பைத் தேர்ந்தெடுக்கவும்
+                    </ThemedText>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                      {editable.map((c: any) => {
+                        const isSelected = c.classId === selectedTopicClassId;
+                        return (
+                          <Pressable
+                            key={c.classId}
+                            onPress={() => setSelectedTopicClassId(c.classId)}
+                            style={{
+                              paddingVertical: 6,
+                              paddingHorizontal: 12,
+                              borderRadius: 12,
+                              borderWidth: 1,
+                              borderColor: isSelected ? colors.primary : colors.border,
+                              backgroundColor: isSelected ? `${colors.primary}10` : colors.cardBg
+                            }}
+                          >
+                            <ThemedText style={{ fontSize: 12, fontWeight: isSelected ? '700' : '500', color: isSelected ? colors.primary : colors.text }}>
+                              {c.className}
+                            </ThemedText>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  </View>
+                );
+              })()}
+
+              {/* Topic English Input */}
+              <View style={{ gap: 6 }}>
+                <ThemedText style={{ fontSize: 12, fontWeight: '700', color: colors.textSecondary }}>
+                  Topic in English / ஆங்கிலத் தலைப்பு
+                </ThemedText>
+                <TextInput
+                  value={upcomingTopicEn}
+                  onChangeText={setUpcomingTopicEn}
+                  placeholder="e.g. Weekly Tamil Class"
+                  placeholderTextColor={colors.textSecondary}
+                  style={{
+                    height: 44,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                    borderRadius: 12,
+                    paddingHorizontal: 12,
+                    fontSize: 14,
+                    color: colors.text,
+                    backgroundColor: colors.background
+                  }}
+                />
+              </View>
+
+              {/* Topic Tamil Input */}
+              <View style={{ gap: 6 }}>
+                <ThemedText style={{ fontSize: 12, fontWeight: '700', color: colors.textSecondary }}>
+                  Topic in Tamil / தமிழ்த் தலைப்பு
+                </ThemedText>
+                <TextInput
+                  value={upcomingTopicTa}
+                  onChangeText={setUpcomingTopicTa}
+                  placeholder="எ.கா. வாராந்திரத் தமிழ் வகுப்பு"
+                  placeholderTextColor={colors.textSecondary}
+                  style={{
+                    height: 44,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                    borderRadius: 12,
+                    paddingHorizontal: 12,
+                    fontSize: 14,
+                    color: colors.text,
+                    backgroundColor: colors.background
+                  }}
+                />
+              </View>
+
+              <ThemedText style={{ fontSize: 11, color: colors.textSecondary, fontStyle: 'italic' }}>
+                Note: Leave inputs empty to fall back to the default general text.
+              </ThemedText>
+            </ScrollView>
+
+            {/* Modal Actions */}
+            <View style={{
+              flexDirection: 'row',
+              justifyContent: 'flex-end',
+              gap: Spacing.two,
+              borderTopWidth: 1,
+              borderTopColor: colors.border,
+              paddingTop: Spacing.three
+            }}>
+              <Pressable
+                onPress={() => setTopicEditModalVisible(false)}
+                style={{
+                  paddingVertical: 10,
+                  paddingHorizontal: 16,
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: colors.border
+                }}
+              >
+                <ThemedText style={{ fontSize: 13, fontWeight: '600', color: colors.textSecondary }}>
+                  {i18n.language === 'ta' ? 'ரத்துசெய்' : 'Cancel'}
+                </ThemedText>
+              </Pressable>
+              
+              <Pressable
+                onPress={async () => {
+                  try {
+                    if (!selectedTopicClassId) return;
+                    await mockDb.updateClass(selectedTopicClassId, {
+                      upcomingTopicEn: upcomingTopicEn.trim(),
+                      upcomingTopicTa: upcomingTopicTa.trim()
+                    });
+                    // Refresh data
+                    const cls = await mockDb.getClasses();
+                    setClasses(cls);
+                    await reloadDashboardData();
+                    setTopicEditModalVisible(false);
+                    Alert.alert(
+                      i18n.language === 'ta' ? 'வெற்றி' : 'Success',
+                      i18n.language === 'ta' ? 'அடுத்த வாரத் தலைப்பு புதுப்பிக்கப்பட்டது.' : 'Upcoming topic updated successfully.'
+                    );
+                  } catch (err) {
+                    Alert.alert(
+                      i18n.language === 'ta' ? 'பிழை' : 'Error',
+                      i18n.language === 'ta' ? 'தலைப்பைச் சேமிப்பதில் தோல்வி.' : 'Failed to update topic.'
+                    );
+                  }
+                }}
+                style={{
+                  paddingVertical: 10,
+                  paddingHorizontal: 20,
+                  borderRadius: 12,
+                  backgroundColor: colors.primary
+                }}
+              >
+                <ThemedText style={{ fontSize: 13, fontWeight: '700', color: '#FFF' }}>
+                  {i18n.language === 'ta' ? 'சேமி' : 'Save'}
                 </ThemedText>
               </Pressable>
             </View>
