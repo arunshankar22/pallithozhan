@@ -342,67 +342,12 @@ export function NewsfeedTab({
           return new Promise((resolve) => {
             const isVideo = file.type ? file.type.startsWith('video/') : /\.(mp4|mov|avi|mkv|webm)$/i.test(file.name);
             const resolvedType = isVideo ? 'video' : 'image';
-
-            if (resolvedType === 'video') {
-              // For videos, create a lightweight blob URL directly to prevent browser/Safari OOM
-              const blobUrl = URL.createObjectURL(file);
-              resolve({
-                name: file.name,
-                type: 'video',
-                data: blobUrl
-              });
-            } else {
-              // For images, load from object URL to optimize memory, resize, and compress
-              const objectUrl = URL.createObjectURL(file);
-              const img = new window.Image();
-              img.onload = () => {
-                let width = img.width;
-                let height = img.height;
-                const maxWidth = 1200;
-                const maxHeight = 1200;
-
-                if (width > maxWidth || height > maxHeight) {
-                  if (width > height) {
-                    height = Math.round((height * maxWidth) / width);
-                    width = maxWidth;
-                  } else {
-                    width = Math.round((width * maxHeight) / height);
-                    height = maxHeight;
-                  }
-                }
-
-                const canvas = document.createElement('canvas');
-                canvas.width = width;
-                canvas.height = height;
-                const ctx = canvas.getContext('2d');
-                if (ctx) {
-                  ctx.drawImage(img, 0, 0, width, height);
-                  const compressedData = canvas.toDataURL('image/jpeg', 0.7);
-                  URL.revokeObjectURL(objectUrl);
-                  resolve({
-                    name: file.name,
-                    type: 'image',
-                    data: compressedData
-                  });
-                } else {
-                  URL.revokeObjectURL(objectUrl);
-                  resolve({ name: file.name, type: 'image', data: objectUrl });
-                }
-              };
-              img.onerror = () => {
-                const reader = new FileReader();
-                reader.onload = () => {
-                  URL.revokeObjectURL(objectUrl);
-                  resolve({ name: file.name, type: 'image', data: reader.result as string });
-                };
-                reader.onerror = () => {
-                  URL.revokeObjectURL(objectUrl);
-                  resolve({ name: file.name, type: 'image', data: '' });
-                };
-                reader.readAsDataURL(file);
-              };
-              img.src = objectUrl;
-            }
+            const blobUrl = URL.createObjectURL(file);
+            resolve({
+              name: file.name,
+              type: resolvedType,
+              data: blobUrl
+            });
           });
         };
 
