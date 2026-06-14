@@ -166,41 +166,112 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
         input.type = 'file';
         input.accept = 'image/*,video/*'; // Allow both photos and videos!
         input.multiple = true; // Allow selecting multiple files at once!
-        
-        input.onchange = (e: any) => {
-          const files = e.target.files;
-          if (files && files.length > 0) {
-            const filesCount = files.length;
-            const newFileRecords: { name: string; type: 'image' | 'video'; data: string; }[] = [];
-            let loadedCount = 0;
-            
-            for (let i = 0; i < filesCount; i++) {
-              const file = files[i];
-              const reader = new FileReader();
-              
-              // Dynamically resolve if the file is an image or video
-              const isVideo = file.type ? file.type.startsWith('video/') : /\.(mp4|mov|avi|mkv|webm)$/i.test(file.name);
-              const resolvedType = isVideo ? 'video' : 'image';
-              
-              reader.onload = () => {
-                const dataUrl = reader.result as string;
-                newFileRecords.push({
-                  name: file.name,
-                  type: resolvedType,
-                  data: dataUrl
-                });
-                
-                loadedCount++;
-                if (loadedCount === filesCount) {
-                  setAttachedHomeworkFiles(prev => [...prev, ...newFileRecords]);
-                  showToast(`Attached ${filesCount} file(s) successfully for homework!`, 'success');
-                }
-              };
-              
-              reader.readAsDataURL(file);
-            }
+        input.style.position = 'absolute';
+        input.style.width = '1px';
+        input.style.height = '1px';
+        input.style.opacity = '0';
+        input.style.pointerEvents = 'none';
+
+        document.body.appendChild(input);
+
+        const cleanup = () => {
+          if (document.body.contains(input)) {
+            document.body.removeChild(input);
           }
         };
+
+        const readFileAndCompress = (file: any): Promise<{ name: string; type: 'image' | 'video'; data: string }> => {
+          return new Promise((resolve) => {
+            const isVideo = file.type ? file.type.startsWith('video/') : /\.(mp4|mov|avi|mkv|webm)$/i.test(file.name);
+            const resolvedType = isVideo ? 'video' : 'image';
+
+            if (resolvedType === 'video') {
+              // For videos, create a lightweight blob URL directly to prevent browser/Safari OOM
+              const blobUrl = URL.createObjectURL(file);
+              resolve({
+                name: file.name,
+                type: 'video',
+                data: blobUrl
+              });
+            } else {
+              // For images, load from object URL to optimize memory, resize, and compress
+              const objectUrl = URL.createObjectURL(file);
+              const img = new window.Image();
+              img.onload = () => {
+                let width = img.width;
+                let height = img.height;
+                const maxWidth = 1200;
+                const maxHeight = 1200;
+
+                if (width > maxWidth || height > maxHeight) {
+                  if (width > height) {
+                    height = Math.round((height * maxWidth) / width);
+                    width = maxWidth;
+                  } else {
+                    width = Math.round((width * maxHeight) / height);
+                    height = maxHeight;
+                  }
+                }
+
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                if (ctx) {
+                  ctx.drawImage(img, 0, 0, width, height);
+                  const compressedData = canvas.toDataURL('image/jpeg', 0.7);
+                  URL.revokeObjectURL(objectUrl);
+                  resolve({
+                    name: file.name,
+                    type: 'image',
+                    data: compressedData
+                  });
+                } else {
+                  URL.revokeObjectURL(objectUrl);
+                  resolve({ name: file.name, type: 'image', data: objectUrl });
+                }
+              };
+              img.onerror = () => {
+                const reader = new FileReader();
+                reader.onload = () => {
+                  URL.revokeObjectURL(objectUrl);
+                  resolve({ name: file.name, type: 'image', data: reader.result as string });
+                };
+                reader.onerror = () => {
+                  URL.revokeObjectURL(objectUrl);
+                  resolve({ name: file.name, type: 'image', data: '' });
+                };
+                reader.readAsDataURL(file);
+              };
+              img.src = objectUrl;
+            }
+          });
+        };
+
+        input.onchange = async (e: any) => {
+          try {
+            const files = e.target.files;
+            if (files && files.length > 0) {
+              const promises = Array.from(files).map(file => readFileAndCompress(file));
+              const results = await Promise.all(promises);
+              const newFileRecords = results.filter(record => !!record.data);
+
+              if (newFileRecords.length > 0) {
+                setAttachedHomeworkFiles(prev => [...prev, ...newFileRecords]);
+                showToast(`Attached ${newFileRecords.length} file(s) successfully for homework!`, 'success');
+              }
+            }
+          } catch (err) {
+            console.error('Error processing picked homework files:', err);
+          } finally {
+            cleanup();
+          }
+        };
+
+        input.oncancel = () => {
+          cleanup();
+        };
+
         input.click();
       } catch (error) {
         console.error('Failed to open file picker:', error);
@@ -210,13 +281,13 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
       const defaultData = type === 'video'
         ? 'https://www.w3schools.com/html/mov_bbb.mp4'
         : 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?auto=format&fit=crop&q=80&w=800';
-      
+
       const fileRecord = {
         name: `Device_${Date.now()}.${type === 'video' ? 'mp4' : 'jpg'}`,
         type: type === 'video' ? 'video' as const : 'image' as const,
         data: defaultData
       };
-      
+
       setAttachedHomeworkFiles(prev => [...prev, fileRecord]);
       showToast(`Uploaded simulated media successfully for homework.`, 'success');
     }

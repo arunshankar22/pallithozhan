@@ -258,141 +258,6 @@ export function NewsfeedTab({
   };
 
   // Device upload / Real Web File Input Picker (Allows multiple mixed selection!)
-  const handleSimulateDeviceUpload = async (type: 'image' | 'video' | 'mixed' = 'mixed') => {
-    if (Platform.OS === 'web') {
-      try {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = 'image/*,video/*'; // Allow selecting both photos and videos!
-        input.multiple = true; // Allow selecting multiple files at once!
-        
-        const readFileAndCompress = (file: any): Promise<{ name: string; type: 'image' | 'video'; data: string }> => {
-          return new Promise((resolve) => {
-            const reader = new FileReader();
-            
-            const isVideo = file.type ? file.type.startsWith('video/') : /\.(mp4|mov|avi|mkv|webm)$/i.test(file.name);
-            const resolvedType = isVideo ? 'video' : 'image';
-            
-            reader.onload = () => {
-              const dataUrl = reader.result as string;
-              if (resolvedType === 'image') {
-                const img = new window.Image();
-                img.onload = () => {
-                  let width = img.width;
-                  let height = img.height;
-                  const maxWidth = 1200;
-                  const maxHeight = 1200;
-                  
-                  if (width > maxWidth || height > maxHeight) {
-                    if (width > height) {
-                      height = Math.round((height * maxWidth) / width);
-                      width = maxWidth;
-                    } else {
-                      width = Math.round((width * maxHeight) / height);
-                      height = maxHeight;
-                    }
-                  }
-                  
-                  const canvas = document.createElement('canvas');
-                  canvas.width = width;
-                  canvas.height = height;
-                  const ctx = canvas.getContext('2d');
-                  if (ctx) {
-                    ctx.drawImage(img, 0, 0, width, height);
-                    resolve({
-                      name: file.name,
-                      type: 'image',
-                      data: canvas.toDataURL('image/jpeg', 0.7)
-                    });
-                  } else {
-                    resolve({ name: file.name, type: 'image', data: dataUrl });
-                  }
-                };
-                img.onerror = () => {
-                  resolve({ name: file.name, type: 'image', data: dataUrl });
-                };
-                img.src = dataUrl;
-              } else {
-                resolve({ name: file.name, type: 'video', data: dataUrl });
-              }
-            };
-            reader.onerror = () => {
-              resolve({ name: file.name, type: resolvedType, data: '' });
-            };
-            reader.readAsDataURL(file);
-          });
-        };
-
-        input.onchange = async (e: any) => {
-          const files = e.target.files;
-          if (files && files.length > 0) {
-            const filesCount = files.length;
-            const newFileRecords: { name: string; type: 'image' | 'video'; data: string; }[] = [];
-            
-            for (let i = 0; i < filesCount; i++) {
-              const file = files[i];
-              const record = await readFileAndCompress(file);
-              if (record.data) {
-                newFileRecords.push(record);
-              }
-            }
-            
-            if (newFileRecords.length > 0) {
-              setAttachedFiles(prev => [...prev, ...newFileRecords]);
-              showToast(`Attached ${newFileRecords.length} file(s) successfully!`, 'success');
-            }
-          }
-        };
-        input.click();
-      } catch (error) {
-        console.error('Failed to open file picker:', error);
-        fallbackSimulation('image');
-      }
-    } else {
-      // Native iOS/Android logic using expo-image-picker
-      try {
-        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (status !== 'granted') {
-          Alert.alert(
-            'Permission Denied',
-            'Permission to access your photo library is required to upload files.'
-          );
-          return;
-        }
-
-        let mediaTypes = ImagePicker.MediaTypeOptions.All;
-        if (type === 'image') {
-          mediaTypes = ImagePicker.MediaTypeOptions.Images;
-        } else if (type === 'video') {
-          mediaTypes = ImagePicker.MediaTypeOptions.Videos;
-        }
-
-        const result = await ImagePicker.launchImageLibraryAsync({
-          mediaTypes,
-          allowsMultipleSelection: true,
-          quality: 0.7,
-        });
-
-        if (!result.canceled && result.assets && result.assets.length > 0) {
-          const newFileRecords = result.assets.map(asset => {
-            const resolvedType: 'image' | 'video' = asset.type === 'video' ? 'video' : 'image';
-            return {
-              name: asset.fileName || `mobile_upload_${Date.now()}.${resolvedType === 'video' ? 'mp4' : 'jpg'}`,
-              type: resolvedType,
-              data: asset.uri
-            };
-          });
-
-          setAttachedFiles(prev => [...prev, ...newFileRecords]);
-          showToast(`Attached ${newFileRecords.length} file(s) successfully!`, 'success');
-        }
-      } catch (error) {
-        console.error('Native image picker failed:', error);
-        fallbackSimulation(type === 'mixed' ? 'image' : type);
-      }
-    }
-  };
-
   const fallbackSimulation = (type: 'image' | 'video') => {
     const defaultData = type === 'image' 
       ? 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?auto=format&fit=crop&q=80&w=800'
@@ -406,6 +271,173 @@ export function NewsfeedTab({
     
     setAttachedFiles(prev => [...prev, fileRecord]);
     showToast(`Uploaded simulated ${type} successfully!`, 'success');
+  };
+
+  const handleNativeUpload = async (type: 'image' | 'video' | 'mixed') => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permission Denied',
+          'Permission to access your photo library is required to upload files.'
+        );
+        return;
+      }
+
+      let mediaTypes = ImagePicker.MediaTypeOptions.All;
+      if (type === 'image') {
+        mediaTypes = ImagePicker.MediaTypeOptions.Images;
+      } else if (type === 'video') {
+        mediaTypes = ImagePicker.MediaTypeOptions.Videos;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes,
+        allowsMultipleSelection: true,
+        quality: 0.7,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const newFileRecords = result.assets.map(asset => {
+          const resolvedType: 'image' | 'video' = asset.type === 'video' ? 'video' : 'image';
+          return {
+            name: asset.fileName || `mobile_upload_${Date.now()}.${resolvedType === 'video' ? 'mp4' : 'jpg'}`,
+            type: resolvedType,
+            data: asset.uri
+          };
+        });
+
+        setAttachedFiles(prev => [...prev, ...newFileRecords]);
+        showToast(`Attached ${newFileRecords.length} file(s) successfully!`, 'success');
+      }
+    } catch (error) {
+      console.error('Native image picker failed:', error);
+      fallbackSimulation(type === 'mixed' ? 'image' : type);
+    }
+  };
+
+  // Device upload / Real Web File Input Picker (Allows multiple mixed selection!)
+  const handleSimulateDeviceUpload = (type: 'image' | 'video' | 'mixed' = 'mixed') => {
+    if (Platform.OS === 'web') {
+      try {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*,video/*'; // Allow selecting both photos and videos!
+        input.multiple = true; // Allow selecting multiple files at once!
+        input.style.position = 'absolute';
+        input.style.width = '1px';
+        input.style.height = '1px';
+        input.style.opacity = '0';
+        input.style.pointerEvents = 'none';
+
+        document.body.appendChild(input);
+
+        const cleanup = () => {
+          if (document.body.contains(input)) {
+            document.body.removeChild(input);
+          }
+        };
+
+        const readFileAndCompress = (file: any): Promise<{ name: string; type: 'image' | 'video'; data: string }> => {
+          return new Promise((resolve) => {
+            const isVideo = file.type ? file.type.startsWith('video/') : /\.(mp4|mov|avi|mkv|webm)$/i.test(file.name);
+            const resolvedType = isVideo ? 'video' : 'image';
+
+            if (resolvedType === 'video') {
+              // For videos, create a lightweight blob URL directly to prevent browser/Safari OOM
+              const blobUrl = URL.createObjectURL(file);
+              resolve({
+                name: file.name,
+                type: 'video',
+                data: blobUrl
+              });
+            } else {
+              // For images, load from object URL to optimize memory, resize, and compress
+              const objectUrl = URL.createObjectURL(file);
+              const img = new window.Image();
+              img.onload = () => {
+                let width = img.width;
+                let height = img.height;
+                const maxWidth = 1200;
+                const maxHeight = 1200;
+
+                if (width > maxWidth || height > maxHeight) {
+                  if (width > height) {
+                    height = Math.round((height * maxWidth) / width);
+                    width = maxWidth;
+                  } else {
+                    width = Math.round((width * maxHeight) / height);
+                    height = maxHeight;
+                  }
+                }
+
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                if (ctx) {
+                  ctx.drawImage(img, 0, 0, width, height);
+                  const compressedData = canvas.toDataURL('image/jpeg', 0.7);
+                  URL.revokeObjectURL(objectUrl);
+                  resolve({
+                    name: file.name,
+                    type: 'image',
+                    data: compressedData
+                  });
+                } else {
+                  URL.revokeObjectURL(objectUrl);
+                  resolve({ name: file.name, type: 'image', data: objectUrl });
+                }
+              };
+              img.onerror = () => {
+                const reader = new FileReader();
+                reader.onload = () => {
+                  URL.revokeObjectURL(objectUrl);
+                  resolve({ name: file.name, type: 'image', data: reader.result as string });
+                };
+                reader.onerror = () => {
+                  URL.revokeObjectURL(objectUrl);
+                  resolve({ name: file.name, type: 'image', data: '' });
+                };
+                reader.readAsDataURL(file);
+              };
+              img.src = objectUrl;
+            }
+          });
+        };
+
+        input.onchange = async (e: any) => {
+          try {
+            const files = e.target.files;
+            if (files && files.length > 0) {
+              const promises = Array.from(files).map(file => readFileAndCompress(file));
+              const results = await Promise.all(promises);
+              const newFileRecords = results.filter(record => !!record.data);
+
+              if (newFileRecords.length > 0) {
+                setAttachedFiles(prev => [...prev, ...newFileRecords]);
+                showToast(`Attached ${newFileRecords.length} file(s) successfully!`, 'success');
+              }
+            }
+          } catch (err) {
+            console.error('Error processing picked files:', err);
+          } finally {
+            cleanup();
+          }
+        };
+
+        input.oncancel = () => {
+          cleanup();
+        };
+
+        input.click();
+      } catch (error) {
+        console.error('Failed to open file picker:', error);
+        fallbackSimulation('image');
+      }
+    } else {
+      handleNativeUpload(type);
+    }
   };
 
   const handleSavePost = async () => {

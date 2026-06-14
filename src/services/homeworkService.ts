@@ -15,6 +15,75 @@ export const DEFAULT_HOMEWORK = [
   }
 ];
 
+const uploadHomeworkMedia = async (homeworkId: string, mediaAttachments: any[], storage: any, mediaUrlObj: { mediaUrl?: string }) => {
+  if (!storage || !mediaAttachments || mediaAttachments.length === 0) return;
+  
+  const { ref, uploadString, uploadBytes, getDownloadURL } = require('firebase/storage');
+  
+  for (let i = 0; i < mediaAttachments.length; i++) {
+    const att = mediaAttachments[i];
+    if (!att.url) continue;
+    
+    if (att.url.startsWith('data:')) {
+      // Base64 Web upload
+      try {
+        console.log(`Uploading homework attachment ${att.name} to Firebase Storage...`);
+        const fileRef = ref(storage, `homework/${homeworkId}_${i}_${att.name}`);
+        await uploadString(fileRef, att.url, 'data_url');
+        const downloadUrl = await getDownloadURL(fileRef);
+        att.url = downloadUrl;
+        
+        if (mediaUrlObj.mediaUrl && mediaUrlObj.mediaUrl.startsWith('data:')) {
+          mediaUrlObj.mediaUrl = downloadUrl;
+        }
+        console.log(`Successfully uploaded. Download URL: ${downloadUrl}`);
+      } catch (storageErr) {
+        console.warn(`Firebase Storage upload failed for Web attachment ${att.name}:`, storageErr);
+        if (att.url.length > 800 * 1024) {
+          console.warn(`Base64 too large for Firestore, falling back to placeholder.`);
+          const placeholder = att.type === 'video'
+            ? 'https://www.w3schools.com/html/mov_bbb.mp4'
+            : 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&q=80&w=800';
+          att.url = placeholder;
+          if (mediaUrlObj.mediaUrl && mediaUrlObj.mediaUrl.startsWith('data:')) {
+            mediaUrlObj.mediaUrl = placeholder;
+          }
+        }
+      }
+    } else if (
+      !att.url.startsWith('http://') && 
+      !att.url.startsWith('https://')
+    ) {
+      // Local native file URI or Web blob: URI
+      try {
+        console.log(`Uploading local file/blob homework attachment ${att.name} to Firebase Storage...`);
+        const fileRef = ref(storage, `homework/${homeworkId}_${i}_${att.name}`);
+        
+        const response = await fetch(att.url);
+        const blob = await response.blob();
+        
+        await uploadBytes(fileRef, blob);
+        const downloadUrl = await getDownloadURL(fileRef);
+        att.url = downloadUrl;
+        
+        if (mediaUrlObj.mediaUrl === att.url || (mediaUrlObj.mediaUrl && !mediaUrlObj.mediaUrl.startsWith('http'))) {
+          mediaUrlObj.mediaUrl = downloadUrl;
+        }
+        console.log(`Successfully uploaded local file/blob. Download URL: ${downloadUrl}`);
+      } catch (storageErr) {
+        console.warn(`Firebase Storage upload failed for local file/blob ${att.name}:`, storageErr);
+        const placeholder = att.type === 'video'
+          ? 'https://www.w3schools.com/html/mov_bbb.mp4'
+          : 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&q=80&w=800';
+        att.url = placeholder;
+        if (mediaUrlObj.mediaUrl && !mediaUrlObj.mediaUrl.startsWith('http')) {
+          mediaUrlObj.mediaUrl = placeholder;
+        }
+      }
+    }
+  }
+};
+
 export const homeworkService = {
   reset: async (): Promise<void> => {
     if (isServerOnline) {
@@ -94,34 +163,9 @@ export const homeworkService = {
       }
 
       if (storage && newHw.mediaAttachments && newHw.mediaAttachments.length > 0) {
-        for (let i = 0; i < newHw.mediaAttachments.length; i++) {
-          const att = newHw.mediaAttachments[i];
-          if (att.url && att.url.startsWith('data:')) {
-            try {
-              console.log(`Uploading homework attachment ${att.name} to Firebase Storage...`);
-              const fileRef = ref(storage, `homework/${homeworkId}_${i}_${att.name}`);
-              await uploadString(fileRef, att.url, 'data_url');
-              const downloadUrl = await getDownloadURL(fileRef);
-              att.url = downloadUrl;
-              
-              if (newHw.mediaUrl.startsWith('data:')) {
-                newHw.mediaUrl = downloadUrl;
-              }
-              console.log(`Successfully uploaded homework file. Download URL: ${downloadUrl}`);
-            } catch (storageErr) {
-              console.warn(`Firebase Storage upload failed for ${att.name}:`, storageErr);
-              if (att.url.length > 800 * 1024) {
-                const placeholder = att.type === 'video'
-                  ? 'https://www.w3schools.com/html/mov_bbb.mp4'
-                  : 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&q=80&w=800';
-                att.url = placeholder;
-                if (newHw.mediaUrl.startsWith('data:')) {
-                  newHw.mediaUrl = placeholder;
-                }
-              }
-            }
-          }
-        }
+        const mediaUrlObj = { mediaUrl: newHw.mediaUrl };
+        await uploadHomeworkMedia(homeworkId, newHw.mediaAttachments, storage, mediaUrlObj);
+        newHw.mediaUrl = mediaUrlObj.mediaUrl || '';
       }
 
       const { homeworkId: omitted, ...details } = newHw;
@@ -207,6 +251,42 @@ export const homeworkService = {
 
     // 1. Firebase Firestore
     if (!isDemoMode && db) {
+      const { ref, uploadString, uploadBytes, getDownloadURL } = require('firebase/storage');
+      const { storage } = require('./firebase');
+
+      if (storage && cleanAttachments.length > 0) {
+        for (let i = 0; i < cleanAttachments.length; i++) {
+          const att = cleanAttachments[i];
+          if (!att.url) continue;
+
+          if (att.url.startsWith('data:')) {
+            try {
+              console.log(`Uploading submission attachment ${att.name} to Firebase Storage...`);
+              const fileRef = ref(storage, `homework_submissions/${homeworkId}_${studentId}_${i}_${att.name}`);
+              await uploadString(fileRef, att.url, 'data_url');
+              const downloadUrl = await getDownloadURL(fileRef);
+              att.url = downloadUrl;
+              console.log(`Successfully uploaded. Download URL: ${downloadUrl}`);
+            } catch (err) {
+              console.warn('Failed to upload submission attachment:', err);
+            }
+          } else if (!att.url.startsWith('http://') && !att.url.startsWith('https://')) {
+            try {
+              console.log(`Uploading local/blob submission attachment ${att.name} to Firebase Storage...`);
+              const fileRef = ref(storage, `homework_submissions/${homeworkId}_${studentId}_${i}_${att.name}`);
+              const response = await fetch(att.url);
+              const blob = await response.blob();
+              await uploadBytes(fileRef, blob);
+              const downloadUrl = await getDownloadURL(fileRef);
+              att.url = downloadUrl;
+              console.log(`Successfully uploaded local/blob. Download URL: ${downloadUrl}`);
+            } catch (err) {
+              console.warn('Failed to upload submission attachment:', err);
+            }
+          }
+        }
+      }
+
       const docRef = doc(db, 'homework', homeworkId);
       const docSnap = await getDoc(docRef);
       if (docSnap.exists()) {
@@ -273,34 +353,9 @@ export const homeworkService = {
       }
 
       if (storage && updatedHw.mediaAttachments && updatedHw.mediaAttachments.length > 0) {
-        for (let i = 0; i < updatedHw.mediaAttachments.length; i++) {
-          const att = updatedHw.mediaAttachments[i];
-          if (att.url && att.url.startsWith('data:')) {
-            try {
-              console.log(`Uploading updated homework attachment ${att.name} to Firebase Storage...`);
-              const fileRef = ref(storage, `homework/${homeworkId}_${i}_${att.name}`);
-              await uploadString(fileRef, att.url, 'data_url');
-              const downloadUrl = await getDownloadURL(fileRef);
-              att.url = downloadUrl;
-              
-              if (updatedHw.mediaUrl && updatedHw.mediaUrl.startsWith('data:')) {
-                updatedHw.mediaUrl = downloadUrl;
-              }
-              console.log(`Successfully uploaded homework file. Download URL: ${downloadUrl}`);
-            } catch (storageErr) {
-              console.warn(`Firebase Storage upload failed for ${att.name}:`, storageErr);
-              if (att.url.length > 800 * 1024) {
-                const placeholder = att.type === 'video'
-                  ? 'https://www.w3schools.com/html/mov_bbb.mp4'
-                  : 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&q=80&w=800';
-                att.url = placeholder;
-                if (updatedHw.mediaUrl && updatedHw.mediaUrl.startsWith('data:')) {
-                  updatedHw.mediaUrl = placeholder;
-                }
-              }
-            }
-          }
-        }
+        const mediaUrlObj = { mediaUrl: updatedHw.mediaUrl };
+        await uploadHomeworkMedia(homeworkId, updatedHw.mediaAttachments, storage, mediaUrlObj);
+        updatedHw.mediaUrl = mediaUrlObj.mediaUrl || '';
       }
 
       const docRef = doc(db, 'homework', homeworkId);
