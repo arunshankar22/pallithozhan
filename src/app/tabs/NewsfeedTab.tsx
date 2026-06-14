@@ -277,7 +277,6 @@ export function NewsfeedTab({
               const dataUrl = reader.result as string;
               if (resolvedType === 'image') {
                 const img = new window.Image();
-                img.src = dataUrl;
                 img.onload = () => {
                   let width = img.width;
                   let height = img.height;
@@ -312,6 +311,7 @@ export function NewsfeedTab({
                 img.onerror = () => {
                   resolve({ name: file.name, type: 'image', data: dataUrl });
                 };
+                img.src = dataUrl;
               } else {
                 resolve({ name: file.name, type: 'video', data: dataUrl });
               }

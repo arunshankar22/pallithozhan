@@ -14,6 +14,8 @@ if (typeof window !== 'undefined' && window.location) {
   if (
     hostname && (
       hostname === 'pallithozhan.vercel.app' || 
+      hostname === 'pallithozhan.3stech.com.au' ||
+      hostname === 'pallithozhan.3stech.ai' ||
       (hostname.includes('balarmalar.nsw.edu.au') && !hostname.includes('dev') && !hostname.includes('preview'))
     )
   ) {
