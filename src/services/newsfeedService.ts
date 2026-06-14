@@ -22,6 +22,76 @@ export const DEFAULT_NEWSFEED = [
   }
 ];
 
+const uploadPostMedia = async (postId: string, mediaAttachments: any[], storage: any, mediaUrlObj: { mediaUrl?: string }) => {
+  if (!storage || !mediaAttachments || mediaAttachments.length === 0) return;
+  
+  const { ref, uploadString, uploadBytes, getDownloadURL } = require('firebase/storage');
+  
+  for (let i = 0; i < mediaAttachments.length; i++) {
+    const att = mediaAttachments[i];
+    if (!att.url) continue;
+    
+    if (att.url.startsWith('data:')) {
+      // Base64 Web upload
+      try {
+        console.log(`Uploading Web Base64 attachment ${att.name} to Firebase Storage...`);
+        const fileRef = ref(storage, `newsfeed/${postId}_${i}_${att.name}`);
+        await uploadString(fileRef, att.url, 'data_url');
+        const downloadUrl = await getDownloadURL(fileRef);
+        att.url = downloadUrl;
+        
+        if (mediaUrlObj.mediaUrl && mediaUrlObj.mediaUrl.startsWith('data:')) {
+          mediaUrlObj.mediaUrl = downloadUrl;
+        }
+        console.log(`Successfully uploaded. Download URL: ${downloadUrl}`);
+      } catch (storageErr) {
+        console.warn(`Firebase Storage upload failed for Web attachment ${att.name}:`, storageErr);
+        if (att.url.length > 800 * 1024) {
+          console.warn(`Base64 too large for Firestore, falling back to placeholder.`);
+          const placeholder = att.type === 'video'
+            ? 'https://www.w3schools.com/html/mov_bbb.mp4'
+            : 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&q=80&w=800';
+          att.url = placeholder;
+          if (mediaUrlObj.mediaUrl && mediaUrlObj.mediaUrl.startsWith('data:')) {
+            mediaUrlObj.mediaUrl = placeholder;
+          }
+        }
+      }
+    } else if (
+      !att.url.startsWith('http://') && 
+      !att.url.startsWith('https://')
+    ) {
+      // Local native file URI (starts with file://, content://, etc.)
+      try {
+        console.log(`Uploading local file attachment ${att.name} to Firebase Storage...`);
+        const fileRef = ref(storage, `newsfeed/${postId}_${i}_${att.name}`);
+        
+        const response = await fetch(att.url);
+        const blob = await response.blob();
+        
+        await uploadBytes(fileRef, blob);
+        const downloadUrl = await getDownloadURL(fileRef);
+        att.url = downloadUrl;
+        
+        if (mediaUrlObj.mediaUrl === att.url || (mediaUrlObj.mediaUrl && !mediaUrlObj.mediaUrl.startsWith('http'))) {
+          mediaUrlObj.mediaUrl = downloadUrl;
+        }
+        console.log(`Successfully uploaded local file. Download URL: ${downloadUrl}`);
+      } catch (storageErr) {
+        console.warn(`Firebase Storage upload failed for local file ${att.name}:`, storageErr);
+        // Fallback placeholder
+        const placeholder = att.type === 'video'
+          ? 'https://www.w3schools.com/html/mov_bbb.mp4'
+          : 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&q=80&w=800';
+        att.url = placeholder;
+        if (mediaUrlObj.mediaUrl && !mediaUrlObj.mediaUrl.startsWith('http')) {
+          mediaUrlObj.mediaUrl = placeholder;
+        }
+      }
+    }
+  }
+};
+
 export const newsfeedService = {
   reset: async (): Promise<void> => {
     if (isServerOnline) {
@@ -82,40 +152,12 @@ export const newsfeedService = {
 
     // 1. Firebase Firestore
     if (!isDemoMode && db) {
-      const { ref, uploadString, getDownloadURL } = require('firebase/storage');
       const { storage } = require('./firebase');
 
       if (storage && newPost.mediaAttachments && newPost.mediaAttachments.length > 0) {
-        for (let i = 0; i < newPost.mediaAttachments.length; i++) {
-          const att = newPost.mediaAttachments[i];
-          if (att.url && att.url.startsWith('data:')) {
-            try {
-              console.log(`Uploading attachment ${att.name} to Firebase Storage...`);
-              const fileRef = ref(storage, `newsfeed/${postId}_${i}_${att.name}`);
-              await uploadString(fileRef, att.url, 'data_url');
-              const downloadUrl = await getDownloadURL(fileRef);
-              att.url = downloadUrl;
-              
-              if (newPost.mediaUrl.startsWith('data:')) {
-                newPost.mediaUrl = downloadUrl;
-              }
-              console.log(`Successfully uploaded. Download URL: ${downloadUrl}`);
-            } catch (storageErr) {
-              console.warn(`Firebase Storage upload failed for ${att.name}:`, storageErr);
-              // Truncate giant base64 to prevent Firestore crash (>1MB)
-              if (att.url.length > 800 * 1024) {
-                console.warn(`Base64 too large for Firestore, falling back to placeholder.`);
-                const placeholder = att.type === 'video'
-                  ? 'https://www.w3schools.com/html/mov_bbb.mp4'
-                  : 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&q=80&w=800';
-                att.url = placeholder;
-                if (newPost.mediaUrl.startsWith('data:')) {
-                  newPost.mediaUrl = placeholder;
-                }
-              }
-            }
-          }
-        }
+        const mediaUrlObj = { mediaUrl: newPost.mediaUrl };
+        await uploadPostMedia(postId, newPost.mediaAttachments, storage, mediaUrlObj);
+        newPost.mediaUrl = mediaUrlObj.mediaUrl || '';
       }
 
       const { postId: omitted, ...details } = newPost;
@@ -146,40 +188,14 @@ export const newsfeedService = {
   updateNewsfeedPost: async (postId: string, post: any): Promise<any> => {
     // 1. Firebase Firestore
     if (!isDemoMode && db) {
-      const { ref, uploadString, getDownloadURL } = require('firebase/storage');
       const { storage } = require('./firebase');
 
       const updatedPost = { ...post };
 
       if (storage && updatedPost.mediaAttachments && updatedPost.mediaAttachments.length > 0) {
-        for (let i = 0; i < updatedPost.mediaAttachments.length; i++) {
-          const att = updatedPost.mediaAttachments[i];
-          if (att.url && att.url.startsWith('data:')) {
-            try {
-              console.log(`Uploading attachment ${att.name} to Firebase Storage...`);
-              const fileRef = ref(storage, `newsfeed/${postId}_${i}_${att.name}`);
-              await uploadString(fileRef, att.url, 'data_url');
-              const downloadUrl = await getDownloadURL(fileRef);
-              att.url = downloadUrl;
-              
-              if (updatedPost.mediaUrl.startsWith('data:')) {
-                updatedPost.mediaUrl = downloadUrl;
-              }
-            } catch (storageErr) {
-              console.warn(`Firebase Storage upload failed for ${att.name}:`, storageErr);
-              // Truncate giant base64 to prevent Firestore crash (>1MB)
-              if (att.url.length > 800 * 1024) {
-                const placeholder = att.type === 'video'
-                  ? 'https://www.w3schools.com/html/mov_bbb.mp4'
-                  : 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&q=80&w=800';
-                att.url = placeholder;
-                if (updatedPost.mediaUrl.startsWith('data:')) {
-                  updatedPost.mediaUrl = placeholder;
-                }
-              }
-            }
-          }
-        }
+        const mediaUrlObj = { mediaUrl: updatedPost.mediaUrl };
+        await uploadPostMedia(postId, updatedPost.mediaAttachments, storage, mediaUrlObj);
+        updatedPost.mediaUrl = mediaUrlObj.mediaUrl || '';
       }
 
       const cleanedPost = cleanFirestoreData(updatedPost);

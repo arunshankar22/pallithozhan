@@ -21,6 +21,7 @@ import { isDemoMode } from '@/services/firebase';
 import { Colors, Spacing, MaxContentWidth } from '@/constants/theme';
 import { ThemedText } from '@/components/themed-text';
 import { styles } from '@/app/styles';
+import { VideoPlayer } from '@/components/VideoPlayer';
 import {
   Newspaper,
   CheckSquare,
@@ -2229,25 +2230,7 @@ export default function HomeScreen() {
                       return (
                         <View key={idx} style={{ borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: colors.border, backgroundColor: '#000' }}>
                           {isVideo ? (
-                            Platform.OS === 'web' ? (
-                              <video 
-                                src={media.url} 
-                                controls 
-                                style={{ width: '100%', maxHeight: 300, display: 'block', objectFit: 'contain' }}
-                              />
-                            ) : (
-                              <Pressable 
-                                onPress={() => handlePlayVideo(media.url)}
-                                style={({ pressed }) => [
-                                  { padding: 24, alignItems: 'center', opacity: pressed ? 0.7 : 1 }
-                                ]}
-                              >
-                                <ThemedText style={{ color: '#FFF', fontWeight: 'bold', fontSize: 14 }}>📹 Play Video Attachment</ThemedText>
-                                <ThemedText style={{ color: '#AAA', fontSize: 10, marginTop: 6, textAlign: 'center' }}>
-                                  {media.name || 'Click to play in player'}
-                                </ThemedText>
-                              </Pressable>
-                            )
+                            <VideoPlayer url={media.url} style={{ height: 300 }} />
                           ) : (
                             <Image
                               source={{ uri: media.url }}

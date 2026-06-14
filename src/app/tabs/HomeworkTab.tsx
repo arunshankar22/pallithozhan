@@ -18,6 +18,7 @@ import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { Spacing } from '@/constants/theme';
 import { ThirukkuralPracticeGuide } from '@/components/ThirukkuralPracticeGuide';
+import { VideoPlayer } from '@/components/VideoPlayer';
 
 export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId }: TabProps) {
   const [homework, setHomework] = useState<any[]>([]);
@@ -855,20 +856,7 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
                               resizeMode="contain"
                             />
                           ) : (
-                            <View style={{ width: '100%', borderRadius: 12, backgroundColor: '#000', overflow: 'hidden' }}>
-                              {Platform.OS === 'web' ? (
-                                <video 
-                                  src={item.mediaUrl} 
-                                  controls 
-                                  style={{ width: '100%', maxHeight: 280, display: 'block', objectFit: 'contain' }}
-                                />
-                              ) : (
-                                <View style={{ padding: 24, alignItems: 'center', gap: 8 }}>
-                                  <ThemedText style={{ color: '#FFF', fontWeight: 'bold' }}>📹 Play Video Attachment</ThemedText>
-                                  <ThemedText style={{ color: '#AAA', fontSize: 11 }}>{item.mediaName || 'Attached Video'}</ThemedText>
-                                </View>
-                              )}
-                            </View>
+                            <VideoPlayer url={item.mediaUrl} style={{ height: 280, borderRadius: 12, overflow: 'hidden' }} />
                           )}
                         </View>
                       )}
@@ -887,20 +875,7 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
                                     resizeMode="contain"
                                   />
                                 ) : (
-                                  <View style={{ width: '100%', borderRadius: 12, backgroundColor: '#000', overflow: 'hidden' }}>
-                                    {Platform.OS === 'web' ? (
-                                      <video 
-                                        src={fileUrl} 
-                                        controls 
-                                        style={{ width: '100%', maxHeight: 280, display: 'block', objectFit: 'contain' }}
-                                      />
-                                    ) : (
-                                      <View style={{ padding: 24, alignItems: 'center', gap: 8 }}>
-                                        <ThemedText style={{ color: '#FFF', fontWeight: 'bold' }}>📹 Play Video Attachment</ThemedText>
-                                        <ThemedText style={{ color: '#AAA', fontSize: 11 }}>{media.name || 'Attached Video'}</ThemedText>
-                                      </View>
-                                    )}
-                                  </View>
+                                  <VideoPlayer url={fileUrl} style={{ height: 280, borderRadius: 12, overflow: 'hidden' }} />
                                 )}
                               </View>
                             );

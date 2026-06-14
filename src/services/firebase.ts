@@ -47,8 +47,8 @@ try {
     experimentalForceLongPolling: true
   }, databaseId);
   storage = getStorage(app, storageBucketId);
-  storage.maxUploadRetryTime = 2000; // Fail-fast on network/CORS blocks (2s limit)
-  storage.maxOperationRetryTime = 2000;  // Fail-fast on general operations (2s limit)
+  storage.maxUploadRetryTime = 30000; // Increase to 30s to allow real mobile uploads
+  storage.maxOperationRetryTime = 30000; // Increase to 30s
 } catch (error) {
   console.error("Failed to initialize production Firebase:", error);
 }

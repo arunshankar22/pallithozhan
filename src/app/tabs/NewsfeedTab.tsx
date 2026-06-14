@@ -42,8 +42,10 @@ import { mockDb, MEDIA_PRESETS } from '@/services/mockBackend';
 import { autoTranslate } from '@/services/translator';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { AudioPlayer } from '@/components/AudioPlayer';
+import { VideoPlayer } from '@/components/VideoPlayer';
 import { Spacing } from '@/constants/theme';
 import { getLocalStorageItem, setLocalStorageItem } from '@/services/dbCommon';
+import * as ImagePicker from 'expo-image-picker';
 
 const { width: windowWidth } = Dimensions.get('window');
 
@@ -256,7 +258,7 @@ export function NewsfeedTab({
   };
 
   // Device upload / Real Web File Input Picker (Allows multiple mixed selection!)
-  const handleSimulateDeviceUpload = (type: 'image' | 'video' | 'mixed' = 'mixed') => {
+  const handleSimulateDeviceUpload = async (type: 'image' | 'video' | 'mixed' = 'mixed') => {
     if (Platform.OS === 'web') {
       try {
         const input = document.createElement('input');
@@ -264,38 +266,80 @@ export function NewsfeedTab({
         input.accept = 'image/*,video/*'; // Allow selecting both photos and videos!
         input.multiple = true; // Allow selecting multiple files at once!
         
-        input.onchange = (e: any) => {
+        const readFileAndCompress = (file: any): Promise<{ name: string; type: 'image' | 'video'; data: string }> => {
+          return new Promise((resolve) => {
+            const reader = new FileReader();
+            
+            const isVideo = file.type ? file.type.startsWith('video/') : /\.(mp4|mov|avi|mkv|webm)$/i.test(file.name);
+            const resolvedType = isVideo ? 'video' : 'image';
+            
+            reader.onload = () => {
+              const dataUrl = reader.result as string;
+              if (resolvedType === 'image') {
+                const img = new window.Image();
+                img.src = dataUrl;
+                img.onload = () => {
+                  let width = img.width;
+                  let height = img.height;
+                  const maxWidth = 1200;
+                  const maxHeight = 1200;
+                  
+                  if (width > maxWidth || height > maxHeight) {
+                    if (width > height) {
+                      height = Math.round((height * maxWidth) / width);
+                      width = maxWidth;
+                    } else {
+                      width = Math.round((width * maxHeight) / height);
+                      height = maxHeight;
+                    }
+                  }
+                  
+                  const canvas = document.createElement('canvas');
+                  canvas.width = width;
+                  canvas.height = height;
+                  const ctx = canvas.getContext('2d');
+                  if (ctx) {
+                    ctx.drawImage(img, 0, 0, width, height);
+                    resolve({
+                      name: file.name,
+                      type: 'image',
+                      data: canvas.toDataURL('image/jpeg', 0.7)
+                    });
+                  } else {
+                    resolve({ name: file.name, type: 'image', data: dataUrl });
+                  }
+                };
+                img.onerror = () => {
+                  resolve({ name: file.name, type: 'image', data: dataUrl });
+                };
+              } else {
+                resolve({ name: file.name, type: 'video', data: dataUrl });
+              }
+            };
+            reader.onerror = () => {
+              resolve({ name: file.name, type: resolvedType, data: '' });
+            };
+            reader.readAsDataURL(file);
+          });
+        };
+
+        input.onchange = async (e: any) => {
           const files = e.target.files;
           if (files && files.length > 0) {
             const filesCount = files.length;
             const newFileRecords: { name: string; type: 'image' | 'video'; data: string; }[] = [];
-            let loadedCount = 0;
             
             for (let i = 0; i < filesCount; i++) {
               const file = files[i];
-              const reader = new FileReader();
-              
-              // Dynamically resolve if the file is an image or video
-              const isVideo = file.type ? file.type.startsWith('video/') : /\.(mp4|mov|avi|mkv|webm)$/i.test(file.name);
-              const resolvedType = isVideo ? 'video' : 'image';
-              
-              reader.onload = () => {
-                const dataUrl = reader.result as string;
-                newFileRecords.push({
-                  name: file.name,
-                  type: resolvedType,
-                  data: dataUrl
-                });
-                
-                loadedCount++;
-                if (loadedCount === filesCount) {
-                  // Maintain ordering and add all at once
-                  setAttachedFiles(prev => [...prev, ...newFileRecords]);
-                  showToast(`Attached ${filesCount} file(s) successfully!`, 'success');
-                }
-              };
-              
-              reader.readAsDataURL(file);
+              const record = await readFileAndCompress(file);
+              if (record.data) {
+                newFileRecords.push(record);
+              }
+            }
+            
+            if (newFileRecords.length > 0) {
+              setAttachedFiles(prev => [...prev, ...newFileRecords]);
+              showToast(`Attached ${newFileRecords.length} file(s) successfully!`, 'success');
             }
           }
         };
@@ -305,7 +349,47 @@ export function NewsfeedTab({
         fallbackSimulation('image');
       }
     } else {
-      fallbackSimulation(type === 'mixed' ? 'image' : type);
+      // Native iOS/Android logic using expo-image-picker
+      try {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert(
+            'Permission Denied',
+            'Permission to access your photo library is required to upload files.'
+          );
+          return;
+        }
+
+        let mediaTypes = ImagePicker.MediaTypeOptions.All;
+        if (type === 'image') {
+          mediaTypes = ImagePicker.MediaTypeOptions.Images;
+        } else if (type === 'video') {
+          mediaTypes = ImagePicker.MediaTypeOptions.Videos;
+        }
+
+        const result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes,
+          allowsMultipleSelection: true,
+          quality: 0.7,
+        });
+
+        if (!result.canceled && result.assets && result.assets.length > 0) {
+          const newFileRecords = result.assets.map(asset => {
+            const resolvedType: 'image' | 'video' = asset.type === 'video' ? 'video' : 'image';
+            return {
+              name: asset.fileName || `mobile_upload_${Date.now()}.${resolvedType === 'video' ? 'mp4' : 'jpg'}`,
+              type: resolvedType,
+              data: asset.uri
+            };
+          });
+
+          setAttachedFiles(prev => [...prev, ...newFileRecords]);
+          showToast(`Attached ${newFileRecords.length} file(s) successfully!`, 'success');
+        }
+      } catch (error) {
+        console.error('Native image picker failed:', error);
+        fallbackSimulation(type === 'mixed' ? 'image' : type);
+      }
     }
   };
 
@@ -1005,28 +1089,7 @@ export function NewsfeedTab({
                             return (
                               <View key={idx} style={{ width: slideWidth, height: '100%' }}>
                                 {media.type === 'video' ? (
-                                  <View style={{ width: '100%', height: '100%', backgroundColor: '#000' }}>
-                                    {Platform.OS === 'web' ? (
-                                      <video 
-                                        src={fileUrl} 
-                                        controls 
-                                        style={{ width: '100%', height: '100%', objectFit: 'contain' }} 
-                                      />
-                                    ) : (
-                                      <Pressable 
-                                        onPress={() => handlePlayVideo(fileUrl)}
-                                        style={({ pressed }) => [
-                                          styles.simulatedImage,
-                                          { backgroundColor: '#000', flex: 1, padding: 24, justifyContent: 'center', alignItems: 'center', opacity: pressed ? 0.8 : 1 }
-                                        ]}
-                                      >
-                                        <ThemedText style={{ color: '#FFF', fontWeight: 'bold', fontSize: 14 }}>📹 Play Video Attachment</ThemedText>
-                                        <ThemedText style={{ color: '#AAA', fontSize: 10, marginTop: 6, textAlign: 'center', paddingHorizontal: 12 }} numberOfLines={1}>
-                                          {media.name || 'Click to play'}
-                                        </ThemedText>
-                                      </Pressable>
-                                    )}
-                                  </View>
+                                  <VideoPlayer url={fileUrl} />
                                 ) : (
                                   <View style={{ flex: 1, backgroundColor: '#0a0a0a' }}>
                                     {Platform.OS === 'web' ? (
@@ -1084,28 +1147,7 @@ export function NewsfeedTab({
                       // Single mediaUrl fallback (backward compatibility)
                       <View style={{ flex: 1 }}>
                         {post.mediaType === 'video' ? (
-                          <View style={{ backgroundColor: '#000', flex: 1 }}>
-                            {Platform.OS === 'web' ? (
-                              <video 
-                                src={post.mediaUrl} 
-                                controls 
-                                style={{ width: '100%', height: '100%', objectFit: 'contain' }} 
-                              />
-                            ) : (
-                              <Pressable 
-                                onPress={() => handlePlayVideo(post.mediaUrl)}
-                                style={({ pressed }) => [
-                                  styles.simulatedImage,
-                                  { backgroundColor: '#000', flex: 1, padding: 24, justifyContent: 'center', alignItems: 'center', opacity: pressed ? 0.8 : 1 }
-                                ]}
-                              >
-                                <ThemedText style={{ color: '#FFF', fontWeight: 'bold', fontSize: 14 }}>📹 Play Video Attachment</ThemedText>
-                                <ThemedText style={{ color: '#AAA', fontSize: 10, marginTop: 6, textAlign: 'center', paddingHorizontal: 12 }} numberOfLines={1}>
-                                  {post.mediaName || 'Click to play'}
-                                </ThemedText>
-                              </Pressable>
-                            )}
-                          </View>
+                          <VideoPlayer url={post.mediaUrl} />
                         ) : (
                           <View style={{ flex: 1, backgroundColor: '#0a0a0a' }}>
                             {Platform.OS === 'web' ? (
