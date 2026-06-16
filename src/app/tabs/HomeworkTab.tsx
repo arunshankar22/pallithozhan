@@ -360,11 +360,22 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
     setDescTa(item.description.ta);
     setRecordedVoiceBase64(item.voiceUrl || null);
     
-    const mappedAttachments = (item.mediaAttachments || []).map((att: any) => ({
-      name: att.name || 'Attachment',
-      type: att.type || 'image',
-      data: att.url || att.data || ''
-    }));
+    const mappedAttachments: { name: string; type: 'image' | 'video'; data: string; }[] = [];
+    if (item.mediaAttachments && item.mediaAttachments.length > 0) {
+      item.mediaAttachments.forEach((att: any) => {
+        mappedAttachments.push({
+          name: att.name || 'Attachment',
+          type: att.type || 'image',
+          data: att.url || att.data || ''
+        });
+      });
+    } else if (item.mediaUrl) {
+      mappedAttachments.push({
+        name: 'Attachment',
+        type: item.mediaType || 'image',
+        data: item.mediaUrl
+      });
+    }
     setAttachedHomeworkFiles(mappedAttachments);
 
     setTitleTaDirty(true);
