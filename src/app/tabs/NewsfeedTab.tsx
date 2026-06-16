@@ -39,7 +39,8 @@ import { ThemedText } from '@/components/themed-text';
 import { TabProps, DriveItem, DRIVE_STRUCTURE, getCurrentFolderItems } from '@/app/sharedTypes';
 import { styles } from '@/app/styles';
 import { mockDb, MEDIA_PRESETS } from '@/services/mockBackend';
-import { autoTranslate } from '@/services/translator';
+import { autoTranslate, translateWithGemini } from '@/services/translator';
+import { useDebounce } from '@/hooks/useDebounce';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { VideoPlayer } from '@/components/VideoPlayer';
@@ -125,6 +126,63 @@ export function NewsfeedTab({
   const [contentTa, setContentTa] = useState('');
   const [titleTaDirty, setTitleTaDirty] = useState(false);
   const [contentTaDirty, setContentTaDirty] = useState(false);
+
+  // Translation loading & debouncing states
+  const [isTitleTranslating, setIsTitleTranslating] = useState(false);
+  const [isContentTranslating, setIsContentTranslating] = useState(false);
+
+  const debouncedTitleEn = useDebounce(titleEn, 700);
+  const debouncedContentEn = useDebounce(contentEn, 850);
+
+  // Auto-translate Title
+  useEffect(() => {
+    if (titleTaDirty) return;
+    if (!debouncedTitleEn || debouncedTitleEn.trim() === '') {
+      setTitleTa('');
+      return;
+    }
+
+    const translateTitle = async () => {
+      setIsTitleTranslating(true);
+      try {
+        const result = await translateWithGemini(debouncedTitleEn);
+        if (!titleTaDirty) {
+          setTitleTa(result);
+        }
+      } catch (err) {
+        console.error('Title translation error:', err);
+      } finally {
+        setIsTitleTranslating(false);
+      }
+    };
+
+    translateTitle();
+  }, [debouncedTitleEn, titleTaDirty]);
+
+  // Auto-translate Content/Description
+  useEffect(() => {
+    if (contentTaDirty) return;
+    if (!debouncedContentEn || debouncedContentEn.trim() === '') {
+      setContentTa('');
+      return;
+    }
+
+    const translateContent = async () => {
+      setIsContentTranslating(true);
+      try {
+        const result = await translateWithGemini(debouncedContentEn);
+        if (!contentTaDirty) {
+          setContentTa(result);
+        }
+      } catch (err) {
+        console.error('Content translation error:', err);
+      } finally {
+        setIsContentTranslating(false);
+      }
+    };
+
+    translateContent();
+  }, [debouncedContentEn, contentTaDirty]);
   
   // Media attachment state
   const [selectedMediaIndex, setSelectedMediaIndex] = useState(0);
@@ -240,16 +298,10 @@ export function NewsfeedTab({
 
   const handleTitleEnChange = (text: string) => {
     setTitleEn(text);
-    if (!titleTaDirty) {
-      setTitleTa(autoTranslate(text));
-    }
   };
 
   const handleContentEnChange = (text: string) => {
     setContentEn(text);
-    if (!contentTaDirty) {
-      setContentTa(autoTranslate(text));
-    }
   };
 
   // Google Drive simulation helpers
@@ -810,7 +862,9 @@ export function NewsfeedTab({
               />
             </View>
             <View style={styles.formCol}>
-              <ThemedText style={styles.formInputLabel}>தமிழ் தலைப்பு *</ThemedText>
+              <ThemedText style={styles.formInputLabel}>
+                தமிழ் தலைப்பு * {isTitleTranslating && <ThemedText style={{ fontSize: 11, color: colors.primary }}> (Translating...)</ThemedText>}
+              </ThemedText>
               <TextInput
                 style={[styles.formInput, { color: colors.text, borderColor: colors.border }]}
                 placeholder="தமிழ் தலைப்பு..."
@@ -835,7 +889,9 @@ export function NewsfeedTab({
               />
             </View>
             <View style={styles.formCol}>
-              <ThemedText style={styles.formInputLabel}>தமிழ் அறிவிப்பு விவரம் *</ThemedText>
+              <ThemedText style={styles.formInputLabel}>
+                தமிழ் அறிவிப்பு விவரம் * {isContentTranslating && <ThemedText style={{ fontSize: 11, color: colors.primary }}> (Translating...)</ThemedText>}
+              </ThemedText>
               <TextInput
                 style={[styles.formTextArea, { color: colors.text, borderColor: colors.border }]}
                 placeholder="அறிவிப்பு விவரம்..."

@@ -13,7 +13,8 @@ import { ThemedText } from '@/components/themed-text';
 import { TabProps } from '@/app/sharedTypes';
 import { styles } from '@/app/styles';
 import { mockDb } from '@/services/mockBackend';
-import { autoTranslate } from '@/services/translator';
+import { autoTranslate, translateWithGemini } from '@/services/translator';
+import { useDebounce } from '@/hooks/useDebounce';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { Spacing } from '@/constants/theme';
@@ -158,6 +159,63 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
   const [titleTaDirty, setTitleTaDirty] = useState(false);
   const [descTaDirty, setDescTaDirty] = useState(false);
 
+  // Translation loading & debouncing states
+  const [isTitleTranslating, setIsTitleTranslating] = useState(false);
+  const [isDescTranslating, setIsDescTranslating] = useState(false);
+
+  const debouncedTitleEn = useDebounce(titleEn, 700);
+  const debouncedDescEn = useDebounce(descEn, 850);
+
+  // Auto-translate Title
+  useEffect(() => {
+    if (titleTaDirty) return;
+    if (!debouncedTitleEn || debouncedTitleEn.trim() === '') {
+      setTitleTa('');
+      return;
+    }
+
+    const translateTitle = async () => {
+      setIsTitleTranslating(true);
+      try {
+        const result = await translateWithGemini(debouncedTitleEn);
+        if (!titleTaDirty) {
+          setTitleTa(result);
+        }
+      } catch (err) {
+        console.error('Title translation error:', err);
+      } finally {
+        setIsTitleTranslating(false);
+      }
+    };
+
+    translateTitle();
+  }, [debouncedTitleEn, titleTaDirty]);
+
+  // Auto-translate Description
+  useEffect(() => {
+    if (descTaDirty) return;
+    if (!debouncedDescEn || debouncedDescEn.trim() === '') {
+      setDescTa('');
+      return;
+    }
+
+    const translateDesc = async () => {
+      setIsDescTranslating(true);
+      try {
+        const result = await translateWithGemini(debouncedDescEn);
+        if (!descTaDirty) {
+          setDescTa(result);
+        }
+      } catch (err) {
+        console.error('Description translation error:', err);
+      } finally {
+        setIsDescTranslating(false);
+      }
+    };
+
+    translateDesc();
+  }, [debouncedDescEn, descTaDirty]);
+
   // Audio Guide recording states
   const [recordedVoiceBase64, setRecordedVoiceBase64] = useState<string | null>(null);
   const { isRecording, recordingTime, startRecording, stopRecording, clearRecording } = useAudioRecorder();
@@ -263,19 +321,13 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
     loadData();
   }, []);
 
-  // Real-time auto-translate triggers
+  // Real-time auto-translate triggers (debounced via useEffect)
   const handleTitleEnChange = (text: string) => {
     setTitleEn(text);
-    if (!titleTaDirty) {
-      setTitleTa(autoTranslate(text));
-    }
   };
 
   const handleDescEnChange = (text: string) => {
     setDescEn(text);
-    if (!descTaDirty) {
-      setDescTa(autoTranslate(text));
-    }
   };
 
   const handleStartRecord = async () => {
@@ -493,7 +545,9 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
               />
             </View>
             <View style={styles.formCol}>
-              <ThemedText style={styles.formInputLabel}>தமிழ் தலைப்பு *</ThemedText>
+              <ThemedText style={styles.formInputLabel}>
+                தமிழ் தலைப்பு * {isTitleTranslating && <ThemedText style={{ fontSize: 11, color: colors.primary }}> (Translating...)</ThemedText>}
+              </ThemedText>
               <TextInput
                 style={[styles.formInput, { color: colors.text, borderColor: colors.border }]}
                 placeholder="தமிழ் தலைப்பு..."
@@ -518,7 +572,9 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
               />
             </View>
             <View style={styles.formCol}>
-              <ThemedText style={styles.formInputLabel}>தமிழ் வழிமுறைகள் *</ThemedText>
+              <ThemedText style={styles.formInputLabel}>
+                தமிழ் வழிமுறைகள் * {isDescTranslating && <ThemedText style={{ fontSize: 11, color: colors.primary }}> (Translating...)</ThemedText>}
+              </ThemedText>
               <TextInput
                 style={[styles.formTextArea, { color: colors.text, borderColor: colors.border }]}
                 placeholder="விவரங்கள்..."

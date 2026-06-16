@@ -2,6 +2,8 @@
 // Helps teachers and admins quickly type in English and get highly-accurate Tamil equivalents,
 // which they can then manually adjust as needed.
 
+import { API_URL } from './dbCommon';
+
 const DICTIONARY: Record<string, string> = {
   // Common School Terms
   "school": "பள்ளி",
@@ -561,3 +563,71 @@ export function autoTranslate(text: string): string {
   
   return translatedWords.join(" ");
 }
+
+/**
+ * Helper to check if any words in the input text are not covered by the local dictionary.
+ */
+export function hasUnmatchedWords(text: string): boolean {
+  if (!text || !text.trim()) return false;
+  
+  // Normalize text by removing punctuation and split by spaces
+  const cleanText = text.toLowerCase().replace(/[^a-z0-9\s]/g, "");
+  const words = cleanText.split(/\s+/).filter(w => w.length > 0);
+  
+  if (words.length === 0) return false;
+  
+  for (const word of words) {
+    // If it is a number or defined in the dictionary, it is a matched word
+    if (isNaN(Number(word)) && !DICTIONARY[word]) {
+      // Check if it is part of a longer phrase key in the dictionary
+      const isPhraseMatch = Object.keys(DICTIONARY).some(key => key.includes(word));
+      if (!isPhraseMatch) {
+        return true; // Unmatched word found
+      }
+    }
+  }
+  return false;
+}
+
+/**
+ * Async translator that queries Gemini API for complex sentences,
+ * but falls back instantly to the local autoTranslate dictionary for pure calendar/homework terms.
+ */
+export async function translateWithGemini(text: string): Promise<string> {
+  if (!text || !text.trim()) return "";
+
+  // 1. Direct dictionary match check
+  const trimmed = text.trim().toLowerCase();
+  if (DICTIONARY[trimmed]) {
+    return DICTIONARY[trimmed];
+  }
+
+  // 2. Hybrid Lookup: If all words exist in local dictionary, use local autoTranslate instantly
+  if (!hasUnmatchedWords(text)) {
+    return autoTranslate(text);
+  }
+
+  // 3. Query server-side Gemini endpoint for complex/unmatched sentences
+  try {
+    const response = await fetch(`${API_URL}/translate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ text })
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      if (data && data.translation) {
+        return data.translation;
+      }
+    }
+  } catch (err) {
+    console.error('Failed to translate with Gemini, falling back to local autoTranslate:', err);
+  }
+
+  // Fallback to local autoTranslate on connection error or API failure
+  return autoTranslate(text);
+}
+

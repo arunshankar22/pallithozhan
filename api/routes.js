@@ -602,6 +602,62 @@ async function handleApiRoutes(req, res, pathname, method, dbData, writeDb, urlO
     return true;
   }
 
+  // POST /api/translate
+  if (pathname === '/api/translate' && method === 'POST') {
+    try {
+      const body = await parseBody(req);
+      const text = body.text || '';
+      if (!text.trim()) {
+        sendJson(res, 200, { translation: '' });
+        return true;
+      }
+
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        console.error('Error: GEMINI_API_KEY is not defined.');
+        sendJson(res, 500, { error: 'Gemini translation API key is not configured on the server.' });
+        return true;
+      }
+
+      // Query Gemini Developer API using the standard REST endpoint
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            contents: [{
+              parts: [{
+                text: `Translate this educational school text to standard Tamil meaning. Keep the numbers as numbers (e.g. 'Term 2 Week 7' becomes 'பருவம் 2 வாரம் 7'). Respond ONLY with the final translated Tamil text, without any additional explanations, notes, markdown formatting, or chat prefixes.\n\nText:\n${text}`
+              }]
+            }],
+            generationConfig: {
+              temperature: 0.1,
+              maxOutputTokens: 1024
+            }
+          })
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Gemini API error:', errorText);
+        sendJson(res, 502, { error: 'Gemini translation API request failed.', details: errorText });
+        return true;
+      }
+
+      const data = await response.json();
+      const translation = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
+      sendJson(res, 200, { translation });
+    } catch (err) {
+      console.error('Error in /api/translate:', err);
+      sendJson(res, 500, { error: 'Failed to process translation request.', message: err.message });
+    }
+    return true;
+  }
+
   return false;
 }
 
