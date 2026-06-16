@@ -446,7 +446,15 @@ export function NewsfeedTab({
     setContentTa(post.content.ta);
     
     const mediaList = [];
-    if (post.mediaUrl) {
+    if (post.mediaAttachments && post.mediaAttachments.length > 0) {
+      post.mediaAttachments.forEach((att: any) => {
+        mediaList.push({
+          name: att.name || 'Attached Media',
+          type: att.type || 'image',
+          data: att.url || att.data || ''
+        });
+      });
+    } else if (post.mediaUrl) {
       mediaList.push({
         name: 'Attached Media',
         type: post.mediaType || 'image',
@@ -955,19 +963,80 @@ export function NewsfeedTab({
                 </Pressable>
               </View>
 
-              {attachedFiles.map((file, i) => (
-                <View key={i} style={[styles.customMediaAttachedCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.two }}>
-                    {file.type === 'video' ? <Video size={14} color={colors.accent} /> : <ImageIcon size={14} color={colors.primary} />}
-                    <ThemedText style={{ fontSize: 11, fontWeight: '700' }} numberOfLines={1}>
-                      📎 {file.name}
-                    </ThemedText>
-                  </View>
-                  <Pressable onPress={() => setAttachedFiles(prev => prev.filter((_, idx) => idx !== i))} style={{ padding: 4 }}>
-                    <X size={14} color={colors.danger} />
-                  </Pressable>
-                </View>
-              ))}
+              {attachedFiles.length > 0 && (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingVertical: 8 }}>
+                  {attachedFiles.map((file, i) => {
+                    const isVideo = file.type === 'video';
+                    const fileUrl = file.data || '';
+                    return (
+                      <View key={i} style={{ width: 100, height: 100, borderRadius: 12, borderWidth: 1, borderColor: colors.border, position: 'relative', overflow: 'hidden', backgroundColor: '#000' }}>
+                        {isVideo ? (
+                          Platform.OS === 'web' ? (
+                            <video 
+                              src={fileUrl} 
+                              style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                            />
+                          ) : (
+                            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#1a1a1a' }}>
+                              <Video size={24} color={colors.accent} />
+                            </View>
+                          )
+                        ) : (
+                          Platform.OS === 'web' ? (
+                            <img 
+                              src={fileUrl} 
+                              alt={file.name || 'Preview'} 
+                              style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                            />
+                          ) : (
+                            <Image 
+                              source={{ uri: fileUrl }} 
+                              style={{ width: '100%', height: '100%' }} 
+                              resizeMode="cover"
+                            />
+                          )
+                        )}
+                        {/* Remove button */}
+                        <Pressable 
+                          onPress={() => setAttachedFiles(prev => prev.filter((_, idx) => idx !== i))}
+                          style={{
+                            position: 'absolute',
+                            top: 4,
+                            right: 4,
+                            backgroundColor: colors.danger,
+                            borderRadius: 10,
+                            width: 22,
+                            height: 22,
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            shadowColor: '#000',
+                            shadowOffset: { width: 0, height: 1 },
+                            shadowOpacity: 0.3,
+                            shadowRadius: 1.5,
+                            elevation: 3
+                          }}
+                        >
+                          <X size={12} color="#FFF" />
+                        </Pressable>
+                        {/* Type overlay label */}
+                        <View style={{
+                          position: 'absolute',
+                          bottom: 0,
+                          left: 0,
+                          right: 0,
+                          backgroundColor: 'rgba(0,0,0,0.6)',
+                          paddingVertical: 2,
+                          paddingHorizontal: 4
+                        }}>
+                          <ThemedText style={{ fontSize: 9, color: '#FFF', textAlign: 'center' }} numberOfLines={1}>
+                            {file.name || (isVideo ? 'Video' : 'Image')}
+                          </ThemedText>
+                        </View>
+                      </View>
+                    );
+                  })}
+                </ScrollView>
+              )}
             </View>
           </View>
 

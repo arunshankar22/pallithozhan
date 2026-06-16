@@ -8,7 +8,7 @@ import {
   Platform,
   Image
 } from 'react-native';
-import { Plus, BookOpen, CheckCircle, Clock, Trash2, Edit, Mic, Square, Upload, Video, Image as ImageIcon } from 'lucide-react-native';
+import { Plus, BookOpen, CheckCircle, Clock, Trash2, Edit, Mic, Square, Upload, Video, Image as ImageIcon, X } from 'lucide-react-native';
 import { ThemedText } from '@/components/themed-text';
 import { TabProps } from '@/app/sharedTypes';
 import { styles } from '@/app/styles';
@@ -39,56 +39,62 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
         input.type = 'file';
         input.accept = 'image/*,video/*';
         input.multiple = true;
-        
-        input.onchange = async (e: any) => {
-          const files = e.target.files;
-          if (files && files.length > 0) {
-            const filesCount = files.length;
-            const newAttachments: any[] = [];
-            let loadedCount = 0;
-            
-            setUploadingHwId(homeworkId);
-            
-            for (let i = 0; i < filesCount; i++) {
-              const file = files[i];
-              const reader = new FileReader();
-              const isVideo = file.type ? file.type.startsWith('video/') : /\.(mp4|mov|avi|mkv|webm)$/i.test(file.name);
-              const resolvedType = isVideo ? 'video' : 'image';
-              
-              reader.onload = async () => {
-                newAttachments.push({
-                  name: file.name,
-                  type: resolvedType,
-                  url: reader.result as string
-                });
-                
-                loadedCount++;
-                if (loadedCount === filesCount) {
-                  try {
-                    const hwItem = homework.find(h => h.homeworkId === homeworkId);
-                    const existingSub = hwItem?.submissions?.[studentId];
-                    const existingFiles = (existingSub && typeof existingSub === 'object' && existingSub.mediaAttachments) || [];
-                    
-                    const mergedAttachments = [...existingFiles, ...newAttachments];
-                    
-                    if (mockDb.submitHomework) {
-                      await mockDb.submitHomework(homeworkId, studentId, mergedAttachments);
-                    } else {
-                      await mockDb.toggleHomeworkSubmission(homeworkId, studentId);
-                    }
-                    showToast(`Successfully uploaded ${filesCount} file(s) for your child's homework!`, 'success');
-                    loadData();
-                  } catch (err) {
-                    showToast('Failed to save homework attachment.', 'error');
-                  } finally {
-                    setUploadingHwId(null);
-                  }
-                }
-              };
-              reader.readAsDataURL(file);
-            }
+        input.style.position = 'absolute';
+        input.style.width = '1px';
+        input.style.height = '1px';
+        input.style.opacity = '0';
+        input.style.pointerEvents = 'none';
+
+        document.body.appendChild(input);
+
+        const cleanup = () => {
+          if (document.body.contains(input)) {
+            document.body.removeChild(input);
           }
         };
+        
+        input.onchange = async (e: any) => {
+          try {
+            const files = e.target.files;
+            if (files && files.length > 0) {
+              const filesCount = files.length;
+              setUploadingHwId(homeworkId);
+              
+              const newAttachments = Array.from(files).map((file: any) => {
+                const isVideo = file.type ? file.type.startsWith('video/') : /\.(mp4|mov|avi|mkv|webm)$/i.test(file.name);
+                const resolvedType = isVideo ? 'video' : 'image';
+                return {
+                  name: file.name,
+                  type: resolvedType,
+                  url: URL.createObjectURL(file)
+                };
+              });
+              
+              const hwItem = homework.find(h => h.homeworkId === homeworkId);
+              const existingSub = hwItem?.submissions?.[studentId];
+              const existingFiles = (existingSub && typeof existingSub === 'object' && existingSub.mediaAttachments) || [];
+              const mergedAttachments = [...existingFiles, ...newAttachments];
+              
+              if (mockDb.submitHomework) {
+                await mockDb.submitHomework(homeworkId, studentId, mergedAttachments);
+              } else {
+                await mockDb.toggleHomeworkSubmission(homeworkId, studentId);
+              }
+              showToast(`Successfully uploaded ${filesCount} file(s) for your child's homework!`, 'success');
+              loadData();
+            }
+          } catch (err) {
+            showToast('Failed to save homework attachment.', 'error');
+          } finally {
+            setUploadingHwId(null);
+            cleanup();
+          }
+        };
+
+        input.oncancel = () => {
+          cleanup();
+        };
+
         input.click();
       } catch (error) {
         showToast('Failed to open file picker.', 'error');
@@ -353,7 +359,14 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
     setDescEn(item.description.en);
     setDescTa(item.description.ta);
     setRecordedVoiceBase64(item.voiceUrl || null);
-    setAttachedHomeworkFiles(item.mediaAttachments || []);
+    
+    const mappedAttachments = (item.mediaAttachments || []).map((att: any) => ({
+      name: att.name || 'Attachment',
+      type: att.type || 'image',
+      data: att.url || att.data || ''
+    }));
+    setAttachedHomeworkFiles(mappedAttachments);
+
     setTitleTaDirty(true);
     setDescTaDirty(true);
     setModalVisible(true);
@@ -550,28 +563,60 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
             
             {attachedHomeworkFiles.length > 0 && (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row', marginVertical: 6 }}>
-                {attachedHomeworkFiles.map((file, i) => (
-                  <View key={i} style={{ width: 120, height: 120, borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: colors.border, position: 'relative', marginRight: 10 }}>
-                    {file.type === 'image' ? (
-                      <Image 
-                        source={{ uri: file.data }} 
-                        style={{ width: '100%', height: '100%' }} 
-                        resizeMode="cover" 
-                      />
-                    ) : (
-                      <View style={{ width: '100%', height: '100%', backgroundColor: '#000', justifyContent: 'center', alignItems: 'center', padding: 4 }}>
-                        <ThemedText style={{ color: '#FFF', fontSize: 10, fontWeight: 'bold', textAlign: 'center' }}>📹 Video Attachment</ThemedText>
-                        <ThemedText style={{ color: '#AAA', fontSize: 8, marginTop: 4 }} numberOfLines={2}>{file.name}</ThemedText>
+                {attachedHomeworkFiles.map((file, i) => {
+                  const isVideo = file.type === 'video';
+                  const fileUrl = file.data || '';
+                  return (
+                    <View key={i} style={{ width: 120, height: 120, borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: colors.border, position: 'relative', marginRight: 10, backgroundColor: '#000' }}>
+                      {isVideo ? (
+                        Platform.OS === 'web' ? (
+                          <video 
+                            src={fileUrl} 
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                          />
+                        ) : (
+                          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#1a1a1a' }}>
+                            <Video size={24} color={colors.accent} />
+                            <ThemedText style={{ color: '#FFF', fontSize: 8, marginTop: 4 }} numberOfLines={1}>📹 {file.name}</ThemedText>
+                          </View>
+                        )
+                      ) : (
+                        Platform.OS === 'web' ? (
+                          <img 
+                            src={fileUrl} 
+                            alt={file.name || 'Preview'} 
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                          />
+                        ) : (
+                          <Image 
+                            source={{ uri: fileUrl }} 
+                            style={{ width: '100%', height: '100%' }} 
+                            resizeMode="cover" 
+                          />
+                        )
+                      )}
+                      <Pressable
+                        onPress={() => setAttachedHomeworkFiles(prev => prev.filter((_, idx) => idx !== i))}
+                        style={{ position: 'absolute', top: 4, right: 4, width: 22, height: 22, borderRadius: 11, backgroundColor: colors.danger, justifyContent: 'center', alignItems: 'center' }}
+                      >
+                        <X size={12} color="#FFF" />
+                      </Pressable>
+                      <View style={{
+                        position: 'absolute',
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                        backgroundColor: 'rgba(0,0,0,0.6)',
+                        paddingVertical: 2,
+                        paddingHorizontal: 4
+                      }}>
+                        <ThemedText style={{ fontSize: 9, color: '#FFF', textAlign: 'center' }} numberOfLines={1}>
+                          {file.name || (isVideo ? 'Video' : 'Image')}
+                        </ThemedText>
                       </View>
-                    )}
-                    <Pressable
-                      onPress={() => setAttachedHomeworkFiles(prev => prev.filter((_, idx) => idx !== i))}
-                      style={{ position: 'absolute', top: 4, right: 4, width: 20, height: 20, borderRadius: 10, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' }}
-                    >
-                      <ThemedText style={{ color: '#FFF', fontSize: 10, fontWeight: 'bold' }}>✕</ThemedText>
-                    </Pressable>
-                  </View>
-                ))}
+                    </View>
+                  );
+                })}
               </ScrollView>
             )}
 
@@ -1005,12 +1050,33 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
                                       showToast(`Viewing simulated attachment: ${file.name}`, 'success');
                                     }
                                   }}
-                                  style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 10 }}
+                                  style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, marginRight: 10 }}
                                 >
                                   {file.type === 'video' ? (
-                                    <Video size={14} color={colors.secondary} />
+                                    Platform.OS === 'web' ? (
+                                      <video 
+                                        src={file.url} 
+                                        style={{ width: 36, height: 36, borderRadius: 6, objectFit: 'cover', backgroundColor: '#000' }} 
+                                      />
+                                    ) : (
+                                      <View style={{ width: 36, height: 36, borderRadius: 6, backgroundColor: '#1a1a1a', justifyContent: 'center', alignItems: 'center' }}>
+                                        <Video size={16} color={colors.secondary} />
+                                      </View>
+                                    )
                                   ) : (
-                                    <ImageIcon size={14} color={colors.secondary} />
+                                    Platform.OS === 'web' ? (
+                                      <img 
+                                        src={file.url} 
+                                        alt={file.name} 
+                                        style={{ width: 36, height: 36, borderRadius: 6, objectFit: 'cover' }} 
+                                      />
+                                    ) : (
+                                      <Image 
+                                        source={{ uri: file.url }} 
+                                        style={{ width: 36, height: 36, borderRadius: 6 }} 
+                                        resizeMode="cover"
+                                      />
+                                    )
                                   )}
                                   <ThemedText numberOfLines={1} style={{ fontSize: 11, color: colors.text, flex: 1 }}>
                                     {file.name}
