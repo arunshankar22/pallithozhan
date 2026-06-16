@@ -1,7 +1,7 @@
-// Balar Malar Parramatta - Newsfeed Database Service (Firestore, REST API & Local Sandbox)
-import { db, isDemoMode } from './firebase';
-import { collection, doc, getDocs, setDoc, addDoc } from 'firebase/firestore';
-import { getLocalStorageItem, setLocalStorageItem, API_URL, isServerOnline, cleanFirestoreData } from './dbCommon';
+// Balar Malar Parramatta - Newsfeed Database Service (Firestore Only)
+import { db } from './firebase';
+import { collection, doc, getDocs, setDoc, getDoc, deleteDoc } from 'firebase/firestore';
+import { cleanFirestoreData } from './dbCommon';
 
 export const MEDIA_PRESETS = [
   { id: 'img_fair', title: 'Tamil Speech Competition', type: 'image', url: 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&q=80&w=800' },
@@ -79,7 +79,6 @@ const uploadPostMedia = async (postId: string, mediaAttachments: any[], storage:
         console.log(`Successfully uploaded local file. Download URL: ${downloadUrl}`);
       } catch (storageErr) {
         console.warn(`Firebase Storage upload failed for local file ${att.name}:`, storageErr);
-        // Fallback placeholder
         const placeholder = att.type === 'video'
           ? 'https://www.w3schools.com/html/mov_bbb.mp4'
           : 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&q=80&w=800';
@@ -94,49 +93,29 @@ const uploadPostMedia = async (postId: string, mediaAttachments: any[], storage:
 
 export const newsfeedService = {
   reset: async (): Promise<void> => {
-    if (isServerOnline) {
-      try {
-        await fetch(`${API_URL}/reset`, { method: 'POST' });
-      } catch (e) { /* fallback */ }
-    }
-    setLocalStorageItem('newsfeed', DEFAULT_NEWSFEED);
+    // Reset handled via seed scripts
   },
 
   getNewsfeed: async (): Promise<any[]> => {
-    // 1. Firebase Firestore
-    if (!isDemoMode && db) {
-      const querySnapshot = await getDocs(collection(db, 'newsfeed'));
-      const feedList: any[] = [];
-      querySnapshot.forEach((doc) => {
-        feedList.push({ postId: doc.id, ...doc.data() });
-      });
-      
-      if (feedList.length === 0) {
-        for (const p of DEFAULT_NEWSFEED) {
-          const { postId, ...details } = p;
-          await setDoc(doc(db, 'newsfeed', postId), details);
-          feedList.push(p);
-        }
+    if (!db) throw new Error('Firestore database is not initialized');
+    const querySnapshot = await getDocs(collection(db, 'newsfeed'));
+    const feedList: any[] = [];
+    querySnapshot.forEach((docSnap) => {
+      feedList.push({ postId: docSnap.id, ...docSnap.data() });
+    });
+    
+    if (feedList.length === 0) {
+      for (const p of DEFAULT_NEWSFEED) {
+        const { postId, ...details } = p;
+        await setDoc(doc(db, 'newsfeed', postId), details);
+        feedList.push(p);
       }
-      return feedList.sort((a: any, b: any) => b.createdAt.localeCompare(a.createdAt));
     }
-
-    // 2. Local REST API Server
-    if (isServerOnline) {
-      try {
-        const res = await fetch(`${API_URL}/newsfeed`);
-        if (res.ok) {
-          const list = await res.ok ? await res.json() : [];
-          return list.sort((a: any, b: any) => b.createdAt.localeCompare(a.createdAt));
-        }
-      } catch (e) { /* fallback */ }
-    }
-
-    // 3. Local Sandbox
-    return getLocalStorageItem('newsfeed', DEFAULT_NEWSFEED).sort((a: any, b: any) => b.createdAt.localeCompare(a.createdAt));
+    return feedList.sort((a: any, b: any) => b.createdAt.localeCompare(a.createdAt));
   },
 
   createNewsfeedPost: async (post: any): Promise<any> => {
+    if (!db) throw new Error('Firestore database is not initialized');
     const postId = `post_${Date.now()}`;
     const newPost = {
       postId,
@@ -150,150 +129,63 @@ export const newsfeedService = {
       authorName: post.authorName || 'Staff'
     };
 
-    // 1. Firebase Firestore
-    if (!isDemoMode && db) {
-      const { storage } = require('./firebase');
+    const { storage } = require('./firebase');
 
-      if (storage && newPost.mediaAttachments && newPost.mediaAttachments.length > 0) {
-        const mediaUrlObj = { mediaUrl: newPost.mediaUrl };
-        await uploadPostMedia(postId, newPost.mediaAttachments, storage, mediaUrlObj);
-        newPost.mediaUrl = mediaUrlObj.mediaUrl || '';
-      }
-
-      const { postId: omitted, ...details } = newPost;
-      const cleanedDetails = cleanFirestoreData(details);
-      await setDoc(doc(db, 'newsfeed', postId), cleanedDetails);
-      return newPost;
+    if (storage && newPost.mediaAttachments && newPost.mediaAttachments.length > 0) {
+      const mediaUrlObj = { mediaUrl: newPost.mediaUrl };
+      await uploadPostMedia(postId, newPost.mediaAttachments, storage, mediaUrlObj);
+      newPost.mediaUrl = mediaUrlObj.mediaUrl || '';
     }
 
-    // 2. Local REST API Server
-    if (isServerOnline) {
-      try {
-        const res = await fetch(`${API_URL}/newsfeed`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(newPost)
-        });
-        if (res.ok) return await res.json();
-      } catch (e) { /* fallback */ }
-    }
-
-    // 3. Sandbox
-    const feed = getLocalStorageItem('newsfeed', DEFAULT_NEWSFEED);
-    feed.push(newPost);
-    setLocalStorageItem('newsfeed', feed);
+    const { postId: omitted, ...details } = newPost;
+    const cleanedDetails = cleanFirestoreData(details);
+    await setDoc(doc(db, 'newsfeed', postId), cleanedDetails);
     return newPost;
   },
 
   updateNewsfeedPost: async (postId: string, post: any): Promise<any> => {
-    // 1. Firebase Firestore
-    if (!isDemoMode && db) {
-      const { storage } = require('./firebase');
+    if (!db) throw new Error('Firestore database is not initialized');
+    const { storage } = require('./firebase');
 
-      const updatedPost = { ...post };
+    const updatedPost = { ...post };
 
-      if (storage && updatedPost.mediaAttachments && updatedPost.mediaAttachments.length > 0) {
-        const mediaUrlObj = { mediaUrl: updatedPost.mediaUrl };
-        await uploadPostMedia(postId, updatedPost.mediaAttachments, storage, mediaUrlObj);
-        updatedPost.mediaUrl = mediaUrlObj.mediaUrl || '';
-      }
-
-      const cleanedPost = cleanFirestoreData(updatedPost);
-      await setDoc(doc(db, 'newsfeed', postId), cleanedPost, { merge: true });
-      return { postId, ...updatedPost };
+    if (storage && updatedPost.mediaAttachments && updatedPost.mediaAttachments.length > 0) {
+      const mediaUrlObj = { mediaUrl: updatedPost.mediaUrl };
+      await uploadPostMedia(postId, updatedPost.mediaAttachments, storage, mediaUrlObj);
+      updatedPost.mediaUrl = mediaUrlObj.mediaUrl || '';
     }
 
-    // 2. Local REST API Server
-    if (isServerOnline) {
-      try {
-        const res = await fetch(`${API_URL}/newsfeed`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ postId, ...post })
-        });
-        if (res.ok) return await res.json();
-      } catch (e) { /* fallback */ }
-    }
-
-    // 3. Sandbox
-    const feed = getLocalStorageItem('newsfeed', DEFAULT_NEWSFEED);
-    const idx = feed.findIndex((p: any) => p.postId === postId);
-    if (idx > -1) {
-      feed[idx] = { ...feed[idx], ...post };
-      setLocalStorageItem('newsfeed', feed);
-      return feed[idx];
-    }
-    return null;
+    const cleanedPost = cleanFirestoreData(updatedPost);
+    await setDoc(doc(db, 'newsfeed', postId), cleanedPost, { merge: true });
+    return { postId, ...updatedPost };
   },
 
   deleteNewsfeedPost: async (postId: string): Promise<any> => {
-    const { deleteDoc } = require('firebase/firestore');
-    // 1. Firebase Firestore
-    if (!isDemoMode && db) {
-      await deleteDoc(doc(db, 'newsfeed', postId));
-      return { postId };
-    }
-
-    // 2. Local REST API Server
-    if (isServerOnline) {
-      try {
-        const res = await fetch(`${API_URL}/newsfeed`, {
-          method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ postId })
-        });
-        if (res.ok) return await res.json();
-      } catch (e) { /* fallback */ }
-    }
-
-    // 3. Sandbox
-    const feed = getLocalStorageItem('newsfeed', DEFAULT_NEWSFEED);
-    const idx = feed.findIndex((p: any) => p.postId === postId);
-    if (idx > -1) {
-      const deleted = feed.splice(idx, 1)[0];
-      setLocalStorageItem('newsfeed', feed);
-      return deleted;
-    }
-    return null;
+    if (!db) throw new Error('Firestore database is not initialized');
+    await deleteDoc(doc(db, 'newsfeed', postId));
+    return { postId };
   },
 
   toggleReaction: async (postId: string, userId: string, reactionType: 'like' | 'love'): Promise<any> => {
-    // 1. Firebase Firestore
-    if (!isDemoMode && db) {
-      const { getDoc, doc, setDoc } = require('firebase/firestore');
-      const docRef = doc(db, 'newsfeed', postId);
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        const reactions = data.reactions || {};
-        if (reactions[userId] === reactionType) {
-          delete reactions[userId]; // Toggle off
-        } else {
-          reactions[userId] = reactionType; // Toggle on or switch
-        }
-        await setDoc(docRef, { reactions }, { merge: true });
-        return { postId, reactions };
-      }
-      return null;
-    }
-
-    // 2. Sandbox
-    const feed = getLocalStorageItem('newsfeed', DEFAULT_NEWSFEED);
-    const post = feed.find((p: any) => p.postId === postId);
-    if (post) {
-      if (!post.reactions) post.reactions = {};
-      if (post.reactions[userId] === reactionType) {
-        delete post.reactions[userId];
+    if (!db) throw new Error('Firestore database is not initialized');
+    const docRef = doc(db, 'newsfeed', postId);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      const reactions = data.reactions || {};
+      if (reactions[userId] === reactionType) {
+        delete reactions[userId]; // Toggle off
       } else {
-        post.reactions[userId] = reactionType;
+        reactions[userId] = reactionType; // Toggle on or switch
       }
-      setLocalStorageItem('newsfeed', feed);
-      return post;
+      await setDoc(docRef, { reactions }, { merge: true });
+      return { postId, reactions };
     }
     return null;
   },
 
   addComment: async (postId: string, userId: string, authorName: string, text: string, voiceUrl?: string): Promise<any> => {
+    if (!db) throw new Error('Firestore database is not initialized');
     const commentId = `comment_${Date.now()}`;
     const newComment: any = {
       commentId,
@@ -306,91 +198,46 @@ export const newsfeedService = {
       newComment.voiceUrl = voiceUrl;
     }
 
-    // 1. Firebase Firestore
-    if (!isDemoMode && db) {
-      const { getDoc, doc, setDoc } = require('firebase/firestore');
-      const docRef = doc(db, 'newsfeed', postId);
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        const comments = data.comments || [];
-        comments.push(newComment);
-        await setDoc(docRef, { comments }, { merge: true });
-        return { postId, comments };
-      }
-      return null;
-    }
-
-    // 2. Sandbox
-    const feed = getLocalStorageItem('newsfeed', DEFAULT_NEWSFEED);
-    const post = feed.find((p: any) => p.postId === postId);
-    if (post) {
-      if (!post.comments) post.comments = [];
-      post.comments.push(newComment);
-      setLocalStorageItem('newsfeed', feed);
-      return post;
+    const docRef = doc(db, 'newsfeed', postId);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      const comments = data.comments || [];
+      comments.push(newComment);
+      await setDoc(docRef, { comments }, { merge: true });
+      return { postId, comments };
     }
     return null;
   },
 
   editComment: async (postId: string, commentId: string, newText: string): Promise<any> => {
-    // 1. Firebase Firestore
-    if (!isDemoMode && db) {
-      const { getDoc, doc, setDoc } = require('firebase/firestore');
-      const docRef = doc(db, 'newsfeed', postId);
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        const comments = data.comments || [];
-        const idx = comments.findIndex((c: any) => c.commentId === commentId);
-        if (idx > -1) {
-          comments[idx].text = newText;
-          comments[idx].updatedAt = new Date().toISOString();
-          await setDoc(docRef, { comments }, { merge: true });
-          return { postId, comments };
-        }
-      }
-      return null;
-    }
-
-    // 2. Sandbox
-    const feed = getLocalStorageItem('newsfeed', DEFAULT_NEWSFEED);
-    const post = feed.find((p: any) => p.postId === postId);
-    if (post && post.comments) {
-      const idx = post.comments.findIndex((c: any) => c.commentId === commentId);
+    if (!db) throw new Error('Firestore database is not initialized');
+    const docRef = doc(db, 'newsfeed', postId);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      const comments = data.comments || [];
+      const idx = comments.findIndex((c: any) => c.commentId === commentId);
       if (idx > -1) {
-        post.comments[idx].text = newText;
-        post.comments[idx].updatedAt = new Date().toISOString();
-        setLocalStorageItem('newsfeed', feed);
-        return post;
+        comments[idx].text = newText;
+        comments[idx].updatedAt = new Date().toISOString();
+        await setDoc(docRef, { comments }, { merge: true });
+        return { postId, comments };
       }
     }
     return null;
   },
 
   deleteComment: async (postId: string, commentId: string): Promise<any> => {
-    // 1. Firebase Firestore
-    if (!isDemoMode && db) {
-      const { getDoc, doc, setDoc } = require('firebase/firestore');
-      const docRef = doc(db, 'newsfeed', postId);
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        const comments = data.comments || [];
-        const filtered = comments.filter((c: any) => c.commentId !== commentId);
-        await setDoc(docRef, { comments: filtered }, { merge: true });
-        return { postId, comments: filtered };
-      }
-      return null;
-    }
-
-    // 2. Sandbox
-    const feed = getLocalStorageItem('newsfeed', DEFAULT_NEWSFEED);
-    const post = feed.find((p: any) => p.postId === postId);
-    if (post && post.comments) {
-      post.comments = post.comments.filter((c: any) => c.commentId !== commentId);
-      setLocalStorageItem('newsfeed', feed);
-      return post;
+    if (!db) throw new Error('Firestore database is not initialized');
+    const docRef = doc(db, 'newsfeed', postId);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      const comments = data.comments || [];
+      const filtered = comments.filter((c: any) => c.commentId !== commentId);
+      await setDoc(docRef, { comments: filtered }, { merge: true });
+      return { postId, comments: filtered };
     }
     return null;
   }

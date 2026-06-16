@@ -12,6 +12,7 @@ import { TabProps } from '@/app/sharedTypes';
 import { styles } from '@/app/styles';
 import { mockDb } from '@/services/mockBackend';
 import { Spacing } from '@/constants/theme';
+import { chatNotificationService } from '@/services/chatNotificationService';
 
 export function MessagesTab({ user, colors, t, showToast, i18n, insets }: TabProps) {
   const { width: windowWidth } = Dimensions.get('window');
@@ -23,10 +24,16 @@ export function MessagesTab({ user, colors, t, showToast, i18n, insets }: TabPro
   const [typeText, setTypeText] = useState('');
   const scrollViewRef = useRef<ScrollView>(null);
 
+  const [allMessages, setAllMessages] = useState<any[]>([]);
+  const [lastReadUpdated, setLastReadUpdated] = useState(Date.now());
+
   // Compute active chatId dynamically by sorting user uids
   const currentChatId = selectedPartner 
     ? [user?.uid, selectedPartner.uid].sort().join('_')
     : 'teacher_1_parent_1';
+
+  const sortedContacts = chatNotificationService.sortContacts(availableUsers, allMessages, user?.uid || '');
+  const unreadCounts = chatNotificationService.getUnreadCounts(allMessages, user?.uid || '');
 
   // 1. Fetch available contacts based on roles
   useEffect(() => {
@@ -59,27 +66,48 @@ export function MessagesTab({ user, colors, t, showToast, i18n, insets }: TabPro
     fetchUsers();
   }, [user]);
 
-  // 2. Poll messages for the active currentChatId
+  // 2. Poll all messages
   useEffect(() => {
-    if (!selectedPartner) return;
-    
-    const load = async () => {
-      setMessages(await mockDb.getMessages(currentChatId));
+    if (!user) return;
+
+    const loadAll = async () => {
+      try {
+        const allMsgs = await mockDb.getAllMessages();
+        setAllMessages(allMsgs);
+      } catch (e) {
+        console.error('Failed to load all messages:', e);
+      }
     };
-    load();
-    
-    const interval = setInterval(async () => {
-      setMessages(await mockDb.getMessages(currentChatId));
-    }, 2500);
+    loadAll();
+
+    const interval = setInterval(loadAll, 2500);
     return () => clearInterval(interval);
-  }, [selectedPartner, currentChatId]);
+  }, [user]);
+
+  // Update current chat messages when allMessages or currentChatId changes
+  useEffect(() => {
+    const currentMsgs = allMessages
+      .filter((m: any) => m.chatId === currentChatId)
+      .sort((a: any, b: any) => a.createdAt.localeCompare(b.createdAt));
+    setMessages(currentMsgs);
+  }, [allMessages, currentChatId]);
+
+  // Mark current active chat as read when opening it or when new messages arrive
+  useEffect(() => {
+    if (selectedPartner && user?.uid) {
+      const chatId = [user.uid, selectedPartner.uid].sort().join('_');
+      chatNotificationService.markChatAsRead(chatId);
+      setLastReadUpdated(Date.now());
+    }
+  }, [messages, selectedPartner, user]);
 
   const handleSend = async () => {
     if (!typeText.trim() || !selectedPartner) return;
-    await mockDb.sendMessage(currentChatId, user?.uid || 'user', typeText.trim());
+    const newMsg = await mockDb.sendMessage(currentChatId, user?.uid || 'user', typeText.trim());
     setTypeText('');
-    const msgs = await mockDb.getMessages(currentChatId);
-    setMessages(msgs);
+    
+    // Add to allMessages state locally so it renders immediately
+    setAllMessages(prev => [...prev, newMsg]);
     
     setTimeout(() => {
       scrollViewRef.current?.scrollToEnd({ animated: true });
@@ -90,9 +118,11 @@ export function MessagesTab({ user, colors, t, showToast, i18n, insets }: TabPro
   const renderContactBarMobile = () => (
     <View style={{ borderBottomWidth: 1, borderColor: colors.border, padding: 8 }}>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-        {availableUsers.map((u) => {
+        {sortedContacts.map((u) => {
           const isSelected = selectedPartner?.uid === u.uid;
           const initials = u.fullName.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase();
+          const chatId = [user?.uid, u.uid].sort().join('_');
+          const unreadCount = unreadCounts[chatId] || 0;
           return (
             <Pressable
               key={u.uid}
@@ -109,10 +139,30 @@ export function MessagesTab({ user, colors, t, showToast, i18n, insets }: TabPro
                 gap: 6
               }}
             >
-              <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: isSelected ? colors.primary : colors.border, justifyContent: 'center', alignItems: 'center' }}>
-                <ThemedText style={{ color: isSelected ? '#FFF' : colors.text, fontSize: 10, fontWeight: '700' }}>
-                  {initials}
-                </ThemedText>
+              <View style={{ position: 'relative' }}>
+                <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: isSelected ? colors.primary : colors.border, justifyContent: 'center', alignItems: 'center' }}>
+                  <ThemedText style={{ color: isSelected ? '#FFF' : colors.text, fontSize: 10, fontWeight: '700' }}>
+                    {initials}
+                  </ThemedText>
+                </View>
+                {unreadCount > 0 && (
+                  <View style={{
+                    position: 'absolute',
+                    top: -4,
+                    right: -4,
+                    backgroundColor: colors.danger,
+                    borderRadius: 6,
+                    minWidth: 12,
+                    height: 12,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    paddingHorizontal: 2
+                  }}>
+                    <ThemedText style={{ color: '#FFF', fontSize: 7, fontWeight: '900' }}>
+                      {unreadCount}
+                    </ThemedText>
+                  </View>
+                )}
               </View>
               <View>
                 <ThemedText style={{ fontSize: 11, fontWeight: '700', color: isSelected ? colors.primary : colors.text }} numberOfLines={1}>
@@ -136,9 +186,11 @@ export function MessagesTab({ user, colors, t, showToast, i18n, insets }: TabPro
         <ThemedText style={{ fontWeight: '700', fontSize: 13 }}>Conversations</ThemedText>
       </View>
       <ScrollView style={{ flex: 1 }}>
-        {availableUsers.map((u) => {
+        {sortedContacts.map((u) => {
           const isSelected = selectedPartner?.uid === u.uid;
           const initials = u.fullName.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase();
+          const chatId = [user?.uid, u.uid].sort().join('_');
+          const unreadCount = unreadCounts[chatId] || 0;
           return (
             <Pressable
               key={u.uid}
@@ -153,10 +205,30 @@ export function MessagesTab({ user, colors, t, showToast, i18n, insets }: TabPro
                 gap: 12
               }}
             >
-              <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: isSelected ? colors.primary : colors.primaryLight, justifyContent: 'center', alignItems: 'center' }}>
-                <ThemedText style={{ color: isSelected ? '#FFF' : colors.primary, fontSize: 12, fontWeight: '700' }}>
-                  {initials}
-                </ThemedText>
+              <View style={{ position: 'relative' }}>
+                <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: isSelected ? colors.primary : colors.primaryLight, justifyContent: 'center', alignItems: 'center' }}>
+                  <ThemedText style={{ color: isSelected ? '#FFF' : colors.primary, fontSize: 12, fontWeight: '700' }}>
+                    {initials}
+                  </ThemedText>
+                </View>
+                {unreadCount > 0 && (
+                  <View style={{
+                    position: 'absolute',
+                    top: -2,
+                    right: -2,
+                    backgroundColor: colors.danger,
+                    borderRadius: 8,
+                    minWidth: 16,
+                    height: 16,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    paddingHorizontal: 4
+                  }}>
+                    <ThemedText style={{ color: '#FFF', fontSize: 8, fontWeight: '900' }}>
+                      {unreadCount}
+                    </ThemedText>
+                  </View>
+                )}
               </View>
               <View style={{ flex: 1 }}>
                 <ThemedText style={{ fontSize: 12, fontWeight: '700', color: isSelected ? colors.primary : colors.text }} numberOfLines={1}>

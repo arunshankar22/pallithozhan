@@ -48,6 +48,7 @@ try {
   db = initializeFirestore(app, {
     experimentalForceLongPolling: true
   }, databaseId);
+  console.log(`[Firebase Init] Connected to Firestore Database ID: "${databaseId}"`);
   storage = getStorage(app, storageBucketId);
   storage.maxUploadRetryTime = 30000; // Increase to 30s to allow real mobile uploads
   storage.maxOperationRetryTime = 30000; // Increase to 30s

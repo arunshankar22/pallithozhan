@@ -86,6 +86,7 @@ export const mockDb = {
 
   // --- MESSAGING ---
   getMessages: messageService.getMessages,
+  getAllMessages: messageService.getAllMessages,
   sendMessage: messageService.sendMessage,
 
   // --- EVENTS ---

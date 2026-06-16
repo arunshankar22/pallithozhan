@@ -1,7 +1,6 @@
-// Balar Malar Parramatta - Event Database Service (Firestore, REST API & Local Sandbox)
-import { db, isDemoMode } from './firebase';
-import { collection, doc, getDoc, getDocs, setDoc } from 'firebase/firestore';
-import { getLocalStorageItem, setLocalStorageItem, API_URL, isServerOnline } from './dbCommon';
+// Balar Malar Parramatta - Event Database Service (Firestore Only)
+import { db } from './firebase';
+import { collection, doc, getDoc, getDocs, setDoc, deleteDoc } from 'firebase/firestore';
 
 export const DEFAULT_EVENTS = [
   {
@@ -25,46 +24,29 @@ export const DEFAULT_EVENTS = [
 
 export const eventService = {
   reset: async (): Promise<void> => {
-    if (isServerOnline) {
-      try {
-        await fetch(`${API_URL}/reset`, { method: 'POST' });
-      } catch (e) { /* fallback */ }
-    }
-    setLocalStorageItem('events', DEFAULT_EVENTS);
+    // Reset handled via seed scripts
   },
 
   getEvents: async (): Promise<any[]> => {
-    // 1. Firebase Firestore
-    if (!isDemoMode && db) {
-      const querySnapshot = await getDocs(collection(db, 'events'));
-      const eventsList: any[] = [];
-      querySnapshot.forEach((doc) => {
-        eventsList.push({ eventId: doc.id, ...doc.data() });
-      });
-      
-      if (eventsList.length === 0) {
-        for (const e of DEFAULT_EVENTS) {
-          const { eventId, ...details } = e;
-          await setDoc(doc(db, 'events', eventId), details);
-          eventsList.push(e);
-        }
+    if (!db) throw new Error('Firestore database is not initialized');
+    const querySnapshot = await getDocs(collection(db, 'events'));
+    const eventsList: any[] = [];
+    querySnapshot.forEach((docSnap) => {
+      eventsList.push({ eventId: docSnap.id, ...docSnap.data() });
+    });
+    
+    if (eventsList.length === 0) {
+      for (const e of DEFAULT_EVENTS) {
+        const { eventId, ...details } = e;
+        await setDoc(doc(db, 'events', eventId), details);
+        eventsList.push(e);
       }
-      return eventsList;
     }
-
-    // 2. Local REST API Server
-    if (isServerOnline) {
-      try {
-        const res = await fetch(`${API_URL}/events`);
-        if (res.ok) return await res.json();
-      } catch (e) { /* fallback */ }
-    }
-
-    // 3. Local Sandbox
-    return getLocalStorageItem('events', DEFAULT_EVENTS);
+    return eventsList;
   },
 
   createEvent: async (event: any): Promise<any> => {
+    if (!db) throw new Error('Firestore database is not initialized');
     const eventId = `evt_${Date.now()}`;
     const newEvent = {
       eventId,
@@ -74,92 +56,22 @@ export const eventService = {
       endDate: event.endDate
     };
 
-    // 1. Firebase Firestore
-    if (!isDemoMode && db) {
-      const { eventId: omitted, ...details } = newEvent;
-      await setDoc(doc(db, 'events', eventId), details);
-      return newEvent;
-    }
-
-    // 2. Local REST API Server
-    if (isServerOnline) {
-      try {
-        const res = await fetch(`${API_URL}/events`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(newEvent)
-        });
-        if (res.ok) return await res.json();
-      } catch (e) { /* fallback */ }
-    }
-
-    // 3. Sandbox
-    const events = getLocalStorageItem('events', DEFAULT_EVENTS);
-    events.push(newEvent);
-    setLocalStorageItem('events', events);
+    const { eventId: omitted, ...details } = newEvent;
+    await setDoc(doc(db, 'events', eventId), details);
     return newEvent;
   },
 
   updateEvent: async (eventId: string, data: any): Promise<any> => {
-    // 1. Firebase Firestore
-    if (!isDemoMode && db) {
-      const docRef = doc(db, 'events', eventId);
-      await setDoc(docRef, data, { merge: true });
-      const updatedSnap = await getDoc(docRef);
-      return { eventId, ...updatedSnap.data() };
-    }
-
-    // 2. Local REST API Server
-    if (isServerOnline) {
-      try {
-        const res = await fetch(`${API_URL}/events`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ eventId, ...data })
-        });
-        if (res.ok) return await res.json();
-      } catch (e) { /* fallback */ }
-    }
-
-    // 3. Sandbox
-    const events = getLocalStorageItem('events', DEFAULT_EVENTS);
-    const idx = events.findIndex((e: any) => e.eventId === eventId);
-    if (idx > -1) {
-      events[idx] = { ...events[idx], ...data };
-      setLocalStorageItem('events', events);
-      return events[idx];
-    }
-    return null;
+    if (!db) throw new Error('Firestore database is not initialized');
+    const docRef = doc(db, 'events', eventId);
+    await setDoc(docRef, data, { merge: true });
+    const updatedSnap = await getDoc(docRef);
+    return { eventId, ...updatedSnap.data() };
   },
 
   deleteEvent: async (eventId: string): Promise<any> => {
-    const { deleteDoc } = require('firebase/firestore');
-    // 1. Firebase Firestore
-    if (!isDemoMode && db) {
-      await deleteDoc(doc(db, 'events', eventId));
-      return { eventId };
-    }
-
-    // 2. Local REST API Server
-    if (isServerOnline) {
-      try {
-        const res = await fetch(`${API_URL}/events`, {
-          method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ eventId })
-        });
-        if (res.ok) return await res.json();
-      } catch (e) { /* fallback */ }
-    }
-
-    // 3. Sandbox
-    const events = getLocalStorageItem('events', DEFAULT_EVENTS);
-    const idx = events.findIndex((e: any) => e.eventId === eventId);
-    if (idx > -1) {
-      const deleted = events.splice(idx, 1)[0];
-      setLocalStorageItem('events', events);
-      return deleted;
-    }
-    return null;
+    if (!db) throw new Error('Firestore database is not initialized');
+    await deleteDoc(doc(db, 'events', eventId));
+    return { eventId };
   }
 };

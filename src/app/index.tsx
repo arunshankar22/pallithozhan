@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   View,
+  Text,
   ScrollView,
   Pressable,
   useColorScheme,
@@ -49,6 +50,7 @@ import { NewsfeedTab } from '@/app/tabs/NewsfeedTab';
 import { AttendanceTab } from '@/app/tabs/AttendanceTab';
 import { HomeworkTab } from '@/app/tabs/HomeworkTab';
 import { MessagesTab } from '@/app/tabs/MessagesTab';
+import { chatNotificationService } from '@/services/chatNotificationService';
 import { CalendarTab } from '@/app/tabs/CalendarTab';
 import { ReportsTab } from '@/app/tabs/ReportsTab';
 import { ManagementTab } from '@/app/tabs/ManagementTab';
@@ -174,6 +176,7 @@ export default function HomeScreen() {
   const [waitlistModalVisible, setWaitlistModalVisible] = useState(false);
   const [schoolsSearch, setSchoolsSearch] = useState('');
   const [schoolsViewMode, setSchoolsViewMode] = useState<'list' | 'map'>('list');
+  const [globalMessages, setGlobalMessages] = useState<any[]>([]);
 
   // Upcoming Topic edit states
   const [topicEditModalVisible, setTopicEditModalVisible] = useState(false);
@@ -558,6 +561,28 @@ export default function HomeScreen() {
   }, [activeTab]);
 
   useEffect(() => {
+    if (!user) {
+      setGlobalMessages([]);
+      return;
+    }
+
+    const loadAll = async () => {
+      try {
+        const allMsgs = await mockDb.getAllMessages();
+        setGlobalMessages(allMsgs);
+      } catch (e) {
+        console.error('Failed to load global messages:', e);
+      }
+    };
+    loadAll();
+
+    const interval = setInterval(loadAll, 2500);
+    return () => clearInterval(interval);
+  }, [user]);
+
+  const totalUnreadMessages = chatNotificationService.getTotalUnreadCount(globalMessages, user?.uid || '');
+
+  useEffect(() => {
     if (user?.role === 'parent') {
       const loadParentProfiles = async () => {
         const profiles = [];
@@ -634,6 +659,14 @@ export default function HomeScreen() {
     { key: 'profile', label: 'Profile', labelTa: 'சுயவிவரம்', icon: UserIcon },
   ] as any;
 
+  const sidebarNavItems = [
+    { key: 'newsfeed', label: t('nav.newsfeed') || 'Home', labelTa: 'முகப்பு', icon: Newspaper },
+    ...(user?.role !== 'volunteer' ? [{ key: 'homework', label: t('nav.homework') || 'Learn', labelTa: 'கற்றல்', icon: BookOpen }] : []),
+    thirdTab,
+    ...(user?.role ? [{ key: 'messages', label: i18n.language === 'ta' ? 'செய்திகள்' : 'Messages', labelTa: 'செய்திகள்', icon: MessageSquare }] : []),
+    { key: 'profile', label: 'Profile', labelTa: 'சுயவிவரம்', icon: UserIcon },
+  ] as any;
+
   const getQuickActions = () => {
     const role = user?.role || '';
     const actions = [];
@@ -676,6 +709,7 @@ export default function HomeScreen() {
         onPress: () => setActiveTab('reports')
       });
       actions.push({
+        key: 'messages',
         label: i18n.language === 'ta' ? 'செய்திகள்' : 'Messages',
         icon: MessageSquare,
         color: '#EBF5FA',
@@ -705,6 +739,7 @@ export default function HomeScreen() {
         onPress: () => setActiveTab('reports')
       });
       actions.push({
+        key: 'messages',
         label: i18n.language === 'ta' ? 'செய்திகள்' : 'Messages',
         icon: MessageSquare,
         color: '#EBF5FA',
@@ -1128,9 +1163,30 @@ export default function HomeScreen() {
                     borderRadius: 18,
                     backgroundColor: action.color,
                     justifyContent: 'center',
-                    alignItems: 'center'
+                    alignItems: 'center',
+                    position: 'relative'
                   }}>
                     <Icon size={18} color={action.iconColor} />
+                    {action.key === 'messages' && totalUnreadMessages > 0 && (
+                      <View style={{
+                        position: 'absolute',
+                        top: -4,
+                        right: -4,
+                        backgroundColor: '#FF3B30',
+                        borderRadius: 9,
+                        minWidth: 18,
+                        height: 18,
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        paddingHorizontal: 4,
+                        borderWidth: 1.5,
+                        borderColor: colors.cardBg,
+                      }}>
+                        <Text style={{ color: '#FFF', fontSize: 9, fontWeight: '800', lineHeight: 11 }}>
+                          {totalUnreadMessages}
+                        </Text>
+                      </View>
+                    )}
                   </View>
                   <ThemedText style={{ fontSize: 12, fontWeight: '700', color: colors.text, textAlign: 'center' }}>
                     {action.label}
@@ -1596,7 +1652,7 @@ export default function HomeScreen() {
     { key: 'newsfeed', label: t('nav.newsfeed'), icon: Newspaper, roles: ['admin', 'teacher', 'volunteer', 'parent', 'student'] },
     { key: 'attendance', label: t('nav.attendance'), icon: CheckSquare, roles: ['admin', 'teacher', 'volunteer', 'parent'] },
     { key: 'homework', label: t('nav.homework'), icon: BookOpen, roles: ['admin', 'teacher', 'parent', 'student'] },
-    { key: 'messages', label: t('nav.messages'), icon: MessageSquare, roles: ['admin', 'teacher', 'volunteer', 'parent'] },
+    { key: 'messages', label: t('nav.messages'), icon: MessageSquare, roles: ['admin', 'teacher', 'volunteer', 'parent', 'student'] },
     { key: 'calendar', label: t('nav.calendar'), icon: CalendarIcon, roles: ['admin', 'teacher', 'volunteer', 'parent', 'student'] },
     { key: 'reports', label: t('nav.reports'), icon: BarChart3, roles: ['admin', 'teacher'] },
     { key: 'management', label: t('nav.management'), icon: Users, roles: ['admin'] },
@@ -1693,7 +1749,7 @@ export default function HomeScreen() {
 
           {/* Navigation Links */}
           <View style={styles.sidebarNav}>
-            {mainNavItems.map((item: any) => {
+            {sidebarNavItems.map((item: any) => {
               const isActive = (item.key === 'newsfeed' && isHomeActive) || (activeTab === item.key);
               const Icon = item.icon;
               const labelText = i18n.language === 'ta' ? item.labelTa : item.label;
@@ -1724,15 +1780,32 @@ export default function HomeScreen() {
                   ]}
                 >
                   <Icon size={18} color={isActive ? '#FFFFFF' : colors.textSecondary} />
-                  <ThemedText
-                    style={[
-                      styles.sidebarNavText,
-                      { color: isActive ? '#FFFFFF' : colors.text },
-                      isActive && { fontWeight: '800' }
-                    ]}
-                  >
-                    {labelText}
-                  </ThemedText>
+                  <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <ThemedText
+                      style={[
+                        styles.sidebarNavText,
+                        { color: isActive ? '#FFFFFF' : colors.text },
+                        isActive && { fontWeight: '800' }
+                      ]}
+                    >
+                      {labelText}
+                    </ThemedText>
+                    {item.key === 'messages' && totalUnreadMessages > 0 && (
+                      <View style={{
+                        backgroundColor: '#FF3B30',
+                        borderRadius: 10,
+                        minWidth: 18,
+                        height: 18,
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        paddingHorizontal: 5,
+                      }}>
+                        <Text style={{ color: '#FFF', fontSize: 10, fontWeight: '700', lineHeight: 12 }}>
+                          {totalUnreadMessages}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
                 </Pressable>
               );
             })}
@@ -1794,6 +1867,35 @@ export default function HomeScreen() {
           ]}>
             <BalarMalarBranchLogo size={26} />
             <View style={styles.headerRightActions}>
+              {user?.role && (
+                <Pressable 
+                  onPress={() => setActiveTab('messages')} 
+                  style={[styles.headerIconButton, { position: 'relative' }]}
+                  hitSlop={{ top: 12, bottom: 12, left: 10, right: 10 }}
+                >
+                  <MessageSquare size={18} color={activeTab === 'messages' ? colors.primary : colors.text} />
+                  {totalUnreadMessages > 0 && (
+                    <View style={{
+                      position: 'absolute',
+                      top: -4,
+                      right: -4,
+                      backgroundColor: '#FF3B30',
+                      borderRadius: 7.5,
+                      minWidth: 15,
+                      height: 15,
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      paddingHorizontal: 3,
+                      borderWidth: 1.5,
+                      borderColor: colors.cardBg,
+                    }}>
+                      <Text style={{ color: '#FFF', fontSize: 8, fontWeight: '800', lineHeight: 10 }}>
+                        {totalUnreadMessages}
+                      </Text>
+                    </View>
+                  )}
+                </Pressable>
+              )}
               <Pressable 
                 onPress={() => setActiveTab('profile')} 
                 style={styles.headerIconButton}

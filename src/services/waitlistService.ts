@@ -1,7 +1,6 @@
-// Balar Malar Parramatta - Waitlist Database Service
-import { db, isDemoMode } from './firebase';
+// Balar Malar Parramatta - Waitlist Database Service (Firestore Only)
+import { db } from './firebase';
 import { collection, doc, getDoc, getDocs, setDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
-import { getLocalStorageItem, setLocalStorageItem, API_URL, isServerOnline } from './dbCommon';
 
 export const DEFAULT_WAITLIST = [
   {
@@ -140,73 +139,28 @@ export const DEFAULT_WAITLIST = [
 
 export const waitlistService = {
   reset: async (): Promise<void> => {
-    if (isServerOnline) {
-      try {
-        await fetch(`${API_URL}/waitlist/reset`, { method: 'POST' });
-      } catch (e) { /* fallback */ }
-    }
-    setLocalStorageItem('waitlist', DEFAULT_WAITLIST);
+    // Reset handled via seed scripts
   },
 
   getWaitlist: async (): Promise<any[]> => {
-    // 1. Firebase Firestore Production
-    if (!isDemoMode && db) {
-      try {
-        const q = query(collection(db, 'waitlist'), orderBy('createdAt', 'asc'));
-        const querySnapshot = await getDocs(q);
-        const list: any[] = [];
-        querySnapshot.forEach((doc) => {
-          list.push({ uid: doc.id, ...doc.data() });
-        });
-        if (list.length === 0) {
-          // Self-seed Firebase if empty for demo purposes
-          for (const w of DEFAULT_WAITLIST) {
-            await waitlistService.submitWaitlist(w);
-            list.push(w);
-          }
-        }
-        return list;
-      } catch (err) {
-        console.warn('Firestore waitlist read failed, falling back to storage/REST:', err);
-      }
-    }
-
-    // 2. Node REST API Server
-    if (isServerOnline) {
-      try {
-        const res = await fetch(`${API_URL}/waitlist`);
-        if (res.ok) {
-          const list = await res.json();
-          if (!list || list.length === 0) {
-            for (const w of DEFAULT_WAITLIST) {
-              await waitlistService.submitWaitlist(w);
-            }
-            return DEFAULT_WAITLIST;
-          }
-          return list;
-        }
-      } catch (e) { /* fallback */ }
-    }
-
-    // 3. Local Sandbox Storage fallback
-    const stored = getLocalStorageItem('waitlist', DEFAULT_WAITLIST);
-    let modified = false;
-    const merged = [...stored];
-    DEFAULT_WAITLIST.forEach((defWait: any) => {
-      const exists = merged.some((w: any) => w.uid === defWait.uid);
-      if (!exists) {
-        merged.push(defWait);
-        modified = true;
-      }
+    if (!db) throw new Error('Firestore database is not initialized');
+    const q = query(collection(db, 'waitlist'), orderBy('createdAt', 'asc'));
+    const querySnapshot = await getDocs(q);
+    const list: any[] = [];
+    querySnapshot.forEach((docSnap) => {
+      list.push({ uid: docSnap.id, ...docSnap.data() });
     });
-    if (modified) {
-      setLocalStorageItem('waitlist', merged);
-      return merged;
+    if (list.length === 0) {
+      for (const w of DEFAULT_WAITLIST) {
+        await waitlistService.submitWaitlist(w);
+        list.push(w);
+      }
     }
-    return stored.sort((a: any, b: any) => (a.createdAt || '').localeCompare(b.createdAt || ''));
+    return list;
   },
 
   submitWaitlist: async (record: any): Promise<any> => {
+    if (!db) throw new Error('Firestore database is not initialized');
     const uid = record.uid || `waitlist_${Date.now()}`;
     const newRecord = {
       school_code: 'BMPM',
@@ -243,81 +197,21 @@ export const waitlistService = {
       createdAt: record.createdAt || new Date().toISOString()
     };
 
-    // 1. Firebase Firestore Production
-    if (!isDemoMode && db) {
-      const { uid: omitted, ...details } = newRecord;
-      await setDoc(doc(db, 'waitlist', uid), details);
-      return newRecord;
-    }
-
-    // 2. Node REST API Server
-    if (isServerOnline) {
-      try {
-        const res = await fetch(`${API_URL}/waitlist`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(newRecord)
-        });
-        if (res.ok) return await res.json();
-      } catch (e) { /* fallback */ }
-    }
-
-    // 3. Local Sandbox Storage fallback
-    const stored = await waitlistService.getWaitlist();
-    stored.push(newRecord);
-    setLocalStorageItem('waitlist', stored);
+    const { uid: omitted, ...details } = newRecord;
+    await setDoc(doc(db, 'waitlist', uid), details);
     return newRecord;
   },
 
   updateWaitlist: async (uid: string, data: any): Promise<any> => {
-    // 1. Firebase Firestore Production
-    if (!isDemoMode && db) {
-      const docRef = doc(db, 'waitlist', uid);
-      await setDoc(docRef, data, { merge: true });
-      const updatedSnap = await getDoc(docRef);
-      return { uid, ...updatedSnap.data() };
-    }
-
-    // 2. Node REST API Server
-    if (isServerOnline) {
-      try {
-        const res = await fetch(`${API_URL}/waitlist/${uid}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data)
-        });
-        if (res.ok) return await res.json();
-      } catch (e) { /* fallback */ }
-    }
-
-    // 3. Local Sandbox Storage fallback
-    const stored = await waitlistService.getWaitlist();
-    const idx = stored.findIndex((w: any) => w.uid === uid);
-    if (idx > -1) {
-      stored[idx] = { ...stored[idx], ...data };
-      setLocalStorageItem('waitlist', stored);
-      return stored[idx];
-    }
-    return null;
+    if (!db) throw new Error('Firestore database is not initialized');
+    const docRef = doc(db, 'waitlist', uid);
+    await setDoc(docRef, data, { merge: true });
+    const updatedSnap = await getDoc(docRef);
+    return { uid, ...updatedSnap.data() };
   },
 
   deleteWaitlist: async (uid: string): Promise<void> => {
-    // 1. Firebase Firestore Production
-    if (!isDemoMode && db) {
-      await deleteDoc(doc(db, 'waitlist', uid));
-      return;
-    }
-
-    // 2. Node REST API Server
-    if (isServerOnline) {
-      try {
-        await fetch(`${API_URL}/waitlist/${uid}`, { method: 'DELETE' });
-      } catch (e) { /* fallback */ }
-    }
-
-    // 3. Local Sandbox Storage fallback
-    const stored = await waitlistService.getWaitlist();
-    const filtered = stored.filter((w: any) => w.uid !== uid);
-    setLocalStorageItem('waitlist', filtered);
+    if (!db) throw new Error('Firestore database is not initialized');
+    await deleteDoc(doc(db, 'waitlist', uid));
   }
 };

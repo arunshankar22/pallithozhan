@@ -1,7 +1,6 @@
-// Balar Malar Parramatta - User Database Service (Firestore, REST API & Local Sandbox)
-import { db, isDemoMode } from './firebase';
-import { collection, doc, getDoc, getDocs, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
-import { getLocalStorageItem, setLocalStorageItem, API_URL, isServerOnline } from './dbCommon';
+// Balar Malar Parramatta - User Database Service (Firestore Only)
+import { db } from './firebase';
+import { collection, doc, getDoc, getDocs, setDoc, deleteDoc } from 'firebase/firestore';
 
 export const DEFAULT_USERS = [
   { uid: 'admin_1', email: 'admin@example.com', fullName: 'Arun Pandian', role: 'admin', phone: '+91 98765 43210', schoolId: 'balarmalar parramatta branch', languagePreference: 'ta' },
@@ -110,93 +109,38 @@ export const DEFAULT_USERS = [
 
 export const userService = {
   reset: async (): Promise<void> => {
-    if (isServerOnline) {
-      try {
-        await fetch(`${API_URL}/reset`, { method: 'POST' });
-      } catch (e) { /* fallback */ }
-    }
-    setLocalStorageItem('users', DEFAULT_USERS);
+    // Reset handled via seed scripts
   },
 
   getUsers: async (): Promise<any[]> => {
-    // 1. Firebase Firestore
-    if (!isDemoMode && db) {
-      const querySnapshot = await getDocs(collection(db, 'users'));
-      const usersList: any[] = [];
-      querySnapshot.forEach((doc) => {
-        usersList.push({ uid: doc.id, ...doc.data() });
-      });
-      
-      if (usersList.length === 0) {
-        for (const u of DEFAULT_USERS) {
-          await userService.createUser(u);
-          usersList.push(u);
-        }
-      }
-      return usersList;
-    }
-
-    // 2. Local REST API Server
-    if (isServerOnline) {
-      try {
-        const res = await fetch(`${API_URL}/users`);
-        if (res.ok) {
-          const list = await res.json();
-          // Self-heal/seed local server if it is empty
-          if (!list || list.length === 0) {
-            for (const u of DEFAULT_USERS) {
-              await userService.createUser(u);
-            }
-            return DEFAULT_USERS;
-          }
-          return list;
-        }
-      } catch (e) { /* fallback */ }
-    }
-
-    // 3. Local Sandbox Mode
-    const stored = getLocalStorageItem('users', DEFAULT_USERS);
-    let modified = false;
-    const merged = [...stored];
-    DEFAULT_USERS.forEach((defUser: any) => {
-      const exists = merged.some((u: any) => u.uid === defUser.uid);
-      if (!exists) {
-        merged.push(defUser);
-        modified = true;
-      }
+    if (!db) throw new Error('Firestore database is not initialized');
+    const querySnapshot = await getDocs(collection(db, 'users'));
+    const usersList: any[] = [];
+    querySnapshot.forEach((docSnap) => {
+      usersList.push({ uid: docSnap.id, ...docSnap.data() });
     });
-    if (modified) {
-      setLocalStorageItem('users', merged);
-      return merged;
+    
+    if (usersList.length === 0) {
+      for (const u of DEFAULT_USERS) {
+        await userService.createUser(u);
+        usersList.push(u);
+      }
     }
-    return stored;
+    return usersList;
   },
 
   getUser: async (uid: string): Promise<any | null> => {
-    // 1. Firebase Firestore
-    if (!isDemoMode && db) {
-      const docRef = doc(db, 'users', uid);
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        return { uid: docSnap.id, ...docSnap.data() };
-      }
-      return null;
+    if (!db) throw new Error('Firestore database is not initialized');
+    const docRef = doc(db, 'users', uid);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      return { uid: docSnap.id, ...docSnap.data() };
     }
-
-    // 2. Local REST API Server
-    if (isServerOnline) {
-      try {
-        const res = await fetch(`${API_URL}/users/${uid}`);
-        if (res.ok) return await res.json();
-      } catch (e) { /* fallback */ }
-    }
-    
-    // 3. Sandbox
-    const users = await userService.getUsers();
-    return users.find((u: any) => u.uid === uid) || null;
+    return null;
   },
 
   createUser: async (user: any): Promise<any> => {
+    if (!db) throw new Error('Firestore database is not initialized');
     const uid = user.uid || `user_${Date.now()}`;
     const newUser = {
       schoolId: typeof window !== 'undefined' && typeof localStorage !== 'undefined' ? (
@@ -217,81 +161,21 @@ export const userService = {
       uid
     };
 
-    // 1. Firebase Firestore
-    if (!isDemoMode && db) {
-      const { uid: omitted, ...details } = newUser;
-      await setDoc(doc(db, 'users', uid), details);
-      return newUser;
-    }
-
-    // 2. Local REST API Server
-    if (isServerOnline) {
-      try {
-        const res = await fetch(`${API_URL}/users`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(newUser)
-        });
-        if (res.ok) return await res.json();
-      } catch (e) { /* fallback */ }
-    }
-
-    // 3. Sandbox
-    const users = await userService.getUsers();
-    users.push(newUser);
-    setLocalStorageItem('users', users);
+    const { uid: omitted, ...details } = newUser;
+    await setDoc(doc(db, 'users', uid), details);
     return newUser;
   },
 
   updateUser: async (uid: string, data: any): Promise<any> => {
-    // 1. Firebase Firestore
-    if (!isDemoMode && db) {
-      const docRef = doc(db, 'users', uid);
-      await setDoc(docRef, data, { merge: true });
-      const updatedSnap = await getDoc(docRef);
-      return { uid, ...updatedSnap.data() };
-    }
-
-    // 2. Local REST API Server
-    if (isServerOnline) {
-      try {
-        const res = await fetch(`${API_URL}/users/${uid}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data)
-        });
-        if (res.ok) return await res.json();
-      } catch (e) { /* fallback */ }
-    }
-
-    // 3. Sandbox
-    const users = await userService.getUsers();
-    const idx = users.findIndex((u: any) => u.uid === uid);
-    if (idx > -1) {
-      users[idx] = { ...users[idx], ...data };
-      setLocalStorageItem('users', users);
-      return users[idx];
-    }
-    return null;
+    if (!db) throw new Error('Firestore database is not initialized');
+    const docRef = doc(db, 'users', uid);
+    await setDoc(docRef, data, { merge: true });
+    const updatedSnap = await getDoc(docRef);
+    return { uid, ...updatedSnap.data() };
   },
 
   deleteUser: async (uid: string): Promise<void> => {
-    // 1. Firebase Firestore
-    if (!isDemoMode && db) {
-      await deleteDoc(doc(db, 'users', uid));
-      return;
-    }
-
-    // 2. Local REST API Server
-    if (isServerOnline) {
-      try {
-        await fetch(`${API_URL}/users/${uid}`, { method: 'DELETE' });
-      } catch (e) { /* fallback */ }
-    }
-
-    // 3. Sandbox
-    const users = await userService.getUsers();
-    const filtered = users.filter((u: any) => u.uid !== uid);
-    setLocalStorageItem('users', filtered);
+    if (!db) throw new Error('Firestore database is not initialized');
+    await deleteDoc(doc(db, 'users', uid));
   }
 };
