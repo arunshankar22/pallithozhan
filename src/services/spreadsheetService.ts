@@ -115,32 +115,117 @@ export const spreadsheetService = {
     const delimiter = firstLine.includes('\t') ? '\t' : ',';
     const firstRowCells = spreadsheetService.parseRow(firstLine, delimiter).map(h => h.trim().toLowerCase());
     
-    // Auto-detect header row presence
-    const hasHeader = firstRowCells.some(cell => 
-      ['given_name', 'name', 'email', 'student_email', 'wwc', 'dob', 'id', 'role', 'school_code', 'request_date', 'request'].includes(cell)
+    const normalizeHeader = (h: string) => h.trim().toLowerCase().replace(/[\s\-_]/g, '');
+    const mapHeaderToField = (normalizedHeader: string): string => {
+      switch (normalizedHeader) {
+        case 'givenname':
+        case 'firstname':
+        case 'name':
+          return 'given_name';
+        case 'familyname':
+        case 'lastname':
+          return 'family_name';
+        case 'studentemail':
+        case 'email':
+          return 'student_email';
+        case 'dateofbirth':
+        case 'dob':
+          return 'date_of_birth';
+        case 'gender':
+        case 'sex':
+          return 'gender';
+        case 'studentcreated':
+        case 'registered':
+        case 'created':
+        case 'createdat':
+        case 'registrationdate':
+          return 'student_created';
+        case 'requestdate':
+          return 'request_date';
+        case 'mainstreamschoolname':
+        case 'mainstreamschool':
+          return 'mainstream_school_name';
+        case 'mainstreamschoolclass':
+        case 'mainstreamgrade':
+        case 'mainstreamclass':
+          return 'mainstream_school_class';
+        case 'classname':
+        case 'class':
+        case 'stage':
+        case 'classpreference':
+          return 'class_name';
+        case 'parent1name':
+        case 'parent1':
+          return 'parent1_name';
+        case 'parent1email':
+          return 'parent1_email';
+        case 'parent1mobile':
+        case 'parent1phone':
+          return 'parent1_mobile';
+        case 'parent1volunteer':
+          return 'parent1_volunteer';
+        case 'parent2name':
+        case 'parent2':
+          return 'parent2_name';
+        case 'parent2email':
+          return 'parent2_email';
+        case 'parent2mobile':
+        case 'parent2phone':
+          return 'parent2_mobile';
+        case 'parent2volunteer':
+          return 'parent2_volunteer';
+        case 'oktoissuebooks':
+          return 'ok_to_issue_books';
+        case 'stationaryissued':
+          return 'stationary_issued';
+        case 'booksissued':
+          return 'books_issued';
+        case 'schoolcode':
+          return 'school_code';
+        case 'year':
+          return 'year';
+        case 'studentid':
+          return 'student_id';
+        case 'fullnametamil':
+        case 'tamilname':
+          return 'full_name_tamil';
+        case 'prevbmschoolclass':
+          return 'prev_bm_school_class';
+        case 'purpose':
+          return 'purpose';
+        case 'request':
+          return 'request';
+        default:
+          return normalizedHeader;
+      }
+    };
+
+    const normalizedRowCells = firstRowCells.map(normalizeHeader);
+    const hasHeader = normalizedRowCells.some(cell => 
+      ['givenname', 'firstname', 'name', 'email', 'studentemail', 'wwc', 'dob', 'dateofbirth', 'id', 'role', 'schoolcode', 'requestdate', 'request', 'registered'].includes(cell)
     );
 
     const records: any[] = [];
 
     if (hasHeader) {
-      const headers = firstRowCells;
+      const mappedHeaders = firstRowCells.map(h => mapHeaderToField(normalizeHeader(h)));
       
       // Required header validation
       if (role === 'student') {
         const required = ['given_name', 'family_name', 'student_email'];
-        const missing = required.filter(r => !headers.includes(r));
-        if (missing.length > 0 && !headers.includes('email')) {
+        const missing = required.filter(r => !mappedHeaders.includes(r));
+        if (missing.length > 0 && !mappedHeaders.includes('email')) {
           return { records: [], error: `Missing required columns: ${missing.join(', ')}` };
         }
       } else if (role === 'waitlist') {
         const required = ['given_name', 'parent1_name'];
-        const missing = required.filter(r => !headers.includes(r));
-        if (missing.length > 0 && !headers.includes('name')) {
+        const missing = required.filter(r => !mappedHeaders.includes(r));
+        if (missing.length > 0 && !mappedHeaders.includes('given_name') && !mappedHeaders.includes('family_name')) {
           return { records: [], error: `Missing required columns: ${missing.join(', ')}` };
         }
       } else {
-        const required = ['name', 'email'];
-        const missing = required.filter(r => !headers.includes(r));
+        const required = ['given_name', 'student_email']; // name/email mapped to given_name/student_email
+        const missing = required.filter(r => !mappedHeaders.includes(r));
         if (missing.length > 0) {
           return { records: [], error: `Missing required columns: ${missing.join(', ')}` };
         }
@@ -151,13 +236,13 @@ export const spreadsheetService = {
         if (cells.length === 0 || !lines[i].trim()) continue;
         
         const rowObj: Record<string, string> = {};
-        headers.forEach((header, idx) => {
+        mappedHeaders.forEach((header, idx) => {
           rowObj[header] = cells[idx] || '';
         });
 
         if (role === 'student') {
-          const email = rowObj.student_email || rowObj.email || '';
-          const givenName = rowObj.given_name || rowObj.name || '';
+          const email = rowObj.student_email || '';
+          const givenName = rowObj.given_name || '';
           const familyName = rowObj.family_name || '';
           const fullName = `${givenName} ${familyName}`.trim();
           
@@ -171,32 +256,32 @@ export const spreadsheetService = {
             languagePreference: 'ta',
             fullNameTamil: rowObj.full_name_tamil || '',
             gender: rowObj.gender || '',
-            dateOfBirth: rowObj.date_of_birth || rowObj.dob || '',
+            dateOfBirth: rowObj.date_of_birth || '',
             mainstreamSchoolName: rowObj.mainstream_school_name || '',
             mainstreamSchoolClass: rowObj.mainstream_school_class || '',
-            className: rowObj.class_name || rowObj.stage || '',
+            className: rowObj.class_name || '',
             okToIssueBooks: rowObj.ok_to_issue_books || 'NO',
             stationaryIssued: rowObj.stationary_issued || 'NO',
             booksIssued: rowObj.books_issued || 'NO',
             prevBmSchoolClass: rowObj.prev_bm_school_class || '',
-            studentCreated: rowObj.student_created || '',
+            studentCreated: rowObj.student_created || new Date().toISOString(),
             effectiveFrom: rowObj.effective_from || '',
             effectiveTo: rowObj.effective_to || '',
             parent1: rowObj.parent1_name ? {
               fullName: rowObj.parent1_name,
               email: (rowObj.parent1_email || '').toLowerCase(),
               phone: rowObj.parent1_mobile || '',
-              volunteer: (rowObj.parent1_volunteer || '').toLowerCase() === 'yes',
+              volunteer: (rowObj.parent1_volunteer || '').toLowerCase() === 'yes' || rowObj.parent1_volunteer === 'YES',
             } : null,
             parent2: rowObj.parent2_name ? {
               fullName: rowObj.parent2_name,
               email: (rowObj.parent2_email || '').toLowerCase(),
               phone: rowObj.parent2_mobile || '',
-              volunteer: (rowObj.parent2_volunteer || '').toLowerCase() === 'yes',
+              volunteer: (rowObj.parent2_volunteer || '').toLowerCase() === 'yes' || rowObj.parent2_volunteer === 'YES',
             } : null,
           } as StudentParsedRecord);
         } else if (role === 'waitlist') {
-          const givenName = rowObj.given_name || rowObj.name || '';
+          const givenName = rowObj.given_name || '';
           const familyName = rowObj.family_name || '';
           const studentEmail = rowObj.student_email || '';
           
@@ -213,9 +298,9 @@ export const spreadsheetService = {
             family_name: familyName,
             full_name_tamil: rowObj.full_name_tamil || '',
             gender: rowObj.gender || '',
-            DATE_OF_BIRTH: rowObj.date_of_birth || rowObj.dob || rowObj['date of birth'] || '',
+            DATE_OF_BIRTH: rowObj.date_of_birth || '',
             prev_bm_school_class: rowObj.prev_bm_school_class || '',
-            student_created: rowObj.student_created || new Date().toISOString().replace('T', ' ').substring(0, 19),
+            student_created: rowObj.student_created || rowObj.request_date || new Date().toISOString().replace('T', ' ').substring(0, 19),
             mainstream_school_name: rowObj.mainstream_school_name || '',
             mainstream_school_class: rowObj.mainstream_school_class || '',
             class_name: rowObj.class_name || '',
@@ -229,7 +314,7 @@ export const spreadsheetService = {
             parent2_volunteer: rowObj.parent2_volunteer || 'NO',
             Purpose: rowObj.purpose || 'New Enrollment',
             Request: rowObj.request || 'Online Form',
-            RequestDate: rowObj['request date'] || rowObj.request_date || new Date().toLocaleDateString('en-GB'),
+            RequestDate: rowObj.request_date || rowObj.student_created || new Date().toLocaleDateString('en-GB'),
             OK_TO_ISSUE_BOOKS: rowObj.ok_to_issue_books || 'NO',
             STATIONARY_ISSUED: rowObj.stationary_issued || 'NO',
             BOOKS_ISSUED: rowObj.books_issued || 'NO',
@@ -336,8 +421,9 @@ export const spreadsheetService = {
             wwcVerified = true;
           } else if (['pending', 'no', '0', 'false'].includes(cell.toLowerCase())) {
             wwcVerified = false;
-          } else if (/^\d{4}-\d{2}-\d{2}$/.test(cell) || /^\d{4}\/\d{2}\/\d{2}$/.test(cell)) {
+          } else if (/^\d{4}[\-\/]\d{2}[\-\/]\d{2}/.test(cell) || /^\d{2}[\-\/]\d{2}[\-\/]\d{4}/.test(cell)) {
             if (!dob) dob = cell;
+            else if (!studCreated) studCreated = cell;
             else if (!wwcVerifiedDate) wwcVerifiedDate = cell;
             else if (!wwcExpiryDate) wwcExpiryDate = cell;
           } else if (/^04\d{8}$/.test(cell) || cell.startsWith('+')) {

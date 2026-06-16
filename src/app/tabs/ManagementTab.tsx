@@ -56,6 +56,7 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [userViewMode, setUserViewMode] = useState<'card' | 'table'>('card');
+  const [waitlistViewMode, setWaitlistViewMode] = useState<'card' | 'table'>('card');
 
   // Filtered users
   const filteredUsers = users.filter(u => {
@@ -2189,6 +2190,19 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
               value={waitlistSearchQuery}
               onChangeText={setWaitlistSearchQuery}
             />
+
+            <Pressable
+              onPress={() => setWaitlistViewMode(prev => prev === 'card' ? 'table' : 'card')}
+              style={[
+                { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background },
+                waitlistViewMode === 'table' ? { borderColor: colors.secondary, backgroundColor: colors.secondaryLight } : {}
+              ]}
+            >
+              <ThemedText style={{ fontSize: 11, fontWeight: '700', color: waitlistViewMode === 'table' ? colors.secondary : colors.text }}>
+                {waitlistViewMode === 'card' ? '📊 Table View' : '🎛️ Card View'}
+              </ThemedText>
+            </Pressable>
+
             <Pressable
               onPress={() => {
                 setEditingWaitlist(null);
@@ -2217,7 +2231,11 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
                 (w.parent1_email || '').toLowerCase().includes(queryClean) ||
                 (w.parent2_name || '').toLowerCase().includes(queryClean)
               );
-            }).sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
+            }).sort((a, b) => {
+              const dateA = a.student_created || a.createdAt || '';
+              const dateB = b.student_created || b.createdAt || '';
+              return dateA.localeCompare(dateB);
+            });
 
             if (filteredWaitlist.length === 0) {
               return (
@@ -2371,14 +2389,150 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
               </View>
             );
 
-            return isLargeScreen ? (
-              <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: Spacing.four }}>
-                {waitlistListContent}
-              </ScrollView>
+            const waitlistTableContent = (
+              <View style={{ flex: 1, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.cardBg, overflow: 'hidden' }}>
+                <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: isLargeScreen ? Spacing.four : 80 + (insets?.bottom || 0) + 20 }}>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={true}>
+                    <View style={{ flexDirection: 'column' }}>
+                      {/* Header Row */}
+                      <View style={{ flexDirection: 'row', backgroundColor: colors.background, borderBottomWidth: 2, borderBottomColor: colors.border, paddingVertical: 10, alignItems: 'center' }}>
+                        {[
+                          { label: 'Actions', width: 140 },
+                          { label: 'Given Name', width: 130 },
+                          { label: 'Family Name', width: 120 },
+                          { label: 'Tamil Name', width: 120 },
+                          { label: 'Email', width: 180 },
+                          { label: 'DOB', width: 110 },
+                          { label: 'Gender', width: 80 },
+                          { label: 'Mainstream School', width: 160 },
+                          { label: 'Grade', width: 70 },
+                          { label: 'Pref Class', width: 120 },
+                          { label: 'Registered', width: 150 },
+                          { label: 'Parent 1 Name', width: 140 },
+                          { label: 'Parent 1 Email', width: 180 },
+                          { label: 'Parent 1 Phone', width: 120 },
+                          { label: 'Parent 1 Vol', width: 100 },
+                          { label: 'Parent 2 Name', width: 140 },
+                          { label: 'Parent 2 Email', width: 180 },
+                          { label: 'Parent 2 Phone', width: 120 },
+                          { label: 'Parent 2 Vol', width: 100 },
+                          { label: 'Books OK', width: 90 },
+                          { label: 'Stationary', width: 100 },
+                          { label: 'Books Issued', width: 100 }
+                        ].map((col, idx) => (
+                          <View key={idx} style={{ width: col.width, paddingHorizontal: 10 }}>
+                            <ThemedText style={{ fontSize: 11, fontWeight: '800', color: colors.textSecondary }}>{col.label}</ThemedText>
+                          </View>
+                        ))}
+                      </View>
+
+                      {/* Rows */}
+                      {filteredWaitlist.map((w) => {
+                        return (
+                          <View key={w.uid} style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: 8, alignItems: 'center' }}>
+                            {/* Actions */}
+                            <View style={{ width: 140, paddingHorizontal: 10, flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+                              <Pressable
+                                onPress={() => handleAdmitWaitlist(w)}
+                                style={{ backgroundColor: colors.success || '#4CAF50', padding: 4, borderRadius: 4 }}
+                              >
+                                <UserCheck size={11} color="#FFF" />
+                              </Pressable>
+                              <Pressable
+                                onPress={() => {
+                                  setEditingWaitlist(w);
+                                  setWaitlistModalVisible(true);
+                                }}
+                                style={{ padding: 4, borderRadius: 4, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border }}
+                              >
+                                <Edit size={11} color={colors.textSecondary} />
+                              </Pressable>
+                              <Pressable
+                                onPress={() => handleDeleteWaitlist(w.uid)}
+                                style={{ padding: 4, borderRadius: 4, backgroundColor: colors.primaryLight || '#FFE5E5', borderWidth: 1, borderColor: colors.danger || '#FF4D4D' }}
+                              >
+                                <Trash2 size={11} color={colors.danger || '#FF4D4D'} />
+                              </Pressable>
+                            </View>
+
+                            <View style={{ width: 130, paddingHorizontal: 10 }}><ThemedText style={{ fontSize: 12 }} numberOfLines={1}>{w.given_name || '-'}</ThemedText></View>
+                            <View style={{ width: 120, paddingHorizontal: 10 }}><ThemedText style={{ fontSize: 12 }} numberOfLines={1}>{w.family_name || '-'}</ThemedText></View>
+                            <View style={{ width: 120, paddingHorizontal: 10 }}><ThemedText style={{ fontSize: 12 }} numberOfLines={1}>{w.full_name_tamil || '-'}</ThemedText></View>
+                            <View style={{ width: 180, paddingHorizontal: 10 }}><ThemedText style={{ fontSize: 12 }} numberOfLines={1}>{w.student_email || '-'}</ThemedText></View>
+                            <View style={{ width: 110, paddingHorizontal: 10 }}><ThemedText style={{ fontSize: 12 }} numberOfLines={1}>{w.DATE_OF_BIRTH || w.dob || '-'}</ThemedText></View>
+                            <View style={{ width: 80, paddingHorizontal: 10 }}><ThemedText style={{ fontSize: 12 }} numberOfLines={1}>{w.gender || '-'}</ThemedText></View>
+                            <View style={{ width: 160, paddingHorizontal: 10 }}><ThemedText style={{ fontSize: 12 }} numberOfLines={1}>{w.mainstream_school_name || '-'}</ThemedText></View>
+                            <View style={{ width: 70, paddingHorizontal: 10 }}><ThemedText style={{ fontSize: 12 }} numberOfLines={1}>{w.mainstream_school_class || '-'}</ThemedText></View>
+                            <View style={{ width: 120, paddingHorizontal: 10 }}><ThemedText style={{ fontSize: 12 }} numberOfLines={1}>{w.class_name || '-'}</ThemedText></View>
+                            <View style={{ width: 150, paddingHorizontal: 10 }}><ThemedText style={{ fontSize: 12 }} numberOfLines={1}>{w.student_created || '-'}</ThemedText></View>
+                            <View style={{ width: 140, paddingHorizontal: 10 }}><ThemedText style={{ fontSize: 12 }} numberOfLines={1}>{w.parent1_name || '-'}</ThemedText></View>
+                            <View style={{ width: 180, paddingHorizontal: 10 }}><ThemedText style={{ fontSize: 12 }} numberOfLines={1}>{w.parent1_email || '-'}</ThemedText></View>
+                            <View style={{ width: 120, paddingHorizontal: 10 }}><ThemedText style={{ fontSize: 12 }} numberOfLines={1}>{w.parent1_mobile || '-'}</ThemedText></View>
+                            <View style={{ width: 100, paddingHorizontal: 10 }}><ThemedText style={{ fontSize: 12, color: w.parent1_volunteer === 'YES' ? colors.success : colors.text }}>{w.parent1_volunteer || 'NO'}</ThemedText></View>
+                            <View style={{ width: 140, paddingHorizontal: 10 }}><ThemedText style={{ fontSize: 12 }} numberOfLines={1}>{w.parent2_name || '-'}</ThemedText></View>
+                            <View style={{ width: 180, paddingHorizontal: 10 }}><ThemedText style={{ fontSize: 12 }} numberOfLines={1}>{w.parent2_email || '-'}</ThemedText></View>
+                            <View style={{ width: 120, paddingHorizontal: 10 }}><ThemedText style={{ fontSize: 12 }} numberOfLines={1}>{w.parent2_mobile || '-'}</ThemedText></View>
+                            <View style={{ width: 100, paddingHorizontal: 10 }}><ThemedText style={{ fontSize: 12, color: w.parent2_volunteer === 'YES' ? colors.success : colors.text }}>{w.parent2_volunteer || 'NO'}</ThemedText></View>
+                            
+                            {/* OK_TO_ISSUE_BOOKS Checkbox */}
+                            <View style={{ width: 90, paddingHorizontal: 10 }}>
+                              <Pressable
+                                onPress={() => handleToggleWaitlistCheck(w.uid, 'OK_TO_ISSUE_BOOKS', w.OK_TO_ISSUE_BOOKS)}
+                                style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                              >
+                                <View style={{ width: 12, height: 12, borderWidth: 1, borderColor: w.OK_TO_ISSUE_BOOKS === 'YES' ? colors.secondary : colors.border, borderRadius: 2, backgroundColor: w.OK_TO_ISSUE_BOOKS === 'YES' ? colors.secondary : 'transparent', justifyContent: 'center', alignItems: 'center' }}>
+                                  {w.OK_TO_ISSUE_BOOKS === 'YES' && <CheckCircle size={8} color="#FFF" />}
+                                </View>
+                                <ThemedText style={{ fontSize: 11 }}>{w.OK_TO_ISSUE_BOOKS === 'YES' ? 'YES' : 'NO'}</ThemedText>
+                              </Pressable>
+                            </View>
+
+                            {/* STATIONARY_ISSUED Checkbox */}
+                            <View style={{ width: 100, paddingHorizontal: 10 }}>
+                              <Pressable
+                                onPress={() => handleToggleWaitlistCheck(w.uid, 'STATIONARY_ISSUED', w.STATIONARY_ISSUED)}
+                                style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                              >
+                                <View style={{ width: 12, height: 12, borderWidth: 1, borderColor: w.STATIONARY_ISSUED === 'YES' ? colors.secondary : colors.border, borderRadius: 2, backgroundColor: w.STATIONARY_ISSUED === 'YES' ? colors.secondary : 'transparent', justifyContent: 'center', alignItems: 'center' }}>
+                                  {w.STATIONARY_ISSUED === 'YES' && <CheckCircle size={8} color="#FFF" />}
+                                </View>
+                                <ThemedText style={{ fontSize: 11 }}>{w.STATIONARY_ISSUED === 'YES' ? 'YES' : 'NO'}</ThemedText>
+                              </Pressable>
+                            </View>
+
+                            {/* BOOKS_ISSUED Checkbox */}
+                            <View style={{ width: 100, paddingHorizontal: 10 }}>
+                              <Pressable
+                                onPress={() => handleToggleWaitlistCheck(w.uid, 'BOOKS_ISSUED', w.BOOKS_ISSUED)}
+                                style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                              >
+                                <View style={{ width: 12, height: 12, borderWidth: 1, borderColor: w.BOOKS_ISSUED === 'YES' ? colors.secondary : colors.border, borderRadius: 2, backgroundColor: w.BOOKS_ISSUED === 'YES' ? colors.secondary : 'transparent', justifyContent: 'center', alignItems: 'center' }}>
+                                  {w.BOOKS_ISSUED === 'YES' && <CheckCircle size={8} color="#FFF" />}
+                                </View>
+                                <ThemedText style={{ fontSize: 11 }}>{w.BOOKS_ISSUED === 'YES' ? 'YES' : 'NO'}</ThemedText>
+                              </Pressable>
+                            </View>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  </ScrollView>
+                </ScrollView>
+              </View>
+            );
+
+            return waitlistViewMode === 'card' ? (
+              isLargeScreen ? (
+                <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: Spacing.four }}>
+                  {waitlistListContent}
+                </ScrollView>
+              ) : (
+                <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 80 + (insets?.bottom || 0) + 20 }}>
+                  {waitlistListContent}
+                </ScrollView>
+              )
             ) : (
-              <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 80 + (insets?.bottom || 0) + 20 }}>
-                {waitlistListContent}
-              </ScrollView>
+              waitlistTableContent
             );
           })()}
         </View>
