@@ -18,9 +18,10 @@ if (Platform.OS !== 'web') {
 interface VideoPlayerProps {
   url: string;
   style?: any;
+  onPlayingStateChange?: (isPlaying: boolean) => void;
 }
 
-export function VideoPlayer({ url, style }: VideoPlayerProps) {
+export function VideoPlayer({ url, style, onPlayingStateChange }: VideoPlayerProps) {
   if (Platform.OS === 'web') {
     return (
       <View style={[styles.container, style]}>
@@ -28,6 +29,9 @@ export function VideoPlayer({ url, style }: VideoPlayerProps) {
           src={url}
           controls
           playsInline
+          onPlay={() => onPlayingStateChange?.(true)}
+          onPause={() => onPlayingStateChange?.(false)}
+          onEnded={() => onPlayingStateChange?.(false)}
           style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', backgroundColor: '#000' }}
         />
       </View>
@@ -36,7 +40,7 @@ export function VideoPlayer({ url, style }: VideoPlayerProps) {
 
   // Native mobile rendering using expo-video
   if (useVideoPlayer && VideoView) {
-    return <NativeVideoView url={url} style={style} />;
+    return <NativeVideoView url={url} style={style} onPlayingStateChange={onPlayingStateChange} />;
   }
 
   // Fallback if expo-video fails to load
@@ -45,12 +49,34 @@ export function VideoPlayer({ url, style }: VideoPlayerProps) {
   );
 }
 
-function NativeVideoView({ url, style }: { url: string; style?: any }) {
+function NativeVideoView({ 
+  url, 
+  style, 
+  onPlayingStateChange 
+}: { 
+  url: string; 
+  style?: any; 
+  onPlayingStateChange?: (isPlaying: boolean) => void;
+}) {
   try {
     const player = useVideoPlayer(url, (playerInstance: any) => {
       playerInstance.loop = false;
       playerInstance.playsInteractiveHeaders = true;
     });
+
+    React.useEffect(() => {
+      const subscription = player.addListener('playingChange', (event: any) => {
+        const isPlaying = event?.isPlaying ?? false;
+        onPlayingStateChange?.(isPlaying);
+      });
+      const endSubscription = player.addListener('playToEnd', () => {
+        onPlayingStateChange?.(false);
+      });
+      return () => {
+        subscription.remove();
+        endSubscription.remove();
+      };
+    }, [player, onPlayingStateChange]);
 
     return (
       <VideoView

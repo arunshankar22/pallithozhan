@@ -154,6 +154,14 @@ export function NewsfeedTab({
   const [heroActiveIndex, setHeroActiveIndex] = useState(0);
   const heroRef = useRef<ScrollView | null>(null);
   const carouselRefs = useRef<Record<string, ScrollView | null>>({});
+  const [playingPostIds, setPlayingPostIds] = useState<Record<string, boolean>>({});
+
+  const handleVideoPlaying = (postId: string, isPlaying: boolean) => {
+    setPlayingPostIds(prev => ({
+      ...prev,
+      [postId]: isPlaying
+    }));
+  };
 
   // Voice recording states for voice comments
   const [recordingCommentPostId, setRecordingCommentPostId] = useState<string | null>(null);
@@ -191,6 +199,11 @@ export function NewsfeedTab({
   useEffect(() => {
     const postInterval = setInterval(() => {
       posts.forEach((post) => {
+        // Skip autoscroll if a video is playing in this post
+        if (playingPostIds[post.postId]) {
+          return;
+        }
+
         if (post.mediaAttachments && post.mediaAttachments.length > 1) {
           const total = post.mediaAttachments.length;
           const current = activeSlides[post.postId] || 0;
@@ -207,7 +220,7 @@ export function NewsfeedTab({
     return () => {
       clearInterval(postInterval);
     };
-  }, [posts, activeSlides, wrapperWidths]);
+  }, [posts, activeSlides, wrapperWidths, playingPostIds]);
 
   // Autoscroll Hero Banner (every 4 seconds)
   useEffect(() => {
@@ -1135,7 +1148,10 @@ export function NewsfeedTab({
                             return (
                               <View key={idx} style={{ width: slideWidth, height: '100%' }}>
                                 {media.type === 'video' ? (
-                                  <VideoPlayer url={fileUrl} />
+                                  <VideoPlayer 
+                                    url={fileUrl} 
+                                    onPlayingStateChange={(playing) => handleVideoPlaying(post.postId, playing)}
+                                  />
                                 ) : (
                                   <View style={{ flex: 1, backgroundColor: '#0a0a0a' }}>
                                     {Platform.OS === 'web' ? (
@@ -1193,7 +1209,10 @@ export function NewsfeedTab({
                       // Single mediaUrl fallback (backward compatibility)
                       <View style={{ flex: 1 }}>
                         {post.mediaType === 'video' ? (
-                          <VideoPlayer url={post.mediaUrl} />
+                          <VideoPlayer 
+                            url={post.mediaUrl} 
+                            onPlayingStateChange={(playing) => handleVideoPlaying(post.postId, playing)}
+                          />
                         ) : (
                           <View style={{ flex: 1, backgroundColor: '#0a0a0a' }}>
                             {Platform.OS === 'web' ? (

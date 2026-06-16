@@ -32,6 +32,7 @@ export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentI
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportTerm, setExportTerm] = useState<'all' | '1' | '2' | '3' | '4' | 'selected'>('all');
   const [exportFormat, setExportFormat] = useState<'csv' | 'xlsx'>('xlsx');
+  const [showDatePickerModal, setShowDatePickerModal] = useState(false);
 
   // Custom School Session Dates States
   const [schoolDates, setSchoolDates] = useState<any[]>([]);
@@ -80,29 +81,7 @@ export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentI
     load();
   }, []);
 
-  // Auto-select first date of the selected term/year when filter changes
-  useEffect(() => {
-    if (schoolDates.length > 0) {
-      const filtered = schoolDates.filter(sd => 
-        (selectedTerm === 'all' || String(sd.term) === selectedTerm) &&
-        (selectedYear === 'all' || sd.date.startsWith(selectedYear))
-      );
-      const activeFiltered = filtered.filter(sd => !sd.isHoliday);
-      if (activeFiltered.length > 0) {
-        const exists = activeFiltered.some(sd => sd.date === selectedDate);
-        if (!exists) {
-          // Prefer current academic year dates
-          const currentYear = new Date().getFullYear().toString();
-          const currentYearDates = activeFiltered.filter(sd => sd.date.startsWith(currentYear));
-          if (currentYearDates.length > 0) {
-            setSelectedDate(currentYearDates[0].date);
-          } else {
-            setSelectedDate(activeFiltered[0].date);
-          }
-        }
-      }
-    }
-  }, [selectedTerm, selectedYear, schoolDates, selectedDate]);
+  // Auto-selection useEffect removed to prevent overwriting custom date picker choices
 
   // Load parent dashboard details asynchronously if user is parent
   useEffect(() => {
@@ -553,6 +532,110 @@ export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentI
     );
   };
 
+  const renderDatePickerModal = () => {
+    if (!showDatePickerModal) return null;
+
+    // Sort all school dates descending so newest dates are at the top
+    const sortedDates = [...schoolDates].sort((a, b) => b.date.localeCompare(a.date));
+
+    return (
+      <View style={{
+        position: Platform.OS === 'web' ? 'fixed' : 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 1000,
+        padding: 16
+      }}>
+        <View style={{
+          width: '100%',
+          maxWidth: 450,
+          maxHeight: '80%',
+          backgroundColor: colors.cardBg,
+          borderRadius: 20,
+          borderWidth: 1,
+          borderColor: colors.border,
+          padding: 24,
+          gap: 16
+        }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <ThemedText style={{ fontSize: 18, fontWeight: '800', color: colors.text }}>
+              Select Session Date / வகுப்பு நாள் தேர்வு
+            </ThemedText>
+            <Pressable onPress={() => setShowDatePickerModal(false)} style={{ padding: 6 }}>
+              <ThemedText style={{ fontSize: 18, color: colors.textSecondary, fontWeight: '700' }}>✕</ThemedText>
+            </Pressable>
+          </View>
+
+          <ScrollView style={{ flex: 1, marginVertical: 8 }}>
+            <View style={{ gap: 8 }}>
+              {sortedDates.map((sd) => {
+                const isSel = selectedDate === sd.date;
+                const isHoliday = sd.isHoliday;
+                return (
+                  <Pressable
+                    key={sd.dateId}
+                    onPress={() => {
+                      if (isHoliday) {
+                        showToast(`Cannot mark attendance on holidays: ${sd.holidayName || 'School Holiday'}.`, 'warning');
+                        return;
+                      }
+                      setSelectedDate(sd.date);
+                      setShowDatePickerModal(false);
+                    }}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      paddingVertical: 12,
+                      paddingHorizontal: 16,
+                      borderRadius: 12,
+                      borderWidth: 1,
+                      borderColor: isSel ? colors.primary : colors.border,
+                      backgroundColor: isSel ? colors.primaryLight : isHoliday ? 'rgba(239, 68, 68, 0.05)' : colors.background
+                    }}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <ThemedText style={{ fontSize: 14, color: isHoliday ? colors.danger : colors.text, textDecorationLine: isHoliday ? 'line-through' : 'none', fontWeight: isSel ? '700' : '400' }}>
+                        📅 {sd.date}
+                      </ThemedText>
+                      {isHoliday && (
+                        <ThemedText style={{ fontSize: 11, color: colors.danger, fontWeight: '500' }}>
+                          (Holiday: {sd.holidayName || 'Break'})
+                        </ThemedText>
+                      )}
+                    </View>
+                    {!isHoliday && (
+                      <ThemedText style={{ fontSize: 11, color: colors.textSecondary }}>
+                        Term {sd.term}
+                      </ThemedText>
+                    )}
+                  </Pressable>
+                );
+              })}
+            </View>
+          </ScrollView>
+
+          <Pressable
+            onPress={() => setShowDatePickerModal(false)}
+            style={{
+              paddingVertical: 12,
+              borderRadius: 12,
+              backgroundColor: colors.primary,
+              alignItems: 'center'
+            }}
+          >
+            <ThemedText style={{ color: '#FFF', fontWeight: '700' }}>Close / மூடுக</ThemedText>
+          </Pressable>
+        </View>
+      </View>
+    );
+  };
+
   // Parent Dashboard View for Attendance
   if (user?.role === 'parent') {
     return (
@@ -819,130 +902,168 @@ export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentI
             </View>
 
             {/* Session Date Selector */}
-            {selectedClassId ? (
-              <View style={{ marginBottom: Spacing.three }}>
-                
-                {/* Year Filter Segment Selector */}
-                <View style={{ marginBottom: Spacing.two }}>
-                  <ThemedText style={[styles.formInputLabel, { marginBottom: 6 }]}>Filter by Year / ஆண்டு வாரியாக வடிகட்டுக</ThemedText>
-                  <View style={{ flexDirection: 'row', gap: 6 }}>
-                    {[
-                      { key: 'all', label: 'All' },
-                      { key: '2026', label: '2026' },
-                      { key: '2025', label: '2025' }
-                    ].map(yObj => {
-                      const isSel = selectedYear === yObj.key;
-                      return (
+            {selectedClassId ? (() => {
+              const activeDates = schoolDates.filter(sd => !sd.isHoliday);
+              const sortedActiveDates = [...activeDates].sort((a, b) => a.date.localeCompare(b.date));
+              
+              const today = new Date().toISOString().split('T')[0];
+              const todayMs = new Date(today).getTime();
+
+              let closestIdx = -1;
+              let minDiff = Infinity;
+              sortedActiveDates.forEach((sd, idx) => {
+                const diff = Math.abs(new Date(sd.date).getTime() - todayMs);
+                if (diff < minDiff) {
+                  minDiff = diff;
+                  closestIdx = idx;
+                }
+              });
+
+              const currentDate = closestIdx !== -1 ? sortedActiveDates[closestIdx] : null;
+              const prevDate = (closestIdx > 0) ? sortedActiveDates[closestIdx - 1] : null;
+              const upcomingDate = (closestIdx !== -1 && closestIdx < sortedActiveDates.length - 1) ? sortedActiveDates[closestIdx + 1] : null;
+
+              const isCustomSelected = selectedDate && 
+                (!prevDate || prevDate.date !== selectedDate) && 
+                (!currentDate || currentDate.date !== selectedDate) && 
+                (!upcomingDate || upcomingDate.date !== selectedDate);
+
+              return (
+                <View style={{ marginBottom: Spacing.three }}>
+                  <ThemedText style={[styles.formInputLabel, { marginBottom: 8 }]}>
+                    Session Date / வகுப்பு நாள் தேர்வு
+                  </ThemedText>
+
+                  <View style={{ gap: 10 }}>
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                      {/* Previous Week Shortcut */}
+                      {prevDate ? (
                         <Pressable
-                          key={yObj.key}
-                          onPress={() => setSelectedYear(yObj.key)}
+                          onPress={() => setSelectedDate(prevDate.date)}
                           style={{
                             flex: 1,
-                            paddingVertical: 6,
-                            borderRadius: 8,
+                            paddingVertical: 10,
+                            paddingHorizontal: 6,
+                            borderRadius: 12,
                             borderWidth: 1,
-                            borderColor: isSel ? colors.primary : colors.border,
-                            backgroundColor: isSel ? colors.primaryLight : 'transparent',
-                            alignItems: 'center'
+                            borderColor: selectedDate === prevDate.date ? colors.primary : colors.border,
+                            backgroundColor: selectedDate === prevDate.date ? colors.primaryLight : colors.background,
+                            alignItems: 'center',
+                            justifyContent: 'center'
                           }}
                         >
-                          <ThemedText style={{ fontSize: 11, fontWeight: '700', color: isSel ? colors.primary : colors.text }}>
-                            {yObj.label}
+                          <ThemedText style={{ fontSize: 9, fontWeight: '600', color: colors.textSecondary, marginBottom: 2 }}>
+                            Previous Week
+                          </ThemedText>
+                          <ThemedText style={{ fontSize: 11, fontWeight: '700', color: selectedDate === prevDate.date ? colors.primary : colors.text }}>
+                            📅 {prevDate.date}
                           </ThemedText>
                         </Pressable>
-                      );
-                    })}
-                  </View>
-                </View>
+                      ) : (
+                        <View style={{ flex: 1 }} />
+                      )}
 
-                {/* Term Filter Segment Selector */}
-                <View style={{ marginBottom: Spacing.two }}>
-                  <ThemedText style={[styles.formInputLabel, { marginBottom: 6 }]}>Filter by Term / பருவம் வாரியாக வடிகட்டுக</ThemedText>
-                  <View style={{ flexDirection: 'row', gap: 6 }}>
-                    {[
-                      { key: 'all', label: 'All' },
-                      { key: '1', label: 'Term 1' },
-                      { key: '2', label: 'Term 2' },
-                      { key: '3', label: 'Term 3' },
-                      { key: '4', label: 'Term 4' }
-                    ].map(tObj => {
-                      const isSel = selectedTerm === tObj.key;
-                      return (
+                      {/* Current Week Shortcut */}
+                      {currentDate ? (
                         <Pressable
-                          key={tObj.key}
-                          onPress={() => setSelectedTerm(tObj.key as any)}
+                          onPress={() => setSelectedDate(currentDate.date)}
                           style={{
                             flex: 1,
-                            paddingVertical: 6,
-                            borderRadius: 8,
+                            paddingVertical: 10,
+                            paddingHorizontal: 6,
+                            borderRadius: 12,
                             borderWidth: 1,
-                            borderColor: isSel ? colors.primary : colors.border,
-                            backgroundColor: isSel ? colors.primaryLight : 'transparent',
-                            alignItems: 'center'
+                            borderColor: selectedDate === currentDate.date ? colors.primary : colors.border,
+                            backgroundColor: selectedDate === currentDate.date ? colors.primaryLight : colors.background,
+                            alignItems: 'center',
+                            justifyContent: 'center'
                           }}
                         >
-                          <ThemedText style={{ fontSize: 11, fontWeight: '700', color: isSel ? colors.primary : colors.text }}>
-                            {tObj.label}
+                          <ThemedText style={{ fontSize: 9, fontWeight: '600', color: colors.textSecondary, marginBottom: 2 }}>
+                            Current Week
+                          </ThemedText>
+                          <ThemedText style={{ fontSize: 11, fontWeight: '700', color: selectedDate === currentDate.date ? colors.primary : colors.text }}>
+                            📅 {currentDate.date}
                           </ThemedText>
                         </Pressable>
-                      );
-                    })}
-                  </View>
-                </View>
+                      ) : (
+                        <View style={{ flex: 1 }} />
+                      )}
 
-                <ThemedText style={styles.formInputLabel}>Select Session Date / வகுப்பு நாள் தேர்வு செய்க</ThemedText>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: Spacing.two, paddingVertical: 4 }}>
-                  {schoolDates.filter(sd => 
-                    (selectedTerm === 'all' || String(sd.term) === selectedTerm) &&
-                    (selectedYear === 'all' || sd.date.startsWith(selectedYear))
-                  ).map((sd) => {
-                    const isSel = selectedDate === sd.date;
-                    const isHoliday = sd.isHoliday;
-                    return (
-                      <Pressable
-                        key={sd.dateId}
-                        onPress={() => {
-                          if (isHoliday) {
-                            showToast(`Cannot mark attendance on holidays: ${sd.holidayName || 'School Holiday'}.`, 'warning');
-                            return;
-                          }
-                          setSelectedDate(sd.date);
-                        }}
-                        style={[
-                          styles.classChip,
-                          {
-                            backgroundColor: isSel 
-                              ? colors.primaryLight 
-                              : isHoliday 
-                                ? colors.danger + '10' 
-                                : colors.background,
-                            borderColor: isSel 
-                              ? colors.primary 
-                              : isHoliday 
-                                ? colors.danger 
-                                : colors.border
-                          }
-                        ]}
-                      >
-                        <ThemedText style={[
-                          styles.classChipText, 
-                          { 
-                            color: isSel 
-                              ? colors.primary 
-                              : isHoliday 
-                                ? colors.danger 
-                                : colors.text,
-                            textDecorationLine: isHoliday ? 'line-through' : 'none'
-                          }
-                        ]}>
-                          📅 {sd.date} {isHoliday ? `(Holiday: ${sd.holidayName || 'Break'})` : `(Term ${sd.term})`}
+                      {/* Upcoming Week Shortcut */}
+                      {upcomingDate ? (
+                        <Pressable
+                          onPress={() => setSelectedDate(upcomingDate.date)}
+                          style={{
+                            flex: 1,
+                            paddingVertical: 10,
+                            paddingHorizontal: 6,
+                            borderRadius: 12,
+                            borderWidth: 1,
+                            borderColor: selectedDate === upcomingDate.date ? colors.primary : colors.border,
+                            backgroundColor: selectedDate === upcomingDate.date ? colors.primaryLight : colors.background,
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
+                        >
+                          <ThemedText style={{ fontSize: 9, fontWeight: '600', color: colors.textSecondary, marginBottom: 2 }}>
+                            Upcoming Week
+                          </ThemedText>
+                          <ThemedText style={{ fontSize: 11, fontWeight: '700', color: selectedDate === upcomingDate.date ? colors.primary : colors.text }}>
+                            📅 {upcomingDate.date}
+                          </ThemedText>
+                        </Pressable>
+                      ) : (
+                        <View style={{ flex: 1 }} />
+                      )}
+                    </View>
+
+                    {/* Custom Selected Date */}
+                    {isCustomSelected && (
+                      <View style={{
+                        paddingVertical: 10,
+                        paddingHorizontal: 12,
+                        borderRadius: 12,
+                        borderWidth: 1,
+                        borderColor: colors.primary,
+                        backgroundColor: colors.primaryLight,
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        <ThemedText style={{ fontSize: 9, fontWeight: '600', color: colors.primary, marginBottom: 2 }}>
+                          Custom Selected Session
                         </ThemedText>
-                      </Pressable>
-                    );
-                  })}
-                </ScrollView>
-              </View>
-            ) : null}
+                        <ThemedText style={{ fontSize: 13, fontWeight: '800', color: colors.primary }}>
+                          📅 {selectedDate} (Term {schoolDates.find(sd => sd.date === selectedDate)?.term || '?'})
+                        </ThemedText>
+                      </View>
+                    )}
+
+                    {/* Select Other Date Button */}
+                    <Pressable
+                      onPress={() => setShowDatePickerModal(true)}
+                      style={({ pressed }) => [
+                        {
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          paddingVertical: 12,
+                          borderRadius: 12,
+                          borderWidth: 1,
+                          borderColor: colors.primary,
+                          backgroundColor: pressed ? colors.primaryLight : 'transparent',
+                          gap: 6
+                        }
+                      ]}
+                    >
+                      <ThemedText style={{ fontSize: 13, fontWeight: '700', color: colors.primary }}>
+                        🔍 Select Other Date / மற்ற நாள் தேர்வு செய்க
+                      </ThemedText>
+                    </Pressable>
+                  </View>
+                </View>
+              );
+            })() : null}
 
             {/* Student lists to toggle present / absent / late */}
             {selectedClassId && studentList.length > 0 ? (
@@ -1055,6 +1176,7 @@ export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentI
         </View>
       </ScrollView>
       {renderExportModal()}
+      {renderDatePickerModal()}
     </View>
   );
 }
