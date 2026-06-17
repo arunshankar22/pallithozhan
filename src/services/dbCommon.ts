@@ -1,9 +1,15 @@
 export const API_URL = (() => {
+  if (typeof window !== 'undefined' && window.location && window.location.hostname) {
+    const hostname = window.location.hostname;
+    // On Vercel deployments (previews and custom domains ending in vercel.app),
+    // always use the same domain to call serverless backend endpoints.
+    if (hostname.endsWith('.vercel.app') || hostname === 'pallithozhan.vercel.app') {
+      return `${window.location.origin}/api`;
+    }
+  }
+
   if (process.env.EXPO_PUBLIC_API_URL) {
     return process.env.EXPO_PUBLIC_API_URL;
-  }
-  if (typeof window !== 'undefined' && window.location && window.location.origin) {
-    return `${window.location.origin}/api`;
   }
   return 'http://localhost:5000/api';
 })();
