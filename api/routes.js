@@ -635,7 +635,7 @@ async function handleApiRoutes(req, res, pathname, method, dbData, writeDb, urlO
             }],
             generationConfig: {
               temperature: 0.1,
-              maxOutputTokens: 1024
+              maxOutputTokens: 8192
             }
           })
         }
