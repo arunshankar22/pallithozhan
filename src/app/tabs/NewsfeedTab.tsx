@@ -52,7 +52,7 @@ const { width: windowWidth } = Dimensions.get('window');
 
 const HERO_SLIDES = [
   {
-    image: require('../../assets/images/tamil_kids_classroom.png'),
+    image: require('../../../assets/images/tamil_kids_classroom.png'),
     titleEn: 'Preserving Tamil Culture & Heritage',
     titleTa: 'தமிழ் பண்பாடு மற்றும் பாரம்பரியப் பாதுகாப்பு',
     subtitleEn: 'Empowering children with native linguistic skills',
