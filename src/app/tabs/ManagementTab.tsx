@@ -19,6 +19,7 @@ import { spreadsheetService } from '@/services/spreadsheetService';
 import { waitlistService } from '@/services/waitlistService';
 import { UserModal } from '@/components/UserModal';
 import { UserBulkBar } from '@/components/UserBulkBar';
+import { DateTimePicker } from '@/components/DateTimePicker';
 import * as XLSX from 'xlsx';
 
 export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabProps) {
@@ -1748,19 +1749,21 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
                     <View style={{ flexDirection: 'row', gap: Spacing.two }}>
                       <View style={{ flex: 1 }}>
                         <ThemedText style={{ fontSize: 11, fontWeight: '600', marginBottom: 2 }}>Start Date</ThemedText>
-                        <TextInput
-                          style={[styles.formInput, { color: colors.text, borderColor: colors.border, padding: 8 }]}
+                        <DateTimePicker
                           value={genStartDate}
-                          onChangeText={setGenStartDate}
+                          onChange={setGenStartDate}
+                          colors={colors}
+                          mode="date"
                           placeholder="YYYY-MM-DD"
                         />
                       </View>
                       <View style={{ flex: 1 }}>
                         <ThemedText style={{ fontSize: 11, fontWeight: '600', marginBottom: 2 }}>End Date</ThemedText>
-                        <TextInput
-                          style={[styles.formInput, { color: colors.text, borderColor: colors.border, padding: 8 }]}
+                        <DateTimePicker
                           value={genEndDate}
-                          onChangeText={setGenEndDate}
+                          onChange={setGenEndDate}
+                          colors={colors}
+                          mode="date"
                           placeholder="YYYY-MM-DD"
                         />
                       </View>
@@ -2720,12 +2723,12 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
             <View style={{ padding: Spacing.three, gap: Spacing.three }}>
               <View style={styles.formGroup}>
                 <ThemedText style={styles.formLabel}>Custom Date / வகுப்பு நாள் (YYYY-MM-DD)</ThemedText>
-                <TextInput
-                  style={[styles.formInput, { color: colors.text, borderColor: colors.border, marginTop: 6 }]}
+                <DateTimePicker
                   value={customDateVal}
-                  onChangeText={setCustomDateVal}
+                  onChange={setCustomDateVal}
+                  colors={colors}
+                  mode="date"
                   placeholder="YYYY-MM-DD"
-                  placeholderTextColor={colors.textSecondary}
                 />
               </View>
 

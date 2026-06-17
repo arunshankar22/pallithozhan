@@ -11,6 +11,7 @@ import { styles } from '@/app/styles';
 import { mockDb } from '@/services/mockBackend';
 import { autoTranslate, translateWithGemini } from '@/services/translator';
 import { useDebounce } from '@/hooks/useDebounce';
+import { DateTimePicker } from '@/components/DateTimePicker';
 
 export function CalendarTab({ user, colors, t, showToast, i18n, activeStudentId }: TabProps) {
   const [events, setEvents] = useState<any[]>([]);
@@ -287,12 +288,12 @@ export function CalendarTab({ user, colors, t, showToast, i18n, activeStudentId 
           <View style={rowStyles.rowForm}>
             <View style={styles.formCol}>
               <ThemedText style={styles.formInputLabel}>Event Date & Time (YYYY-MM-DD HH:MM)</ThemedText>
-              <TextInput
-                style={[styles.formInput, { color: colors.text, borderColor: colors.border }]}
-                placeholder="e.g. 2026-06-15 10:00"
-                placeholderTextColor={colors.textSecondary}
+              <DateTimePicker
                 value={startDateStr}
-                onChangeText={setStartDateStr}
+                onChange={setStartDateStr}
+                colors={colors}
+                mode="datetime"
+                placeholder="e.g. 2026-06-15 10:00"
               />
             </View>
           </View>

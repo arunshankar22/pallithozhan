@@ -52,7 +52,7 @@ const { width: windowWidth } = Dimensions.get('window');
 
 const HERO_SLIDES = [
   {
-    image: 'https://images.unsplash.com/photo-1577896851231-70ef18881754?auto=format&fit=crop&q=80&w=1200',
+    image: require('../../assets/images/tamil_kids_classroom.png'),
     titleEn: 'Preserving Tamil Culture & Heritage',
     titleTa: 'தமிழ் பண்பாடு மற்றும் பாரம்பரியப் பாதுகாப்பு',
     subtitleEn: 'Empowering children with native linguistic skills',
@@ -754,7 +754,7 @@ export function NewsfeedTab({
             return (
               <View key={idx} style={{ width: slideWidth, height: 240, position: 'relative' }}>
                 <Image
-                  source={{ uri: slide.image }}
+                  source={typeof slide.image === 'string' ? { uri: slide.image } : slide.image}
                   style={{ width: '100%', height: '100%', resizeMode: 'cover' }}
                 />
                 {/* Premium Gradation Overlay Mask */}
