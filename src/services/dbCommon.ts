@@ -1,5 +1,12 @@
-// Balar Malar Parramatta - Unified Database Common Utilities
-export const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
+export const API_URL = (() => {
+  if (process.env.EXPO_PUBLIC_API_URL) {
+    return process.env.EXPO_PUBLIC_API_URL;
+  }
+  if (typeof window !== 'undefined' && window.location && window.location.origin) {
+    return `${window.location.origin}/api`;
+  }
+  return 'http://localhost:5000/api';
+})();
 
 export let isServerOnline = false;
 

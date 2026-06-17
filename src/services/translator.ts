@@ -579,8 +579,11 @@ export function hasUnmatchedWords(text: string): boolean {
   for (const word of words) {
     // If it is a number or defined in the dictionary, it is a matched word
     if (isNaN(Number(word)) && !DICTIONARY[word]) {
-      // Check if it is part of a longer phrase key in the dictionary
-      const isPhraseMatch = Object.keys(DICTIONARY).some(key => key.includes(word));
+      // Check if it is a whole word in a longer phrase key in the dictionary
+      const isPhraseMatch = Object.keys(DICTIONARY).some(key => {
+        const keyWords = key.toLowerCase().split(/[^a-z0-9]+/);
+        return keyWords.includes(word);
+      });
       if (!isPhraseMatch) {
         return true; // Unmatched word found
       }
