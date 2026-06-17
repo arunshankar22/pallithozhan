@@ -126,6 +126,8 @@ export function NewsfeedTab({
   const [contentTa, setContentTa] = useState('');
   const [titleTaDirty, setTitleTaDirty] = useState(false);
   const [contentTaDirty, setContentTaDirty] = useState(false);
+  const [originalTitleEn, setOriginalTitleEn] = useState('');
+  const [originalContentEn, setOriginalContentEn] = useState('');
 
   // Translation loading & debouncing states
   const [isTitleTranslating, setIsTitleTranslating] = useState(false);
@@ -141,6 +143,7 @@ export function NewsfeedTab({
       setTitleTa('');
       return;
     }
+    if (debouncedTitleEn === originalTitleEn) return;
 
     const translateTitle = async () => {
       setIsTitleTranslating(true);
@@ -157,7 +160,7 @@ export function NewsfeedTab({
     };
 
     translateTitle();
-  }, [debouncedTitleEn, titleTaDirty]);
+  }, [debouncedTitleEn, titleTaDirty, originalTitleEn]);
 
   // Auto-translate Content/Description
   useEffect(() => {
@@ -166,6 +169,7 @@ export function NewsfeedTab({
       setContentTa('');
       return;
     }
+    if (debouncedContentEn === originalContentEn) return;
 
     const translateContent = async () => {
       setIsContentTranslating(true);
@@ -182,7 +186,7 @@ export function NewsfeedTab({
     };
 
     translateContent();
-  }, [debouncedContentEn, contentTaDirty]);
+  }, [debouncedContentEn, contentTaDirty, originalContentEn]);
   
   // Media attachment state
   const [selectedMediaIndex, setSelectedMediaIndex] = useState(0);
@@ -492,6 +496,8 @@ export function NewsfeedTab({
     setTitleTa('');
     setContentEn('');
     setContentTa('');
+    setOriginalTitleEn('');
+    setOriginalContentEn('');
     setAttachedFiles([]);
     setSelectedTaggedClassIds([]);
     setSelectedTaggedStudentIds([]);
@@ -509,6 +515,8 @@ export function NewsfeedTab({
     setTitleTa(post.title.ta);
     setContentEn(post.content.en);
     setContentTa(post.content.ta);
+    setOriginalTitleEn(post.title.en);
+    setOriginalContentEn(post.content.en);
     
     const mediaList = [];
     if (post.mediaAttachments && post.mediaAttachments.length > 0) {
@@ -529,8 +537,8 @@ export function NewsfeedTab({
     setAttachedFiles(mediaList);
     setSelectedTaggedClassIds(post.taggedClassIds || []);
     setSelectedTaggedStudentIds(post.taggedStudentIds || []);
-    setTitleTaDirty(true);
-    setContentTaDirty(true);
+    setTitleTaDirty(false);
+    setContentTaDirty(false);
     setModalVisible(true);
   };
 
@@ -689,6 +697,8 @@ export function NewsfeedTab({
               setTitleTa('');
               setContentEn('');
               setContentTa('');
+              setOriginalTitleEn('');
+              setOriginalContentEn('');
               setAttachedFiles([]);
               setSelectedTaggedClassIds([]);
               setSelectedTaggedStudentIds([]);

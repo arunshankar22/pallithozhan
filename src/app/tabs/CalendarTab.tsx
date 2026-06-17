@@ -27,6 +27,8 @@ export function CalendarTab({ user, colors, t, showToast, i18n, activeStudentId 
   const [startDateStr, setStartDateStr] = useState('');
   const [titleTaDirty, setTitleTaDirty] = useState(false);
   const [descTaDirty, setDescTaDirty] = useState(false);
+  const [originalTitleEn, setOriginalTitleEn] = useState('');
+  const [originalDescEn, setOriginalDescEn] = useState('');
 
   // Translation loading & debouncing states
   const [isTitleTranslating, setIsTitleTranslating] = useState(false);
@@ -42,6 +44,7 @@ export function CalendarTab({ user, colors, t, showToast, i18n, activeStudentId 
       setTitleTa('');
       return;
     }
+    if (debouncedTitleEn === originalTitleEn) return;
 
     const translateTitle = async () => {
       setIsTitleTranslating(true);
@@ -58,7 +61,7 @@ export function CalendarTab({ user, colors, t, showToast, i18n, activeStudentId 
     };
 
     translateTitle();
-  }, [debouncedTitleEn, titleTaDirty]);
+  }, [debouncedTitleEn, titleTaDirty, originalTitleEn]);
 
   // Auto-translate Description
   useEffect(() => {
@@ -67,6 +70,7 @@ export function CalendarTab({ user, colors, t, showToast, i18n, activeStudentId 
       setDescTa('');
       return;
     }
+    if (debouncedDescEn === originalDescEn) return;
 
     const translateDesc = async () => {
       setIsDescTranslating(true);
@@ -83,7 +87,7 @@ export function CalendarTab({ user, colors, t, showToast, i18n, activeStudentId 
     };
 
     translateDesc();
-  }, [debouncedDescEn, descTaDirty]);
+  }, [debouncedDescEn, descTaDirty, originalDescEn]);
 
   useEffect(() => {
     const load = async () => {
@@ -137,6 +141,8 @@ export function CalendarTab({ user, colors, t, showToast, i18n, activeStudentId 
     setDescEn('');
     setDescTa('');
     setStartDateStr('');
+    setOriginalTitleEn('');
+    setOriginalDescEn('');
     setTitleTaDirty(false);
     setDescTaDirty(false);
     setEditingEventId(null);
@@ -150,6 +156,8 @@ export function CalendarTab({ user, colors, t, showToast, i18n, activeStudentId 
     setTitleTa(evt.title.ta);
     setDescEn(evt.description.en);
     setDescTa(evt.description.ta);
+    setOriginalTitleEn(evt.title.en);
+    setOriginalDescEn(evt.description.en);
     
     const dt = new Date(evt.startDate);
     const year = dt.getFullYear();
@@ -159,8 +167,8 @@ export function CalendarTab({ user, colors, t, showToast, i18n, activeStudentId 
     const minutes = String(dt.getMinutes()).padStart(2, '0');
     setStartDateStr(`${year}-${month}-${day} ${hours}:${minutes}`);
 
-    setTitleTaDirty(true);
-    setDescTaDirty(true);
+    setTitleTaDirty(false);
+    setDescTaDirty(false);
     setModalVisible(true);
   };
 
@@ -202,6 +210,8 @@ export function CalendarTab({ user, colors, t, showToast, i18n, activeStudentId 
               setTitleTa('');
               setDescEn('');
               setDescTa('');
+              setOriginalTitleEn('');
+              setOriginalDescEn('');
               const dt = new Date(Date.now() + 3600000 * 24);
               const year = dt.getFullYear();
               const month = String(dt.getMonth() + 1).padStart(2, '0');

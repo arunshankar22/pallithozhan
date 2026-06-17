@@ -236,7 +236,7 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
         {/* HERO SECTION */}
         <View style={styles.heroContainer}>
           <Image 
-            source={{ uri: 'https://images.unsplash.com/photo-1577896851231-70ef18881754?auto=format&fit=crop&q=80&w=1200' }} 
+            source={require('../../assets/images/tamil_kids_classroom.png')} 
             style={styles.heroBgImage} 
           />
           <View style={styles.heroOverlay} />

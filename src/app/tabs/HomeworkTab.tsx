@@ -158,6 +158,8 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
   const [descTa, setDescTa] = useState('');
   const [titleTaDirty, setTitleTaDirty] = useState(false);
   const [descTaDirty, setDescTaDirty] = useState(false);
+  const [originalTitleEn, setOriginalTitleEn] = useState('');
+  const [originalDescEn, setOriginalDescEn] = useState('');
 
   // Translation loading & debouncing states
   const [isTitleTranslating, setIsTitleTranslating] = useState(false);
@@ -173,6 +175,7 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
       setTitleTa('');
       return;
     }
+    if (debouncedTitleEn === originalTitleEn) return;
 
     const translateTitle = async () => {
       setIsTitleTranslating(true);
@@ -189,7 +192,7 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
     };
 
     translateTitle();
-  }, [debouncedTitleEn, titleTaDirty]);
+  }, [debouncedTitleEn, titleTaDirty, originalTitleEn]);
 
   // Auto-translate Description
   useEffect(() => {
@@ -198,6 +201,7 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
       setDescTa('');
       return;
     }
+    if (debouncedDescEn === originalDescEn) return;
 
     const translateDesc = async () => {
       setIsDescTranslating(true);
@@ -214,7 +218,7 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
     };
 
     translateDesc();
-  }, [debouncedDescEn, descTaDirty]);
+  }, [debouncedDescEn, descTaDirty, originalDescEn]);
 
   // Audio Guide recording states
   const [recordedVoiceBase64, setRecordedVoiceBase64] = useState<string | null>(null);
@@ -392,6 +396,8 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
     setTitleTa('');
     setDescEn('');
     setDescTa('');
+    setOriginalTitleEn('');
+    setOriginalDescEn('');
     setTitleTaDirty(false);
     setDescTaDirty(false);
     setSelectedClassId('');
@@ -410,6 +416,8 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
     setTitleTa(item.title.ta);
     setDescEn(item.description.en);
     setDescTa(item.description.ta);
+    setOriginalTitleEn(item.title.en);
+    setOriginalDescEn(item.description.en);
     setRecordedVoiceBase64(item.voiceUrl || null);
     
     const mappedAttachments: { name: string; type: 'image' | 'video'; data: string; }[] = [];
@@ -430,8 +438,8 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
     }
     setAttachedHomeworkFiles(mappedAttachments);
 
-    setTitleTaDirty(true);
-    setDescTaDirty(true);
+    setTitleTaDirty(false);
+    setDescTaDirty(false);
     setModalVisible(true);
   };
 
@@ -481,6 +489,8 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
               setTitleTa('');
               setDescEn('');
               setDescTa('');
+              setOriginalTitleEn('');
+              setOriginalDescEn('');
               setRecordedVoiceBase64(null);
               setAttachedHomeworkFiles([]);
               clearRecording();
