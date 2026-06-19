@@ -338,7 +338,7 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
           {activeHeroIdx === 0 ? (
             <Image 
               source={require('../../assets/images/tamil_kids_hero.jpg')} 
-              style={[styles.heroBgImage, { resizeMode: 'contain', backgroundColor: '#FAF6EB' }]} 
+              style={[styles.heroBgImage, { resizeMode: 'cover' }]} 
             />
           ) : (
             <>
