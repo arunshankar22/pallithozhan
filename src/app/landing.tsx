@@ -918,23 +918,42 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
 
                   <View style={{ gap: 8, marginTop: 4 }}>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                      <ThemedText style={{ fontWeight: '600', fontSize: 12, color: colors.text }}>{i18n.language === 'ta' ? 'தலைவர் (President)' : 'Board President'}</ThemedText>
-                      <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>Dr. K. Anbarasan</ThemedText>
+                      <ThemedText style={{ fontWeight: '600', fontSize: 12, color: colors.text }}>{i18n.language === 'ta' ? 'தலைவர் (President)' : 'President'}</ThemedText>
+                      <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>Jayakumar Pandiyan</ThemedText>
                     </View>
 
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                      <ThemedText style={{ fontWeight: '600', fontSize: 12, color: colors.text }}>{i18n.language === 'ta' ? 'செயலாளர் (Secretary)' : 'Board Secretary'}</ThemedText>
-                      <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>Mrs. Meera Sundar</ThemedText>
+                      <ThemedText style={{ fontWeight: '600', fontSize: 12, color: colors.text }}>{i18n.language === 'ta' ? 'செயலாளர் (Secretary)' : 'Secretary'}</ThemedText>
+                      <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>Anbazhagan Devaraj</ThemedText>
                     </View>
 
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                      <ThemedText style={{ fontWeight: '600', fontSize: 12, color: colors.text }}>{i18n.language === 'ta' ? 'பொருளாளர் (Treasurer)' : 'Board Treasurer'}</ThemedText>
-                      <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>Mr. S. Viswanathan</ThemedText>
+                      <ThemedText style={{ fontWeight: '600', fontSize: 12, color: colors.text }}>{i18n.language === 'ta' ? 'முதல்வர் (Principal)' : 'Principal'}</ThemedText>
+                      <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>Sanjeev Prabhu Shanmugam</ThemedText>
                     </View>
 
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                      <ThemedText style={{ fontWeight: '600', fontSize: 12, color: colors.text }}>{i18n.language === 'ta' ? 'கிளை ஒருங்கிணைப்பாளர்' : 'Parramatta Coordinator'}</ThemedText>
-                      <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>Mrs. Priyalatha Rajan</ThemedText>
+                      <ThemedText style={{ fontWeight: '600', fontSize: 12, color: colors.text }}>{i18n.language === 'ta' ? 'பொருளாளர் (Treasurer)' : 'Treasurer'}</ThemedText>
+                      <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>Suthakar Balakrishnan</ThemedText>
+                    </View>
+
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                      <ThemedText style={{ fontWeight: '600', fontSize: 12, color: colors.text }}>{i18n.language === 'ta' ? 'இணைப் பொருளாளர் (Joint Treasurer)' : 'Joint Treasurer'}</ThemedText>
+                      <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>Chandra Mohan Subramaniam</ThemedText>
+                    </View>
+
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                      <ThemedText style={{ fontWeight: '600', fontSize: 12, color: colors.text }}>{i18n.language === 'ta' ? 'நிர்வாக ஒருங்கிணைப்பாளர் (Admin Coordinator)' : 'Admin Coordinator'}</ThemedText>
+                      <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>Shanmugavel Sampath</ThemedText>
+                    </View>
+
+                    <View style={{ paddingVertical: 8 }}>
+                      <ThemedText style={{ fontWeight: '600', fontSize: 12, color: colors.text, marginBottom: 4 }}>
+                        {i18n.language === 'ta' ? 'தகவல் தொழில்நுட்ப ஒருங்கிணைப்பாளர்கள் (IT Coordinators)' : 'IT Coordinators'}
+                      </ThemedText>
+                      <ThemedText style={{ fontSize: 12, color: colors.textSecondary, lineHeight: 18 }}>
+                        Ravichandhiran Chandrasekaran, Krithika Rajendran, Amutha Kalichamy
+                      </ThemedText>
                     </View>
                   </View>
 
