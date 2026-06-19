@@ -21,7 +21,12 @@ import {
   Rocket, 
   Compass, 
   Mail, 
-  Phone 
+  Phone,
+  Headphones,
+  CheckSquare,
+  ClipboardList,
+  HardDrive,
+  MessageSquare
 } from 'lucide-react-native';
 import LoginScreen from './login';
 import RegisterScreen from './register';
@@ -47,6 +52,7 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
   const [portalVisible, setPortalVisible] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register' | 'waitlist'>('login');
   const [isLargeScreen, setIsLargeScreen] = useState(windowWidth >= 768);
+  const [activeInfoTopic, setActiveInfoTopic] = useState<string | null>(null);
 
   React.useEffect(() => {
     const handleResize = () => {
@@ -107,6 +113,57 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
         : 'Active, vibrant community of parents and educators dedicated to preserving our linguistic legacy for generations to come.',
       icon: Users,
       color: '#F59E0B'
+    }
+  ];
+
+  const appFeatures = [
+    {
+      title: i18n.language === 'ta' ? 'நேரடி அரட்டை மற்றும் அறிவிப்புகள்' : 'Real-time Chat & Newsfeed',
+      desc: i18n.language === 'ta'
+        ? 'பெற்றோர்கள், ஆசிரியர்கள் மற்றும் பள்ளி நிர்வாகத்தினரிடையே நேரடி இருவழி அரட்டை மற்றும் நிகழ்நேர பள்ளிச் செய்திகள்.'
+        : 'Direct two-way messaging between parents, teachers, and school admin with instant notifications and push updates.',
+      icon: MessageSquare,
+      color: '#3B82F6'
+    },
+    {
+      title: i18n.language === 'ta' ? 'வீட்டுப்பாடம் & உச்சரிப்பு ஒலி வழிகாட்டி' : 'Digital Homework & Audio Guides',
+      desc: i18n.language === 'ta'
+        ? 'ஆசிரியர்களால் வழங்கப்படும் வாராந்திர வீட்டுப்பாடங்கள். முறையான உச்சரிப்பைப் பயிற்சி செய்ய குரல் பதிவு வழிகாட்டி வசதி.'
+        : 'Weekly homework uploads with teacher-recorded audio pronunciation guides to help students practice correct Tamil speech.',
+      icon: Headphones,
+      color: '#8B5CF6'
+    },
+    {
+      title: i18n.language === 'ta' ? 'தானியங்கி வருகைப் பதிவு' : 'Automated Attendance Logs',
+      desc: i18n.language === 'ta'
+        ? 'மாணவர்களின் வருகை மற்றும் கற்றல் முன்னேற்றத்தை எளிதாகக் கண்காணிக்க வகுப்புகள் மற்றும் பருவ வாரியான வருகைப்பதிவு.'
+        : 'Class and term-wise attendance logs tracking student participation with automated certificates and CSV export/import.',
+      icon: CheckSquare,
+      color: '#10B981'
+    },
+    {
+      title: i18n.language === 'ta' ? 'அறிவார்ந்த சேர்க்கை & காத்திருப்புப் பட்டியல்' : 'Smart Waiting List & Admission',
+      desc: i18n.language === 'ta'
+        ? 'புதிய சேர்க்கைகளுக்கான எளிய படிவம், முன்னுரிமை வரிசைப்படுத்தல், சீருடை/புத்தகங்கள் விநியோகக் கண்காணிப்பு மற்றும் சேர்க்கை வாரியக் கட்டுப்பாடுகள்.'
+        : 'Simplified student onboarding with first-come-first-served waits, inventory tracking, and admin controls.',
+      icon: ClipboardList,
+      color: '#F59E0B'
+    },
+    {
+      title: i18n.language === 'ta' ? 'ஜெமினி தமிழ் மொழிபெயர்ப்பு' : 'Gemini Translation Engine',
+      desc: i18n.language === 'ta'
+        ? 'கூகுள் ஜெமினி செயற்கை நுண்ணறிவின் மூலம் அறிவிப்புகள், பள்ளி நாட்காட்டி மற்றும் வீட்டுப்பாட விளக்கங்களை உடனுக்குடன் மொழிபெயர்க்கும் வசதி.'
+        : 'Instantly translate announcements, calendar entries, and homework descriptions between English and Tamil with Google Gemini AI.',
+      icon: Sparkles,
+      color: '#EC4899'
+    },
+    {
+      title: i18n.language === 'ta' ? 'கூகுள் டிரைவ் ஆதார மையம்' : 'Google Drive Resource Hub',
+      desc: i18n.language === 'ta'
+        ? 'வகுப்பறைப் பாடங்கள், பயிற்சித் தாள்கள் மற்றும் கற்றல் வளங்களை மாணவர்களுடன் எளிதாகப் பகிர கூகுள் டிரைவ் இணைப்பு.'
+        : 'Keep course worksheets, syllabus files, and classroom slides organized and synced directly with Google Drive.',
+      icon: HardDrive,
+      color: '#14B8A6'
     }
   ];
 
@@ -329,7 +386,7 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
                 ? 'அடிப்படை எழுத்துக்கள் முதல் மேல்நிலைத் தேர்வு தயாரிப்பு வரையிலான எங்களது திட்டமிட்ட தமிழ்ப் பயிற்றுவிப்பு முறைகள்.' 
                 : 'Our structured curriculum is designed to guide students from their first words to higher secondary curriculum.'}
             </ThemedText>
-            <Pressable style={styles.curriculumLink}>
+            <Pressable style={styles.curriculumLink} onPress={() => setActiveInfoTopic('curriculum')}>
               <ThemedText style={{ color: colors.primary, fontSize: 13, fontWeight: '700' }}>
                 {i18n.language === 'ta' ? 'முழு பாடத்திட்டத்தை ஆராய்க >' : 'Explore Full Curriculum >'}
               </ThemedText>
@@ -399,6 +456,47 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
           </View>
         </View>
 
+        {/* APP FEATURES SHOWCASE SECTION */}
+        <View style={[styles.mainGridWrapper, { paddingTop: 0, paddingBottom: Spacing.five }]}>
+          <View style={styles.sectionHeaderContainer}>
+            <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>
+              {i18n.language === 'ta' ? 'டிஜிட்டல் வகுப்பறை மற்றும் மேலாண்மை செயலி' : 'Digital Classroom & Administration Suite'}
+            </ThemedText>
+            <ThemedText style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>
+              {i18n.language === 'ta' 
+                ? 'பெற்றோர்கள், ஆசிரியர்கள் மற்றும் பள்ளி சேர்க்கை வாரியத்திற்கு உதவும் பாலர் மலரின் பிரத்யேக மொபைல் செயலி அம்சங்கள்.' 
+                : 'All-in-one portal designed to streamline communication, manage waitlists, track attendance, and host learning resources.'}
+            </ThemedText>
+          </View>
+
+          <View style={[styles.featuresGrid, { marginTop: Spacing.two }]}>
+            {appFeatures.map((item, idx) => {
+              const Icon = item.icon;
+              return (
+                <View 
+                  key={idx} 
+                  style={[
+                    styles.featureCard, 
+                    { 
+                      backgroundColor: colors.cardBg, 
+                      borderColor: colors.border,
+                      width: isLargeScreen ? '31.5%' : '100%',
+                      minWidth: isLargeScreen ? 240 : undefined,
+                      padding: Spacing.four,
+                    }
+                  ]}
+                >
+                  <View style={[styles.featureIconContainer, { backgroundColor: item.color + '15' }]}>
+                    <Icon size={20} color={item.color} />
+                  </View>
+                  <ThemedText style={[styles.featureTitle, { color: colors.text, fontSize: 14 }]}>{item.title}</ThemedText>
+                  <ThemedText style={[styles.featureDesc, { color: colors.textSecondary, fontSize: 11, lineHeight: 16 }]}>{item.desc}</ThemedText>
+                </View>
+              );
+            })}
+          </View>
+        </View>
+
         {/* MAP & FIND BRANCH SECTION */}
         <View style={[styles.mainGridWrapper, { paddingTop: 0, paddingBottom: Spacing.six }]}>
           <View style={{ flexDirection: isLargeScreen ? 'row' : 'column', gap: Spacing.four, alignItems: 'stretch' }}>
@@ -456,7 +554,10 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
                 </Pressable>
               </View>
 
-              <Pressable style={[styles.viewBranchesButton, { borderColor: colors.primary }]}>
+              <Pressable 
+                onPress={() => setActiveInfoTopic('branches')}
+                style={[styles.viewBranchesButton, { borderColor: colors.primary }]}
+              >
                 <ThemedText style={{ color: colors.primary, fontSize: 13, fontWeight: '700' }}>
                   {i18n.language === 'ta' ? 'அனைத்து 15 கிளைகளையும் காண்க' : 'View All 15 Branches'}
                 </ThemedText>
@@ -546,35 +647,24 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
                   ? '1977 முதல் உள்ளூர் சமூகங்கள் முழுவதிலும் தமிழ் மொழியைப் பாதுகாப்பதற்கும் வளர்ப்பதற்கும் அர்ப்பணிக்கப்பட்ட நியூ சவுத் வேல்ஸின் மிகப்பெரிய தமிழ்க் கல்வி அமைப்பு.'
                   : 'NSW\'s largest provider dedicated to preserving Tamil language across local communities since 1977.'}
               </ThemedText>
-              {/* NSW Community Logo badge placeholders */}
-              <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
-                <View style={styles.footerBadgePlaceholder}>
-                  <Award size={14} color="#F59E0B" />
-                  <ThemedText style={{ color: '#FFF', fontSize: 9, fontWeight: '600' }}>CLS Accredited</ThemedText>
-                </View>
-                <View style={styles.footerBadgePlaceholder}>
-                  <Sparkles size={14} color="#10B981" />
-                  <ThemedText style={{ color: '#FFF', fontSize: 9, fontWeight: '600' }}>NSW HSL School</ThemedText>
-                </View>
-              </View>
             </View>
 
             {/* Col 2: Quick Links */}
             <View style={styles.footerLinkCol}>
               <ThemedText style={styles.footerColHeader}>Quick Links</ThemedText>
-              <Pressable><ThemedText style={styles.footerLinkText}>Curriculum</ThemedText></Pressable>
-              <Pressable><ThemedText style={styles.footerLinkText}>Branches</ThemedText></Pressable>
-              <Pressable><ThemedText style={styles.footerLinkText}>Annual Magazine</ThemedText></Pressable>
-              <Pressable><ThemedText style={styles.footerLinkText}>Admissions</ThemedText></Pressable>
+              <Pressable onPress={() => setActiveInfoTopic('curriculum')}><ThemedText style={styles.footerLinkText}>Curriculum</ThemedText></Pressable>
+              <Pressable onPress={() => setActiveInfoTopic('branches')}><ThemedText style={styles.footerLinkText}>Branches</ThemedText></Pressable>
+              <Pressable onPress={() => setActiveInfoTopic('magazine')}><ThemedText style={styles.footerLinkText}>Annual Magazine</ThemedText></Pressable>
+              <Pressable onPress={() => setActiveInfoTopic('admissions')}><ThemedText style={styles.footerLinkText}>Admissions</ThemedText></Pressable>
             </View>
 
             {/* Col 3: Administration */}
             <View style={styles.footerLinkCol}>
               <ThemedText style={styles.footerColHeader}>Administration</ThemedText>
-              <Pressable><ThemedText style={styles.footerLinkText}>Syllabus Guidelines</ThemedText></Pressable>
+              <Pressable onPress={() => setActiveInfoTopic('syllabus')}><ThemedText style={styles.footerLinkText}>Syllabus Guidelines</ThemedText></Pressable>
               <Pressable onPress={() => { setAuthMode('login'); setPortalVisible(true); }}><ThemedText style={styles.footerLinkText}>Portal Login</ThemedText></Pressable>
               <Pressable onPress={() => { setAuthMode('register'); setPortalVisible(true); }}><ThemedText style={styles.footerLinkText}>Student Register</ThemedText></Pressable>
-              <Pressable><ThemedText style={styles.footerLinkText}>Admissions Board</ThemedText></Pressable>
+              <Pressable onPress={() => setActiveInfoTopic('board')}><ThemedText style={styles.footerLinkText}>Admissions Board</ThemedText></Pressable>
             </View>
 
             {/* Col 4: Contact */}
@@ -582,7 +672,7 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
               <ThemedText style={styles.footerColHeader}>Contact</ThemedText>
               <View style={styles.footerContactItem}>
                 <Mail size={12} color="rgba(255,255,255,0.5)" />
-                <ThemedText style={styles.footerContactText}>admin@balarmalar.nsw.edu.au</ThemedText>
+                <ThemedText style={styles.footerContactText}>parramatta@balarmalar.nsw.edu.au</ThemedText>
               </View>
               <View style={styles.footerContactItem}>
                 <Phone size={12} color="rgba(255,255,255,0.5)" />
@@ -607,6 +697,262 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
         </View>
 
       </ScrollView>
+
+      {/* INFO MODAL DIALOG */}
+      {activeInfoTopic && (
+        <View style={styles.modalBackdrop}>
+          <Pressable style={styles.modalBackdropClickable} onPress={() => setActiveInfoTopic(null)} />
+          <View style={[
+            styles.infoModalCard,
+            {
+              backgroundColor: scheme === 'dark' ? 'rgba(25, 27, 24, 0.96)' : 'rgba(255, 254, 249, 0.98)',
+              borderColor: colors.border,
+              ...Platform.select({
+                web: {
+                  backdropFilter: 'blur(30px)',
+                  WebkitBackdropFilter: 'blur(30px)',
+                }
+              })
+            }
+          ]}>
+            <View style={[styles.modalHeader, { borderColor: colors.border }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <BookOpen size={18} color={colors.primary} />
+                <ThemedText style={{ fontSize: 16, fontWeight: '800', color: colors.text }}>
+                  {activeInfoTopic === 'curriculum' ? (i18n.language === 'ta' ? 'கல்வி பாடத்திட்டம்' : 'Academic Curriculum') :
+                   activeInfoTopic === 'branches' ? (i18n.language === 'ta' ? 'எங்கள் கிளைகள்' : 'Our Branches') :
+                   activeInfoTopic === 'magazine' ? (i18n.language === 'ta' ? 'மலர் ஆண்டு இதழ்' : 'Malar Annual Magazine') :
+                   activeInfoTopic === 'admissions' ? (i18n.language === 'ta' ? 'மாணவர் சேர்க்கை' : 'Student Admissions') :
+                   activeInfoTopic === 'syllabus' ? (i18n.language === 'ta' ? 'பாடநெறி வழிகாட்டுதல்கள்' : 'Syllabus Guidelines') :
+                   activeInfoTopic === 'board' ? (i18n.language === 'ta' ? 'சேர்க்கை வாரியம்' : 'Admissions Board') : ''}
+                </ThemedText>
+              </View>
+              <Pressable onPress={() => setActiveInfoTopic(null)} style={styles.closeButton}>
+                <X size={18} color={colors.text} />
+              </Pressable>
+            </View>
+
+            <ScrollView style={{ padding: Spacing.four }} contentContainerStyle={{ gap: 16, paddingBottom: 24 }}>
+              {activeInfoTopic === 'curriculum' && (
+                <View style={{ gap: 12 }}>
+                  <ThemedText style={{ fontSize: 13, lineHeight: 20, color: colors.textSecondary }}>
+                    {i18n.language === 'ta' 
+                      ? 'பாலர் மலர் தமிழ்ப் பள்ளி 5 வயது முதல் 16 வயது வரையிலான மாணவர்களுக்கு முறையான மற்றும் வயதுக்கேற்ற தமிழ்க் கல்வியை வழங்குகிறது. எங்களது பாடத்திட்டம் நான்கு முக்கிய நிலைகளாகப் பிரிக்கப்பட்டுள்ளது:' 
+                      : 'Balar Malar Tamil School provides a structured and age-appropriate Tamil language program for students aged 5 to 16. Our curriculum is divided into four developmental stages:'}
+                  </ThemedText>
+                  
+                  <View style={{ gap: 10, marginTop: 4 }}>
+                    <View style={{ padding: 12, borderRadius: 12, backgroundColor: colors.primaryLight, borderWidth: 1, borderColor: colors.primary + '30' }}>
+                      <ThemedText style={{ fontWeight: '700', fontSize: 13, color: colors.primary, marginBottom: 4 }}>
+                        1. {i18n.language === 'ta' ? 'அரும்பு நிலை (Kindergarten)' : 'Arumbu Stage (Kindergarten)'}
+                      </ThemedText>
+                      <ThemedText style={{ fontSize: 12, color: colors.textSecondary, lineHeight: 16 }}>
+                        {i18n.language === 'ta' ? 'விளையாட்டு வழிக் கற்றல், பாடல்கள், எழுத்து அறிமுகம் மற்றும் எளிய சொற்கள்.' : 'Play-based alphabet recognition, basic colors, counting, nursery rhymes, and vocabulary.'}
+                      </ThemedText>
+                    </View>
+                    
+                    <View style={{ padding: 12, borderRadius: 12, backgroundColor: colors.primaryLight, borderWidth: 1, borderColor: colors.primary + '30' }}>
+                      <ThemedText style={{ fontWeight: '700', fontSize: 13, color: colors.primary, marginBottom: 4 }}>
+                        2. {i18n.language === 'ta' ? 'மொட்டு & மலர் நிலை (Years 1 - 2)' : 'Mottu & Malar Stage (Years 1 - 2)'}
+                      </ThemedText>
+                      <ThemedText style={{ fontSize: 12, color: colors.textSecondary, lineHeight: 16 }}>
+                        {i18n.language === 'ta' ? 'மெய் எழுத்துக்கள் கூட்டுதல், எளிய வாக்கியங்களை வாசித்தல் மற்றும் எளிய அன்றாட உரையாடல்கள்.' : 'Sound blending, consonant-vowel combinations, simple text reading, and primary daily conversation.'}
+                      </ThemedText>
+                    </View>
+
+                    <View style={{ padding: 12, borderRadius: 12, backgroundColor: colors.primaryLight, borderWidth: 1, borderColor: colors.primary + '30' }}>
+                      <ThemedText style={{ fontWeight: '700', fontSize: 13, color: colors.primary, marginBottom: 4 }}>
+                        3. {i18n.language === 'ta' ? 'இடைநிலை வகுப்பு (Years 3 - 6)' : 'Primary/Intermediate (Years 3 - 6)'}
+                      </ThemedText>
+                      <ThemedText style={{ fontSize: 12, color: colors.textSecondary, lineHeight: 16 }}>
+                        {i18n.language === 'ta' ? 'முறையான தமிழ் இலக்கணம், வாசிப்புப் புரிதல், பத்திகள் எழுதுதல் மற்றும் கதைகள் கூறுதல்.' : 'Grammar foundation, reading comprehension, composition writing, and short storytelling.'}
+                      </ThemedText>
+                    </View>
+
+                    <View style={{ padding: 12, borderRadius: 12, backgroundColor: colors.primaryLight, borderWidth: 1, borderColor: colors.primary + '30' }}>
+                      <ThemedText style={{ fontWeight: '700', fontSize: 13, color: colors.primary, marginBottom: 4 }}>
+                        4. {i18n.language === 'ta' ? 'மேல்நிலை வகுப்பு (Years 7 - 10)' : 'High School (Years 7 - 10)'}
+                      </ThemedText>
+                      <ThemedText style={{ fontSize: 12, color: colors.textSecondary, lineHeight: 16 }}>
+                        {i18n.language === 'ta' ? 'உயர்தர தமிழ் இலக்கியம், கட்டுரை எழுதுதல், சொற்பொழிவுப் பயிற்சிகள் மற்றும் NSW HSL தமிழ்த் தேர்வுக்குத் தயாராகுதல்.' : 'Advanced literature analysis, formal essay writing, speech contests, and preparation for the NSW HSL equivalent Tamil examinations.'}
+                      </ThemedText>
+                    </View>
+                  </View>
+                </View>
+              )}
+
+              {activeInfoTopic === 'branches' && (
+                <View style={{ gap: 12 }}>
+                  <ThemedText style={{ fontSize: 13, lineHeight: 20, color: colors.textSecondary }}>
+                    {i18n.language === 'ta'
+                      ? 'பாலர் மலர் NSW முழுவதும் பல கிளைகளைக் கொண்டு சமூகத்திற்குத் தமிழ்க் கல்விப் பணியாற்றுகிறது. முக்கிய கிளைகளின் விபரங்கள்:'
+                      : 'Balar Malar runs multiple weekly branches across NSW to bring Tamil learning to your doorstep. Here are our main locations:'}
+                  </ThemedText>
+
+                  <View style={{ gap: 12, marginTop: 4 }}>
+                    <View style={{ borderLeftWidth: 3, borderLeftColor: colors.primary, paddingLeft: 12, gap: 2 }}>
+                      <ThemedText style={{ fontWeight: '700', fontSize: 13, color: colors.text }}>Parramatta (Main Campus)</ThemedText>
+                      <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>🏫 Parramatta High School, Great Western Hwy & Pitt St</ThemedText>
+                      <ThemedText style={{ fontSize: 11, color: colors.primary, fontWeight: '600' }}>📅 Sundays: 9:00 AM – 12:15 PM | 📧 parramatta@balarmalar.nsw.edu.au</ThemedText>
+                    </View>
+
+                    <View style={{ borderLeftWidth: 3, borderLeftColor: '#10B981', paddingLeft: 12, gap: 2 }}>
+                      <ThemedText style={{ fontWeight: '700', fontSize: 13, color: colors.text }}>Seven Hills Branch</ThemedText>
+                      <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>🏫 Seven Hills North Public School, 1 Beecroft Rd</ThemedText>
+                      <ThemedText style={{ fontSize: 11, color: '#10B981', fontWeight: '600' }}>📅 Sundays: 9:30 AM – 12:30 PM | 📧 sevenhills@balarmalar.nsw.edu.au</ThemedText>
+                    </View>
+
+                    <View style={{ borderLeftWidth: 3, borderLeftColor: '#F59E0B', paddingLeft: 12, gap: 2 }}>
+                      <ThemedText style={{ fontWeight: '700', fontSize: 13, color: colors.text }}>Homebush Branch</ThemedText>
+                      <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>🏫 Homebush Public School, Rochester St</ThemedText>
+                      <ThemedText style={{ fontSize: 11, color: '#F59E0B', fontWeight: '600' }}>📅 Saturdays: 2:00 PM – 5:00 PM | 📧 homebush@balarmalar.nsw.edu.au</ThemedText>
+                    </View>
+
+                    <View style={{ borderLeftWidth: 3, borderLeftColor: '#8B5CF6', paddingLeft: 12, gap: 2 }}>
+                      <ThemedText style={{ fontWeight: '700', fontSize: 13, color: colors.text }}>Liverpool Branch</ThemedText>
+                      <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>🏫 Liverpool Public School, 18-20 Hunter St</ThemedText>
+                      <ThemedText style={{ fontSize: 11, color: '#8B5CF6', fontWeight: '600' }}>📅 Saturdays: 9:00 AM – 12:00 PM | 📧 liverpool@balarmalar.nsw.edu.au</ThemedText>
+                    </View>
+                  </View>
+                </View>
+              )}
+
+              {activeInfoTopic === 'magazine' && (
+                <View style={{ gap: 12 }}>
+                  <ThemedText style={{ fontSize: 13, lineHeight: 20, color: colors.textSecondary }}>
+                    {i18n.language === 'ta'
+                      ? '"மலர்" என்பது எங்களது பள்ளி மாணவர்களின் படைப்பாற்றலை வெளிக்காட்டும் வருடாந்திர இதழாகும். ஒவ்வொரு வருடமும் பருவம் 4-ல் இது வெளியிடப்பட்டு அனைத்து மாணவர்களுக்கும் வழங்கப்படுகிறது.'
+                      : '"Malar" is our school\'s annual flagship magazine, showcasing student creativity, cultural essays, poetry, and highlights of our academic year. It is published in Term 4.'}
+                  </ThemedText>
+
+                  <View style={{ padding: 14, borderRadius: 16, backgroundColor: colors.cardBg, borderWidth: 1, borderColor: colors.border, gap: 8 }}>
+                    <ThemedText style={{ fontWeight: '700', fontSize: 13, color: colors.text }}>
+                      {i18n.language === 'ta' ? 'இதழின் சிறப்பம்சங்கள்:' : 'Magazine Highlights:'}
+                    </ThemedText>
+                    <ThemedText style={{ fontSize: 12, color: colors.textSecondary, lineHeight: 18 }}>
+                      • {i18n.language === 'ta' ? 'மாணவர்களின் சொந்தத் தமிழ் கவிதைகள், ஓவியங்கள் மற்றும் கட்டுரைகள்.' : 'Handwritten poems, stories, and drawings contributed directly by students.'}
+                    </ThemedText>
+                    <ThemedText style={{ fontSize: 12, color: colors.textSecondary, lineHeight: 18 }}>
+                      • {i18n.language === 'ta' ? 'ஆண்டு நிகழ்வுகள், பேச்சுப் போட்டிகள் மற்றும் கலாச்சார விழாக்களின் தொகுப்பு.' : 'High-resolution photo journals of school events, speech contests, and annual day performances.'}
+                    </ThemedText>
+                    <ThemedText style={{ fontSize: 12, color: colors.textSecondary, lineHeight: 18 }}>
+                      • {i18n.language === 'ta' ? 'ஆசிரியர்களின் தமிழ் வாழ்த்துச் செய்திகள் மற்றும் கல்வி ஆலோசனைகள்.' : 'Literary articles and insights from our volunteer academic council.'}
+                    </ThemedText>
+                    <ThemedText style={{ fontSize: 12, color: colors.textSecondary, lineHeight: 18 }}>
+                      • {i18n.language === 'ta' ? 'முந்தைய இதழ்களின் பிரதிகளைப் பெற உங்கள் கிளை நிர்வாகியைத் தொடர்பு கொள்ளவும்.' : 'Back-issues (2023 - 2025) are archived and available upon request at the front desk.'}
+                    </ThemedText>
+                  </View>
+                </View>
+              )}
+
+              {activeInfoTopic === 'admissions' && (
+                <View style={{ gap: 12 }}>
+                  <ThemedText style={{ fontSize: 13, lineHeight: 20, color: colors.textSecondary }}>
+                    {i18n.language === 'ta'
+                      ? 'பாலர் மலர் NSW தமிழ்ப் பள்ளியில் புதிய மாணவர் சேர்க்கை பற்றிய முக்கிய தகவல்கள்:'
+                      : 'We welcome new student enrollments for the academic year 2026. Please find registration guidelines below:'}
+                  </ThemedText>
+
+                  <View style={{ gap: 10, marginTop: 4 }}>
+                    <View style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-start' }}>
+                      <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.primary, marginTop: 7 }} />
+                      <View style={{ flex: 1 }}>
+                        <ThemedText style={{ fontWeight: '700', fontSize: 13, color: colors.text }}>{i18n.language === 'ta' ? 'வயது வரம்பு' : 'Eligibility & Age Limit'}</ThemedText>
+                        <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>{i18n.language === 'ta' ? 'சேர்க்கை பெற குழந்தை பிப்ரவரி மாதத்தில் 5 வயது பூர்த்தியடைந்திருக்க வேண்டும்.' : 'Children must turn 5 years of age by February of the current enrollment year.'}</ThemedText>
+                      </View>
+                    </View>
+
+                    <View style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-start' }}>
+                      <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.primary, marginTop: 7 }} />
+                      <View style={{ flex: 1 }}>
+                        <ThemedText style={{ fontWeight: '700', fontSize: 13, color: colors.text }}>{i18n.language === 'ta' ? 'கல்விக் கட்டணம்' : 'School Term Fees'}</ThemedText>
+                        <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>{i18n.language === 'ta' ? 'ஒரு பருவத்திற்கு $120. உடன்பிறப்புகளுக்கு 10% வரை கட்டணக் கழிவு உண்டு.' : '$120 per student, per term. Sibling discounts of 10% apply for 2nd and subsequent children.'}</ThemedText>
+                      </View>
+                    </View>
+
+                    <View style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-start' }}>
+                      <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.primary, marginTop: 7 }} />
+                      <View style={{ flex: 1 }}>
+                        <ThemedText style={{ fontWeight: '700', fontSize: 13, color: colors.text }}>{i18n.language === 'ta' ? 'சேர்க்கை முறைமை' : 'Enrollment & Waiting List'}</ThemedText>
+                        <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>{i18n.language === 'ta' ? 'வகுப்பு இடங்களின் அடிப்படையில் மாணவர்கள் சேர்க்கப்படுவர். இடம் இல்லாத போது காத்திருப்புப் பட்டியலின்படி சேர்க்கை வழங்கப்படும்.' : 'Admissions are finalized on a first-come, first-served basis. If class limits are reached, applicants will be placed on our waitlist.'}</ThemedText>
+                      </View>
+                    </View>
+                  </View>
+                </View>
+              )}
+
+              {activeInfoTopic === 'syllabus' && (
+                <View style={{ gap: 12 }}>
+                  <ThemedText style={{ fontSize: 13, lineHeight: 20, color: colors.textSecondary }}>
+                    {i18n.language === 'ta'
+                      ? 'மாணவர்களின் கல்வித் தரம் மற்றும் தமிழ் மொழித் திறனை உறுதி செய்ய வகுப்புகள் பின்வரும் வழிமுறைகளைப் பின்பற்றுகின்றன:'
+                      : 'We maintain high academic standards to support structured language acquisition. Our guidelines include:'}
+                  </ThemedText>
+
+                  <View style={{ padding: 14, borderRadius: 16, backgroundColor: colors.cardBg, borderWidth: 1, borderColor: colors.border, gap: 10 }}>
+                    <View style={{ gap: 2 }}>
+                      <ThemedText style={{ fontWeight: '700', fontSize: 12, color: colors.text }}>• {i18n.language === 'ta' ? 'வருகைப்பதிவு விதிமுறை (Attendance Rule):' : 'Attendance Requirement:'}</ThemedText>
+                      <ThemedText style={{ fontSize: 11, color: colors.textSecondary, paddingLeft: 10 }}>
+                        {i18n.language === 'ta' ? 'ஆண்டு இறுதித் தேர்வில் பங்கேற்கவும் சான்றிதழ் பெறவும் குறைந்தபட்சம் 80% வருகைப்பதிவு அவசியம்.' : 'Students must maintain a minimum of 80% attendance to qualify for grade progression and terminal exams.'}
+                      </ThemedText>
+                    </View>
+
+                    <View style={{ gap: 2 }}>
+                      <ThemedText style={{ fontWeight: '700', fontSize: 12, color: colors.text }}>• {i18n.language === 'ta' ? 'மதிப்பீட்டு முறை (Evaluation Structure):' : 'Assessment Weights:'}</ThemedText>
+                      <ThemedText style={{ fontSize: 11, color: colors.textSecondary, paddingLeft: 10 }}>
+                        {i18n.language === 'ta' ? 'வாராந்திர வீட்டுப்பாடம் (20%), இடைநிலைத் தேர்வு (30%), இறுதி எழுத்து மற்றும் வாய்மொழித் தேர்வு (50%).' : 'Weekly Homework & Reading (20%), Mid-term Assessment (30%), Final written and oral exam (50%).'}
+                      </ThemedText>
+                    </View>
+
+                    <View style={{ gap: 2 }}>
+                      <ThemedText style={{ fontWeight: '700', fontSize: 12, color: colors.text }}>• {i18n.language === 'ta' ? 'பாடப்புத்தகங்கள் (Textbooks):' : 'Learning Resources:'}</ThemedText>
+                      <ThemedText style={{ fontSize: 11, color: colors.textSecondary, paddingLeft: 10 }}>
+                        {i18n.language === 'ta' ? 'பாலர் மலர் தயாரித்த பிரத்யேக தமிழ்ப் பாடப்புத்தகங்கள் மற்றும் பயிற்சித் தாள்கள் பள்ளித் தொடக்கத்தில் வழங்கப்படும்.' : 'Specially compiled Balarmalar Tamil reader textbooks, workbooks, and voice guide access are provided upon enrollment.'}
+                      </ThemedText>
+                    </View>
+                  </View>
+                </View>
+              )}
+
+              {activeInfoTopic === 'board' && (
+                <View style={{ gap: 12 }}>
+                  <ThemedText style={{ fontSize: 13, lineHeight: 20, color: colors.textSecondary }}>
+                    {i18n.language === 'ta'
+                      ? 'பள்ளியின் சேர்க்கை, கல்விக் கொள்கைகள் மற்றும் கிளை செயல்பாடுகளை நிர்வகிக்கும் தற்போதைய பாலர் மலர் NSW சேர்க்கை வாரியம்:'
+                      : 'The Balar Malar NSW Admissions Board handles all enrollment requests, school policies, coordinator settings, and syllabus revisions:'}
+                  </ThemedText>
+
+                  <View style={{ gap: 8, marginTop: 4 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                      <ThemedText style={{ fontWeight: '600', fontSize: 12, color: colors.text }}>{i18n.language === 'ta' ? 'தலைவர் (President)' : 'Board President'}</ThemedText>
+                      <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>Dr. K. Anbarasan</ThemedText>
+                    </View>
+
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                      <ThemedText style={{ fontWeight: '600', fontSize: 12, color: colors.text }}>{i18n.language === 'ta' ? 'செயலாளர் (Secretary)' : 'Board Secretary'}</ThemedText>
+                      <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>Mrs. Meera Sundar</ThemedText>
+                    </View>
+
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                      <ThemedText style={{ fontWeight: '600', fontSize: 12, color: colors.text }}>{i18n.language === 'ta' ? 'பொருளாளர் (Treasurer)' : 'Board Treasurer'}</ThemedText>
+                      <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>Mr. S. Viswanathan</ThemedText>
+                    </View>
+
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                      <ThemedText style={{ fontWeight: '600', fontSize: 12, color: colors.text }}>{i18n.language === 'ta' ? 'கிளை ஒருங்கிணைப்பாளர்' : 'Parramatta Coordinator'}</ThemedText>
+                      <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>Mrs. Priyalatha Rajan</ThemedText>
+                    </View>
+                  </View>
+
+                  <ThemedText style={{ fontSize: 11, color: colors.textSecondary, fontStyle: 'italic', marginTop: 8, textAlign: 'center' }}>
+                    {i18n.language === 'ta' ? 'விசாரணைகளுக்கு: parramatta@balarmalar.nsw.edu.au என்ற மின்னஞ்சலைத் தொடர்பு கொள்ளவும்.' : 'For direct escalations, contact: parramatta@balarmalar.nsw.edu.au'}
+                  </ThemedText>
+                </View>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      )}
 
       {/* PORTAL MODAL DIALOG */}
       {portalVisible && (
@@ -1130,6 +1476,28 @@ const styles = StyleSheet.create({
       },
       web: {
         boxShadow: '0 20px 40px -10px rgba(0,0,0,0.25)',
+      }
+    }),
+  },
+  infoModalCard: {
+    width: '92%',
+    maxWidth: 600,
+    maxHeight: '80%',
+    borderRadius: 24,
+    borderWidth: 1,
+    overflow: 'hidden',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.15,
+        shadowRadius: 20,
+      },
+      android: {
+        elevation: 10,
+      },
+      web: {
+        boxShadow: '0 20px 45px -10px rgba(0,0,0,0.25)',
       }
     }),
   },
