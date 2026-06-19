@@ -53,6 +53,7 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
   const [authMode, setAuthMode] = useState<'login' | 'register' | 'waitlist'>('login');
   const [isLargeScreen, setIsLargeScreen] = useState(windowWidth >= 768);
   const [activeInfoTopic, setActiveInfoTopic] = useState<string | null>(null);
+  const [activeHeroIdx, setActiveHeroIdx] = useState(0);
 
   React.useEffect(() => {
     const handleResize = () => {
@@ -60,6 +61,13 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
     };
     const sub = Dimensions.addEventListener('change', handleResize);
     return () => sub.remove();
+  }, []);
+
+  React.useEffect(() => {
+    const timer = setInterval(() => {
+      setActiveHeroIdx((prev) => (prev === 0 ? 1 : 0));
+    }, 6000);
+    return () => clearInterval(timer);
   }, []);
 
   const toggleLanguage = () => {
@@ -291,62 +299,109 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
       <ScrollView contentContainerStyle={styles.scrollWrapper}>
         
         {/* HERO SECTION */}
-        <View style={styles.heroContainer}>
-          <Image 
-            source={require('../../assets/images/tamil_kids_classroom.png')} 
-            style={styles.heroBgImage} 
-          />
-          <View style={styles.heroOverlay} />
-          
-          <View style={styles.heroContent}>
-            {/* Banner Badge */}
-            <View style={[styles.heroBadge, { borderColor: colors.secondary }]}>
-              <ThemedText style={{ color: colors.secondary, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>
-                {i18n.language === 'ta' ? 'பாலர் மலர் 2026 • வகுப்புகள் துவங்கின!' : 'Balar Malar 2026 • Classes Started!'}
-              </ThemedText>
-            </View>
+        <View style={[styles.heroContainer, { height: isLargeScreen ? 480 : 280, minHeight: isLargeScreen ? 480 : 280, paddingVertical: activeHeroIdx === 0 ? 0 : Spacing.six }]}>
+          {activeHeroIdx === 0 ? (
+            <Image 
+              source={require('../../assets/images/tamil_kids_hero.jpg')} 
+              style={[styles.heroBgImage, { resizeMode: 'cover' }]} 
+            />
+          ) : (
+            <>
+              <Image 
+                source={require('../../assets/images/tamil_kids_classroom.png')} 
+                style={[styles.heroBgImage, { resizeMode: 'cover' }]} 
+              />
+              <View style={styles.heroOverlay} />
+            </>
+          )}
 
-            {/* Title */}
-            <ThemedText style={styles.heroTitle}>
-              {i18n.language === 'ta' 
-                ? 'தமிழ் மொழியால் இளைய தலைமுறையை மேம்படுத்துவோம்' 
-                : 'Empowering the Next Generation through Tamil Excellence'}
-            </ThemedText>
-
-            {/* Description */}
-            <ThemedText style={styles.heroDesc}>
-              {i18n.language === 'ta'
-                ? 'ஆஸ்திரேலியாவின் முன்னோடித் தமிழ்ப் பள்ளி அமைப்பான பாலர் மலர் NSW. 1977 முதல் நமது குழந்தைகளுக்கு முறையான தமிழ்க் கல்வியையும் கலாச்சாரத்தையும் பயிற்றுவித்து வருகிறோம்.'
-                : 'Balar Malar NSW - Australia\'s pioneer community Tamil school. Providing structured academic development and cultural alignment since 1977.'}
-            </ThemedText>
-
-            {/* Action Buttons */}
-            <View style={styles.heroActions}>
-              <Pressable 
-                onPress={() => { setAuthMode('register'); setPortalVisible(true); }}
-                style={({ pressed }) => [
-                  styles.heroBtnPrimary,
-                  { backgroundColor: colors.primary, opacity: pressed ? 0.9 : 1 }
-                ]}
-              >
-                <ThemedText style={styles.heroBtnText}>
-                  {i18n.language === 'ta' ? 'பதிவு செய்க 2026' : 'Enroll for 2026'}
-                </ThemedText>
-              </Pressable>
-
-              <Pressable 
-                onPress={() => { setAuthMode('waitlist'); setPortalVisible(true); }}
-                style={({ pressed }) => [
-                  styles.heroBtnSecondary,
-                  { opacity: pressed ? 0.8 : 1 }
-                ]}
-              >
-                <ThemedText style={[styles.heroBtnText, { color: '#FFF' }]}>
-                  {i18n.language === 'ta' ? 'காத்திருப்புப் பட்டியல்' : 'Join Waitlist'}
-                </ThemedText>
-              </Pressable>
-            </View>
+          {/* Slide Indicator Dots */}
+          <View style={{
+            position: 'absolute',
+            bottom: 12,
+            left: 0,
+            right: 0,
+            flexDirection: 'row',
+            justifyContent: 'center',
+            gap: 8,
+            zIndex: 30
+          }}>
+            <Pressable 
+              onPress={() => setActiveHeroIdx(0)}
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: 4,
+                backgroundColor: activeHeroIdx === 0 ? colors.secondary : 'rgba(255,255,255,0.4)',
+                borderWidth: 1,
+                borderColor: activeHeroIdx === 0 ? colors.secondary : 'transparent'
+              }}
+            />
+            <Pressable 
+              onPress={() => setActiveHeroIdx(1)}
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: 4,
+                backgroundColor: activeHeroIdx === 1 ? colors.secondary : 'rgba(255,255,255,0.4)',
+                borderWidth: 1,
+                borderColor: activeHeroIdx === 1 ? colors.secondary : 'transparent'
+              }}
+            />
           </View>
+
+          {/* Only render text overlays and CTA buttons for slide 1 */}
+          {activeHeroIdx === 1 && (
+            <View style={styles.heroContent}>
+              {/* Banner Badge */}
+              <View style={[styles.heroBadge, { borderColor: colors.secondary }]}>
+                <ThemedText style={{ color: colors.secondary, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>
+                  {i18n.language === 'ta' ? 'பாலர் மலர் 2026 • வகுப்புகள் துவங்கின!' : 'Balar Malar 2026 • Classes Started!'}
+                </ThemedText>
+              </View>
+
+              {/* Title */}
+              <ThemedText style={styles.heroTitle}>
+                {i18n.language === 'ta' 
+                  ? 'தமிழ் மொழியால் இளைய தலைமுறையை மேம்படுத்துவோம்' 
+                  : 'Empowering the Next Generation through Tamil Excellence'}
+              </ThemedText>
+
+              {/* Description */}
+              <ThemedText style={styles.heroDesc}>
+                {i18n.language === 'ta'
+                  ? 'ஆஸ்திரேலியாவின் முன்னோடித் தமிழ்ப் பள்ளி அமைப்பான பாலர் மலர் NSW. 1977 முதல் நமது குழந்தைகளுக்கு முறையான தமிழ்க் கல்வியையும் கலாச்சாரத்தையும் பயிற்றுவித்து வருகிறோம்.'
+                  : 'Balar Malar NSW - Australia\'s pioneer community Tamil school. Providing structured academic development and cultural alignment since 1977.'}
+              </ThemedText>
+
+              {/* Action Buttons */}
+              <View style={styles.heroActions}>
+                <Pressable 
+                  onPress={() => { setAuthMode('register'); setPortalVisible(true); }}
+                  style={({ pressed }) => [
+                    styles.heroBtnPrimary,
+                    { backgroundColor: colors.primary, opacity: pressed ? 0.9 : 1 }
+                  ]}
+                >
+                  <ThemedText style={styles.heroBtnText}>
+                    {i18n.language === 'ta' ? 'பதிவு செய்க 2026' : 'Enroll for 2026'}
+                  </ThemedText>
+                </Pressable>
+
+                <Pressable 
+                  onPress={() => { setAuthMode('waitlist'); setPortalVisible(true); }}
+                  style={({ pressed }) => [
+                    styles.heroBtnSecondary,
+                    { opacity: pressed ? 0.8 : 1 }
+                  ]}
+                >
+                  <ThemedText style={[styles.heroBtnText, { color: '#FFF' }]}>
+                    {i18n.language === 'ta' ? 'காத்திருப்புப் பட்டியல்' : 'Join Waitlist'}
+                  </ThemedText>
+                </Pressable>
+              </View>
+            </View>
+          )}
         </View>
 
         {/* CORE FEATURES SECTION */}
