@@ -80,12 +80,12 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
     'Balar Malar Blacktown';
 
   const branchAddress = 
-    activeBranch === 'parramatta' ? 'Parramatta High School, Great Western Hwy & Pitt St, Parramatta NSW 2150' : 
+    activeBranch === 'parramatta' ? 'Parramatta Public School, 177 Macquarie St, Parramatta NSW 2150 (Enter via Little Street Gate)' : 
     activeBranch === 'sevenhills' ? 'Seven Hills West Public School, Lucas Rd & Sackville St, Seven Hills NSW 2147' : 
     'Blacktown Boys High School, Fifth Ave, Blacktown NSW 2148';
 
   const branchSchedule = 
-    activeBranch === 'parramatta' ? 'Every Sunday, 9:00 AM – 12:15 PM' : 
+    activeBranch === 'parramatta' ? 'Every Saturday, 2:00 PM – 4:30 PM (NSW School Term Days)' : 
     activeBranch === 'sevenhills' ? 'Every Saturday, 2:00 PM – 4:30 PM' : 
     'Every Saturday, 9:00 AM – 12:00 PM';
 
@@ -523,7 +523,7 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
                 >
                   <MapPin size={16} color={colors.primary} />
                   <ThemedText style={[styles.branchListText, { color: colors.text, fontWeight: activeBranch === 'parramatta' ? '700' : 'normal' }]}>
-                    Parramatta – Main Campus (Parramatta High School)
+                    Parramatta – Central CBD (Parramatta Public School)
                   </ThemedText>
                 </Pressable>
 
@@ -792,8 +792,8 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
                   <View style={{ gap: 12, marginTop: 4 }}>
                     <View style={{ borderLeftWidth: 3, borderLeftColor: colors.primary, paddingLeft: 12, gap: 2 }}>
                       <ThemedText style={{ fontWeight: '700', fontSize: 13, color: colors.text }}>Parramatta (Main Campus)</ThemedText>
-                      <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>🏫 Parramatta High School, Great Western Hwy & Pitt St, Parramatta NSW 2150</ThemedText>
-                      <ThemedText style={{ fontSize: 11, color: colors.primary, fontWeight: '600' }}>📅 Sundays: 9:00 AM – 12:15 PM | 📧 parramatta@balarmalar.nsw.edu.au</ThemedText>
+                      <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>🏫 Parramatta Public School, 177 Macquarie St, Parramatta NSW 2150 (Enter via Little Street Gate)</ThemedText>
+                      <ThemedText style={{ fontSize: 11, color: colors.primary, fontWeight: '600' }}>📅 Saturdays: 2:00 PM – 4:30 PM (NSW School Term Days) | 📧 parramatta@balarmalar.nsw.edu.au</ThemedText>
                     </View>
 
                     <View style={{ borderLeftWidth: 3, borderLeftColor: '#10B981', paddingLeft: 12, gap: 2 }}>
