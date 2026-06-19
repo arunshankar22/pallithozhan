@@ -354,8 +354,8 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
         <View style={[
           styles.heroContainer, 
           { 
-            height: screenWidth * 0.5, 
-            minHeight: screenWidth * 0.5, 
+            height: screenWidth * (605 / 1024), 
+            minHeight: screenWidth * (605 / 1024), 
             paddingVertical: 0, 
             backgroundColor: activeHeroIdx === 0 ? '#FAF6EB' : '#050B0D' 
           }
