@@ -496,7 +496,7 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
                   { 
                     backgroundColor: colors.cardBg, 
                     borderColor: colors.border,
-                    flex: isLargeScreen ? 1 : undefined,
+                    flex: isLargeScreen ? 1 : 0,
                     width: isLargeScreen ? undefined : '100%'
                   }
                 ]}>
@@ -1283,7 +1283,6 @@ const styles = StyleSheet.create({
     zIndex: 20
   },
   featureCard: {
-    flex: 1,
     minWidth: 260,
     padding: Spacing.four,
     borderRadius: 20,
@@ -1339,7 +1338,6 @@ const styles = StyleSheet.create({
     marginTop: Spacing.two
   },
   curriculumCard: {
-    flex: 1,
     minWidth: 260,
     borderRadius: 20,
     overflow: 'hidden',
