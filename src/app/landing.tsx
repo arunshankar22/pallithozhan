@@ -17,7 +17,9 @@ import {
   X, 
   Heart, 
   Flower, 
-  Users, 
+  Users,
+  ChevronLeft,
+  ChevronRight, 
   Rocket, 
   Compass, 
   Mail, 
@@ -265,9 +267,11 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
             source={require('../../assets/images/pallithozhan_logo.png')} 
             style={{ width: 26, height: 26, borderRadius: 6 }} 
           />
-          <ThemedText style={{ color: colors.primary, fontSize: 16, fontWeight: '800', letterSpacing: 0.5 }}>
-            Pallithozhan
-          </ThemedText>
+          {isLargeScreen && (
+            <ThemedText style={{ color: colors.primary, fontSize: 16, fontWeight: '800', letterSpacing: 0.5 }}>
+              Pallithozhan
+            </ThemedText>
+          )}
         </View>
 
         <View style={styles.headbarActions}>
@@ -275,6 +279,37 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
             <Languages size={14} color={colors.primary} />
             <ThemedText style={styles.langText}>
               {isLargeScreen ? (i18n.language === 'ta' ? 'English' : 'தமிழ்') : (i18n.language === 'ta' ? 'EN' : 'தமிழ்')}
+            </ThemedText>
+          </Pressable>
+
+          <Pressable
+            onPress={() => { setAuthMode('register'); setPortalVisible(true); }}
+            style={({ pressed }) => [
+              styles.portalButton,
+              { 
+                backgroundColor: colors.secondary, 
+                opacity: pressed ? 0.9 : 1,
+              }
+            ]}
+          >
+            <ThemedText style={[styles.portalButtonText, { color: '#0D1B21' }]}>
+              {isLargeScreen ? (i18n.language === 'ta' ? 'பதிவு செய்க 2026' : 'Enroll 2026') : (i18n.language === 'ta' ? 'பதிவு' : 'Enroll')}
+            </ThemedText>
+          </Pressable>
+
+          <Pressable
+            onPress={() => { setAuthMode('waitlist'); setPortalVisible(true); }}
+            style={({ pressed }) => [
+              styles.langBadge,
+              { 
+                backgroundColor: 'transparent',
+                borderColor: colors.border,
+                opacity: pressed ? 0.8 : 1,
+              }
+            ]}
+          >
+            <ThemedText style={[styles.langText, { marginLeft: 0, color: colors.textSecondary }]}>
+              {isLargeScreen ? (i18n.language === 'ta' ? 'காத்திருப்புப் பட்டியல்' : 'Waitlist') : (i18n.language === 'ta' ? 'காத்திருப்பு' : 'Waitlist')}
             </ThemedText>
           </Pressable>
 
@@ -299,11 +334,11 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
       <ScrollView contentContainerStyle={styles.scrollWrapper}>
         
         {/* HERO SECTION */}
-        <View style={[styles.heroContainer, { height: isLargeScreen ? 480 : 280, minHeight: isLargeScreen ? 480 : 280, paddingVertical: activeHeroIdx === 0 ? 0 : Spacing.six }]}>
+        <View style={[styles.heroContainer, { height: isLargeScreen ? 480 : 280, minHeight: isLargeScreen ? 480 : 280, paddingVertical: activeHeroIdx === 0 ? 0 : Spacing.six, backgroundColor: activeHeroIdx === 0 ? '#FAF6EB' : '#050B0D' }]}>
           {activeHeroIdx === 0 ? (
             <Image 
               source={require('../../assets/images/tamil_kids_hero.jpg')} 
-              style={[styles.heroBgImage, { resizeMode: 'cover' }]} 
+              style={[styles.heroBgImage, { resizeMode: 'contain', backgroundColor: '#FAF6EB' }]} 
             />
           ) : (
             <>
@@ -314,6 +349,52 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
               <View style={styles.heroOverlay} />
             </>
           )}
+
+          {/* Left Arrow Button */}
+          <Pressable
+            onPress={() => setActiveHeroIdx((prev) => (prev === 0 ? 1 : 0))}
+            style={({ pressed }) => [
+              {
+                position: 'absolute',
+                left: 12,
+                top: '50%',
+                marginTop: -18,
+                width: 36,
+                height: 36,
+                borderRadius: 18,
+                backgroundColor: 'rgba(0, 0, 0, 0.4)',
+                justifyContent: 'center',
+                alignItems: 'center',
+                zIndex: 40,
+                opacity: pressed ? 0.8 : 1
+              }
+            ]}
+          >
+            <ChevronLeft size={20} color="#FFF" />
+          </Pressable>
+
+          {/* Right Arrow Button */}
+          <Pressable
+            onPress={() => setActiveHeroIdx((prev) => (prev === 0 ? 1 : 0))}
+            style={({ pressed }) => [
+              {
+                position: 'absolute',
+                right: 12,
+                top: '50%',
+                marginTop: -18,
+                width: 36,
+                height: 36,
+                borderRadius: 18,
+                backgroundColor: 'rgba(0, 0, 0, 0.4)',
+                justifyContent: 'center',
+                alignItems: 'center',
+                zIndex: 40,
+                opacity: pressed ? 0.8 : 1
+              }
+            ]}
+          >
+            <ChevronRight size={20} color="#FFF" />
+          </Pressable>
 
           {/* Slide Indicator Dots */}
           <View style={{
@@ -350,7 +431,7 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
             />
           </View>
 
-          {/* Only render text overlays and CTA buttons for slide 1 */}
+          {/* Only render text overlays for slide 1 */}
           {activeHeroIdx === 1 && (
             <View style={styles.heroContent}>
               {/* Banner Badge */}
@@ -373,33 +454,6 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
                   ? 'ஆஸ்திரேலியாவின் முன்னோடித் தமிழ்ப் பள்ளி அமைப்பான பாலர் மலர் NSW. 1977 முதல் நமது குழந்தைகளுக்கு முறையான தமிழ்க் கல்வியையும் கலாச்சாரத்தையும் பயிற்றுவித்து வருகிறோம்.'
                   : 'Balar Malar NSW - Australia\'s pioneer community Tamil school. Providing structured academic development and cultural alignment since 1977.'}
               </ThemedText>
-
-              {/* Action Buttons */}
-              <View style={styles.heroActions}>
-                <Pressable 
-                  onPress={() => { setAuthMode('register'); setPortalVisible(true); }}
-                  style={({ pressed }) => [
-                    styles.heroBtnPrimary,
-                    { backgroundColor: colors.primary, opacity: pressed ? 0.9 : 1 }
-                  ]}
-                >
-                  <ThemedText style={styles.heroBtnText}>
-                    {i18n.language === 'ta' ? 'பதிவு செய்க 2026' : 'Enroll for 2026'}
-                  </ThemedText>
-                </Pressable>
-
-                <Pressable 
-                  onPress={() => { setAuthMode('waitlist'); setPortalVisible(true); }}
-                  style={({ pressed }) => [
-                    styles.heroBtnSecondary,
-                    { opacity: pressed ? 0.8 : 1 }
-                  ]}
-                >
-                  <ThemedText style={[styles.heroBtnText, { color: '#FFF' }]}>
-                    {i18n.language === 'ta' ? 'காத்திருப்புப் பட்டியல்' : 'Join Waitlist'}
-                  </ThemedText>
-                </Pressable>
-              </View>
             </View>
           )}
         </View>
