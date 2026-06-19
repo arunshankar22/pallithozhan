@@ -278,7 +278,7 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
         </View>
 
         <View style={styles.headbarActions}>
-          <Pressable onPress={toggleLanguage} style={[styles.langBadge, { backgroundColor: colors.background, borderColor: colors.border }]}>
+          <Pressable onPress={toggleLanguage} style={[styles.langBadge, { backgroundColor: colors.background, borderColor: colors.border, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 }]}>
             <Languages size={14} color={colors.primary} />
             <ThemedText style={styles.langText}>
               {isLargeScreen ? (i18n.language === 'ta' ? 'English' : 'தமிழ்') : (i18n.language === 'ta' ? 'EN' : 'தமிழ்')}
@@ -290,12 +290,20 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
             style={({ pressed }) => [
               styles.portalButton,
               { 
-                backgroundColor: colors.secondary, 
+                backgroundColor: '#EA5330', 
                 opacity: pressed ? 0.9 : 1,
+                borderRadius: 20,
+                paddingHorizontal: 16,
+                paddingVertical: 6,
+                shadowColor: '#EA5330',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.15,
+                shadowRadius: 4,
+                elevation: 2,
               }
             ]}
           >
-            <ThemedText style={[styles.portalButtonText, { color: '#0D1B21' }]}>
+            <ThemedText style={[styles.portalButtonText, { color: '#FFF', fontWeight: '800' }]}>
               {isLargeScreen ? (i18n.language === 'ta' ? 'பதிவு செய்க 2026' : 'Enroll 2026') : (i18n.language === 'ta' ? 'பதிவு' : 'Enroll')}
             </ThemedText>
           </Pressable>
@@ -308,6 +316,9 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
                 backgroundColor: 'transparent',
                 borderColor: colors.border,
                 opacity: pressed ? 0.8 : 1,
+                borderRadius: 20,
+                paddingHorizontal: 14,
+                paddingVertical: 6,
               }
             ]}
           >
@@ -321,8 +332,11 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
             style={({ pressed }) => [
               styles.portalButton,
               { 
-                backgroundColor: colors.primary, 
+                backgroundColor: colors.success, 
                 opacity: pressed ? 0.9 : 1,
+                borderRadius: 20,
+                paddingHorizontal: 16,
+                paddingVertical: 6,
               }
             ]}
           >
@@ -340,9 +354,9 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
         <View style={[
           styles.heroContainer, 
           { 
-            height: activeHeroIdx === 0 ? screenWidth * 0.5 : (isLargeScreen ? 340 : 200), 
-            minHeight: activeHeroIdx === 0 ? screenWidth * 0.5 : (isLargeScreen ? 340 : 200), 
-            paddingVertical: activeHeroIdx === 0 ? 0 : (isLargeScreen ? Spacing.six : Spacing.four), 
+            height: screenWidth * 0.5, 
+            minHeight: screenWidth * 0.5, 
+            paddingVertical: 0, 
             backgroundColor: activeHeroIdx === 0 ? '#FAF6EB' : '#050B0D' 
           }
         ]}>
@@ -455,8 +469,8 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
               {/* Title */}
               <ThemedText style={[styles.heroTitle, { fontSize: isLargeScreen ? 28 : 16, lineHeight: isLargeScreen ? 36 : 22 }]}>
                 {i18n.language === 'ta' 
-                  ? 'தமிழ் மொழியால் இளைய தலைமுறையை மேம்படுத்துவோம்' 
-                  : 'Empowering the Next Generation through Tamil Excellence'}
+                  ? 'டிஜிட்டல் கற்றல் & ஸ்மார்ட் நிர்வாகம் மூலம் தமிழ்ப் பள்ளிகளை மேம்படுத்துவோம்' 
+                  : 'Empowering Tamil Schools Through Digital Learning & Smart Administration'}
               </ThemedText>
 
               {/* Description */}
