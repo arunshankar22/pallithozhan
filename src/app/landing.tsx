@@ -80,12 +80,12 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
     'Balar Malar Blacktown';
 
   const branchAddress = 
-    activeBranch === 'parramatta' ? 'Parramatta Public School, 177 Macquarie St, Parramatta NSW 2150' : 
+    activeBranch === 'parramatta' ? 'Parramatta High School, Great Western Hwy & Pitt St, Parramatta NSW 2150' : 
     activeBranch === 'sevenhills' ? 'Seven Hills West Public School, Lucas Rd & Sackville St, Seven Hills NSW 2147' : 
     'Blacktown Boys High School, Fifth Ave, Blacktown NSW 2148';
 
   const branchSchedule = 
-    activeBranch === 'parramatta' ? 'Every Saturday, 2:00 PM – 4:30 PM' : 
+    activeBranch === 'parramatta' ? 'Every Sunday, 9:00 AM – 12:15 PM' : 
     activeBranch === 'sevenhills' ? 'Every Saturday, 2:00 PM – 4:30 PM' : 
     'Every Saturday, 9:00 AM – 12:00 PM';
 
@@ -508,8 +508,8 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
               </ThemedText>
               <ThemedText style={[styles.sectionSubtitle, { textAlign: 'left', maxWidth: '100%', marginBottom: 12 }]}>
                 {i18n.language === 'ta' 
-                  ? 'ஆஸ்திரேலியா நியூ சவுத் வேல்ஸ் மாநிலத்தில் 15க்கும் மேற்பட்ட கிளைகளில் தமிழ் வகுப்புகள் சிறப்பாக நடத்தப்படுகின்றன.' 
-                  : 'We have 15+ centers across NSW to ensure quality Tamil education is accessible in your community.'}
+                  ? 'ஆஸ்திரேலியா நியூ சவுத் வேல்ஸ் மாநிலத்தில் எங்களது கிளைகளில் தமிழ் வகுப்புகள் சிறப்பாக நடத்தப்படுகின்றன.' 
+                  : 'We have weekly branches across NSW to ensure quality Tamil education is accessible in your community.'}
               </ThemedText>
 
               {/* Branch quick items */}
@@ -523,7 +523,7 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
                 >
                   <MapPin size={16} color={colors.primary} />
                   <ThemedText style={[styles.branchListText, { color: colors.text, fontWeight: activeBranch === 'parramatta' ? '700' : 'normal' }]}>
-                    Parramatta – Central CBD (Parramatta Public School)
+                    Parramatta – Main Campus (Parramatta High School)
                   </ThemedText>
                 </Pressable>
 
@@ -559,7 +559,7 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
                 style={[styles.viewBranchesButton, { borderColor: colors.primary }]}
               >
                 <ThemedText style={{ color: colors.primary, fontSize: 13, fontWeight: '700' }}>
-                  {i18n.language === 'ta' ? 'அனைத்து 15 கிளைகளையும் காண்க' : 'View All 15 Branches'}
+                  {i18n.language === 'ta' ? 'கிளை விபரங்களைக் காண்க' : 'View Branch Details'}
                 </ThemedText>
               </Pressable>
             </View>
@@ -785,33 +785,27 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
                 <View style={{ gap: 12 }}>
                   <ThemedText style={{ fontSize: 13, lineHeight: 20, color: colors.textSecondary }}>
                     {i18n.language === 'ta'
-                      ? 'பாலர் மலர் NSW முழுவதும் பல கிளைகளைக் கொண்டு சமூகத்திற்குத் தமிழ்க் கல்விப் பணியாற்றுகிறது. முக்கிய கிளைகளின் விபரங்கள்:'
-                      : 'Balar Malar runs multiple weekly branches across NSW to bring Tamil learning to your doorstep. Here are our main locations:'}
+                      ? 'பாலர் மலர் NSW-ல் உள்ள எங்களது கிளைகளின் விபரங்கள்:'
+                      : 'Balar Malar weekly branches across NSW. Here are our active locations:'}
                   </ThemedText>
 
                   <View style={{ gap: 12, marginTop: 4 }}>
                     <View style={{ borderLeftWidth: 3, borderLeftColor: colors.primary, paddingLeft: 12, gap: 2 }}>
                       <ThemedText style={{ fontWeight: '700', fontSize: 13, color: colors.text }}>Parramatta (Main Campus)</ThemedText>
-                      <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>🏫 Parramatta High School, Great Western Hwy & Pitt St</ThemedText>
+                      <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>🏫 Parramatta High School, Great Western Hwy & Pitt St, Parramatta NSW 2150</ThemedText>
                       <ThemedText style={{ fontSize: 11, color: colors.primary, fontWeight: '600' }}>📅 Sundays: 9:00 AM – 12:15 PM | 📧 parramatta@balarmalar.nsw.edu.au</ThemedText>
                     </View>
 
                     <View style={{ borderLeftWidth: 3, borderLeftColor: '#10B981', paddingLeft: 12, gap: 2 }}>
                       <ThemedText style={{ fontWeight: '700', fontSize: 13, color: colors.text }}>Seven Hills Branch</ThemedText>
-                      <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>🏫 Seven Hills North Public School, 1 Beecroft Rd</ThemedText>
-                      <ThemedText style={{ fontSize: 11, color: '#10B981', fontWeight: '600' }}>📅 Sundays: 9:30 AM – 12:30 PM | 📧 sevenhills@balarmalar.nsw.edu.au</ThemedText>
+                      <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>🏫 Seven Hills West Public School, Lucas Rd & Sackville St, Seven Hills NSW 2147</ThemedText>
+                      <ThemedText style={{ fontSize: 11, color: '#10B981', fontWeight: '600' }}>📅 Saturdays: 2:00 PM – 4:30 PM | 📧 sevenhills@balarmalar.nsw.edu.au</ThemedText>
                     </View>
 
                     <View style={{ borderLeftWidth: 3, borderLeftColor: '#F59E0B', paddingLeft: 12, gap: 2 }}>
-                      <ThemedText style={{ fontWeight: '700', fontSize: 13, color: colors.text }}>Homebush Branch</ThemedText>
-                      <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>🏫 Homebush Public School, Rochester St</ThemedText>
-                      <ThemedText style={{ fontSize: 11, color: '#F59E0B', fontWeight: '600' }}>📅 Saturdays: 2:00 PM – 5:00 PM | 📧 homebush@balarmalar.nsw.edu.au</ThemedText>
-                    </View>
-
-                    <View style={{ borderLeftWidth: 3, borderLeftColor: '#8B5CF6', paddingLeft: 12, gap: 2 }}>
-                      <ThemedText style={{ fontWeight: '700', fontSize: 13, color: colors.text }}>Liverpool Branch</ThemedText>
-                      <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>🏫 Liverpool Public School, 18-20 Hunter St</ThemedText>
-                      <ThemedText style={{ fontSize: 11, color: '#8B5CF6', fontWeight: '600' }}>📅 Saturdays: 9:00 AM – 12:00 PM | 📧 liverpool@balarmalar.nsw.edu.au</ThemedText>
+                      <ThemedText style={{ fontWeight: '700', fontSize: 13, color: colors.text }}>Blacktown Branch</ThemedText>
+                      <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>🏫 Blacktown Boys High School, Fifth Ave, Blacktown NSW 2148</ThemedText>
+                      <ThemedText style={{ fontSize: 11, color: '#F59E0B', fontWeight: '600' }}>📅 Saturdays: 9:00 AM – 12:00 PM | 📧 blacktown@balarmalar.nsw.edu.au</ThemedText>
                     </View>
                   </View>
                 </View>
