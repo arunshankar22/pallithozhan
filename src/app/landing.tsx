@@ -53,13 +53,16 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
   );
   const [portalVisible, setPortalVisible] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register' | 'waitlist'>('login');
+  const [screenWidth, setScreenWidth] = useState(windowWidth);
   const [isLargeScreen, setIsLargeScreen] = useState(windowWidth >= 768);
   const [activeInfoTopic, setActiveInfoTopic] = useState<string | null>(null);
   const [activeHeroIdx, setActiveHeroIdx] = useState(0);
 
   React.useEffect(() => {
     const handleResize = () => {
-      setIsLargeScreen(Dimensions.get('window').width >= 768);
+      const width = Dimensions.get('window').width;
+      setScreenWidth(width);
+      setIsLargeScreen(width >= 768);
     };
     const sub = Dimensions.addEventListener('change', handleResize);
     return () => sub.remove();
@@ -334,7 +337,15 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
       <ScrollView contentContainerStyle={styles.scrollWrapper}>
         
         {/* HERO SECTION */}
-        <View style={[styles.heroContainer, { height: isLargeScreen ? 340 : Math.max(windowWidth * 0.5, 200), minHeight: isLargeScreen ? 340 : Math.max(windowWidth * 0.5, 200), paddingVertical: activeHeroIdx === 0 ? 0 : Spacing.four, backgroundColor: activeHeroIdx === 0 ? '#FAF6EB' : '#050B0D' }]}>
+        <View style={[
+          styles.heroContainer, 
+          { 
+            height: activeHeroIdx === 0 ? screenWidth * 0.5 : (isLargeScreen ? 340 : 200), 
+            minHeight: activeHeroIdx === 0 ? screenWidth * 0.5 : (isLargeScreen ? 340 : 200), 
+            paddingVertical: activeHeroIdx === 0 ? 0 : (isLargeScreen ? Spacing.six : Spacing.four), 
+            backgroundColor: activeHeroIdx === 0 ? '#FAF6EB' : '#050B0D' 
+          }
+        ]}>
           {activeHeroIdx === 0 ? (
             <Image 
               source={require('../../assets/images/tamil_kids_hero.jpg')} 
