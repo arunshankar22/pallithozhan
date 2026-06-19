@@ -334,7 +334,7 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
       <ScrollView contentContainerStyle={styles.scrollWrapper}>
         
         {/* HERO SECTION */}
-        <View style={[styles.heroContainer, { height: isLargeScreen ? 480 : 280, minHeight: isLargeScreen ? 480 : 280, paddingVertical: activeHeroIdx === 0 ? 0 : Spacing.six, backgroundColor: activeHeroIdx === 0 ? '#FAF6EB' : '#050B0D' }]}>
+        <View style={[styles.heroContainer, { height: isLargeScreen ? 340 : Math.max(windowWidth * 0.5, 200), minHeight: isLargeScreen ? 340 : Math.max(windowWidth * 0.5, 200), paddingVertical: activeHeroIdx === 0 ? 0 : Spacing.four, backgroundColor: activeHeroIdx === 0 ? '#FAF6EB' : '#050B0D' }]}>
           {activeHeroIdx === 0 ? (
             <Image 
               source={require('../../assets/images/tamil_kids_hero.jpg')} 
@@ -433,27 +433,29 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
 
           {/* Only render text overlays for slide 1 */}
           {activeHeroIdx === 1 && (
-            <View style={styles.heroContent}>
+            <View style={[styles.heroContent, { gap: isLargeScreen ? 16 : 8 }]}>
               {/* Banner Badge */}
               <View style={[styles.heroBadge, { borderColor: colors.secondary }]}>
-                <ThemedText style={{ color: colors.secondary, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>
+                <ThemedText style={{ color: colors.secondary, fontSize: isLargeScreen ? 11 : 9, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>
                   {i18n.language === 'ta' ? 'பாலர் மலர் 2026 • வகுப்புகள் துவங்கின!' : 'Balar Malar 2026 • Classes Started!'}
                 </ThemedText>
               </View>
 
               {/* Title */}
-              <ThemedText style={styles.heroTitle}>
+              <ThemedText style={[styles.heroTitle, { fontSize: isLargeScreen ? 28 : 16, lineHeight: isLargeScreen ? 36 : 22 }]}>
                 {i18n.language === 'ta' 
                   ? 'தமிழ் மொழியால் இளைய தலைமுறையை மேம்படுத்துவோம்' 
                   : 'Empowering the Next Generation through Tamil Excellence'}
               </ThemedText>
 
               {/* Description */}
-              <ThemedText style={styles.heroDesc}>
-                {i18n.language === 'ta'
-                  ? 'ஆஸ்திரேலியாவின் முன்னோடித் தமிழ்ப் பள்ளி அமைப்பான பாலர் மலர் NSW. 1977 முதல் நமது குழந்தைகளுக்கு முறையான தமிழ்க் கல்வியையும் கலாச்சாரத்தையும் பயிற்றுவித்து வருகிறோம்.'
-                  : 'Balar Malar NSW - Australia\'s pioneer community Tamil school. Providing structured academic development and cultural alignment since 1977.'}
-              </ThemedText>
+              {isLargeScreen && (
+                <ThemedText style={styles.heroDesc}>
+                  {i18n.language === 'ta'
+                    ? 'ஆஸ்திரேலியாவின் முன்னோடித் தமிழ்ப் பள்ளி அமைப்பான பாலர் மலர் NSW. 1977 முதல் நமது குழந்தைகளுக்கு முறையான தமிழ்க் கல்வியையும் கலாச்சாரத்தையும் பயிற்றுவித்து வருகிறோம்.'
+                    : 'Balar Malar NSW - Australia\'s pioneer community Tamil school. Providing structured academic development and cultural alignment since 1977.'}
+                </ThemedText>
+              )}
             </View>
           )}
         </View>
