@@ -1201,7 +1201,7 @@ export default function HomeScreen() {
         <View style={{ gap: Spacing.two }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
             <ThemedText style={{ fontSize: 14, fontWeight: '700', color: colors.text }}>
-              {i18n.language === 'ta' ? 'முகப்பு' : 'Home'}
+              {t('newsfeed.title')}
             </ThemedText>
             <Pressable onPress={() => setActiveTab('full-newsfeed')}>
               <ThemedText style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>

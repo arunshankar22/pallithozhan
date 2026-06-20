@@ -16,7 +16,7 @@ import { attendanceService } from '@/services/attendanceService';
 import { spreadsheetService } from '@/services/spreadsheetService';
 import { Spacing } from '@/constants/theme';
 import * as XLSX from 'xlsx';
-import { isDemoMode } from '@/services/firebase';
+
 
 export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentId, insets }: TabProps) {
   const { width: windowWidth } = Dimensions.get('window');
@@ -815,12 +815,6 @@ export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentI
           <ThemedText style={styles.sectionTitle}>{t('attendance.title')}</ThemedText>
           <ThemedText style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>
             Attendance logs and real-time alerts
-          </ThemedText>
-        </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: isDemoMode ? '#EA533015' : '#4CAF5015', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, borderWidth: 1, borderColor: isDemoMode ? colors.danger : colors.secondary }}>
-          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: isDemoMode ? colors.danger : colors.secondary }} />
-          <ThemedText style={{ fontSize: 11, fontWeight: '700', color: isDemoMode ? colors.danger : colors.secondary }}>
-            {isDemoMode ? 'Sandbox Fallback' : 'Firestore Production DB'}
           </ThemedText>
         </View>
       </View>

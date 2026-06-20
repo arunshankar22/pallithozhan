@@ -459,57 +459,7 @@ export function ProfileTab({ user, colors, t, showToast, i18n, logout }: TabProp
           borderColor: colors.border,
           overflow: 'hidden'
         }}>
-          {/* Active Role Switcher Row for Dual Roles */}
-          {canSwitchRole && alternateRole && (
-            <View style={{
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              padding: Spacing.three,
-              borderBottomWidth: 1,
-              borderColor: colors.border
-            }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, marginRight: 8 }}>
-                <Shield size={18} color={colors.primary} />
-                <View style={{ gap: 2, flex: 1 }}>
-                  <ThemedText style={{ fontSize: 13, fontWeight: '700', color: colors.text }} numberOfLines={1}>
-                    Switch View Role / பொறுப்பை மாற்று
-                  </ThemedText>
-                  <ThemedText style={{ fontSize: 11, color: colors.textSecondary }} numberOfLines={2}>
-                    {user?.role === 'parent' 
-                      ? `Viewing as Parent (Switch back to ${user?.originalRole?.toUpperCase()})` 
-                      : `Viewing as ${user?.role?.toUpperCase()} (Switch to Parent View)`}
-                  </ThemedText>
-                </View>
-              </View>
-              <Pressable
-                onPress={() => {
-                  switchRole(alternateRole);
-                  showToast(
-                    i18n.language === 'ta'
-                      ? `காட்சிப் பொறுப்பு ${alternateRole.toUpperCase()} ஆக மாற்றப்பட்டது!`
-                      : `Switched view context to ${alternateRole.toUpperCase()}!`,
-                    'success'
-                  );
-                }}
-                style={({ pressed }) => [
-                  {
-                    backgroundColor: colors.primaryLight,
-                    paddingVertical: 6,
-                    paddingHorizontal: 12,
-                    borderRadius: 8,
-                    borderWidth: 1,
-                    borderColor: colors.primary,
-                    opacity: pressed ? 0.9 : 1
-                  }
-                ]}
-              >
-                <ThemedText style={{ color: colors.primary, fontSize: 11, fontWeight: '700' }}>
-                  {user?.role === 'parent' ? `Switch to ${user?.originalRole?.toUpperCase()}` : 'Switch to PARENT'}
-                </ThemedText>
-              </Pressable>
-            </View>
-          )}
+
 
           {/* Notifications Toggle */}
           <View style={{
@@ -676,29 +626,54 @@ export function ProfileTab({ user, colors, t, showToast, i18n, logout }: TabProp
             <ChevronRight size={16} color={colors.textSecondary} />
           </Pressable>
 
-          {/* Reset Database and Logout Buttons (Rendered inside settings layout) */}
-          <Pressable
-            onPress={async () => {
-              await mockDb.resetDatabase();
-              showToast('Sandbox database reset to seed defaults! Logging out...', 'success');
-              setTimeout(() => {
-                logout?.();
-              }, 1500);
-            }}
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              padding: Spacing.three,
-              borderBottomWidth: 1,
-              borderColor: colors.border,
-              gap: 12
-            }}
-          >
-            <AlertTriangle size={18} color={colors.accent} />
-            <ThemedText style={{ fontSize: 13, fontWeight: '700', color: colors.text }}>
-              Reset Database to Seed Defaults
-            </ThemedText>
-          </Pressable>
+          {/* Active Role Switcher Row for Dual Roles */}
+          {canSwitchRole && alternateRole && (
+            <Pressable
+              onPress={() => {
+                switchRole(alternateRole);
+                showToast(
+                  i18n.language === 'ta'
+                    ? `காட்சிப் பொறுப்பு ${alternateRole.toUpperCase()} ஆக மாற்றப்பட்டது!`
+                    : `Switched view context to ${alternateRole.toUpperCase()}!`,
+                  'success'
+                );
+              }}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                padding: Spacing.three,
+                borderBottomWidth: 1,
+                borderColor: colors.border,
+                gap: 12
+              }}
+            >
+              <Shield size={18} color={colors.primary} />
+              <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <View style={{ gap: 2, flex: 1 }}>
+                  <ThemedText style={{ fontSize: 13, fontWeight: '700', color: colors.text }}>
+                    Switch View Role / பொறுப்பை மாற்று
+                  </ThemedText>
+                  <ThemedText style={{ fontSize: 11, color: colors.textSecondary }}>
+                    {user?.role === 'parent' 
+                      ? `Viewing as Parent (Switch back to ${user?.originalRole?.toUpperCase()})` 
+                      : `Viewing as ${user?.role?.toUpperCase()} (Switch to Parent View)`}
+                  </ThemedText>
+                </View>
+                <View style={{
+                  backgroundColor: colors.primaryLight,
+                  paddingVertical: 4,
+                  paddingHorizontal: 8,
+                  borderRadius: 6,
+                  borderWidth: 1,
+                  borderColor: colors.primary,
+                }}>
+                  <ThemedText style={{ color: colors.primary, fontSize: 10, fontWeight: '700' }}>
+                    {user?.role === 'parent' ? `Switch to ${user?.originalRole?.toUpperCase()}` : 'Switch to PARENT'}
+                  </ThemedText>
+                </View>
+              </View>
+            </Pressable>
+          )}
 
           <Pressable
             onPress={() => logout?.()}
