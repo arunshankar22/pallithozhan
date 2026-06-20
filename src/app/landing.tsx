@@ -487,7 +487,13 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
 
         {/* CORE FEATURES SECTION */}
         <View style={styles.mainGridWrapper}>
-          <View style={styles.featuresGrid}>
+          <View style={[
+            styles.featuresGrid,
+            {
+              flexDirection: isLargeScreen ? 'row' : 'column',
+              flexWrap: isLargeScreen ? 'wrap' : 'nowrap',
+            }
+          ]}>
             {coreFeatures.map((item, idx) => {
               const Icon = item.icon;
               return (
@@ -496,7 +502,7 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
                   { 
                     backgroundColor: colors.cardBg, 
                     borderColor: colors.border,
-                    flex: isLargeScreen ? 1 : 0,
+                    flex: isLargeScreen ? 1 : undefined,
                     width: isLargeScreen ? undefined : '100%'
                   }
                 ]}>
@@ -530,7 +536,13 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
           </View>
 
           {/* Timeline Cards Grid */}
-          <View style={styles.curriculumGrid}>
+          <View style={[
+            styles.curriculumGrid,
+            {
+              flexDirection: isLargeScreen ? 'row' : 'column',
+              flexWrap: isLargeScreen ? 'wrap' : 'nowrap',
+            }
+          ]}>
             {curriculumStages.map((stage, idx) => {
               return (
                 <View 
