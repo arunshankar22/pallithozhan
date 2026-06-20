@@ -980,7 +980,7 @@ export function ProfileTab({ user, colors, t, showToast, i18n, logout }: TabProp
         opacity: 0.85
       }}>
         <Image 
-          source={require('../../assets/images/pallithozhan_logo.png')} 
+          source={require('../../../assets/images/pallithozhan_logo.png')} 
           style={{ width: 44, height: 44, borderRadius: 10 }} 
         />
         <View style={{ alignItems: 'center' }}>
