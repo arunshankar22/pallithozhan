@@ -492,6 +492,8 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
             {
               flexDirection: isLargeScreen ? 'row' : 'column',
               flexWrap: isLargeScreen ? 'wrap' : 'nowrap',
+              alignItems: 'stretch',
+              width: '100%'
             }
           ]}>
             {coreFeatures.map((item, idx) => {
@@ -503,7 +505,8 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
                     backgroundColor: colors.cardBg, 
                     borderColor: colors.border,
                     flex: isLargeScreen ? 1 : undefined,
-                    width: isLargeScreen ? undefined : '100%'
+                    width: isLargeScreen ? undefined : '100%',
+                    alignSelf: isLargeScreen ? undefined : 'stretch'
                   }
                 ]}>
                   <View style={[styles.featureIconContainer, { backgroundColor: item.color + '15' }]}>
@@ -535,12 +538,13 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
             </Pressable>
           </View>
 
-          {/* Timeline Cards Grid */}
           <View style={[
             styles.curriculumGrid,
             {
               flexDirection: isLargeScreen ? 'row' : 'column',
               flexWrap: isLargeScreen ? 'wrap' : 'nowrap',
+              alignItems: 'stretch',
+              width: '100%'
             }
           ]}>
             {curriculumStages.map((stage, idx) => {
@@ -554,7 +558,8 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
                       borderColor: stage.borderColor || colors.border,
                       borderWidth: 1,
                       flex: isLargeScreen ? 1 : undefined,
-                      width: isLargeScreen ? '48%' : '100%'
+                      width: isLargeScreen ? '48%' : '100%',
+                      alignSelf: isLargeScreen ? undefined : 'stretch'
                     }
                   ]}
                 >
@@ -1193,7 +1198,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', paddingVertical: 5, paddingHorizontal: Spacing.two, borderRadius: 14,
   },
   portalButtonText: { color: '#FFF', fontSize: 11, fontWeight: '700' },
-  scrollWrapper: { flexGrow: 1 },
+  scrollWrapper: { flexGrow: 1, width: '100%' },
   
   // Hero section
   heroContainer: {
@@ -1292,7 +1297,8 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap', 
     gap: Spacing.three,
     marginTop: -Spacing.four,
-    zIndex: 20
+    zIndex: 20,
+    width: '100%'
   },
   featureCard: {
     minWidth: 260,
@@ -1347,7 +1353,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: Spacing.three,
-    marginTop: Spacing.two
+    marginTop: Spacing.two,
+    width: '100%'
   },
   curriculumCard: {
     minWidth: 260,
