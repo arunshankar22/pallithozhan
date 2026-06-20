@@ -683,7 +683,7 @@ export function NewsfeedTab({
     <View style={styles.tabContentWrapper}>
       <View style={styles.sectionHeaderRow}>
         <View>
-          <ThemedText style={styles.sectionTitle}>{t('nav.newsfeed')}</ThemedText>
+          <ThemedText style={styles.sectionTitle}>{t('newsfeed.title')}</ThemedText>
           <ThemedText style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>
             Broadcast updates, speech contest details, and Google Drive resources
           </ThemedText>

@@ -49,13 +49,13 @@
     "present": "Present",
     "absent": "Absent",
     "late": "Late",
-    "saveAttendance": "Submit Roll Call",
+    "saveAttendance": "Submit",
     "selectClass": "Select Class",
     "markedBy": "Marked by: {{name}}",
     "approvalPending": "Absence alerts pending admin approval"
   },
   "newsfeed": {
-    "title": "Home",
+    "title": "School Announcement",
     "postNew": "Post Announcement",
     "whatIsNew": "What's happening in school?",
     "postButton": "Post",

@@ -967,6 +967,31 @@ export function ProfileTab({ user, colors, t, showToast, i18n, logout }: TabProp
           </View>
         </View>
       </Modal>
+
+      {/* Pallithozhan App Branding */}
+      <View style={{
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: Spacing.two,
+        marginTop: Spacing.five,
+        paddingVertical: Spacing.three,
+        borderTopWidth: 1,
+        borderTopColor: colors.border,
+        opacity: 0.85
+      }}>
+        <Image 
+          source={require('../../assets/images/pallithozhan_logo.png')} 
+          style={{ width: 44, height: 44, borderRadius: 10 }} 
+        />
+        <View style={{ alignItems: 'center' }}>
+          <ThemedText style={{ fontSize: 14, fontWeight: '800', color: colors.text, letterSpacing: 0.5 }}>
+            Pallithozhan
+          </ThemedText>
+          <ThemedText style={{ fontSize: 11, color: colors.textSecondary }}>
+            Balar Malar School Portal v1.0
+          </ThemedText>
+        </View>
+      </View>
     </View>
   );
 }

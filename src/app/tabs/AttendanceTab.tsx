@@ -27,6 +27,7 @@ export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentI
   const [rolls, setRolls] = useState<Record<string, 'present' | 'absent' | 'late'>>({});
   const [saving, setSaving] = useState(false);
   const [pendingApprovals, setPendingApprovals] = useState<any[]>([]);
+  const [assignedTeachers, setAssignedTeachers] = useState<any[]>([]);
   
   // Custom Export Modal States
   const [showExportModal, setShowExportModal] = useState(false);
@@ -109,6 +110,22 @@ export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentI
     }
   }, [user]);
 
+  // Default select teacher's assigned class when classes or user are loaded
+  useEffect(() => {
+    if (user && classes.length > 0 && !selectedClassId) {
+      if (user.role === 'teacher' || user.role === 'volunteer') {
+        const assignedClass = classes.find(c => 
+          c.teacherId === user.uid || 
+          (c.teacherIds && c.teacherIds.includes(user.uid)) ||
+          (c.volunteerIds && c.volunteerIds.includes(user.uid))
+        );
+        if (assignedClass) {
+          setSelectedClassId(assignedClass.classId);
+        }
+      }
+    }
+  }, [classes, user]);
+
   // Loading Selected Date's rolls from database to allow modification edits saving
   useEffect(() => {
     const loadRolls = async () => {
@@ -126,6 +143,7 @@ export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentI
             list = allUsers.filter(u => u.role === 'teacher' || u.role === 'volunteer' || u.role === 'admin');
           }
           existingRecord = await mockDb.getAttendanceRecord(selectedClassId, selectedDate);
+          setAssignedTeachers([]);
         } else {
           const cls = await mockDb.getClass(selectedClassId);
           if (cls) {
@@ -139,6 +157,17 @@ export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentI
               if (profile) list.push(profile);
             }
             existingRecord = await mockDb.getAttendanceRecord(selectedClassId, selectedDate);
+
+            // Fetch assigned teachers
+            const teachers: any[] = [];
+            const tIds = cls.teacherIds || (cls.teacherId ? [cls.teacherId] : []);
+            for (const tId of tIds) {
+              const profile = await mockDb.getUser(tId);
+              if (profile) teachers.push(profile);
+            }
+            setAssignedTeachers(teachers);
+          } else {
+            setAssignedTeachers([]);
           }
         }
 
@@ -159,6 +188,7 @@ export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentI
         }
       } else {
         setStudentList([]);
+        setAssignedTeachers([]);
       }
     };
     loadRolls();
@@ -1109,6 +1139,36 @@ export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentI
                   </View>
                 </View>
                 
+                {assignedTeachers.length > 0 && (
+                  <View style={{ 
+                    flexDirection: 'row', 
+                    alignItems: 'center', 
+                    flexWrap: 'wrap', 
+                    gap: 8, 
+                    backgroundColor: colors.success + '15', 
+                    borderRadius: 12, 
+                    paddingVertical: 8, 
+                    paddingHorizontal: 12, 
+                    marginBottom: Spacing.three,
+                    borderWidth: 1,
+                    borderColor: colors.success + '30'
+                  }}>
+                    <ThemedText style={{ fontSize: 13, fontWeight: '700', color: colors.success }}>
+                      🏫 {i18n.language === 'ta' ? 'ஒதுக்கப்பட்ட ஆசிரியர்(கள்):' : 'Assigned Teacher(s):'}
+                    </ThemedText>
+                    {assignedTeachers.map((teacher, index) => (
+                      <View key={teacher.uid} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <ThemedText style={{ fontSize: 13, fontWeight: '800', color: colors.text }}>
+                          {teacher.fullName}
+                        </ThemedText>
+                        {index < assignedTeachers.length - 1 && (
+                          <ThemedText style={{ color: colors.textSecondary, marginHorizontal: 4 }}>,</ThemedText>
+                        )}
+                      </View>
+                    ))}
+                  </View>
+                )}
+                
                 {studentList.map((student) => {
                   const status = rolls[student.uid] || 'present';
                   return (
@@ -1125,10 +1185,10 @@ export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentI
                           onPress={() => handleMarkRoll(student.uid, 'present')}
                           style={[
                             styles.rollButton,
-                            status === 'present' && { backgroundColor: colors.secondary + '20', borderColor: colors.secondary }
+                            status === 'present' && { backgroundColor: colors.success + '20', borderColor: colors.success }
                           ]}
                         >
-                          <ThemedText style={[styles.rollBtnText, { color: status === 'present' ? colors.secondary : colors.textSecondary }]}>
+                          <ThemedText style={[styles.rollBtnText, { color: status === 'present' ? colors.success : colors.textSecondary }]}>
                             {t('attendance.present')}
                           </ThemedText>
                         </Pressable>
@@ -1160,7 +1220,7 @@ export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentI
                   {saving ? (
                     <ActivityIndicator size="small" color="#FFF" />
                   ) : (
-                    <ThemedText style={styles.submitRollBtnText}>Submit Today's Roll Call</ThemedText>
+                    <ThemedText style={styles.submitRollBtnText}>{t('attendance.saveAttendance')}</ThemedText>
                   )}
                 </Pressable>
               </View>

@@ -1698,20 +1698,14 @@ export default function HomeScreen() {
         {/* Divider line */}
         <View style={{ width: 1, height: 18, backgroundColor: colors.border, marginHorizontal: 2 }} />
 
-        {/* Branch Info with Logo Icon next to Parramatta */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <Image 
-            source={require('../../assets/images/pallithozhan_logo.png')} 
-            style={{ width: 28, height: 28, borderRadius: 6 }} 
-          />
-          <View style={{ gap: 0, justifyContent: 'center' }}>
-            <ThemedText style={{ color: colors.secondary, fontSize: 6, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5, lineHeight: 7 }}>
-              {currentBranch.en}
-            </ThemedText>
-            <ThemedText style={{ color: colors.textSecondary, fontSize: 6, fontWeight: '600', lineHeight: 7 }}>
-              {currentBranch.ta}
-            </ThemedText>
-          </View>
+        {/* Branch Info (Logo removed as requested) */}
+        <View style={{ justifyContent: 'center' }}>
+          <ThemedText style={{ color: colors.secondary, fontSize: 6, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5, lineHeight: 7 }}>
+            {currentBranch.en}
+          </ThemedText>
+          <ThemedText style={{ color: colors.textSecondary, fontSize: 6, fontWeight: '600', lineHeight: 7 }}>
+            {currentBranch.ta}
+          </ThemedText>
         </View>
       </View>
     );
@@ -1847,6 +1841,27 @@ export default function HomeScreen() {
                 Sign Out
               </ThemedText>
             </Pressable>
+
+            {/* Pallithozhan desktop footer brand */}
+            <View style={{ 
+              flexDirection: 'row', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              gap: 8, 
+              marginTop: Spacing.four,
+              paddingTop: Spacing.two,
+              borderTopWidth: 1,
+              borderTopColor: colors.border + '40',
+              opacity: 0.8
+            }}>
+              <Image 
+                source={require('../../assets/images/pallithozhan_logo.png')} 
+                style={{ width: 18, height: 18, borderRadius: 4 }} 
+              />
+              <ThemedText style={{ fontSize: 10, fontWeight: '700', color: colors.textSecondary, letterSpacing: 0.5 }}>
+                Pallithozhan
+              </ThemedText>
+            </View>
           </View>
         </View>
       ) : null}
