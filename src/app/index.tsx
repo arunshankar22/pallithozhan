@@ -53,12 +53,14 @@ import { NewsletterTab } from '@/app/tabs/NewsletterTab';
 import { AttendanceTab } from '@/app/tabs/AttendanceTab';
 import { HomeworkTab } from '@/app/tabs/HomeworkTab';
 import { MessagesTab } from '@/app/tabs/MessagesTab';
-import { chatNotificationService } from '@/services/chatNotificationService';
 import { CalendarTab } from '@/app/tabs/CalendarTab';
 import { ReportsTab } from '@/app/tabs/ReportsTab';
 import { ManagementTab } from '@/app/tabs/ManagementTab';
 import { ProfileTab } from '@/app/tabs/ProfileTab';
 import { StudentsTab } from '@/app/tabs/StudentsTab';
+import { SuperAdminTab } from '@/app/tabs/SuperAdminTab';
+import { auditLogService } from '@/services/auditLogService';
+import { chatNotificationService } from '@/services/chatNotificationService';
 import WaitlistScreen from './waitlist';
 
 const { width: windowWidth } = Dimensions.get('window');
@@ -162,7 +164,7 @@ export default function HomeScreen() {
   };
 
   // Layout Tab State
-  const [activeTab, setActiveTab] = useState<'newsfeed' | 'attendance' | 'homework' | 'messages' | 'calendar' | 'reports' | 'management' | 'profile' | 'schools' | 'full-newsfeed' | 'students' | 'newsletter'>('newsfeed');
+  const [activeTab, setActiveTab] = useState<'newsfeed' | 'attendance' | 'homework' | 'messages' | 'calendar' | 'reports' | 'management' | 'profile' | 'schools' | 'full-newsfeed' | 'students' | 'newsletter' | 'superadmin'>('newsfeed');
 
   const [classes, setClasses] = useState<any[]>([]);
   const [studentProfiles, setStudentProfiles] = useState<any[]>([]);
@@ -256,7 +258,7 @@ export default function HomeScreen() {
 
       // 1. Absences
       const pendingAbsences = approvals.filter((a: any) => a.status === 'pending');
-      const filteredAbsences = user?.role === 'admin' 
+      const filteredAbsences = (user?.role === 'admin' || user?.role === 'superadmin') 
         ? pendingAbsences 
         : pendingAbsences.filter((a: any) => userClassIds.includes(a.classId));
       
@@ -285,7 +287,7 @@ export default function HomeScreen() {
         console.warn('Failed to load achievements in dashboard:', e);
       }
       const pendingAchievements = achievements.filter((ach: any) => ach.status === 'pending' || ach.status === 'pending_deletion');
-      const filteredAchievements = user?.role === 'admin'
+      const filteredAchievements = (user?.role === 'admin' || user?.role === 'superadmin')
         ? pendingAchievements
         : pendingAchievements.filter((ach: any) => teacherStudentIds.includes(ach.studentId));
 
@@ -314,7 +316,7 @@ export default function HomeScreen() {
         console.warn('Failed to load articles in dashboard:', e);
       }
       const pendingArticles = articles.filter((art: any) => art.status === 'pending');
-      const filteredArticles = (user?.role === 'admin' || user?.role === 'teacher' || user?.role === 'volunteer')
+      const filteredArticles = (user?.role === 'admin' || user?.role === 'superadmin' || user?.role === 'teacher' || user?.role === 'volunteer')
         ? pendingArticles
         : [];
 
@@ -601,6 +603,18 @@ export default function HomeScreen() {
             : 'Approval submitted successfully!',
           'success'
         );
+        
+        // Modular Centralized Audit Logging
+        if (user) {
+          if (type === 'absence') {
+            auditLogService.logAbsenceApproval(user, 'Student (ID: ' + id + ')', 'marked date').catch(e => console.error(e));
+          } else if (type === 'achievement') {
+            auditLogService.logAchievementAction(user, 'Approved', id).catch(e => console.error(e));
+          } else if (type === 'article') {
+            auditLogService.logArticleAction(user, 'Approved', id).catch(e => console.error(e));
+          }
+        }
+
         await reloadDashboardData();
       } else {
         showToast('Approval failed.', 'error');
@@ -755,7 +769,10 @@ export default function HomeScreen() {
       { key: 'newsfeed', label: t('nav.newsfeed') || 'Home', labelTa: 'முகப்பு', icon: Newspaper }
     ];
 
-    if (role === 'admin') {
+    if (role === 'superadmin') {
+      items.push({ key: 'superadmin', label: 'Super Admin', labelTa: 'முதன்மை நிர்வாகி', icon: Shield });
+      items.push({ key: 'messages', label: i18n.language === 'ta' ? 'செய்திகள்' : 'Messages', labelTa: 'செய்திகள்', icon: MessageSquare });
+    } else if (role === 'admin') {
       items.push({ key: 'management', label: 'Admin Panel', labelTa: 'நிர்வாகம்', icon: Users });
       items.push({ key: 'messages', label: i18n.language === 'ta' ? 'செய்திகள்' : 'Messages', labelTa: 'செய்திகள்', icon: MessageSquare });
     } else if (role === 'teacher') {
@@ -1024,7 +1041,7 @@ export default function HomeScreen() {
     const greetingTa = user?.languagePreference === 'ta' ? 'வணக்கம்' : 'வணக்கம்';
     const activeStudentName = user?.fullName || 'Student';
     
-    const progressPct = user?.role === 'admin' ? dashboardStats.admin.progressPct :
+    const progressPct = (user?.role === 'admin' || user?.role === 'superadmin') ? dashboardStats.admin.progressPct :
                         user?.role === 'volunteer' ? Math.round(Math.min(dashboardStats.teacher.attendanceTaken / 5, 1.0) * 100) :
                         user?.role === 'teacher' ? dashboardStats.teacher.progressPct :
                         user?.role === 'parent' ? dashboardStats.parent.progressPct : dashboardStats.student.progressPct;
@@ -1077,14 +1094,14 @@ export default function HomeScreen() {
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
               <View style={{ gap: 4, flex: 1, marginRight: 10 }}>
                 <ThemedText style={{ color: '#FFF', fontSize: 13, fontWeight: '700' }}>
-                  {user?.role === 'admin' ? (i18n.language === 'ta' ? 'அங்கீகாரங்கள் நிலுவையில்' : 'Pending Tasks & Approvals') :
+                  {(user?.role === 'admin' || user?.role === 'superadmin') ? (i18n.language === 'ta' ? 'அங்கீகாரங்கள் நிலுவையில்' : 'Pending Tasks & Approvals') :
                    user?.role === 'volunteer' ? (i18n.language === 'ta' ? 'தன்னார்வலர் கடமைகள் முன்னேற்றம்' : 'Volunteer Duties Progress') :
                    user?.role === 'teacher' ? (i18n.language === 'ta' ? 'கற்பித்தல் கடமைகள் முன்னேற்றம்' : 'Teaching Duties Progress') :
                    user?.role === 'parent' ? (i18n.language === 'ta' ? 'குழந்தைகளின் வீட்டுப்பாடம்' : "Children's Homework Progress") :
                    (i18n.language === 'ta' ? 'இந்த வார முன்னேற்றம்' : "This Week's Lesson Progress")}
                 </ThemedText>
                 <ThemedText style={{ color: 'rgba(255, 255, 255, 0.85)', fontSize: 11, fontWeight: '500', lineHeight: 15 }}>
-                  {user?.role === 'admin' ? (i18n.language === 'ta' ? `${dashboardStats.admin.pendingCount} வருகைப்பதிவு தாள்கள் அங்கீகரிக்கப்பட வேண்டும்` : `${dashboardStats.admin.pendingCount} Attendance sheet(s) pending approval`) :
+                  {(user?.role === 'admin' || user?.role === 'superadmin') ? (i18n.language === 'ta' ? `${dashboardStats.admin.pendingCount} வருகைப்பதிவு தாள்கள் அங்கீகரிக்கப்பட வேண்டும்` : `${dashboardStats.admin.pendingCount} Attendance sheet(s) pending approval`) :
                    user?.role === 'volunteer' ? (i18n.language === 'ta' ? `வருகை: ${dashboardStats.teacher.attendanceTaken}/5` : `Attendance Taken: ${dashboardStats.teacher.attendanceTaken}/5`) :
                    user?.role === 'teacher' ? (i18n.language === 'ta' ? `வீட்டுப்பாடம்: ${dashboardStats.teacher.homeworkGiven}/5 | தேர்வுகள்: ${dashboardStats.teacher.resultsReviewed}/5 | வருகை: ${dashboardStats.teacher.attendanceTaken}/5` : `Homework Given: ${dashboardStats.teacher.homeworkGiven}/5 | Results Reviewed: ${dashboardStats.teacher.resultsReviewed}/5 | Attendance Taken: ${dashboardStats.teacher.attendanceTaken}/5`) :
                    user?.role === 'parent' ? (i18n.language === 'ta' ? `${dashboardStats.parent.completedCount}/${dashboardStats.parent.totalCount} வீட்டுப்பாடங்கள் முடிக்கப்பட்டது` : `${dashboardStats.parent.completedCount} out of ${dashboardStats.parent.totalCount} homework tasks completed by your children`) :
@@ -1126,7 +1143,7 @@ export default function HomeScreen() {
         </View>
 
         {/* Pending Tasks & Approvals card for Admin, Teacher, and Volunteer */}
-        {(user?.role === 'admin' || ((user?.role === 'teacher' || user?.role === 'volunteer') && pendingApprovalsList.length > 0)) && (
+        {((user?.role === 'admin' || user?.role === 'superadmin') || ((user?.role === 'teacher' || user?.role === 'volunteer') && pendingApprovalsList.length > 0)) && (
           <View style={{ gap: Spacing.two, marginBottom: Spacing.four }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <CheckSquare size={16} color={colors.primary} />
@@ -1849,6 +1866,8 @@ export default function HomeScreen() {
         );
       case 'management':
         return <ManagementTab {...props} />;
+      case 'superadmin':
+        return <SuperAdminTab {...props} />;
       case 'schools':
         return renderSchoolsTab();
       case 'students':
@@ -1870,14 +1889,15 @@ export default function HomeScreen() {
 
   // Nav Item Definition
   const navItems = [
-    { key: 'newsfeed', label: t('nav.newsfeed'), icon: Newspaper, roles: ['admin', 'teacher', 'volunteer', 'parent', 'student'] },
-    { key: 'newsletter', label: t('nav.newsletter'), icon: Newspaper, roles: ['admin', 'teacher', 'volunteer', 'parent', 'student'] },
-    { key: 'attendance', label: t('nav.attendance'), icon: CheckSquare, roles: ['admin', 'teacher', 'volunteer', 'parent'] },
-    { key: 'homework', label: t('nav.homework'), icon: BookOpen, roles: ['admin', 'teacher', 'parent', 'student'] },
-    { key: 'messages', label: t('nav.messages'), icon: MessageSquare, roles: ['admin', 'teacher', 'volunteer', 'parent', 'student'] },
-    { key: 'calendar', label: t('nav.calendar'), icon: CalendarIcon, roles: ['admin', 'teacher', 'volunteer', 'parent', 'student'] },
-    { key: 'reports', label: t('nav.reports'), icon: Award, roles: ['admin', 'teacher', 'volunteer', 'parent'] },
-    { key: 'management', label: t('nav.management'), icon: Users, roles: ['admin'] },
+    { key: 'newsfeed', label: t('nav.newsfeed'), icon: Newspaper, roles: ['superadmin', 'admin', 'teacher', 'volunteer', 'parent', 'student'] },
+    { key: 'newsletter', label: t('nav.newsletter'), icon: Newspaper, roles: ['superadmin', 'admin', 'teacher', 'volunteer', 'parent', 'student'] },
+    { key: 'attendance', label: t('nav.attendance'), icon: CheckSquare, roles: ['superadmin', 'admin', 'teacher', 'volunteer', 'parent'] },
+    { key: 'homework', label: t('nav.homework'), icon: BookOpen, roles: ['superadmin', 'admin', 'teacher', 'parent', 'student'] },
+    { key: 'messages', label: t('nav.messages'), icon: MessageSquare, roles: ['superadmin', 'admin', 'teacher', 'volunteer', 'parent', 'student'] },
+    { key: 'calendar', label: t('nav.calendar'), icon: CalendarIcon, roles: ['superadmin', 'admin', 'teacher', 'volunteer', 'parent', 'student'] },
+    { key: 'reports', label: t('nav.reports'), icon: Award, roles: ['superadmin', 'admin', 'teacher', 'volunteer', 'parent'] },
+    { key: 'management', label: t('nav.management'), icon: Users, roles: ['superadmin', 'admin'] },
+    { key: 'superadmin', label: 'Super Admin', icon: Shield, roles: ['superadmin'] },
   ] as const;
 
   // Filter Nav Items based on user role
@@ -3077,7 +3097,7 @@ export default function HomeScreen() {
             <ScrollView style={{ maxHeight: 350 }} contentContainerStyle={{ gap: Spacing.three }}>
               {/* Class Selector if multiple classes exist */}
               {(() => {
-                const editable = (user?.role === 'admin') 
+                const editable = (user?.role === 'admin' || user?.role === 'superadmin') 
                   ? classes 
                   : classes.filter((c: any) => 
                       user?.uid && (c.teacherId === user.uid || c.teacherIds?.includes(user.uid) || c.volunteerIds?.includes(user.uid))

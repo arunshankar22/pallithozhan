@@ -3,6 +3,7 @@ import i18n from './i18n';
 import { isDemoMode, auth as fbAuth } from './firebase';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updatePassword as fbUpdatePassword } from 'firebase/auth';
 import { mockDb } from './mockBackend';
+import { auditLogService } from './auditLogService';
 
 export const BRANCH_SCHOOL_MAPPING: Record<string, string> = {
   'parramatta': 'balarmalar parramatta branch',
@@ -20,8 +21,8 @@ export interface UserProfile {
   uid: string;
   email: string;
   fullName: string;
-  role: 'admin' | 'teacher' | 'volunteer' | 'parent' | 'student';
-  originalRole?: 'admin' | 'teacher' | 'volunteer' | 'parent' | 'student';
+  role: 'superadmin' | 'admin' | 'teacher' | 'volunteer' | 'parent' | 'student';
+  originalRole?: 'superadmin' | 'admin' | 'teacher' | 'volunteer' | 'parent' | 'student';
   phone: string;
   schoolId: string;
   languagePreference: string;
@@ -39,7 +40,7 @@ interface AuthContextType {
   updateLanguage: (lang: string) => void;
   updateProfile: (fullName: string, phone: string, profilePicture?: string) => Promise<void>;
   updateAuthPassword: (newPassword: string) => Promise<void>;
-  switchRole: (role: 'admin' | 'teacher' | 'volunteer' | 'parent' | 'student') => void;
+  switchRole: (role: 'superadmin' | 'admin' | 'teacher' | 'volunteer' | 'parent' | 'student') => void;
   isLoading: boolean;
 }
 
@@ -110,6 +111,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (typeof window !== 'undefined' && typeof window.localStorage !== 'undefined') {
           window.localStorage.setItem('pallithozhan_session_uid', resolved.uid);
         }
+        // Log user login in dev database
+        auditLogService.logLogin(resolved, 'Demo/Mock Mode').catch(err => 
+          console.error('Failed to log login:', err)
+        );
         return resolved;
       } else {
         // Complete Firebase production integration
@@ -119,9 +124,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           let profile = await mockDb.getUser(fbUser.uid);
           if (!profile) {
             console.log(`Profile not found in Firestore for authenticated UID: ${fbUser.uid}. Auto-creating default profile...`);
-            let role: 'admin' | 'teacher' | 'volunteer' | 'parent' | 'student' = 'parent';
+            let role: 'superadmin' | 'admin' | 'teacher' | 'volunteer' | 'parent' | 'student' = 'parent';
             const lowerEmail = (email || '').toLowerCase();
-            if (lowerEmail.includes('admin')) {
+            if (lowerEmail.includes('superadmin')) {
+              role = 'superadmin';
+            } else if (lowerEmail.includes('admin')) {
               role = 'admin';
             } else if (lowerEmail.includes('teacher')) {
               role = 'teacher';
@@ -148,6 +155,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const resolved = resolveUserProfile(profile);
           setUser(resolved);
           i18n.changeLanguage(resolved.languagePreference);
+          // Log user login in dev database
+          auditLogService.logLogin(resolved, 'Firebase Auth').catch(err => 
+            console.error('Failed to log login:', err)
+          );
           return resolved;
         } catch (fbAuthErr: any) {
           // INTERCEPT SPREADSHEET IMPORTED USERS FIRST-TIME ACTIVATION
@@ -181,6 +192,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 const resolved = resolveUserProfile(newProfile);
                 setUser(resolved);
                 i18n.changeLanguage(resolved.languagePreference || 'ta');
+                // Log user login in dev database
+                auditLogService.logLogin(resolved, 'Self-healed imported user').catch(err => 
+                  console.error('Failed to log login:', err)
+                );
                 return resolved;
               }
             } catch (autoRegErr) {
@@ -308,13 +323,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const switchRole = (newRole: 'admin' | 'teacher' | 'volunteer' | 'parent' | 'student') => {
+  const switchRole = (newRole: 'superadmin' | 'admin' | 'teacher' | 'volunteer' | 'parent' | 'student') => {
     if (user) {
       const updated = { ...user, role: newRole };
       setUser(updated);
       if (typeof window !== 'undefined' && typeof window.localStorage !== 'undefined') {
         window.localStorage.setItem(`active_role_${user.uid}`, newRole);
       }
+      // Log switching role
+      auditLogService.logRoleSwitch(user, newRole).catch(err =>
+        console.error('Failed to log role switch:', err)
+      );
     }
   };
 

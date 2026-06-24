@@ -34,6 +34,7 @@ import { TabProps, getGlassStyle } from '@/app/sharedTypes';
 import { styles as globalStyles } from '@/app/styles';
 import { mockDb } from '@/services/mockBackend';
 import { autoTranslate, translateWithGemini } from '@/services/translator';
+import { auditLogService } from '@/services/auditLogService';
 import { useDebounce } from '@/hooks/useDebounce';
 import { DateTimePicker } from '@/components/DateTimePicker';
 import { Spacing } from '@/constants/theme';
@@ -513,6 +514,9 @@ export function NewsletterTab({
     try {
       await mockDb.approveArticle(id, user?.fullName || 'Staff Member');
       showToast('Article approved successfully / கட்டுரை அங்கீகரிக்கப்பட்டது', 'success');
+      if (user) {
+        auditLogService.logArticleAction(user, 'Approved', id).catch(e => console.error(e));
+      }
       loadData();
     } catch (e) {
       showToast('Approval failed / அங்கீகாரம் தோல்வியடைந்தது', 'error');
@@ -523,6 +527,9 @@ export function NewsletterTab({
     try {
       await mockDb.rejectArticle(id);
       showToast('Article rejected / கட்டுரை நிராகரிக்கப்பட்டது', 'success');
+      if (user) {
+        auditLogService.logArticleAction(user, 'Rejected', id).catch(e => console.error(e));
+      }
       loadData();
     } catch (e) {
       showToast('Rejection failed / நிராகரிப்பு தோல்வியடைந்தது', 'error');
@@ -533,6 +540,9 @@ export function NewsletterTab({
     try {
       await mockDb.deleteArticle(id);
       showToast('Article deleted / கட்டுரை நீக்கப்பட்டது', 'success');
+      if (user) {
+        auditLogService.logArticleAction(user, 'Deleted', id).catch(e => console.error(e));
+      }
       loadData();
     } catch (e) {
       showToast('Deletion failed / நீக்குதல் தோல்வியடைந்தது', 'error');

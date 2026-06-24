@@ -3,6 +3,7 @@ import { db } from './firebase';
 import { collection, doc, getDoc, getDocs, setDoc, deleteDoc } from 'firebase/firestore';
 
 export const DEFAULT_USERS = [
+  { uid: 'superadmin_1', email: 'superadmin@example.com', fullName: 'Super Admin', role: 'superadmin', phone: '+91 99999 99999', schoolId: 'balarmalar parramatta branch', languagePreference: 'en' },
   { uid: 'admin_1', email: 'admin@example.com', fullName: 'Arun Pandian', role: 'admin', phone: '+91 98765 43210', schoolId: 'balarmalar parramatta branch', languagePreference: 'ta' },
   { 
     uid: 'teacher_1', 

@@ -40,6 +40,7 @@ import { styles as globalStyles } from '@/app/styles';
 import { mockDb } from '@/services/mockBackend';
 import { Spacing } from '@/constants/theme';
 import * as ImagePicker from 'expo-image-picker';
+import { auditLogService } from '@/services/auditLogService';
 import { useDebounce } from '@/hooks/useDebounce';
 import { autoTranslate, translateWithGemini } from '@/services/translator';
 import { DateTimePicker } from '@/components/DateTimePicker';
@@ -532,6 +533,9 @@ export function ReportsTab({
           : 'Achievement approved successfully!', 
         'success'
       );
+      if (user) {
+        auditLogService.logAchievementAction(user, 'Approved', achievementId).catch(e => console.error(e));
+      }
       loadData();
     } catch (err) {
       console.error('Error approving achievement:', err);
@@ -549,6 +553,9 @@ export function ReportsTab({
           : 'Deletion request rejected. Award retained.', 
         'success'
       );
+      if (user) {
+        auditLogService.logAchievementAction(user, 'Retained', achievementId).catch(e => console.error(e));
+      }
       loadData();
     } catch (err) {
       console.error('Error rejecting deletion request:', err);
@@ -623,6 +630,9 @@ export function ReportsTab({
               : (i18n.language === 'ta' ? 'பதிவு நீக்கப்பட்டது.' : 'Record deleted successfully.'),
             'success'
           );
+          if (user) {
+            auditLogService.logAchievementAction(user, 'Deleted', achievementId).catch(e => console.error(e));
+          }
           loadData();
         } catch (err) {
           showToast('Failed to delete record.', 'error');
@@ -643,6 +653,9 @@ export function ReportsTab({
                   : (i18n.language === 'ta' ? 'பதிவு நீக்கப்பட்டது.' : 'Record deleted successfully.'),
                 'success'
               );
+              if (user) {
+                auditLogService.logAchievementAction(user, 'Deleted', achievementId).catch(e => console.error(e));
+              }
               loadData();
             } catch (err) {
               showToast('Failed to delete record.', 'error');
