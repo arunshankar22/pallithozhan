@@ -7,21 +7,18 @@ import {
   StyleSheet,
   Modal,
   ActivityIndicator,
-  FlatList,
   Platform
 } from 'react-native';
 import {
   Shield,
   Users,
   Search,
-  Filter,
   Clock,
   Key,
   CheckCircle,
   XCircle,
   Edit,
   Trash2,
-  AlertTriangle,
   User as UserIcon,
   ChevronRight,
   Database,
@@ -94,13 +91,20 @@ export function SuperAdminTab({ user, colors, t, showToast, i18n }: TabProps) {
   const [logSearch, setLogSearch] = useState('');
   const [selectedActionFilter, setSelectedActionFilter] = useState<string>('all');
 
+  // Sorting state for Users Table
+  const [userSortField, setUserSortField] = useState<string>('fullName');
+  const [userSortAsc, setUserSortAsc] = useState<boolean>(true);
+
+  // Sorting state for Audit Logs Table
+  const [logSortField, setLogSortField] = useState<string>('timestamp');
+  const [logSortAsc, setLogSortAsc] = useState<boolean>(false);
+
   // Modal for log inspect
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
 
   const loadData = async (showIndicator = true) => {
     if (showIndicator) setLoading(true);
     try {
-      // Direct Firestore queries
       const fetchedUsers = await userService.getUsers();
       const fetchedLogs = await auditLogService.getAuditLogs();
       setUsersList(fetchedUsers);
@@ -122,33 +126,72 @@ export function SuperAdminTab({ user, colors, t, showToast, i18n }: TabProps) {
     loadData(false);
   };
 
-  // Filtered lists
-  const filteredUsers = usersList.filter(u => {
-    const matchesSearch = 
-      (u.fullName || '').toLowerCase().includes(userSearch.toLowerCase()) ||
-      (u.email || '').toLowerCase().includes(userSearch.toLowerCase()) ||
-      (u.phone || '').includes(userSearch);
-    const matchesRole = selectedRoleFilter === 'all' || u.role === selectedRoleFilter;
-    return matchesSearch && matchesRole;
-  });
-
-  const filteredLogs = logsList.filter(l => {
-    const matchesSearch = 
-      (l.userName || '').toLowerCase().includes(logSearch.toLowerCase()) ||
-      (l.userEmail || '').toLowerCase().includes(logSearch.toLowerCase()) ||
-      (l.action || '').toLowerCase().includes(logSearch.toLowerCase()) ||
-      (l.details || '').toLowerCase().includes(logSearch.toLowerCase());
-    
-    let matchesAction = true;
-    if (selectedActionFilter !== 'all') {
-      const actLower = l.action.toLowerCase();
-      if (selectedActionFilter === 'login') matchesAction = actLower.includes('login');
-      else if (selectedActionFilter === 'switch') matchesAction = actLower.includes('switch');
-      else if (selectedActionFilter === 'approve') matchesAction = actLower.includes('approve');
-      else if (selectedActionFilter === 'reject') matchesAction = actLower.includes('reject');
+  const handleSortUsers = (field: string) => {
+    if (userSortField === field) {
+      setUserSortAsc(!userSortAsc);
+    } else {
+      setUserSortField(field);
+      setUserSortAsc(true);
     }
-    return matchesSearch && matchesAction;
-  });
+  };
+
+  const handleSortLogs = (field: string) => {
+    if (logSortField === field) {
+      setLogSortAsc(!logSortAsc);
+    } else {
+      setLogSortField(field);
+      setLogSortAsc(true);
+    }
+  };
+
+  // Filtered and Sorted lists
+  const filteredUsers = usersList
+    .filter(u => {
+      const matchesSearch = 
+        (u.fullName || '').toLowerCase().includes(userSearch.toLowerCase()) ||
+        (u.email || '').toLowerCase().includes(userSearch.toLowerCase()) ||
+        (u.phone || '').includes(userSearch);
+      const matchesRole = selectedRoleFilter === 'all' || u.role === selectedRoleFilter;
+      return matchesSearch && matchesRole;
+    })
+    .sort((a, b) => {
+      let valA = a[userSortField] || '';
+      let valB = b[userSortField] || '';
+      
+      if (userSortField === 'schoolId') {
+        valA = (a.schoolId || 'balarmalar parramatta branch').split(' ').slice(1, -1).join(' ');
+        valB = (b.schoolId || 'balarmalar parramatta branch').split(' ').slice(1, -1).join(' ');
+      }
+      
+      const comparison = String(valA).localeCompare(String(valB));
+      return userSortAsc ? comparison : -comparison;
+    });
+
+  const filteredLogs = logsList
+    .filter(l => {
+      const matchesSearch = 
+        (l.userName || '').toLowerCase().includes(logSearch.toLowerCase()) ||
+        (l.userEmail || '').toLowerCase().includes(logSearch.toLowerCase()) ||
+        (l.action || '').toLowerCase().includes(logSearch.toLowerCase()) ||
+        (l.details || '').toLowerCase().includes(logSearch.toLowerCase());
+      
+      let matchesAction = true;
+      if (selectedActionFilter !== 'all') {
+        const actLower = l.action.toLowerCase();
+        if (selectedActionFilter === 'login') matchesAction = actLower.includes('login');
+        else if (selectedActionFilter === 'switch') matchesAction = actLower.includes('switch');
+        else if (selectedActionFilter === 'approve') matchesAction = actLower.includes('approve');
+        else if (selectedActionFilter === 'reject') matchesAction = actLower.includes('reject');
+      }
+      return matchesSearch && matchesAction;
+    })
+    .sort((a, b) => {
+      const valA = a[logSortField as keyof AuditLog] || '';
+      const valB = b[logSortField as keyof AuditLog] || '';
+      
+      const comparison = String(valA).localeCompare(String(valB));
+      return logSortAsc ? comparison : -comparison;
+    });
 
   const rolesList = ['all', 'superadmin', 'admin', 'teacher', 'volunteer', 'parent', 'student'];
   const actionFilters = [
@@ -160,6 +203,23 @@ export function SuperAdminTab({ user, colors, t, showToast, i18n }: TabProps) {
   ];
 
   const isTa = i18n.language === 'ta';
+
+  const renderSortHeader = (label: string, field: string, currentField: string, isAsc: boolean, onSort: (field: string) => void) => {
+    const isActive = currentField === field;
+    return (
+      <Pressable 
+        onPress={() => onSort(field)} 
+        style={stylesTab.tableHeaderCellContainer}
+      >
+        <ThemedText style={[stylesTab.tableHeaderCellText, { color: colors.text }]}>
+          {label}
+        </ThemedText>
+        <ThemedText style={[stylesTab.sortArrow, { color: isActive ? colors.primary : colors.textSecondary }]}>
+          {isActive ? (isAsc ? ' ▲' : ' ▼') : ' ↕'}
+        </ThemedText>
+      </Pressable>
+    );
+  };
 
   return (
     <View style={[stylesTab.container, { backgroundColor: colors.background }]}>
@@ -237,7 +297,7 @@ export function SuperAdminTab({ user, colors, t, showToast, i18n }: TabProps) {
           </ThemedText>
         </View>
       ) : activeSubTab === 'users' ? (
-        // --- USERS DIRECTORY VIEW ---
+        // --- SORTABLE USERS TABLE VIEW ---
         <View style={{ flex: 1 }}>
           {/* User Search & Filters */}
           <View style={stylesTab.filterSection}>
@@ -255,7 +315,6 @@ export function SuperAdminTab({ user, colors, t, showToast, i18n }: TabProps) {
             {/* Role Filter Chips */}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={stylesTab.rolesScroll}>
               {rolesList.map(role => {
-                const colorsTag = getRoleColor(role, colors);
                 const isSelected = selectedRoleFilter === role;
                 return (
                   <Pressable
@@ -279,57 +338,72 @@ export function SuperAdminTab({ user, colors, t, showToast, i18n }: TabProps) {
             </ScrollView>
           </View>
 
-          {/* Users List */}
-          <FlatList
-            data={filteredUsers}
-            keyExtractor={item => item.uid}
-            contentContainerStyle={stylesTab.listContent}
-            renderItem={({ item }) => {
-              const colorsTag = getRoleColor(item.role, colors);
-              return (
-                <View style={[stylesTab.userCard, { backgroundColor: colors.backgroundElement, borderColor: colors.border }]}>
-                  <View style={stylesTab.userCardHeader}>
-                    <View style={[stylesTab.avatar, { backgroundColor: colors.border }]}>
-                      <UserIcon size={18} color={colors.text} />
-                    </View>
-                    <View style={stylesTab.userInfo}>
-                      <ThemedText style={stylesTab.userName}>{item.fullName}</ThemedText>
-                      <ThemedText style={[stylesTab.userEmail, { color: colors.textSecondary }]}>{item.email}</ThemedText>
-                      {item.phone ? (
-                        <ThemedText style={[stylesTab.userPhone, { color: colors.textSecondary }]}>{item.phone}</ThemedText>
-                      ) : null}
-                    </View>
-                    <View style={[stylesTab.roleBadge, { backgroundColor: colorsTag.bg, borderColor: colorsTag.border }]}>
-                      <ThemedText style={[stylesTab.roleBadgeText, { color: colorsTag.text }]}>
-                        {item.role}
-                      </ThemedText>
-                    </View>
-                  </View>
-                  <View style={[stylesTab.cardFooter, { borderTopColor: colors.border }]}>
-                    <ThemedText style={[stylesTab.footerText, { color: colors.textSecondary }]}>
-                      Branch: <ThemedText style={{ fontWeight: '600' }}>{(item.schoolId || 'balarmalar parramatta branch').split(' ').slice(1, -1).join(' ').toUpperCase() || 'PARRAMATTA'}</ThemedText>
-                    </ThemedText>
-                    {item.lastLogin ? (
-                      <ThemedText style={[stylesTab.footerText, { color: colors.textSecondary }]}>
-                        Last active: {getRelativeTime(item.lastLogin, i18n.language)}
-                      </ThemedText>
-                    ) : null}
-                  </View>
-                </View>
-              );
-            }}
-            ListEmptyComponent={
-              <View style={stylesTab.emptyContainer}>
-                <Users size={48} color={colors.textSecondary} />
-                <ThemedText style={{ marginTop: 12, color: colors.textSecondary }}>
-                  {isTa ? 'பயனர்கள் யாரும் கிடைக்கவில்லை' : 'No users found matching filters.'}
-                </ThemedText>
+          {/* Users Directory Table with Horizontal Scrolling */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={true} style={{ flex: 1 }}>
+            <View style={stylesTab.tableWrapper}>
+              {/* Table Header Row */}
+              <View style={[stylesTab.tableRow, stylesTab.tableHeaderRow, { backgroundColor: colors.backgroundSelected, borderBottomColor: colors.border }]}>
+                <View style={{ width: 180 }}>{renderSortHeader(isTa ? 'பெயர்' : 'Name', 'fullName', userSortField, userSortAsc, handleSortUsers)}</View>
+                <View style={{ width: 220 }}>{renderSortHeader(isTa ? 'மின்னஞ்சல்' : 'Email', 'email', userSortField, userSortAsc, handleSortUsers)}</View>
+                <View style={{ width: 110 }}>{renderSortHeader(isTa ? 'பங்கு' : 'Role', 'role', userSortField, userSortAsc, handleSortUsers)}</View>
+                <View style={{ width: 140 }}>{renderSortHeader(isTa ? 'தொலைபேசி' : 'Phone', 'phone', userSortField, userSortAsc, handleSortUsers)}</View>
+                <View style={{ width: 150 }}>{renderSortHeader(isTa ? 'கிளை' : 'Branch', 'schoolId', userSortField, userSortAsc, handleSortUsers)}</View>
               </View>
-            }
-          />
+
+              {/* Table Body Content */}
+              <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 40 }}>
+                {filteredUsers.map((item, index) => {
+                  const colorsTag = getRoleColor(item.role, colors);
+                  const isEven = index % 2 === 0;
+                  return (
+                    <View 
+                      key={item.uid}
+                      style={[
+                        stylesTab.tableRow, 
+                        { 
+                          backgroundColor: isEven ? colors.backgroundElement : colors.background,
+                          borderBottomColor: colors.border 
+                        }
+                      ]}
+                    >
+                      <View style={{ width: 180, paddingRight: 8 }}>
+                        <ThemedText style={[stylesTab.tableCellText, { fontWeight: '700' }]}>{item.fullName}</ThemedText>
+                      </View>
+                      <View style={{ width: 220, paddingRight: 8 }}>
+                        <ThemedText style={stylesTab.tableCellText}>{item.email}</ThemedText>
+                      </View>
+                      <View style={{ width: 110, paddingRight: 8 }}>
+                        <View style={[stylesTab.roleBadge, { backgroundColor: colorsTag.bg, borderColor: colorsTag.border, alignSelf: 'flex-start' }]}>
+                          <ThemedText style={[stylesTab.roleBadgeText, { color: colorsTag.text }]}>
+                            {item.role}
+                          </ThemedText>
+                        </View>
+                      </View>
+                      <View style={{ width: 140, paddingRight: 8 }}>
+                        <ThemedText style={stylesTab.tableCellText}>{item.phone || '-'}</ThemedText>
+                      </View>
+                      <View style={{ width: 150, paddingRight: 8 }}>
+                        <ThemedText style={stylesTab.tableCellText}>
+                          {(item.schoolId || 'balarmalar parramatta branch').split(' ').slice(1, -1).join(' ').toUpperCase() || 'PARRAMATTA'}
+                        </ThemedText>
+                      </View>
+                    </View>
+                  );
+                })}
+                {filteredUsers.length === 0 && (
+                  <View style={stylesTab.emptyContainer}>
+                    <Users size={48} color={colors.textSecondary} />
+                    <ThemedText style={{ marginTop: 12, color: colors.textSecondary }}>
+                      {isTa ? 'பயனர்கள் யாரும் கிடைக்கவில்லை' : 'No users found matching filters.'}
+                    </ThemedText>
+                  </View>
+                )}
+              </ScrollView>
+            </View>
+          </ScrollView>
         </View>
       ) : (
-        // --- AUDIT LOGS VIEW ---
+        // --- SORTABLE AUDIT LOGS TABLE VIEW ---
         <View style={{ flex: 1 }}>
           {/* Audit Logs Filters */}
           <View style={stylesTab.filterSection}>
@@ -370,60 +444,86 @@ export function SuperAdminTab({ user, colors, t, showToast, i18n }: TabProps) {
             </ScrollView>
           </View>
 
-          {/* Audit Logs Feed */}
-          <FlatList
-            data={filteredLogs}
-            keyExtractor={item => item.logId}
-            contentContainerStyle={stylesTab.listContent}
-            renderItem={({ item }) => {
-              const actionMeta = getActionIcon(item.action);
-              const ActionIconComponent = actionMeta.icon;
-              return (
-                <Pressable
-                  style={({ pressed }) => [
-                    stylesTab.logCard,
-                    { backgroundColor: colors.backgroundElement, borderColor: colors.border, opacity: pressed ? 0.8 : 1 }
-                  ]}
-                  onPress={() => setSelectedLog(item)}
-                >
-                  <View style={stylesTab.logCardHeader}>
-                    <View style={[stylesTab.actionIconWrapper, { backgroundColor: actionMeta.color + '20' }]}>
-                      <ActionIconComponent size={16} color={actionMeta.color} />
-                    </View>
-                    <View style={stylesTab.logMeta}>
-                      <ThemedText style={stylesTab.logAction}>{item.action}</ThemedText>
-                      <ThemedText style={[stylesTab.logUser, { color: colors.textSecondary }]}>
-                        {item.userName} <ThemedText style={{ fontSize: 11, fontWeight: 'normal' }}>({item.role})</ThemedText>
-                      </ThemedText>
-                    </View>
-                    <View style={stylesTab.timeContainer}>
-                      <Clock size={12} color={colors.textSecondary} style={{ marginRight: 4 }} />
-                      <ThemedText style={[stylesTab.timeText, { color: colors.textSecondary }]}>
-                        {getRelativeTime(item.timestamp, i18n.language)}
-                      </ThemedText>
-                    </View>
-                  </View>
-                  <ThemedText style={[stylesTab.logDetails, { color: colors.text }]} numberOfLines={2}>
-                    {item.details}
-                  </ThemedText>
-                  <View style={stylesTab.logInspectRow}>
-                    <ThemedText style={[stylesTab.inspectText, { color: colors.primary }]}>
-                      {isTa ? 'மேலும் விபரங்களை ஆய்வு செய்' : 'Inspect Details'}
-                    </ThemedText>
-                    <ChevronRight size={14} color={colors.primary} />
-                  </View>
-                </Pressable>
-              );
-            }}
-            ListEmptyComponent={
-              <View style={stylesTab.emptyContainer}>
-                <Database size={48} color={colors.textSecondary} />
-                <ThemedText style={{ marginTop: 12, color: colors.textSecondary }}>
-                  {isTa ? 'பதிவுகள் எதுவும் கிடைக்கவில்லை' : 'No audit logs found matching filters.'}
-                </ThemedText>
+          {/* Audit Logs Table with Horizontal Scrolling */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={true} style={{ flex: 1 }}>
+            <View style={[stylesTab.tableWrapper, { minWidth: 950 }]}>
+              {/* Table Header Row */}
+              <View style={[stylesTab.tableRow, stylesTab.tableHeaderRow, { backgroundColor: colors.backgroundSelected, borderBottomColor: colors.border }]}>
+                <View style={{ width: 150 }}>{renderSortHeader(isTa ? 'நேரம்' : 'Time', 'timestamp', logSortField, logSortAsc, handleSortLogs)}</View>
+                <View style={{ width: 160 }}>{renderSortHeader(isTa ? 'பயனர்' : 'User', 'userName', logSortField, logSortAsc, handleSortLogs)}</View>
+                <View style={{ width: 110 }}>{renderSortHeader(isTa ? 'பங்கு' : 'Role', 'role', logSortField, logSortAsc, handleSortLogs)}</View>
+                <View style={{ width: 160 }}>{renderSortHeader(isTa ? 'செயல்பாடு' : 'Action', 'action', logSortField, logSortAsc, handleSortLogs)}</View>
+                <View style={{ width: 370 }}>{renderSortHeader(isTa ? 'விவரங்கள்' : 'Details', 'details', logSortField, logSortAsc, handleSortLogs)}</View>
               </View>
-            }
-          />
+
+              {/* Table Body Content */}
+              <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 40 }}>
+                {filteredLogs.map((item, index) => {
+                  const actionMeta = getActionIcon(item.action);
+                  const ActionIconComponent = actionMeta.icon;
+                  const isEven = index % 2 === 0;
+                  return (
+                    <Pressable 
+                      key={item.logId}
+                      style={({ pressed }) => [
+                        stylesTab.tableRow, 
+                        { 
+                          backgroundColor: isEven ? colors.backgroundElement : colors.background,
+                          borderBottomColor: colors.border,
+                          opacity: pressed ? 0.8 : 1
+                        }
+                      ]}
+                      onPress={() => setSelectedLog(item)}
+                    >
+                      <View style={{ width: 150, paddingRight: 8, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                        <Clock size={12} color={colors.textSecondary} />
+                        <ThemedText style={[stylesTab.tableCellText, { fontSize: 11 }]}>
+                          {getRelativeTime(item.timestamp, i18n.language)}
+                        </ThemedText>
+                      </View>
+                      <View style={{ width: 160, paddingRight: 8 }}>
+                        <ThemedText style={[stylesTab.tableCellText, { fontWeight: '700' }]}>{item.userName}</ThemedText>
+                      </View>
+                      <View style={{ width: 110, paddingRight: 8 }}>
+                        <View style={[stylesTab.roleBadge, { backgroundColor: getRoleColor(item.role, colors).bg, borderColor: getRoleColor(item.role, colors).border, alignSelf: 'flex-start' }]}>
+                          <ThemedText style={[stylesTab.roleBadgeText, { color: getRoleColor(item.role, colors).text }]}>
+                            {item.role}
+                          </ThemedText>
+                        </View>
+                      </View>
+                      <View style={{ width: 160, paddingRight: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <View style={[stylesTab.actionIconWrapper, { width: 20, height: 20, borderRadius: 10, backgroundColor: actionMeta.color + '20' }]}>
+                          <ActionIconComponent size={11} color={actionMeta.color} />
+                        </View>
+                        <ThemedText style={[stylesTab.tableCellText, { fontWeight: '700', color: actionMeta.color }]}>
+                          {item.action}
+                        </ThemedText>
+                      </View>
+                      <View style={{ width: 370, paddingRight: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <ThemedText style={stylesTab.tableCellText} numberOfLines={1}>
+                          {item.details}
+                        </ThemedText>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+                          <ThemedText style={{ fontSize: 10, color: colors.primary, fontWeight: '700' }}>
+                            {isTa ? 'ஆய்வு' : 'Inspect'}
+                          </ThemedText>
+                          <ChevronRight size={12} color={colors.primary} />
+                        </View>
+                      </View>
+                    </Pressable>
+                  );
+                })}
+                {filteredLogs.length === 0 && (
+                  <View style={stylesTab.emptyContainer}>
+                    <Database size={48} color={colors.textSecondary} />
+                    <ThemedText style={{ marginTop: 12, color: colors.textSecondary }}>
+                      {isTa ? 'பதிவுகள் எதுவும் கிடைக்கவில்லை' : 'No audit logs found matching filters.'}
+                    </ThemedText>
+                  </View>
+                )}
+              </ScrollView>
+            </View>
+          </ScrollView>
         </View>
       )}
 
@@ -607,52 +707,36 @@ const stylesTab = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700'
   },
-  listContent: {
-    paddingHorizontal: 12,
-    paddingBottom: 24
+  tableWrapper: {
+    flex: 1,
+    minWidth: 800
   },
-  userCard: {
-    borderRadius: 12,
-    borderWidth: 1,
-    marginBottom: 12,
-    padding: 12,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 4
-      },
-      android: {
-        elevation: 2
-      }
-    })
-  },
-  userCardHeader: {
+  tableRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1
   },
-  avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center'
+  tableHeaderRow: {
+    paddingVertical: 12,
+    borderBottomWidth: 2
   },
-  userInfo: {
-    flex: 1,
-    gap: 2
+  tableHeaderCellContainer: {
+    flexDirection: 'row',
+    alignItems: 'center'
   },
-  userName: {
-    fontSize: 14,
+  tableHeaderCellText: {
+    fontSize: 12,
+    fontWeight: '800'
+  },
+  sortArrow: {
+    fontSize: 10,
     fontWeight: '700'
   },
-  userEmail: {
-    fontSize: 11
-  },
-  userPhone: {
-    fontSize: 11
+  tableCellText: {
+    fontSize: 12,
+    fontWeight: '500'
   },
   roleBadge: {
     paddingHorizontal: 8,
@@ -664,45 +748,11 @@ const stylesTab = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700'
   },
-  cardFooter: {
-    marginTop: 10,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center'
-  },
-  footerText: {
-    fontSize: 10
-  },
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 60,
     gap: 12
-  },
-  logCard: {
-    borderRadius: 12,
-    borderWidth: 1,
-    marginBottom: 12,
-    padding: 12,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 4
-      },
-      android: {
-        elevation: 2
-      }
-    })
-  },
-  logCardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 8
   },
   actionIconWrapper: {
     width: 28,
@@ -710,41 +760,6 @@ const stylesTab = StyleSheet.create({
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center'
-  },
-  logMeta: {
-    flex: 1,
-    gap: 2
-  },
-  logAction: {
-    fontSize: 13,
-    fontWeight: '700'
-  },
-  logUser: {
-    fontSize: 11,
-    fontWeight: '600'
-  },
-  timeContainer: {
-    flexDirection: 'row',
-    alignItems: 'center'
-  },
-  timeText: {
-    fontSize: 10,
-    fontWeight: '500'
-  },
-  logDetails: {
-    fontSize: 12,
-    lineHeight: 16
-  },
-  logInspectRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    gap: 4,
-    marginTop: 8
-  },
-  inspectText: {
-    fontSize: 11,
-    fontWeight: '700'
   },
   modalOverlay: {
     flex: 1,
