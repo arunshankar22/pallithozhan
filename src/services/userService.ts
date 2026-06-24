@@ -121,8 +121,11 @@ export const userService = {
       usersList.push({ uid: docSnap.id, ...docSnap.data() });
     });
     
-    if (usersList.length === 0) {
-      for (const u of DEFAULT_USERS) {
+    // Self-healing seeding: Ensure all DEFAULT_USERS exist in the database
+    for (const u of DEFAULT_USERS) {
+      const exists = usersList.some((user) => user.email && user.email.toLowerCase() === u.email.toLowerCase());
+      if (!exists) {
+        console.log(`[userService] Seeding missing default user: ${u.email}`);
         await userService.createUser(u);
         usersList.push(u);
       }
