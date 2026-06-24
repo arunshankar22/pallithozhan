@@ -64,6 +64,10 @@ const DICTIONARY: Record<string, string> = {
   "basic": "அடிப்படை",
   "intermediate": "இடைநிலை",
   "advanced": "மேம்பட்ட",
+  "thirukkural": "திருக்குறள்",
+  "thirukkurals": "திருக்குறள்கள்",
+  "kural": "குறள்",
+  "kurals": "குறள்கள்",
   
   // Verbs & Common Instructions
   "write": "எழுதுக",

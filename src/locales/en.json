@@ -26,9 +26,10 @@
     "homework": "Homework",
     "messages": "Messages",
     "calendar": "Calendar",
-    "reports": "Reports",
+    "reports": "Achievements",
     "management": "Management",
-    "profile": "Profile"
+    "profile": "Profile",
+    "newsletter": "Newsletter"
   },
   "auth": {
     "login": "Log In",

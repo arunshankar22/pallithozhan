@@ -117,3 +117,60 @@ export const cleanFirestoreData = (obj: any): any => {
   }
   return obj;
 };
+
+// Dynamically resolves the class partition folder for a user ID based on their Firestore profile
+export const resolveClassFolderForUser = async (userId: string): Promise<string> => {
+  const { db } = require('./firebase');
+  const { doc, getDoc } = require('firebase/firestore');
+  if (!db || !userId) return 'general';
+  try {
+    const docRef = doc(db, 'users', userId);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      // 1. If student, return their className
+      if (data.role === 'student' && data.className) {
+        return data.className.toLowerCase().replace(/[^a-z0-9]/g, '_');
+      }
+      // 2. If teacher or volunteer, return their stage
+      if ((data.role === 'teacher' || data.role === 'volunteer') && data.stage) {
+        return data.stage.toLowerCase().replace(/[^a-z0-9]/g, '_');
+      }
+      // 3. If parent, resolve the class of their first associated child
+      if (data.role === 'parent' && data.associatedStudents && data.associatedStudents.length > 0) {
+        const studentId = data.associatedStudents[0];
+        const studentSnap = await getDoc(doc(db, 'users', studentId));
+        if (studentSnap.exists()) {
+          const studentData = studentSnap.data();
+          if (studentData.className) {
+            return studentData.className.toLowerCase().replace(/[^a-z0-9]/g, '_');
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('Error resolving class folder for user:', err);
+  }
+  return 'general';
+};
+
+// Dynamically resolves the class partition folder for a class ID based on its Firestore document
+export const resolveClassFolderForClass = async (classId: string): Promise<string> => {
+  const { db } = require('./firebase');
+  const { doc, getDoc } = require('firebase/firestore');
+  if (!db || !classId) return 'general';
+  try {
+    const docRef = doc(db, 'classes', classId);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      if (data.className) {
+        return data.className.toLowerCase().replace(/[^a-z0-9]/g, '_');
+      }
+    }
+  } catch (err) {
+    console.warn('Error resolving class folder for classId:', err);
+  }
+  return 'general';
+};
+

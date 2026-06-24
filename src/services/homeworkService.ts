@@ -15,7 +15,15 @@ export const DEFAULT_HOMEWORK = [
   }
 ];
 
-const uploadHomeworkMedia = async (homeworkId: string, mediaAttachments: any[], storage: any, mediaUrlObj: { mediaUrl?: string }) => {
+const uploadHomeworkMedia = async (
+  homeworkId: string,
+  mediaAttachments: any[],
+  storage: any,
+  mediaUrlObj: { mediaUrl?: string },
+  classFolder: string = 'general',
+  userId: string = 'unknown',
+  dateFolder: string = new Date().toISOString().split('T')[0]
+) => {
   if (!storage || !mediaAttachments || mediaAttachments.length === 0) return;
   
   const { ref, uploadString, uploadBytes, getDownloadURL } = require('firebase/storage');
@@ -24,11 +32,15 @@ const uploadHomeworkMedia = async (homeworkId: string, mediaAttachments: any[], 
     const att = mediaAttachments[i];
     if (!att.url) continue;
     
+    const sanitizedName = att.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const filename = `${homeworkId}_${i}_${sanitizedName}`;
+    const storagePath = `homework/${classFolder}/${userId}/${dateFolder}/${filename}`;
+    
     if (att.url.startsWith('data:')) {
       // Base64 Web upload
       try {
-        console.log(`Uploading homework attachment ${att.name} to Firebase Storage...`);
-        const fileRef = ref(storage, `homework/${homeworkId}_${i}_${att.name}`);
+        console.log(`Uploading homework attachment ${att.name} to Firebase Storage at path: ${storagePath}...`);
+        const fileRef = ref(storage, storagePath);
         await uploadString(fileRef, att.url, 'data_url');
         const downloadUrl = await getDownloadURL(fileRef);
         att.url = downloadUrl;
@@ -56,8 +68,8 @@ const uploadHomeworkMedia = async (homeworkId: string, mediaAttachments: any[], 
     ) {
       // Local native file URI or Web blob: URI
       try {
-        console.log(`Uploading local file/blob homework attachment ${att.name} to Firebase Storage...`);
-        const fileRef = ref(storage, `homework/${homeworkId}_${i}_${att.name}`);
+        console.log(`Uploading local file/blob homework attachment ${att.name} to Firebase Storage at path: ${storagePath}...`);
+        const fileRef = ref(storage, storagePath);
         
         const response = await fetch(att.url);
         const blob = await response.blob();
@@ -127,11 +139,18 @@ export const homeworkService = {
     const { ref, uploadString, getDownloadURL } = require('firebase/storage');
     const { storage } = require('./firebase');
 
+    // Resolve classFolder, userId and dateFolder
+    const { resolveClassFolderForClass } = require('./dbCommon');
+    const classFolder = await resolveClassFolderForClass(newHw.classId);
+    const userId = homework.createdBy || 'unknown';
+    const dateFolder = new Date().toISOString().split('T')[0];
+
     // Upload Voice Guide if present in Base64
     if (storage && newHw.voiceUrl && newHw.voiceUrl.startsWith('data:')) {
       try {
         console.log('Uploading homework voice guide to Firebase Storage...');
-        const voiceRef = ref(storage, `homework/${homeworkId}_voice.mp3`);
+        const voicePath = `homework/${classFolder}/${userId}/${dateFolder}/${homeworkId}_voice.mp3`;
+        const voiceRef = ref(storage, voicePath);
         await uploadString(voiceRef, newHw.voiceUrl, 'data_url');
         const downloadUrl = await getDownloadURL(voiceRef);
         newHw.voiceUrl = downloadUrl;
@@ -143,14 +162,15 @@ export const homeworkService = {
 
     if (storage && newHw.mediaAttachments && newHw.mediaAttachments.length > 0) {
       const mediaUrlObj = { mediaUrl: newHw.mediaUrl };
-      await uploadHomeworkMedia(homeworkId, newHw.mediaAttachments, storage, mediaUrlObj);
+      await uploadHomeworkMedia(homeworkId, newHw.mediaAttachments, storage, mediaUrlObj, classFolder, userId, dateFolder);
       newHw.mediaUrl = mediaUrlObj.mediaUrl || '';
     }
 
     const { homeworkId: omitted, ...details } = newHw;
     const cleanedDetails = cleanFirestoreData(details);
+    cleanedDetails.createdBy = userId;
     await setDoc(doc(db, 'homework', homeworkId), cleanedDetails);
-    return newHw;
+    return { ...newHw, createdBy: userId };
   },
 
   toggleHomeworkSubmission: async (homeworkId: string, studentId: string): Promise<any> => {
@@ -183,14 +203,22 @@ export const homeworkService = {
     const { storage } = require('./firebase');
 
     if (storage && cleanAttachments.length > 0) {
+      const { resolveClassFolderForUser } = require('./dbCommon');
+      const classFolder = await resolveClassFolderForUser(studentId);
+      const dateFolder = new Date().toISOString().split('T')[0];
+
       for (let i = 0; i < cleanAttachments.length; i++) {
         const att = cleanAttachments[i];
         if (!att.url) continue;
 
+        const sanitizedName = att.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+        const filename = `${homeworkId}_${studentId}_${i}_${sanitizedName}`;
+        const storagePath = `homework_submissions/${classFolder}/${studentId}/${dateFolder}/${filename}`;
+
         if (att.url.startsWith('data:')) {
           try {
-            console.log(`Uploading submission attachment ${att.name} to Firebase Storage...`);
-            const fileRef = ref(storage, `homework_submissions/${homeworkId}_${studentId}_${i}_${att.name}`);
+            console.log(`Uploading submission attachment ${att.name} to Firebase Storage at path: ${storagePath}...`);
+            const fileRef = ref(storage, storagePath);
             await uploadString(fileRef, att.url, 'data_url');
             const downloadUrl = await getDownloadURL(fileRef);
             att.url = downloadUrl;
@@ -200,8 +228,8 @@ export const homeworkService = {
           }
         } else if (!att.url.startsWith('http://') && !att.url.startsWith('https://')) {
           try {
-            console.log(`Uploading local/blob submission attachment ${att.name} to Firebase Storage...`);
-            const fileRef = ref(storage, `homework_submissions/${homeworkId}_${studentId}_${i}_${att.name}`);
+            console.log(`Uploading local/blob submission attachment ${att.name} to Firebase Storage at path: ${storagePath}...`);
+            const fileRef = ref(storage, storagePath);
             const response = await fetch(att.url);
             const blob = await response.blob();
             await uploadBytes(fileRef, blob);
@@ -239,11 +267,18 @@ export const homeworkService = {
     const { ref, uploadString, getDownloadURL } = require('firebase/storage');
     const { storage } = require('./firebase');
 
+    // Resolve classFolder, userId and dateFolder
+    const { resolveClassFolderForClass } = require('./dbCommon');
+    const classFolder = await resolveClassFolderForClass(updatedHw.classId || 'general');
+    const userId = data.createdBy || 'unknown';
+    const dateFolder = new Date().toISOString().split('T')[0];
+
     // Upload Voice Guide if present in Base64
     if (storage && updatedHw.voiceUrl && updatedHw.voiceUrl.startsWith('data:')) {
       try {
         console.log('Uploading updated homework voice guide to Firebase Storage...');
-        const voiceRef = ref(storage, `homework/${homeworkId}_voice.mp3`);
+        const voicePath = `homework/${classFolder}/${userId}/${dateFolder}/${homeworkId}_voice.mp3`;
+        const voiceRef = ref(storage, voicePath);
         await uploadString(voiceRef, updatedHw.voiceUrl, 'data_url');
         const downloadUrl = await getDownloadURL(voiceRef);
         updatedHw.voiceUrl = downloadUrl;
@@ -255,7 +290,7 @@ export const homeworkService = {
 
     if (storage && updatedHw.mediaAttachments && updatedHw.mediaAttachments.length > 0) {
       const mediaUrlObj = { mediaUrl: updatedHw.mediaUrl };
-      await uploadHomeworkMedia(homeworkId, updatedHw.mediaAttachments, storage, mediaUrlObj);
+      await uploadHomeworkMedia(homeworkId, updatedHw.mediaAttachments, storage, mediaUrlObj, classFolder, userId, dateFolder);
       updatedHw.mediaUrl = mediaUrlObj.mediaUrl || '';
     }
 
@@ -272,3 +307,4 @@ export const homeworkService = {
     return { homeworkId };
   }
 };
+

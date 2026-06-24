@@ -41,12 +41,15 @@ import {
   MapPin,
   ArrowLeft,
   Edit,
-  Trash2
+  Trash2,
+  Award,
+  FileText
 } from 'lucide-react-native';
 
 
 // Modular Tabs
 import { NewsfeedTab } from '@/app/tabs/NewsfeedTab';
+import { NewsletterTab } from '@/app/tabs/NewsletterTab';
 import { AttendanceTab } from '@/app/tabs/AttendanceTab';
 import { HomeworkTab } from '@/app/tabs/HomeworkTab';
 import { MessagesTab } from '@/app/tabs/MessagesTab';
@@ -128,7 +131,10 @@ const cleanTopic = (topicStr: string) => {
 
 export default function HomeScreen() {
   const { t, i18n } = useTranslation();
-  const { user, logout, updateLanguage, updateAuthPassword } = useAuth();
+  const { user, logout, updateLanguage, updateAuthPassword, switchRole } = useAuth();
+  const canSwitchRole = (user?.originalRole === 'teacher' || user?.originalRole === 'volunteer' || user?.originalRole === 'admin') && 
+                       !!(user?.associatedStudents && user?.associatedStudents.length > 0);
+  const alternateRole = user?.role === 'parent' ? user?.originalRole : 'parent';
   const scheme = useColorScheme();
   const theme = scheme === 'dark' ? 'dark' : 'light';
   const colors = Colors[theme];
@@ -156,7 +162,7 @@ export default function HomeScreen() {
   };
 
   // Layout Tab State
-  const [activeTab, setActiveTab] = useState<'newsfeed' | 'attendance' | 'homework' | 'messages' | 'calendar' | 'reports' | 'management' | 'profile' | 'schools' | 'full-newsfeed' | 'students'>('newsfeed');
+  const [activeTab, setActiveTab] = useState<'newsfeed' | 'attendance' | 'homework' | 'messages' | 'calendar' | 'reports' | 'management' | 'profile' | 'schools' | 'full-newsfeed' | 'students' | 'newsletter'>('newsfeed');
 
   const [classes, setClasses] = useState<any[]>([]);
   const [studentProfiles, setStudentProfiles] = useState<any[]>([]);
@@ -177,6 +183,10 @@ export default function HomeScreen() {
   const [schoolsSearch, setSchoolsSearch] = useState('');
   const [schoolsViewMode, setSchoolsViewMode] = useState<'list' | 'map'>('list');
   const [globalMessages, setGlobalMessages] = useState<any[]>([]);
+  const [pendingApprovalsList, setPendingApprovalsList] = useState<any[]>([]);
+  const [newsletterSubTab, setNewsletterSubTab] = useState<'newsletters' | 'articles' | 'submit' | 'pending' | 'upload' | undefined>(undefined);
+  const [newsletterSelectedArticleId, setNewsletterSelectedArticleId] = useState<string | null>(null);
+  const [reportsSubTab, setReportsSubTab] = useState<'active' | 'pending' | 'record' | undefined>(undefined);
 
   // Upcoming Topic edit states
   const [topicEditModalVisible, setTopicEditModalVisible] = useState(false);
@@ -238,9 +248,100 @@ export default function HomeScreen() {
       // --- 1. ADMIN STATS ---
       // Get all pending and approved absences:
       const approvals = await mockDb.getApprovals();
-      const pendingList = approvals.filter((a: any) => a.status === 'pending');
       const approvedCount = approvals.filter((a: any) => a.status === 'approved').length;
-      const pendingCount = pendingList.length;
+
+      // Unified approvals list:
+      const combinedPending: any[] = [];
+      const teacherStudentIds = userClasses.flatMap((c: any) => c.studentIds || []);
+
+      // 1. Absences
+      const pendingAbsences = approvals.filter((a: any) => a.status === 'pending');
+      const filteredAbsences = user?.role === 'admin' 
+        ? pendingAbsences 
+        : pendingAbsences.filter((a: any) => userClassIds.includes(a.classId));
+      
+      filteredAbsences.forEach((item: any) => {
+        combinedPending.push({
+          approvalId: item.approvalId,
+          id: item.approvalId,
+          type: 'absence',
+          titleEn: `Absence Approval (${item.studentName || 'Student'})`,
+          titleTa: `வருகை ஒப்புதல் (${item.studentName || 'மாணவர்'})`,
+          subtitleEn: `${item.className || 'Unknown'} • Teacher: ${item.markedByName || 'Teacher'} • ${item.date}`,
+          subtitleTa: `${item.className || 'Unknown'} • பதிவு செய்தவர்: ${item.markedByName || 'Teacher'} • ${item.date}`,
+          date: item.date,
+          studentName: item.studentName,
+          markedByName: item.markedByName,
+          className: item.className,
+          rawItem: item
+        });
+      });
+
+      // 2. Achievements (Awards)
+      let achievements: any[] = [];
+      try {
+        achievements = await mockDb.getAchievements();
+      } catch (e) {
+        console.warn('Failed to load achievements in dashboard:', e);
+      }
+      const pendingAchievements = achievements.filter((ach: any) => ach.status === 'pending' || ach.status === 'pending_deletion');
+      const filteredAchievements = user?.role === 'admin'
+        ? pendingAchievements
+        : pendingAchievements.filter((ach: any) => teacherStudentIds.includes(ach.studentId));
+
+      filteredAchievements.forEach((item: any) => {
+        combinedPending.push({
+          approvalId: item.achievementId,
+          id: item.achievementId,
+          type: 'achievement',
+          titleEn: `${item.status === 'pending_deletion' ? 'Deletion Request' : 'Award Approval'}: ${item.awardName} (${item.studentName})`,
+          titleTa: `${item.status === 'pending_deletion' ? 'நீக்கல் கோரிக்கை' : 'விருது அங்கீகாரம்'}: ${item.awardNameTa || item.awardName} (${item.studentName})`,
+          subtitleEn: `Recorded by: ${item.recordedBy} • Date: ${item.dateReceived}`,
+          subtitleTa: `பதிவு செய்தவர்: ${item.recordedBy} • தேதி: ${item.dateReceived}`,
+          date: item.dateReceived,
+          studentName: item.studentName,
+          markedByName: item.recordedBy,
+          className: '',
+          rawItem: item
+        });
+      });
+
+      // 3. Articles (Newsletters / Announcements)
+      let articles: any[] = [];
+      try {
+        articles = await mockDb.getArticles();
+      } catch (e) {
+        console.warn('Failed to load articles in dashboard:', e);
+      }
+      const pendingArticles = articles.filter((art: any) => art.status === 'pending');
+      const filteredArticles = (user?.role === 'admin' || user?.role === 'teacher' || user?.role === 'volunteer')
+        ? pendingArticles
+        : [];
+
+      filteredArticles.forEach((item: any) => {
+        combinedPending.push({
+          approvalId: item.articleId,
+          id: item.articleId,
+          type: 'article',
+          titleEn: `Article Approval: ${item.titleEn || item.title || 'Untitled'}`,
+          titleTa: `கட்டுரை அங்கீகாரம்: ${item.titleTa || item.title || 'தலைப்பற்றது'}`,
+          subtitleEn: `Author: ${item.authorName} (${item.authorRole}) • Date: ${item.date || item.createdAt?.split('T')[0] || ''}`,
+          subtitleTa: `எழுத்தாளர்: ${item.authorName} (${item.authorRole}) • தேதி: ${item.date || item.createdAt?.split('T')[0] || ''}`,
+          date: item.date || item.createdAt || '',
+          studentName: item.authorName,
+          markedByName: '',
+          className: item.authorClass || '',
+          rawItem: item
+        });
+      });
+
+      // Sort combined list by date descending
+      combinedPending.sort((a, b) => b.date.localeCompare(a.date));
+
+      setPendingApprovalsList(combinedPending);
+
+      const pendingCount = combinedPending.length;
+      const pendingList = combinedPending;
       const adminTotal = pendingCount + approvedCount;
       const adminProgressPct = adminTotal > 0 ? Math.round((approvedCount / adminTotal) * 100) : 100;
 
@@ -482,14 +583,22 @@ export default function HomeScreen() {
     }
   };
 
-  const handleApprovePending = async (approvalId: string) => {
+  const handleApprovePending = async (id: string, type: 'absence' | 'achievement' | 'article') => {
     try {
-      const res = await mockDb.approveAbsence(approvalId);
+      let res;
+      if (type === 'absence') {
+        res = await mockDb.approveAbsence(id);
+      } else if (type === 'achievement') {
+        res = await mockDb.approveAchievement(id);
+      } else if (type === 'article') {
+        res = await mockDb.approveArticle(id, user?.fullName || 'Staff Member');
+      }
+
       if (res) {
         showToast(
           i18n.language === 'ta'
-            ? 'வருகைப்பதிவு ஒப்புதல் அளிக்கப்பட்டது!'
-            : 'Absence approved successfully!',
+            ? 'ஒப்புதல் வெற்றிகரமாக அளிக்கப்பட்டது!'
+            : 'Approval submitted successfully!',
           'success'
         );
         await reloadDashboardData();
@@ -632,40 +741,52 @@ export default function HomeScreen() {
 
 
 
-  const thirdTabKey = user?.role === 'admin' ? 'management' :
-                      (user?.role === 'teacher' || user?.role === 'volunteer') ? 'attendance' :
-                      user?.role === 'parent' ? 'students' : 'calendar';
+  const getNavItemsForUser = () => {
+    if (!user) {
+      return [
+        { key: 'newsfeed', label: t('nav.newsfeed') || 'Home', labelTa: 'முகப்பு', icon: Newspaper },
+        { key: 'calendar', label: 'Calendar', labelTa: 'நாட்காட்டி', icon: CalendarIcon },
+        { key: 'profile', label: 'Profile', labelTa: 'சுயவிவரம்', icon: UserIcon },
+      ];
+    }
 
-  const thirdTab = user?.role === 'admin' ? { key: 'management', label: 'Admin Panel', labelTa: 'நிர்வாகம்', icon: Users } :
-                   (user?.role === 'teacher' || user?.role === 'volunteer') ? { key: 'attendance', label: 'Take Attendance', labelTa: 'வருகைப்பதிவு', icon: CheckSquare } :
-                   user?.role === 'parent' ? { key: 'students', label: 'My Children', labelTa: 'என் குழந்தைகள்', icon: Users } :
-                   { key: 'calendar', label: 'Calendar', labelTa: 'நாட்காட்டி', icon: CalendarIcon };
+    const role = user.role;
+    const items = [
+      { key: 'newsfeed', label: t('nav.newsfeed') || 'Home', labelTa: 'முகப்பு', icon: Newspaper }
+    ];
+
+    if (role === 'admin') {
+      items.push({ key: 'management', label: 'Admin Panel', labelTa: 'நிர்வாகம்', icon: Users });
+      items.push({ key: 'messages', label: i18n.language === 'ta' ? 'செய்திகள்' : 'Messages', labelTa: 'செய்திகள்', icon: MessageSquare });
+    } else if (role === 'teacher') {
+      items.push({ key: 'attendance', label: 'Take Attendance', labelTa: 'வருகைப்பதிவு', icon: CheckSquare });
+      items.push({ key: 'homework', label: t('nav.homework') || 'Learn', labelTa: 'கற்றல்', icon: BookOpen });
+    } else if (role === 'volunteer') {
+      items.push({ key: 'attendance', label: 'Take Attendance', labelTa: 'வருகைப்பதிவு', icon: CheckSquare });
+      items.push({ key: 'messages', label: i18n.language === 'ta' ? 'செய்திகள்' : 'Messages', labelTa: 'செய்திகள்', icon: MessageSquare });
+    } else if (role === 'parent') {
+      items.push({ key: 'homework', label: t('nav.homework') || 'Learn', labelTa: 'கற்றல்', icon: BookOpen });
+      items.push({ key: 'students', label: 'My Children', labelTa: 'என் குழந்தைகள்', icon: Users });
+    } else if (role === 'student') {
+      items.push({ key: 'homework', label: t('nav.homework') || 'Learn', labelTa: 'கற்றல்', icon: BookOpen });
+      items.push({ key: 'messages', label: i18n.language === 'ta' ? 'செய்திகள்' : 'Messages', labelTa: 'செய்திகள்', icon: MessageSquare });
+    } else {
+      items.push({ key: 'messages', label: i18n.language === 'ta' ? 'செய்திகள்' : 'Messages', labelTa: 'செய்திகள்', icon: MessageSquare });
+    }
+
+    items.push({ key: 'profile', label: 'Profile', labelTa: 'சுயவிவரம்', icon: UserIcon });
+    return items;
+  };
+
+  const mainNavItems = getNavItemsForUser() as any;
+  const sidebarNavItems = mainNavItems;
+
+  const mainNavKeys = mainNavItems.map((item: any) => item.key);
 
   const isHomeActive = activeTab === 'newsfeed' || activeTab === 'full-newsfeed' || 
-                       (activeTab === 'messages') || (activeTab === 'reports') ||
-                       (thirdTabKey !== 'management' && activeTab === 'management') ||
-                       (thirdTabKey !== 'attendance' && activeTab === 'attendance') ||
-                       (thirdTabKey !== 'calendar' && activeTab === 'calendar');
+                       (!mainNavKeys.includes(activeTab) && activeTab !== 'profile');
 
-  const isSubTab = activeTab !== 'newsfeed' && 
-                   activeTab !== 'homework' && 
-                   activeTab !== thirdTabKey && 
-                   activeTab !== 'profile';
-
-  const mainNavItems = [
-    { key: 'newsfeed', label: t('nav.newsfeed') || 'Home', labelTa: 'முகப்பு', icon: Newspaper },
-    ...(user?.role !== 'volunteer' ? [{ key: 'homework', label: t('nav.homework') || 'Learn', labelTa: 'கற்றல்', icon: BookOpen }] : []),
-    thirdTab,
-    { key: 'profile', label: 'Profile', labelTa: 'சுயவிவரம்', icon: UserIcon },
-  ] as any;
-
-  const sidebarNavItems = [
-    { key: 'newsfeed', label: t('nav.newsfeed') || 'Home', labelTa: 'முகப்பு', icon: Newspaper },
-    ...(user?.role !== 'volunteer' ? [{ key: 'homework', label: t('nav.homework') || 'Learn', labelTa: 'கற்றல்', icon: BookOpen }] : []),
-    thirdTab,
-    ...(user?.role ? [{ key: 'messages', label: i18n.language === 'ta' ? 'செய்திகள்' : 'Messages', labelTa: 'செய்திகள்', icon: MessageSquare }] : []),
-    { key: 'profile', label: 'Profile', labelTa: 'சுயவிவரம்', icon: UserIcon },
-  ] as any;
+  const isSubTab = !mainNavKeys.includes(activeTab);
 
   const getQuickActions = () => {
     const role = user?.role || '';
@@ -686,8 +807,17 @@ export default function HomeScreen() {
           iconColor: colors.primary,
           onPress: () => setWaitlistModalVisible(true)
         });
+        actions.push({
+          key: 'students',
+          label: i18n.language === 'ta' ? 'என் குழந்தைகள்' : 'My Children',
+          icon: Users,
+          color: '#E0F2FE',
+          iconColor: '#0284C7',
+          onPress: () => setActiveTab('students')
+        });
       }
       actions.push({
+        key: 'homework',
         label: i18n.language === 'ta' ? 'செயல்பாடுகள் / விளையாட்டுகள்' : 'Games',
         icon: BookOpen,
         color: '#FFF9E8',
@@ -695,6 +825,7 @@ export default function HomeScreen() {
         onPress: () => setActiveTab('homework')
       });
       actions.push({
+        key: 'attendance',
         label: i18n.language === 'ta' ? 'வருகைப்பதிவு' : 'Attendance',
         icon: CheckSquare,
         color: '#E6F4EA',
@@ -702,10 +833,11 @@ export default function HomeScreen() {
         onPress: () => setActiveTab('attendance')
       });
       actions.push({
-        label: i18n.language === 'ta' ? 'தேர்வு முடிவுகள்' : 'Results',
-        icon: BarChart3,
-        color: '#E0F2F1',
-        iconColor: '#00796B',
+        key: 'reports',
+        label: i18n.language === 'ta' ? 'மாணவர் சாதனைகள்' : 'Students achievements',
+        icon: Award,
+        color: '#FEF3C7',
+        iconColor: '#D97706',
         onPress: () => setActiveTab('reports')
       });
       actions.push({
@@ -717,6 +849,15 @@ export default function HomeScreen() {
         onPress: () => setActiveTab('messages')
       });
       actions.push({
+        key: 'newsletter',
+        label: i18n.language === 'ta' ? 'செய்திமடல்' : 'Newsletter',
+        icon: FileText,
+        color: '#E6FFFA',
+        iconColor: '#0D9488',
+        onPress: () => setActiveTab('newsletter')
+      });
+      actions.push({
+        key: 'calendar',
         label: i18n.language === 'ta' ? 'நாட்காட்டி' : 'Calendar',
         icon: CalendarIcon,
         color: '#F3E8FF',
@@ -724,7 +865,18 @@ export default function HomeScreen() {
         onPress: () => setActiveTab('calendar')
       });
     } else {
+      if (role !== 'volunteer') {
+        actions.push({
+          key: 'homework',
+          label: i18n.language === 'ta' ? 'கற்றல் / வீட்டுப்பாடம்' : 'Homework assignments',
+          icon: BookOpen,
+          color: '#FFF9E8',
+          iconColor: colors.secondary,
+          onPress: () => setActiveTab('homework')
+        });
+      }
       actions.push({
+        key: 'attendance',
         label: i18n.language === 'ta' ? 'வருகைப்பதிவு' : 'Take Attendance',
         icon: CheckSquare,
         color: '#E6F4EA',
@@ -732,10 +884,11 @@ export default function HomeScreen() {
         onPress: () => setActiveTab('attendance')
       });
       actions.push({
-        label: i18n.language === 'ta' ? 'மதிப்பீடுகள்' : 'Enter Results',
-        icon: BarChart3,
-        color: '#E0F2F1',
-        iconColor: '#00796B',
+        key: 'reports',
+        label: i18n.language === 'ta' ? 'மாணவர் சாதனைகள்' : 'Students achievements',
+        icon: Award,
+        color: '#FEF3C7',
+        iconColor: '#D97706',
         onPress: () => setActiveTab('reports')
       });
       actions.push({
@@ -747,6 +900,15 @@ export default function HomeScreen() {
         onPress: () => setActiveTab('messages')
       });
       actions.push({
+        key: 'newsletter',
+        label: i18n.language === 'ta' ? 'செய்திமடல்' : 'Newsletter',
+        icon: FileText,
+        color: '#E6FFFA',
+        iconColor: '#0D9488',
+        onPress: () => setActiveTab('newsletter')
+      });
+      actions.push({
+        key: 'calendar',
         label: i18n.language === 'ta' ? 'நாட்காட்டி' : 'Calendar / Schedule',
         icon: CalendarIcon,
         color: '#F3E8FF',
@@ -755,6 +917,7 @@ export default function HomeScreen() {
       });
       if (role === 'admin') {
         actions.push({
+          key: 'management',
           label: i18n.language === 'ta' ? 'பள்ளி நிர்வாகம்' : 'Admin Panel',
           icon: Users,
           color: '#FFEAE6',
@@ -763,7 +926,8 @@ export default function HomeScreen() {
         });
       }
     }
-    return actions;
+    const mainKeys = mainNavItems.map((item: any) => item.key);
+    return actions.filter(action => !action.key || !mainKeys.includes(action.key));
   };
 
   const [isLargeScreen, setIsLargeScreen] = useState(windowWidth >= 768);
@@ -961,9 +1125,9 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Conditional Card: Admin Pending Tasks Tracker vs Learning Session */}
-        {user?.role === 'admin' ? (
-          <View style={{ gap: Spacing.two }}>
+        {/* Pending Tasks & Approvals card for Admin, Teacher, and Volunteer */}
+        {(user?.role === 'admin' || ((user?.role === 'teacher' || user?.role === 'volunteer') && pendingApprovalsList.length > 0)) && (
+          <View style={{ gap: Spacing.two, marginBottom: Spacing.four }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <CheckSquare size={16} color={colors.primary} />
               <ThemedText style={{ fontSize: 14, fontWeight: '700', color: colors.text }}>
@@ -972,71 +1136,107 @@ export default function HomeScreen() {
             </View>
 
             <View style={{ gap: 12 }}>
-              {dashboardStats.admin.pendingList.map((item: any) => (
-                <View key={item.approvalId} style={{
-                  padding: Spacing.three,
-                  borderRadius: 16,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  backgroundColor: colors.cardBg,
-                  gap: 8
-                }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <View style={{ gap: 2, flex: 1 }}>
-                      <ThemedText style={{ fontSize: 13, fontWeight: '700', color: colors.text }}>
-                        Absence Approval ({item.studentName || 'Student'})
-                      </ThemedText>
-                      <ThemedText style={{ fontSize: 11, color: colors.textSecondary }}>
-                        Parramatta Branch • Teacher: {item.markedByName || 'Suresh Kumar'} • {item.date}
-                      </ThemedText>
+              {pendingApprovalsList.map((item: any) => {
+                const IconComponent = item.type === 'absence' ? CheckSquare :
+                                      item.type === 'achievement' ? Award : Newspaper;
+                const titleLabel = i18n.language === 'ta' ? item.titleTa : item.titleEn;
+                const subtitleLabel = i18n.language === 'ta' ? item.subtitleTa : item.subtitleEn;
+                return (
+                  <View key={`${item.type}_${item.id}`} style={{
+                    padding: Spacing.three,
+                    borderRadius: 16,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                    backgroundColor: colors.cardBg,
+                    gap: 8
+                  }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <View style={{ flexDirection: 'row', gap: 10, flex: 1, alignItems: 'flex-start' }}>
+                        <View style={{
+                          padding: 8,
+                          borderRadius: 8,
+                          backgroundColor: item.type === 'absence' ? '#EBF5FA' :
+                                           item.type === 'achievement' ? '#FEF3C7' : '#E6FFFA',
+                          justifyContent: 'center',
+                          alignItems: 'center'
+                        }}>
+                          <IconComponent size={16} color={item.type === 'absence' ? '#0284C7' :
+                                                         item.type === 'achievement' ? '#D97706' : '#0D9488'} />
+                        </View>
+                        <View style={{ gap: 2, flex: 1 }}>
+                          <ThemedText style={{ fontSize: 13, fontWeight: '700', color: colors.text }}>
+                            {titleLabel}
+                          </ThemedText>
+                          <ThemedText style={{ fontSize: 11, color: colors.textSecondary }}>
+                            {subtitleLabel}
+                          </ThemedText>
+                        </View>
+                      </View>
+                      <View style={{
+                        paddingHorizontal: 8,
+                        paddingVertical: 3,
+                        borderRadius: 6,
+                        backgroundColor: item.rawItem.status === 'pending_deletion' ? 'rgba(239, 68, 68, 0.08)' : 'rgba(245, 158, 11, 0.08)',
+                        borderWidth: 0.5,
+                        borderColor: item.rawItem.status === 'pending_deletion' ? 'rgba(239, 68, 68, 0.25)' : 'rgba(245, 158, 11, 0.25)'
+                      }}>
+                        <ThemedText style={{
+                          color: item.rawItem.status === 'pending_deletion' ? '#EF4444' : '#F59E0B',
+                          fontSize: 9,
+                          fontWeight: '800'
+                        }}>
+                          {item.rawItem.status === 'pending_deletion' ? 'DELETE REQ' : 'PENDING'}
+                        </ThemedText>
+                      </View>
                     </View>
-                    <View style={{
-                      paddingHorizontal: 8,
-                      paddingVertical: 3,
-                      borderRadius: 6,
-                      backgroundColor: 'rgba(234, 83, 48, 0.08)',
-                      borderWidth: 0.5,
-                      borderColor: 'rgba(234, 83, 48, 0.25)'
-                    }}>
-                      <ThemedText style={{ color: colors.primary, fontSize: 9, fontWeight: '800' }}>
-                        PENDING
-                      </ThemedText>
+                    
+                    <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
+                      <Pressable
+                        onPress={() => handleApprovePending(item.id, item.type)}
+                        style={{
+                          flex: 1,
+                          backgroundColor: colors.primary,
+                          borderRadius: 8,
+                          paddingVertical: 8,
+                          alignItems: 'center'
+                        }}
+                      >
+                        <ThemedText style={{ color: '#FFF', fontSize: 11, fontWeight: '700' }}>
+                          {item.rawItem.status === 'pending_deletion' ? 'Confirm Delete' : (i18n.language === 'ta' ? 'அங்கீகரி' : 'Approve')}
+                        </ThemedText>
+                      </Pressable>
+                      <Pressable
+                        onPress={() => {
+                          if (item.type === 'absence') {
+                            setActiveTab('attendance');
+                          } else if (item.type === 'achievement') {
+                            setReportsSubTab('pending');
+                            setActiveTab('reports');
+                          } else if (item.type === 'article') {
+                            setNewsletterSubTab('pending');
+                            setNewsletterSelectedArticleId(item.id);
+                            setActiveTab('newsletter');
+                          }
+                        }}
+                        style={{
+                          flex: 1,
+                          borderWidth: 1,
+                          borderColor: colors.border,
+                          borderRadius: 8,
+                          paddingVertical: 8,
+                          alignItems: 'center',
+                          backgroundColor: colors.background
+                        }}
+                      >
+                        <ThemedText style={{ color: colors.text, fontSize: 11, fontWeight: '600' }}>
+                          {i18n.language === 'ta' ? 'விவரங்களை காண்க' : 'Review details'}
+                        </ThemedText>
+                      </Pressable>
                     </View>
                   </View>
-                  
-                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
-                    <Pressable
-                      onPress={() => handleApprovePending(item.approvalId)}
-                      style={{
-                        flex: 1,
-                        backgroundColor: colors.primary,
-                        borderRadius: 8,
-                        paddingVertical: 8,
-                        alignItems: 'center'
-                      }}
-                    >
-                      <ThemedText style={{ color: '#FFF', fontSize: 11, fontWeight: '700' }}>Approve</ThemedText>
-                    </Pressable>
-                    <Pressable
-                      onPress={() => {
-                        setActiveTab('management');
-                      }}
-                      style={{
-                        flex: 1,
-                        borderWidth: 1,
-                        borderColor: colors.border,
-                        borderRadius: 8,
-                        paddingVertical: 8,
-                        alignItems: 'center',
-                        backgroundColor: colors.background
-                      }}
-                    >
-                      <ThemedText style={{ color: colors.text, fontSize: 11, fontWeight: '600' }}>Review details</ThemedText>
-                    </Pressable>
-                  </View>
-                </View>
-              ))}
-              {dashboardStats.admin.pendingList.length === 0 && (
+                );
+              })}
+              {pendingApprovalsList.length === 0 && (
                 <View style={{
                   padding: Spacing.four,
                   borderRadius: 16,
@@ -1053,8 +1253,11 @@ export default function HomeScreen() {
               )}
             </View>
           </View>
-        ) : user?.role !== 'volunteer' ? (
-          <View style={{ gap: Spacing.two }}>
+        )}
+
+        {/* Next Learning Session card for Parents, Students, and Teachers */}
+        {user?.role !== 'admin' && user?.role !== 'volunteer' && (
+          <View style={{ gap: Spacing.two, marginBottom: Spacing.four }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <CalendarIcon size={16} color={colors.secondary} />
               <ThemedText style={{ fontSize: 14, fontWeight: '700', color: colors.text }}>
@@ -1123,7 +1326,7 @@ export default function HomeScreen() {
               </View>
             </View>
           </View>
-        ) : null}
+        )}
 
         {/* Quick Actions Grid */}
         <View style={{ gap: Spacing.two }}>
@@ -1625,7 +1828,25 @@ export default function HomeScreen() {
       case 'calendar':
         return <CalendarTab {...props} />;
       case 'reports':
-        return <ReportsTab {...props} />;
+        return (
+          <ReportsTab 
+            {...props} 
+            initialSubTab={reportsSubTab} 
+            clearInitialParams={() => setReportsSubTab(undefined)} 
+          />
+        );
+      case 'newsletter':
+        return (
+          <NewsletterTab 
+            {...props} 
+            initialSubTab={newsletterSubTab} 
+            initialSelectedItemId={newsletterSelectedArticleId} 
+            clearInitialParams={() => {
+              setNewsletterSubTab(undefined);
+              setNewsletterSelectedArticleId(null);
+            }} 
+          />
+        );
       case 'management':
         return <ManagementTab {...props} />;
       case 'schools':
@@ -1650,11 +1871,12 @@ export default function HomeScreen() {
   // Nav Item Definition
   const navItems = [
     { key: 'newsfeed', label: t('nav.newsfeed'), icon: Newspaper, roles: ['admin', 'teacher', 'volunteer', 'parent', 'student'] },
+    { key: 'newsletter', label: t('nav.newsletter'), icon: Newspaper, roles: ['admin', 'teacher', 'volunteer', 'parent', 'student'] },
     { key: 'attendance', label: t('nav.attendance'), icon: CheckSquare, roles: ['admin', 'teacher', 'volunteer', 'parent'] },
     { key: 'homework', label: t('nav.homework'), icon: BookOpen, roles: ['admin', 'teacher', 'parent', 'student'] },
     { key: 'messages', label: t('nav.messages'), icon: MessageSquare, roles: ['admin', 'teacher', 'volunteer', 'parent', 'student'] },
     { key: 'calendar', label: t('nav.calendar'), icon: CalendarIcon, roles: ['admin', 'teacher', 'volunteer', 'parent', 'student'] },
-    { key: 'reports', label: t('nav.reports'), icon: BarChart3, roles: ['admin', 'teacher'] },
+    { key: 'reports', label: t('nav.reports'), icon: Award, roles: ['admin', 'teacher', 'volunteer', 'parent'] },
     { key: 'management', label: t('nav.management'), icon: Users, roles: ['admin'] },
   ] as const;
 
@@ -1834,6 +2056,43 @@ export default function HomeScreen() {
                 {i18n.language === 'ta' ? 'English' : 'தமிழ் பதிப்பு'}
               </ThemedText>
             </Pressable>
+
+            {canSwitchRole && alternateRole && (
+              <Pressable
+                onPress={() => {
+                  switchRole(alternateRole);
+                  showToast(
+                    i18n.language === 'ta'
+                      ? `காட்சிப் பொறுப்பு ${alternateRole.toUpperCase()} ஆக மாற்றப்பட்டது!`
+                      : `Switched view context to ${alternateRole.toUpperCase()}!`,
+                    'success'
+                  );
+                }}
+                style={[styles.footerAction, { 
+                  backgroundColor: colors.primaryLight + '20', 
+                  borderRadius: 8, 
+                  paddingHorizontal: 8, 
+                  paddingVertical: 6,
+                  borderWidth: 1,
+                  borderColor: colors.primary + '30',
+                  marginBottom: Spacing.one
+                }]}
+              >
+                <Shield size={16} color={colors.primary} />
+                <View style={{ flex: 1 }}>
+                  <ThemedText style={[styles.footerActionText, { color: colors.primary, fontWeight: '700', fontSize: 11 }]}>
+                    {user?.role === 'parent' 
+                      ? `Switch to ${user?.originalRole?.toUpperCase()}`
+                      : 'Switch View Role / பொறுப்பை மாற்று'}
+                  </ThemedText>
+                  <ThemedText style={{ fontSize: 9, color: colors.textSecondary, marginTop: 1 }}>
+                    {user?.role === 'parent' 
+                      ? `Viewing as Parent` 
+                      : `Viewing as ${user?.role?.toUpperCase()} (Switch to Parent View)`}
+                  </ThemedText>
+                </View>
+              </Pressable>
+            )}
 
             <Pressable onPress={logout} style={styles.footerAction}>
               <LogOut size={16} color={colors.danger} />
@@ -2071,6 +2330,24 @@ export default function HomeScreen() {
                   }
                 ]}>
                   <Icon size={18} color={isActive ? '#FFFFFF' : colors.textSecondary} />
+                  {item.key === 'messages' && totalUnreadMessages > 0 && (
+                    <View style={{
+                      position: 'absolute',
+                      top: 2,
+                      right: 10,
+                      backgroundColor: '#FF3B30',
+                      borderRadius: 8,
+                      minWidth: 16,
+                      height: 16,
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      paddingHorizontal: 4,
+                    }}>
+                      <Text style={{ color: '#FFF', fontSize: 8, fontWeight: '700', lineHeight: 10 }}>
+                        {totalUnreadMessages}
+                      </Text>
+                    </View>
+                  )}
                 </View>
                 <ThemedText
                   style={[

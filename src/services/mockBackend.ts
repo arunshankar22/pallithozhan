@@ -9,6 +9,8 @@ import { messageService } from './messageService';
 import { eventService } from './eventService';
 import { schoolDateService } from './schoolDateService';
 import { waitlistService } from './waitlistService';
+import { achievementService } from './achievementService';
+import { newsletterService } from './newsletterService';
 import { checkServerStatus } from './dbCommon';
 
 // Export Presets and status checks
@@ -26,6 +28,7 @@ export const mockDb = {
     await eventService.reset();
     await schoolDateService.reset();
     await waitlistService.reset();
+    await achievementService.reset();
   },
 
   // --- WAITLIST CRUD ---
@@ -94,6 +97,24 @@ export const mockDb = {
   createEvent: eventService.createEvent,
   updateEvent: eventService.updateEvent,
   deleteEvent: eventService.deleteEvent,
+
+  // --- ACHIEVEMENTS ---
+  getAchievements: achievementService.getAchievements,
+  createAchievement: achievementService.createAchievement,
+  updateAchievement: achievementService.updateAchievement,
+  approveAchievement: achievementService.approveAchievement,
+  deleteAchievement: achievementService.deleteAchievement,
+
+  // --- NEWSLETTERS & ARTICLES ---
+  getArticles: newsletterService.getArticles,
+  createArticle: newsletterService.createArticle,
+  updateArticle: newsletterService.updateArticle,
+  approveArticle: newsletterService.approveArticle,
+  rejectArticle: newsletterService.rejectArticle,
+  deleteArticle: newsletterService.deleteArticle,
+  getNewsletters: newsletterService.getNewsletters,
+  createNewsletter: newsletterService.createNewsletter,
+  deleteNewsletter: newsletterService.deleteNewsletter,
 
   // --- SEED CLOUD DATABASE ---
   seedCloudDatabase: async (firebaseConfig: any): Promise<void> => {

@@ -26,9 +26,10 @@
     "homework": "வீட்டுப்பாடம்",
     "messages": "செய்திகள்",
     "calendar": "நாட்காட்டி",
-    "reports": "அறிக்கைகள்",
+    "reports": "சாதனைகள்",
     "management": "நிர்வாகம்",
-    "profile": "சுயவிவரம்"
+    "profile": "சுயவிவரம்",
+    "newsletter": "செய்திமடல்"
   },
   "auth": {
     "login": "உள்நுழை",

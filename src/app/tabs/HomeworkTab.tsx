@@ -371,6 +371,7 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
       description: { en: descEn, ta: descTa },
       dueDate: new Date(Date.now() + 3600000 * 24).toISOString(), // Dummy tomorrow
       createdByName: user?.fullName || 'Teacher',
+      createdBy: user?.uid,
       voiceUrl: recordedVoiceBase64, // Attach audio guide!
       mediaAttachments: attachedHomeworkFiles.map(f => ({
         name: f.name,

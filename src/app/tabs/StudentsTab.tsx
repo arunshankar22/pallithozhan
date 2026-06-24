@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Pressable } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { ThemedText } from '@/components/themed-text';
 import { TabProps } from '@/app/sharedTypes';
 import { Spacing } from '@/constants/theme';
@@ -21,6 +22,7 @@ export function StudentsTab({
   showToast,
   t
 }: StudentsTabProps) {
+  const { i18n } = useTranslation();
   const [studentStats, setStudentStats] = React.useState<Record<string, {
     classTeacher: string;
     attendanceRate: string;
@@ -191,7 +193,7 @@ export function StudentsTab({
                   </View>
                 </View>
 
-                <Pressable
+                 <Pressable
                   onPress={() => {
                     setActiveStudentId(student.uid);
                     setActiveTab('homework');
@@ -208,6 +210,33 @@ export function StudentsTab({
                 >
                   <ThemedText style={{ color: colors.primary, fontWeight: '800', fontSize: 12 }}>
                     View Learning & Homework Tasks
+                  </ThemedText>
+                </Pressable>
+
+                <Pressable
+                  onPress={() => {
+                    setActiveStudentId(student.uid);
+                    setActiveTab('reports');
+                    showToast(
+                      i18n.language === 'ta'
+                        ? `${student.fullName} சாதனைகளைக் காண்க`
+                        : `Viewing achievements for ${student.fullName}`,
+                      'success'
+                    );
+                  }}
+                  style={{
+                    backgroundColor: colors.accentLight,
+                    borderRadius: 10,
+                    paddingVertical: 10,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginTop: 4,
+                    borderWidth: 1,
+                    borderColor: colors.accent + '50'
+                  }}
+                >
+                  <ThemedText style={{ color: colors.secondary, fontWeight: '800', fontSize: 12 }}>
+                    {i18n.language === 'ta' ? 'மாணவர் சாதனைகளைக் காண்க' : 'View Student Achievements'}
                   </ThemedText>
                 </Pressable>
               </View>

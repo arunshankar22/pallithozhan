@@ -15,19 +15,11 @@ const db = initializeFirestore(app, {}, 'pallithozhandb');
 
 async function check() {
   try {
-    console.log("Fetching users from Firestore...");
-    const snap = await getDocs(collection(db, 'users'));
-    console.log(`Total users found: ${snap.size}`);
+    console.log("Fetching achievements from Firestore...");
+    const snap = await getDocs(collection(db, 'achievements'));
+    console.log(`Total achievements found: ${snap.size}`);
     snap.forEach(doc => {
-      const data = doc.data();
-      if (data.role === 'parent' || data.role === 'student' || data.associatedStudents) {
-        console.log(doc.id, "=>", {
-          fullName: data.fullName,
-          role: data.role,
-          associatedStudents: data.associatedStudents,
-          uid: data.uid
-        });
-      }
+      console.log(doc.id, "=>", doc.data());
     });
   } catch (err) {
     console.error("Error reading database:", err);

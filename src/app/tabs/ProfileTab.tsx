@@ -627,53 +627,7 @@ export function ProfileTab({ user, colors, t, showToast, i18n, logout }: TabProp
           </Pressable>
 
           {/* Active Role Switcher Row for Dual Roles */}
-          {canSwitchRole && alternateRole && (
-            <Pressable
-              onPress={() => {
-                switchRole(alternateRole);
-                showToast(
-                  i18n.language === 'ta'
-                    ? `காட்சிப் பொறுப்பு ${alternateRole.toUpperCase()} ஆக மாற்றப்பட்டது!`
-                    : `Switched view context to ${alternateRole.toUpperCase()}!`,
-                  'success'
-                );
-              }}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                padding: Spacing.three,
-                borderBottomWidth: 1,
-                borderColor: colors.border,
-                gap: 12
-              }}
-            >
-              <Shield size={18} color={colors.primary} />
-              <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <View style={{ gap: 2, flex: 1 }}>
-                  <ThemedText style={{ fontSize: 13, fontWeight: '700', color: colors.text }}>
-                    Switch View Role / பொறுப்பை மாற்று
-                  </ThemedText>
-                  <ThemedText style={{ fontSize: 11, color: colors.textSecondary }}>
-                    {user?.role === 'parent' 
-                      ? `Viewing as Parent (Switch back to ${user?.originalRole?.toUpperCase()})` 
-                      : `Viewing as ${user?.role?.toUpperCase()} (Switch to Parent View)`}
-                  </ThemedText>
-                </View>
-                <View style={{
-                  backgroundColor: colors.primaryLight,
-                  paddingVertical: 4,
-                  paddingHorizontal: 8,
-                  borderRadius: 6,
-                  borderWidth: 1,
-                  borderColor: colors.primary,
-                }}>
-                  <ThemedText style={{ color: colors.primary, fontSize: 10, fontWeight: '700' }}>
-                    {user?.role === 'parent' ? `Switch to ${user?.originalRole?.toUpperCase()}` : 'Switch to PARENT'}
-                  </ThemedText>
-                </View>
-              </View>
-            </Pressable>
-          )}
+
 
           <Pressable
             onPress={() => logout?.()}
