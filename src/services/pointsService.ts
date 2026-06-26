@@ -208,5 +208,183 @@ export const pointsService = {
       console.error('Failed to build class leaderboard:', err);
       return [];
     }
+  },
+
+  recalculateAllPoints: async (): Promise<{ success: boolean; updatedUsersCount: number }> => {
+    if (!db) throw new Error('Firestore database is not initialized');
+    
+    // 1. Fetch config settings
+    const config = await pointsService.getPointsConfig();
+    
+    // 2. Fetch all users
+    const usersSnap = await getDocs(collection(db, 'users'));
+    const allUsers: any[] = [];
+    usersSnap.forEach(snap => {
+      allUsers.push({ uid: snap.id, ...snap.data() });
+    });
+    
+    // 3. Fetch all attendance sheets
+    const attendanceSnap = await getDocs(collection(db, 'attendance'));
+    const attendanceRecords: any[] = [];
+    attendanceSnap.forEach(snap => {
+      attendanceRecords.push({ recordId: snap.id, ...snap.data() });
+    });
+    
+    // 4. Fetch all homework
+    const homeworkSnap = await getDocs(collection(db, 'homework'));
+    const homeworkRecords: any[] = [];
+    homeworkSnap.forEach(snap => {
+      homeworkRecords.push({ homeworkId: snap.id, ...snap.data() });
+    });
+    
+    // 5. Fetch all achievements
+    const achievementsSnap = await getDocs(collection(db, 'achievements'));
+    const achievementsRecords: any[] = [];
+    achievementsSnap.forEach(snap => {
+      achievementsRecords.push({ achievementId: snap.id, ...snap.data() });
+    });
+    
+    // 6. Fetch all newsletter articles
+    const articlesSnap = await getDocs(collection(db, 'newsletter_articles'));
+    const articlesRecords: any[] = [];
+    articlesSnap.forEach(snap => {
+      articlesRecords.push({ articleId: snap.id, ...snap.data() });
+    });
+    
+    let updatedUsersCount = 0;
+    
+    // 7. For each user, perform self-healing calculations
+    for (const u of allUsers) {
+      // Fetch all existing points logs for this user
+      const logsSnap = await getDocs(query(collection(db, 'points_logs'), where('studentId', '==', u.uid)));
+      const existingLogs: PointsLog[] = [];
+      logsSnap.forEach(snap => {
+        existingLogs.push({ logId: snap.id, ...snap.data() } as PointsLog);
+      });
+      
+      // A. Process Attendance
+      for (const rec of attendanceRecords) {
+        if (!rec.approved) continue;
+        
+        // Student attendance
+        if (rec.rolls && rec.rolls[u.uid]) {
+          const status = rec.rolls[u.uid];
+          if (status === 'present' || status === 'late') {
+            const hasLog = existingLogs.some(
+              l => l.category === 'attendance' && l.reason.includes(rec.date)
+            );
+            if (!hasLog) {
+              const logEntry = await pointsService.awardPoints(
+                u.uid,
+                config.automatedPoints.attendance,
+                'attendance',
+                `Attended class on ${rec.date} (${status})`,
+                'system',
+                'System'
+              );
+              existingLogs.push(logEntry);
+            }
+          }
+        }
+        
+        // Teacher/Volunteer attendance marking
+        if (rec.markedBy === u.uid) {
+          const hasLog = existingLogs.some(
+            l => l.category === 'attendance' && l.reason.includes(rec.date) && l.reason.includes('Marked')
+          );
+          if (!hasLog) {
+            const logEntry = await pointsService.awardPoints(
+              u.uid,
+              config.automatedPoints.teacherAttendance,
+              'attendance',
+              `Marked attendance sheet for class ID: ${rec.classId} on ${rec.date}`,
+              'system',
+              'System'
+            );
+            existingLogs.push(logEntry);
+          }
+        }
+      }
+      
+      // B. Process Homework
+      for (const hw of homeworkRecords) {
+        if (hw.submissions && hw.submissions[u.uid]) {
+          const sub = hw.submissions[u.uid];
+          const isCompleted = sub === true || (sub && typeof sub === 'object' && sub.completed === true);
+          if (isCompleted) {
+            const hasLog = existingLogs.some(
+              l => l.category === 'homework' && (l.reason.includes(hw.homeworkId) || l.reason.includes(hw.title || ''))
+            );
+            if (!hasLog) {
+              const logEntry = await pointsService.awardPoints(
+                u.uid,
+                config.automatedPoints.homework,
+                'homework',
+                `Submitted homework: "${hw.title || 'Homework'}" (ID: ${hw.homeworkId})`,
+                'system',
+                'System'
+              );
+              existingLogs.push(logEntry);
+            }
+          }
+        }
+      }
+      
+      // C. Process Achievements
+      for (const ach of achievementsRecords) {
+        if (ach.studentId === u.uid && ach.status === 'approved') {
+          const hasLog = existingLogs.some(
+            l => l.category === 'achievement' && (l.reason.includes(ach.achievementId) || l.reason.includes(ach.awardName || ''))
+          );
+          if (!hasLog) {
+            const logEntry = await pointsService.awardPoints(
+              u.uid,
+              config.automatedPoints.achievement,
+              'achievement',
+              `Approved student achievement: "${ach.awardName || 'Award'}" (ID: ${ach.achievementId})`,
+              'system',
+              'System'
+            );
+            existingLogs.push(logEntry);
+          }
+        }
+      }
+      
+      // D. Process Newsletter Articles
+      for (const art of articlesRecords) {
+        const isAuthor = art.authorStudentId === u.uid || (art.authorRole === 'student' && art.submittedBy === u.uid);
+        if (isAuthor && art.status === 'approved') {
+          const hasLog = existingLogs.some(
+            l => l.category === 'newsletter' && (l.reason.includes(art.articleId) || l.reason.includes(art.title || ''))
+          );
+          if (!hasLog) {
+            const logEntry = await pointsService.awardPoints(
+              u.uid,
+              config.automatedPoints.newsletter,
+              'newsletter',
+              `Approved student article: "${art.title || 'Article'}" (ID: ${art.articleId})`,
+              'system',
+              'System'
+            );
+            existingLogs.push(logEntry);
+          }
+        }
+      }
+      
+      // E. Recompute absolute final sum from all logs in points_logs to correct any profile discrepancies
+      const finalLogsSnap = await getDocs(query(collection(db, 'points_logs'), where('studentId', '==', u.uid)));
+      let sum = 0;
+      finalLogsSnap.forEach(snap => {
+        sum += snap.data().points || 0;
+      });
+      
+      if ((u.points || 0) !== sum) {
+        const userRef = doc(db, 'users', u.uid);
+        await setDoc(userRef, { points: sum }, { merge: true });
+        updatedUsersCount++;
+      }
+    }
+    
+    return { success: true, updatedUsersCount };
   }
 };

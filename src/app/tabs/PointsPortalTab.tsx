@@ -76,6 +76,7 @@ export function PointsPortalTab({ user, colors, t, showToast, i18n }: TabProps) 
   const [newsletterVal, setNewsletterVal] = useState('15');
   const [teacherAttendanceVal, setTeacherAttendanceVal] = useState('10');
   const [isSavingConfig, setIsSavingConfig] = useState(false);
+  const [isRecalculating, setIsRecalculating] = useState(false);
 
   // Award Points Form States
   const [awardModalVisible, setAwardModalVisible] = useState(false);
@@ -223,6 +224,45 @@ export function PointsPortalTab({ user, colors, t, showToast, i18n }: TabProps) 
       showToast(isTa ? 'சேமிப்பதில் தோல்வி' : 'Saving failed', 'error');
     } finally {
       setIsSavingConfig(false);
+    }
+  };
+
+  const handleRecalculate = async () => {
+    if (Platform.OS === 'web') {
+      const confirm = window.confirm(
+        isTa 
+          ? 'வருகைப்பதிவு மற்றும் சாதனைகளின் அடிப்படையில் அனைத்து மாணவர்களின் புள்ளிகளையும் மறுகணக்கீடு செய்ய விரும்புகிறீர்களா?' 
+          : 'Are you sure you want to recalculate and synchronize points for all students based on their historical attendance records, homework, and achievements?'
+      );
+      if (!confirm) return;
+    }
+
+    setIsRecalculating(true);
+    try {
+      const result = await pointsService.recalculateAllPoints();
+      showToast(
+        isTa 
+          ? `புள்ளிகள் மறுகணக்கீடு செய்யப்பட்டது! ${result.updatedUsersCount} மாணவர்கள் புதுப்பிக்கப்பட்டனர்.` 
+          : `Recalculation complete! Points for ${result.updatedUsersCount} user(s) were successfully updated and synchronized.`,
+        'success'
+      );
+      
+      // Refresh state
+      const allUsers = await mockDb.getUsers();
+      setUsers(allUsers);
+      if (selectedStudent) {
+        const freshStudent = allUsers.find(u => u.uid === selectedStudent.uid);
+        if (freshStudent) {
+          setSelectedStudent(freshStudent);
+          const logs = await pointsService.getPointsLogs(freshStudent.uid);
+          setStudentLogs(logs);
+        }
+      }
+    } catch (err) {
+      console.error('Recalculation error:', err);
+      showToast(isTa ? 'மறுகணக்கீடு செய்வதில் தோல்வி' : 'Recalculation failed', 'error');
+    } finally {
+      setIsRecalculating(false);
     }
   };
 
@@ -397,37 +437,37 @@ export function PointsPortalTab({ user, colors, t, showToast, i18n }: TabProps) 
         <View style={styles.flexRowContainer}>
           {/* Left panel: student roster */}
           <View style={[styles.leftRosterPanel, { borderRightColor: colors.border }]}>
-            {/* Class picker dropdown selector */}
-            <View style={styles.pickerWrapper}>
-              <Pressable
-                style={[styles.dropdownSelect, { borderColor: colors.border, backgroundColor: colors.surface }]}
-                onPress={() => setShowClassDropdown(!showClassDropdown)}
-              >
-                <ThemedText style={{ fontSize: 14, fontWeight: '600' }}>
-                  {activeClass ? activeClass.className : (isTa ? 'வகுப்பைத் தேர்ந்தெடுக்கவும்' : 'Select Class')}
-                </ThemedText>
-                <ChevronDown size={18} color={colors.text} />
-              </Pressable>
-
-              {showClassDropdown && (
-                <View style={[styles.dropdownList, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                  <ScrollView style={{ maxHeight: 200 }}>
-                    {classes.map(c => (
-                      <Pressable
-                        key={c.classId}
-                        style={[styles.dropdownItem, selectedClassId === c.classId && { backgroundColor: colors.primary + '1F' }]}
-                        onPress={() => {
-                          setSelectedClassId(c.classId);
-                          setShowClassDropdown(false);
-                          setSelectedStudent(null);
-                        }}
-                      >
-                        <ThemedText style={{ fontSize: 13, fontWeight: '500' }}>{c.className}</ThemedText>
-                      </Pressable>
-                    ))}
-                  </ScrollView>
-                </View>
-              )}
+            {/* Class Selector Chips */}
+            <View style={{ marginBottom: 12 }}>
+              <ThemedText style={{ fontSize: 11, fontWeight: 'bold', marginBottom: 6, color: colors.text + '99', textTransform: 'uppercase' }}>
+                {isTa ? 'வகுப்பைத் தேர்ந்தெடுக்கவும்' : 'Select Class'}
+              </ThemedText>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 6 }}>
+                {classes.map(c => {
+                  const isSel = selectedClassId === c.classId;
+                  return (
+                    <Pressable
+                      key={c.classId}
+                      onPress={() => {
+                        setSelectedClassId(c.classId);
+                        setSelectedStudent(null);
+                      }}
+                      style={{
+                        paddingHorizontal: 12,
+                        paddingVertical: 8,
+                        borderRadius: 8,
+                        borderWidth: 1,
+                        borderColor: isSel ? colors.primary : colors.border,
+                        backgroundColor: isSel ? colors.primary + '12' : colors.surface
+                      }}
+                    >
+                      <ThemedText style={{ fontSize: 12, fontWeight: '600', color: isSel ? colors.primary : colors.text }}>
+                        {c.className}
+                      </ThemedText>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
             </View>
 
             {/* Student Search */}
@@ -764,7 +804,7 @@ export function PointsPortalTab({ user, colors, t, showToast, i18n }: TabProps) 
           </View>
 
           <Pressable
-            style={[styles.primaryButton, { backgroundColor: colors.primary, marginBottom: 40 }]}
+            style={[styles.primaryButton, { backgroundColor: colors.primary }]}
             onPress={handleSaveConfig}
             disabled={isSavingConfig}
           >
@@ -775,6 +815,23 @@ export function PointsPortalTab({ user, colors, t, showToast, i18n }: TabProps) 
                 <Save size={18} color="#FFF" style={{ marginRight: 6 }} />
                 <ThemedText style={styles.primaryButtonText}>
                   {isTa ? 'கட்டமைப்பை சேமி' : 'Save Configurations'}
+                </ThemedText>
+              </>
+            )}
+          </Pressable>
+
+          <Pressable
+            style={[styles.primaryButton, { backgroundColor: '#10B981', marginTop: 12, marginBottom: 40 }]}
+            onPress={handleRecalculate}
+            disabled={isRecalculating}
+          >
+            {isRecalculating ? (
+              <ActivityIndicator size="small" color="#FFF" />
+            ) : (
+              <>
+                <Award size={18} color="#FFF" style={{ marginRight: 6 }} />
+                <ThemedText style={styles.primaryButtonText}>
+                  {isTa ? 'புள்ளிகளை மறுகணக்கீடு செய் (வரலாற்று தரவு)' : 'Recalculate & Sync All Points'}
                 </ThemedText>
               </>
             )}
