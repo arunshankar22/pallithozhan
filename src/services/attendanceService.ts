@@ -538,9 +538,25 @@ export const attendanceService = {
       const userObj = allUsers.find(u => u.uid === row.userId || u.fullName === row.userName);
       if (!userObj) return;
 
-      const classId = row.classId;
-      if (!classId) return;
+      // Dynamically resolve classId if not present in the spreadsheet row
+      let classId = row.classId;
+      if (!classId) {
+        const studentClass = classesList.find(c => c.studentIds && c.studentIds.includes(userObj.uid));
+        if (studentClass) {
+          classId = studentClass.classId;
+        } else {
+          // Staff roles fallback
+          if (userObj.role === 'teacher') {
+            classId = 'teacher_attendance';
+          } else if (userObj.role === 'volunteer') {
+            classId = 'volunteer_attendance';
+          } else {
+            return; // No class found for user, skip
+          }
+        }
+      }
 
+      // 1. Check for date columns directly on the row
       Object.keys(row).forEach((key) => {
         if (/^\d{4}-\d{2}-\d{2}$/.test(key)) {
           const date = key;
@@ -553,6 +569,22 @@ export const attendanceService = {
           }
         }
       });
+
+      // 2. Check for date columns inside the nested rolls object (parsed CSV structure)
+      if (row.rolls && typeof row.rolls === 'object') {
+        Object.keys(row.rolls).forEach((key) => {
+          if (/^\d{4}-\d{2}-\d{2}$/.test(key)) {
+            const date = key;
+            detectedDates.add(date);
+            const statusVal = row.rolls[key];
+            if (statusVal === 'present' || statusVal === 'absent' || statusVal === 'late') {
+              if (!rollsByDateAndClass[date]) rollsByDateAndClass[date] = {};
+              if (!rollsByDateAndClass[date][classId]) rollsByDateAndClass[date][classId] = {};
+              rollsByDateAndClass[date][classId][userObj.uid] = (statusVal === 'present' || statusVal === 'late') ? 'present' : 'absent';
+            }
+          }
+        });
+      }
     });
 
     const datesList = Array.from(detectedDates).sort();
