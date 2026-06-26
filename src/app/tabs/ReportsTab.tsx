@@ -523,7 +523,6 @@ export function ReportsTab({
     setActiveSubTab('record');
   };
 
-  // Approval flow for staff (handles both creations and deletion rejection)
   const handleApprove = async (achievementId: string) => {
     try {
       await mockDb.approveAchievement(achievementId);
@@ -533,6 +532,26 @@ export function ReportsTab({
           : 'Achievement approved successfully!', 
         'success'
       );
+
+      // Automated points award hook
+      const ach = achievements.find(a => a.achievementId === achievementId);
+      if (ach && ach.studentId) {
+        try {
+          const { pointsService } = require('@/services/pointsService');
+          const config = await pointsService.getPointsConfig();
+          await pointsService.awardPoints(
+            ach.studentId,
+            config.automatedPoints.achievement,
+            'achievement',
+            `Approved student achievement: "${ach.awardName || 'Award'}"`,
+            user?.uid || 'system',
+            user?.fullName || 'System'
+          );
+        } catch (ptsErr) {
+          console.warn('Failed to automatically award achievement points:', ptsErr);
+        }
+      }
+
       if (user) {
         auditLogService.logAchievementAction(user, 'Approved', achievementId).catch(e => console.error(e));
       }

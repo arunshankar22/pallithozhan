@@ -43,6 +43,7 @@ import {
   Edit,
   Trash2,
   Award,
+  X,
   FileText
 } from 'lucide-react-native';
 
@@ -59,6 +60,7 @@ import { ManagementTab } from '@/app/tabs/ManagementTab';
 import { ProfileTab } from '@/app/tabs/ProfileTab';
 import { StudentsTab } from '@/app/tabs/StudentsTab';
 import { SuperAdminTab } from '@/app/tabs/SuperAdminTab';
+import { PointsPortalTab } from '@/app/tabs/PointsPortalTab';
 import { auditLogService } from '@/services/auditLogService';
 import { chatNotificationService } from '@/services/chatNotificationService';
 import WaitlistScreen from './waitlist';
@@ -164,7 +166,15 @@ export default function HomeScreen() {
   };
 
   // Layout Tab State
-  const [activeTab, setActiveTab] = useState<'newsfeed' | 'attendance' | 'homework' | 'messages' | 'calendar' | 'reports' | 'management' | 'profile' | 'schools' | 'full-newsfeed' | 'students' | 'newsletter' | 'superadmin'>('newsfeed');
+  const [activeTab, setActiveTab] = useState<'newsfeed' | 'attendance' | 'homework' | 'messages' | 'calendar' | 'reports' | 'management' | 'profile' | 'schools' | 'full-newsfeed' | 'students' | 'newsletter' | 'superadmin' | 'points'>('newsfeed');
+
+  // Points System states
+  const [pointsConfig, setPointsConfig] = useState<any>(null);
+  const [leaderboardModalVisible, setLeaderboardModalVisible] = useState(false);
+  const [leaderboardList, setLeaderboardList] = useState<any[]>([]);
+  const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
+  const [leaderboardClassName, setLeaderboardClassName] = useState<string>('');
+  const [leaderboardClassId, setLeaderboardClassId] = useState<string>('');
 
   const [classes, setClasses] = useState<any[]>([]);
   const [studentProfiles, setStudentProfiles] = useState<any[]>([]);
@@ -240,6 +250,15 @@ export default function HomeScreen() {
       const allAttendance = await mockDb.getAttendance();
       const allClassList = await mockDb.getClasses();
       const allEvents = await mockDb.getEvents();
+
+      // Load points config
+      try {
+        const { pointsService } = require('@/services/pointsService');
+        const ptsConfig = await pointsService.getPointsConfig();
+        setPointsConfig(ptsConfig);
+      } catch (err) {
+        console.warn('Failed to load points config in reloadDashboardData:', err);
+      }
 
       // Find standard classes for current logged in user:
       const userClasses = allClassList.filter((c: any) => 
@@ -729,6 +748,48 @@ export default function HomeScreen() {
     reloadDashboardData();
   }, [user]);
 
+  const getRibbonInfo = (points: number, thresholds: { red: number; yellow: number; green: number; blue: number }) => {
+    const red = thresholds?.red ?? 10;
+    const yellow = thresholds?.yellow ?? 20;
+    const green = thresholds?.green ?? 50;
+    const blue = thresholds?.blue ?? 100;
+
+    if (points >= blue) {
+      return { name: 'Blue Ribbon', nameTa: 'நீல ரிப்பன்', color: '#2563EB', emoji: '💙', bg: '#DBEAFE', text: '#1D4ED8' };
+    }
+    if (points >= green) {
+      return { name: 'Green Ribbon', nameTa: 'பச்சை ரிப்பன்', color: '#059669', emoji: '💚', bg: '#D1FAE5', text: '#047857' };
+    }
+    if (points >= yellow) {
+      return { name: 'Yellow Ribbon', nameTa: 'மஞ்சள் ரிப்பன்', color: '#D97706', emoji: '💛', bg: '#FEF3C7', text: '#B45309' };
+    }
+    if (points >= red) {
+      return { name: 'Red Ribbon', nameTa: 'சிவப்பு ரிப்பன்', color: '#DC2626', emoji: '❤️', bg: '#FEE2E2', text: '#B91C1C' };
+    }
+    return { name: 'No Ribbon', nameTa: 'ரிப்பன் இல்லை', color: '#6B7280', emoji: '⚪', bg: '#F3F4F6', text: '#4B5563' };
+  };
+
+  const getNextRibbonInfo = (points: number, thresholds: { red: number; yellow: number; green: number; blue: number }) => {
+    const red = thresholds?.red ?? 10;
+    const yellow = thresholds?.yellow ?? 20;
+    const green = thresholds?.green ?? 50;
+    const blue = thresholds?.blue ?? 100;
+
+    if (points < red) {
+      return { nextName: 'Red Ribbon', nextNameTa: 'சிவப்பு ரிப்பன்', targetPoints: red, currentThreshold: 0 };
+    }
+    if (points < yellow) {
+      return { nextName: 'Yellow Ribbon', nextNameTa: 'மஞ்சள் ரிப்பன்', targetPoints: yellow, currentThreshold: red };
+    }
+    if (points < green) {
+      return { nextName: 'Green Ribbon', nextNameTa: 'பச்சை ரிப்பன்', targetPoints: green, currentThreshold: yellow };
+    }
+    if (points < blue) {
+      return { nextName: 'Blue Ribbon', nextNameTa: 'நீல ரிப்பன்', targetPoints: blue, currentThreshold: green };
+    }
+    return null;
+  };
+
   // Dynamic glassmorphic style helper for cards, buttons, tabs, sidebars, and drawers
   const getGlassStyle = (bgColor: string, opacity: number = 0.75, blurVal = 20) => {
     let cleanColor = bgColor;
@@ -931,6 +992,14 @@ export default function HomeScreen() {
         color: '#F3E8FF',
         iconColor: '#7C3AED',
         onPress: () => setActiveTab('calendar')
+      });
+      actions.push({
+        key: 'points',
+        label: i18n.language === 'ta' ? 'புள்ளிகள் போர்டல்' : 'Points Portal',
+        icon: Award,
+        color: '#E0F2FE',
+        iconColor: '#0284C7',
+        onPress: () => setActiveTab('points')
       });
       if (role === 'admin') {
         actions.push({
@@ -1141,6 +1210,175 @@ export default function HomeScreen() {
             </View>
           </View>
         </View>
+
+        {/* Points & Ribbons Dashboard Widget for Students and Parents */}
+        {(user?.role === 'student' || user?.role === 'parent') && (() => {
+          const targetStudent = user?.role === 'student'
+            ? user
+            : studentProfiles.find((s: any) => s.uid === activeStudentId);
+
+          if (!targetStudent) return null;
+
+          const studentPoints = targetStudent.points || 0;
+          const thresholds = pointsConfig?.ribbonThresholds || { red: 10, yellow: 20, green: 50, blue: 100 };
+          const ribbon = getRibbonInfo(studentPoints, thresholds);
+          const nextRibbon = getNextRibbonInfo(studentPoints, thresholds);
+          const isTa = i18n.language === 'ta';
+
+          let nextProgress = 0;
+          if (nextRibbon) {
+            const range = nextRibbon.targetPoints - nextRibbon.currentThreshold;
+            const earned = studentPoints - nextRibbon.currentThreshold;
+            nextProgress = Math.min(Math.max((earned / range) * 100, 0), 100);
+          }
+
+          const handleOpenLeaderboard = async () => {
+            setLoadingLeaderboard(true);
+            try {
+              const studentClass = classes.find((c: any) => c.studentIds && c.studentIds.includes(targetStudent.uid));
+              if (!studentClass) {
+                Alert.alert(
+                  isTa ? 'வகுப்பு காணப்படவில்லை' : 'Class Not Found',
+                  isTa ? 'இந்த மாணவர் எந்த வகுப்பிலும் சேர்க்கப்படவில்லை.' : 'This student is not enrolled in any active class.'
+                );
+                return;
+              }
+              const { pointsService } = require('@/services/pointsService');
+              const leaderboard = await pointsService.getClassLeaderboard(studentClass.classId);
+              setLeaderboardList(leaderboard);
+              setLeaderboardClassName(studentClass.className);
+              setLeaderboardClassId(studentClass.classId);
+              setLeaderboardModalVisible(true);
+            } catch (err) {
+              console.error('Failed to load leaderboard:', err);
+              showToast(isTa ? 'தரவரிசையை ஏற்ற முடியவில்லை' : 'Failed to load class rankings', 'error');
+            } finally {
+              setLoadingLeaderboard(false);
+            }
+          };
+
+          return (
+            <View style={{
+              borderRadius: 24,
+              padding: Spacing.four,
+              backgroundColor: colors.cardBg,
+              borderWidth: 1,
+              borderColor: colors.border,
+              shadowColor: colors.shadowColor,
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.05,
+              shadowRadius: 10,
+              elevation: 3,
+              gap: 12,
+              marginBottom: Spacing.four
+            }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <View style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 10,
+                    backgroundColor: colors.primary + '1F',
+                    justifyContent: 'center',
+                    alignItems: 'center'
+                  }}>
+                    <Award size={20} color={colors.primary} />
+                  </View>
+                  <View>
+                    <ThemedText style={{ fontSize: 14, fontWeight: '800', color: colors.text }}>
+                      {isTa ? 'புள்ளிகள் மற்றும் ரிப்பன்கள்' : 'Points & Ribbons'}
+                    </ThemedText>
+                    <ThemedText style={{ fontSize: 10, color: colors.textSecondary }}>
+                      {isTa && targetStudent.fullNameTamil ? targetStudent.fullNameTamil : targetStudent.fullName}
+                    </ThemedText>
+                  </View>
+                </View>
+
+                <View style={{ alignItems: 'flex-end' }}>
+                  <ThemedText style={{ fontSize: 20, fontWeight: '900', color: colors.primary }}>
+                    {studentPoints} <ThemedText style={{ fontSize: 11, fontWeight: '600', color: colors.textSecondary }}>pts</ThemedText>
+                  </ThemedText>
+                </View>
+              </View>
+
+              <View style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: ribbon.bg,
+                padding: 10,
+                borderRadius: 12,
+                gap: 8
+              }}>
+                <ThemedText style={{ fontSize: 18 }}>{ribbon.emoji}</ThemedText>
+                <View style={{ flex: 1 }}>
+                  <ThemedText style={{ fontSize: 12, fontWeight: '700', color: ribbon.text }}>
+                    {isTa ? `தற்போதைய ரிப்பன்: ${ribbon.nameTa}` : `Current Level: ${ribbon.name}`}
+                  </ThemedText>
+                  {nextRibbon ? (
+                    <ThemedText style={{ fontSize: 10, color: ribbon.text + 'CC', marginTop: 1 }}>
+                      {isTa 
+                        ? `${nextRibbon.targetPoints - studentPoints} புள்ளிகளில் அடுத்த ரிப்பன்: ${nextRibbon.nextNameTa}` 
+                        : `${nextRibbon.targetPoints - studentPoints} pts away from ${nextRibbon.nextName}`}
+                    </ThemedText>
+                  ) : (
+                    <ThemedText style={{ fontSize: 10, color: ribbon.text + 'CC', marginTop: 1 }}>
+                      {isTa ? 'அனைத்து ரிப்பன்களும் பெறப்பட்டுவிட்டன! 🏆' : 'Maximum rank achieved! 🏆'}
+                    </ThemedText>
+                  )}
+                </View>
+              </View>
+
+              {nextRibbon && (
+                <View style={{ gap: 4 }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <ThemedText style={{ fontSize: 9, color: colors.textSecondary, fontWeight: '700' }}>
+                      {nextRibbon.currentThreshold} pts
+                    </ThemedText>
+                    <ThemedText style={{ fontSize: 9, color: colors.primary, fontWeight: '700' }}>
+                      {Math.round(nextProgress)}%
+                    </ThemedText>
+                    <ThemedText style={{ fontSize: 9, color: colors.textSecondary, fontWeight: '700' }}>
+                      {nextRibbon.targetPoints} pts
+                    </ThemedText>
+                  </View>
+                  <View style={{ height: 8, backgroundColor: colors.border + '50', borderRadius: 4, overflow: 'hidden' }}>
+                    <View style={{
+                      height: '100%',
+                      width: `${nextProgress}%`,
+                      backgroundColor: colors.primary,
+                      borderRadius: 4
+                    }} />
+                  </View>
+                </View>
+              )}
+
+              <Pressable
+                onPress={handleOpenLeaderboard}
+                disabled={loadingLeaderboard}
+                style={({ pressed }) => [
+                  {
+                    backgroundColor: colors.primary + '12',
+                    paddingVertical: 10,
+                    borderRadius: 12,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderWidth: 1,
+                    borderColor: colors.primary + '30',
+                    opacity: pressed || loadingLeaderboard ? 0.8 : 1
+                  }
+                ]}
+              >
+                {loadingLeaderboard ? (
+                  <ActivityIndicator size="small" color={colors.primary} />
+                ) : (
+                  <ThemedText style={{ color: colors.primary, fontWeight: '800', fontSize: 12 }}>
+                    🏆 {isTa ? 'வகுப்பு தரவரிசைப் பட்டியலைக் காண்க' : 'View Class Leaderboard'}
+                  </ThemedText>
+                )}
+              </Pressable>
+            </View>
+          );
+        })()}
 
         {/* Pending Tasks & Approvals card for Admin, Teacher, and Volunteer */}
         {((user?.role === 'admin' || user?.role === 'superadmin') || ((user?.role === 'teacher' || user?.role === 'volunteer') && pendingApprovalsList.length > 0)) && (
@@ -1868,6 +2106,8 @@ export default function HomeScreen() {
         return <ManagementTab {...props} />;
       case 'superadmin':
         return <SuperAdminTab {...props} />;
+      case 'points':
+        return <PointsPortalTab {...props} />;
       case 'schools':
         return renderSchoolsTab();
       case 'students':
@@ -3246,6 +3486,133 @@ export default function HomeScreen() {
                 </ThemedText>
               </Pressable>
             </View>
+          </View>
+        </View>
+      )}
+
+      {/* CLASS LEADERBOARD OVERLAY MODAL */}
+      {leaderboardModalVisible && (
+        <View style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000,
+          padding: 16
+        }}>
+          <View style={{
+            width: '100%',
+            maxWidth: 500,
+            borderRadius: 24,
+            borderWidth: 1,
+            borderColor: colors.border,
+            backgroundColor: colors.cardBg,
+            maxHeight: '80%',
+            overflow: 'hidden',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.15,
+            shadowRadius: 12,
+            elevation: 5
+          }}>
+            {/* Modal Header */}
+            <View style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: 20,
+              borderBottomWidth: 1,
+              borderBottomColor: colors.border
+            }}>
+              <View>
+                <ThemedText style={{ fontSize: 16, fontWeight: '800', color: colors.text }}>
+                  🏆 {i18n.language === 'ta' ? 'வகுப்பு தரவரிசைப் பட்டியல்' : 'Class Leaderboard'}
+                </ThemedText>
+                <ThemedText style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2 }}>
+                  {leaderboardClassName}
+                </ThemedText>
+              </View>
+              <Pressable
+                onPress={() => setLeaderboardModalVisible(false)}
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 16,
+                  backgroundColor: colors.border + '33',
+                  justifyContent: 'center',
+                  alignItems: 'center'
+                }}
+              >
+                <X size={16} color={colors.text} />
+              </Pressable>
+            </View>
+
+            {/* Modal Body: Rank List */}
+            <ScrollView style={{ padding: 20 }}>
+              <View style={{ gap: 8, paddingBottom: 24 }}>
+                {leaderboardList.map((student: any, idx: number) => {
+                  const isCurrent = student.uid === (user?.role === 'student' ? user.uid : activeStudentId);
+                  const rank = idx + 1;
+                  const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `${rank}`;
+                  const thresholds = pointsConfig?.ribbonThresholds || { red: 10, yellow: 20, green: 50, blue: 100 };
+                  const ribbon = getRibbonInfo(student.points || 0, thresholds);
+
+                  return (
+                    <View
+                      key={student.uid}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: 12,
+                        borderRadius: 12,
+                        borderWidth: 1,
+                        borderColor: isCurrent ? colors.primary : colors.border + '50',
+                        backgroundColor: isCurrent ? colors.primary + '0D' : colors.cardBg,
+                      }}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
+                        <View style={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: 14,
+                          backgroundColor: rank <= 3 ? 'transparent' : colors.border + '40',
+                          justifyContent: 'center',
+                          alignItems: 'center'
+                        }}>
+                          <ThemedText style={{ fontSize: rank <= 3 ? 18 : 12, fontWeight: 'bold' }}>
+                            {medal}
+                          </ThemedText>
+                        </View>
+
+                        <View style={{ flex: 1 }}>
+                          <ThemedText style={{ fontSize: 13, fontWeight: isCurrent ? '800' : '600', color: colors.text }}>
+                            {i18n.language === 'ta' && student.fullNameTamil ? student.fullNameTamil : student.fullName}
+                          </ThemedText>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 }}>
+                            <View style={{ backgroundColor: ribbon.bg, paddingVertical: 1, paddingHorizontal: 5, borderRadius: 4 }}>
+                              <ThemedText style={{ fontSize: 8, color: ribbon.text, fontWeight: 'bold' }}>
+                                {ribbon.emoji} {i18n.language === 'ta' ? ribbon.nameTa : ribbon.name}
+                              </ThemedText>
+                            </View>
+                          </View>
+                        </View>
+                      </View>
+
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <ThemedText style={{ fontSize: 14, fontWeight: '900', color: colors.primary }}>
+                          {student.points || 0} <ThemedText style={{ fontSize: 10, color: colors.textSecondary }}>pts</ThemedText>
+                        </ThemedText>
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            </ScrollView>
           </View>
         </View>
       )}

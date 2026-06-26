@@ -71,6 +71,41 @@ export const attendanceService = {
 
     await setDoc(doc(db, 'attendance', docId), cleanRecord);
 
+    // Award automated points for attendance
+    try {
+      const { pointsService } = require('./pointsService');
+      const config = await pointsService.getPointsConfig();
+
+      // 1. Award points to students who are present or late
+      for (const uId of Object.keys(record.rolls)) {
+        const rollStatus = record.rolls[uId];
+        if (rollStatus === 'present' || rollStatus === 'late') {
+          await pointsService.awardPoints(
+            uId,
+            config.automatedPoints.attendance,
+            'attendance',
+            `Attended class on ${record.date} (${rollStatus})`,
+            'system',
+            'System'
+          );
+        }
+      }
+
+      // 2. Award points to the teacher or volunteer marking attendance
+      if (cleanRecord.markedBy) {
+        await pointsService.awardPoints(
+          cleanRecord.markedBy,
+          config.automatedPoints.teacherAttendance,
+          'attendance',
+          `Marked attendance sheet for class ID: ${cleanRecord.classId} on ${record.date}`,
+          'system',
+          'System'
+        );
+      }
+    } catch (ptsErr) {
+      console.warn('Failed to award attendance points automatically:', ptsErr);
+    }
+
     for (const uId of Object.keys(record.rolls)) {
       if (record.rolls[uId] === 'absent') {
         const studentObj = await userService.getUser(uId);

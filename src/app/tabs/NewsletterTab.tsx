@@ -514,6 +514,29 @@ export function NewsletterTab({
     try {
       await mockDb.approveArticle(id, user?.fullName || 'Staff Member');
       showToast('Article approved successfully / கட்டுரை அங்கீகரிக்கப்பட்டது', 'success');
+
+      // Automated points award hook
+      const art = articles.find(a => a.articleId === id);
+      if (art) {
+        const studentId = art.authorStudentId || (art.authorRole === 'student' ? art.submittedBy : null);
+        if (studentId) {
+          try {
+            const { pointsService } = require('@/services/pointsService');
+            const config = await pointsService.getPointsConfig();
+            await pointsService.awardPoints(
+              studentId,
+              config.automatedPoints.newsletter,
+              'newsletter',
+              `Approved student article: "${art.title || 'Article'}"`,
+              user?.uid || 'system',
+              user?.fullName || 'System'
+            );
+          } catch (ptsErr) {
+            console.warn('Failed to automatically award newsletter article points:', ptsErr);
+          }
+        }
+      }
+
       if (user) {
         auditLogService.logArticleAction(user, 'Approved', id).catch(e => console.error(e));
       }

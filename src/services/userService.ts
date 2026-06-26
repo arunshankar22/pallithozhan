@@ -161,6 +161,7 @@ export const userService = {
       languagePreference: 'ta',
       associatedStudents: [],
       phone: '',
+      points: 0,
       ...user,
       uid
     };

@@ -255,6 +255,23 @@ export const homeworkService = {
         submittedAt: new Date().toISOString()
       };
       await setDoc(docRef, { submissions }, { merge: true });
+
+      // Award automated points for homework submission
+      try {
+        const { pointsService } = require('./pointsService');
+        const config = await pointsService.getPointsConfig();
+        await pointsService.awardPoints(
+          studentId,
+          config.automatedPoints.homework,
+          'homework',
+          `Submitted homework assignment: "${data.title?.en || 'Assignment'}"`,
+          'system',
+          'System'
+        );
+      } catch (ptsErr) {
+        console.warn('Failed to award homework points automatically:', ptsErr);
+      }
+
       return { homeworkId, ...data, submissions };
     }
     return null;
