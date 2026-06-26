@@ -250,17 +250,46 @@ export const pointsService = {
     articlesSnap.forEach(snap => {
       articlesRecords.push({ articleId: snap.id, ...snap.data() });
     });
+
+    // 7. OPTIMIZATION: Fetch ALL existing points logs in a single batch query
+    const logsSnap = await getDocs(collection(db, 'points_logs'));
+    const logsByUser: Record<string, PointsLog[]> = {};
+    logsSnap.forEach(snap => {
+      const log = { logId: snap.id, ...snap.data() } as PointsLog;
+      if (!logsByUser[log.studentId]) {
+        logsByUser[log.studentId] = [];
+      }
+      logsByUser[log.studentId].push(log);
+    });
     
     let updatedUsersCount = 0;
+
+    // Helper to write a log entry directly to Firestore without fetching/updating user profile during the loop
+    const awardPointsInline = async (
+      studentId: string,
+      points: number,
+      category: 'attendance' | 'homework' | 'achievement' | 'newsletter' | 'exam' | 'custom',
+      reason: string
+    ): Promise<PointsLog> => {
+      const logId = `plog_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+      const logEntry: PointsLog = {
+        logId,
+        studentId,
+        points,
+        category,
+        reason,
+        awardedBy: 'system',
+        awardedByName: 'System',
+        timestamp: new Date().toISOString()
+      };
+      await setDoc(doc(db, 'points_logs', logId), logEntry);
+      return logEntry;
+    };
     
-    // 7. For each user, perform self-healing calculations
+    // 8. For each user, perform self-healing calculations
     for (const u of allUsers) {
-      // Fetch all existing points logs for this user
-      const logsSnap = await getDocs(query(collection(db, 'points_logs'), where('studentId', '==', u.uid)));
-      const existingLogs: PointsLog[] = [];
-      logsSnap.forEach(snap => {
-        existingLogs.push({ logId: snap.id, ...snap.data() } as PointsLog);
-      });
+      // Get existing logs for this user from our in-memory cache
+      const existingLogs = [...(logsByUser[u.uid] || [])];
       
       // A. Process Attendance
       for (const rec of attendanceRecords) {
@@ -274,13 +303,11 @@ export const pointsService = {
               l => l.category === 'attendance' && l.reason.includes(rec.date)
             );
             if (!hasLog) {
-              const logEntry = await pointsService.awardPoints(
+              const logEntry = await awardPointsInline(
                 u.uid,
                 config.automatedPoints.attendance,
                 'attendance',
-                `Attended class on ${rec.date} (${status})`,
-                'system',
-                'System'
+                `Attended class on ${rec.date} (${status})`
               );
               existingLogs.push(logEntry);
             }
@@ -293,13 +320,11 @@ export const pointsService = {
             l => l.category === 'attendance' && l.reason.includes(rec.date) && l.reason.includes('Marked')
           );
           if (!hasLog) {
-            const logEntry = await pointsService.awardPoints(
+            const logEntry = await awardPointsInline(
               u.uid,
               config.automatedPoints.teacherAttendance,
               'attendance',
-              `Marked attendance sheet for class ID: ${rec.classId} on ${rec.date}`,
-              'system',
-              'System'
+              `Marked attendance sheet for class ID: ${rec.classId} on ${rec.date}`
             );
             existingLogs.push(logEntry);
           }
@@ -316,13 +341,11 @@ export const pointsService = {
               l => l.category === 'homework' && (l.reason.includes(hw.homeworkId) || l.reason.includes(hw.title || ''))
             );
             if (!hasLog) {
-              const logEntry = await pointsService.awardPoints(
+              const logEntry = await awardPointsInline(
                 u.uid,
                 config.automatedPoints.homework,
                 'homework',
-                `Submitted homework: "${hw.title || 'Homework'}" (ID: ${hw.homeworkId})`,
-                'system',
-                'System'
+                `Submitted homework: "${hw.title || 'Homework'}" (ID: ${hw.homeworkId})`
               );
               existingLogs.push(logEntry);
             }
@@ -337,13 +360,11 @@ export const pointsService = {
             l => l.category === 'achievement' && (l.reason.includes(ach.achievementId) || l.reason.includes(ach.awardName || ''))
           );
           if (!hasLog) {
-            const logEntry = await pointsService.awardPoints(
+            const logEntry = await awardPointsInline(
               u.uid,
               config.automatedPoints.achievement,
               'achievement',
-              `Approved student achievement: "${ach.awardName || 'Award'}" (ID: ${ach.achievementId})`,
-              'system',
-              'System'
+              `Approved student achievement: "${ach.awardName || 'Award'}" (ID: ${ach.achievementId})`
             );
             existingLogs.push(logEntry);
           }
@@ -358,29 +379,23 @@ export const pointsService = {
             l => l.category === 'newsletter' && (l.reason.includes(art.articleId) || l.reason.includes(art.title || ''))
           );
           if (!hasLog) {
-            const logEntry = await pointsService.awardPoints(
+            const logEntry = await awardPointsInline(
               u.uid,
               config.automatedPoints.newsletter,
               'newsletter',
-              `Approved student article: "${art.title || 'Article'}" (ID: ${art.articleId})`,
-              'system',
-              'System'
+              `Approved student article: "${art.title || 'Article'}" (ID: ${art.articleId})`
             );
             existingLogs.push(logEntry);
           }
         }
       }
       
-      // E. Recompute absolute final sum from all logs in points_logs to correct any profile discrepancies
-      const finalLogsSnap = await getDocs(query(collection(db, 'points_logs'), where('studentId', '==', u.uid)));
-      let sum = 0;
-      finalLogsSnap.forEach(snap => {
-        sum += snap.data().points || 0;
-      });
+      // E. Recompute absolute final sum from all logs in memory to correct profile points
+      const sum = existingLogs.reduce((acc, l) => acc + (l.points || 0), 0);
       
       if ((u.points || 0) !== sum) {
         const userRef = doc(db, 'users', u.uid);
-        await setDoc(userRef, { points: sum }, { merge: true });
+        await setDoc(userRef, { points: sum, lastPointsAwarded: new Date().toISOString() }, { merge: true });
         updatedUsersCount++;
       }
     }
