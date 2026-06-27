@@ -347,13 +347,27 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
 
       if (importRole === 'waitlist') {
         let waitlistImported = 0;
+        let waitlistUpdated = 0;
+        const dbWaitlist = await waitlistService.getWaitlist();
         for (const record of importPreview) {
+          const existing = dbWaitlist.find(w => 
+            w.given_name.toLowerCase().trim() === record.given_name.toLowerCase().trim() && 
+            w.family_name.toLowerCase().trim() === record.family_name.toLowerCase().trim()
+          );
+          
+          if (existing) {
+            record.uid = existing.uid;
+            waitlistUpdated++;
+            logs.push(`🔄 Waitlist student ${record.given_name} ${record.family_name} already exists. Merged & updated existing entry.`);
+          } else {
+            waitlistImported++;
+            logs.push(`✅ Waitlist record parsed & saved for student: ${record.given_name} ${record.family_name}`);
+          }
           await waitlistService.submitWaitlist(record);
-          waitlistImported++;
-          logs.push(`✅ Waitlist record parsed & saved for student: ${record.given_name} ${record.family_name}`);
         }
         logs.push(`\n🎉 IMPORT COMPLETED SUCCESSFULLY!`);
-        logs.push(`✅ Waitlist Students Imported: ${waitlistImported}`);
+        logs.push(`✅ New Waitlist Students Imported: ${waitlistImported}`);
+        logs.push(`🔄 Existing Waitlist Students Updated: ${waitlistUpdated}`);
         setImportSuccess(true);
         showToast(`Bulk waitlist import completed successfully!`, 'success');
         await refreshData();

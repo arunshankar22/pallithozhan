@@ -1,6 +1,52 @@
 import { Platform } from 'react-native';
 import * as XLSX from 'xlsx';
 
+const formatWaitlistDate = (dateStr: string): string => {
+  if (!dateStr) return '';
+  try {
+    let parsedDate = new Date(dateStr);
+    
+    // Check if invalid date
+    if (isNaN(parsedDate.getTime())) {
+      // Try parsing formats like "3/7/2026 13:17:14"
+      const slashParts = dateStr.split('/');
+      if (slashParts.length === 3) {
+        const day = parseInt(slashParts[0], 10);
+        const month = parseInt(slashParts[1], 10) - 1; // 0-indexed
+        const yearParts = slashParts[2].trim().split(' ');
+        const year = parseInt(yearParts[0], 10);
+        
+        let hours = 0;
+        let minutes = 0;
+        let seconds = 0;
+        
+        if (yearParts.length > 1) {
+          const timeParts = yearParts[1].split(':');
+          hours = parseInt(timeParts[0], 10) || 0;
+          minutes = parseInt(timeParts[1], 10) || 0;
+          seconds = parseInt(timeParts[2], 10) || 0;
+        }
+        
+        parsedDate = new Date(year, month, day, hours, minutes, seconds);
+      }
+    }
+    
+    if (!isNaN(parsedDate.getTime())) {
+      const pad = (num: number) => String(num).padStart(2, '0');
+      const year = parsedDate.getFullYear();
+      const month = pad(parsedDate.getMonth() + 1);
+      const day = pad(parsedDate.getDate());
+      const hours = pad(parsedDate.getHours());
+      const minutes = pad(parsedDate.getMinutes());
+      const seconds = pad(parsedDate.getSeconds());
+      return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+    }
+  } catch (err) {
+    console.warn('Failed to parse date:', dateStr, err);
+  }
+  return dateStr;
+};
+
 export interface StudentParsedRecord {
   uid: string;
   fullName: string;
@@ -140,7 +186,9 @@ export const spreadsheetService = {
         case 'createdat':
         case 'registrationdate':
           return 'student_created';
+        case 'requestdatetime':
         case 'requestdate':
+        case 'datetime':
           return 'request_date';
         case 'mainstreamschoolname':
         case 'mainstreamschool':
@@ -300,7 +348,7 @@ export const spreadsheetService = {
             gender: rowObj.gender || '',
             DATE_OF_BIRTH: rowObj.date_of_birth || '',
             prev_bm_school_class: rowObj.prev_bm_school_class || '',
-            student_created: rowObj.student_created || rowObj.request_date || new Date().toISOString().replace('T', ' ').substring(0, 19),
+            student_created: formatWaitlistDate(rowObj.request_date || rowObj.student_created) || new Date().toISOString().replace('T', ' ').substring(0, 19),
             mainstream_school_name: rowObj.mainstream_school_name || '',
             mainstream_school_class: rowObj.mainstream_school_class || '',
             class_name: rowObj.class_name || '',
@@ -314,7 +362,15 @@ export const spreadsheetService = {
             parent2_volunteer: rowObj.parent2_volunteer || 'NO',
             Purpose: rowObj.purpose || 'New Enrollment',
             Request: rowObj.request || 'Online Form',
-            RequestDate: rowObj.request_date || rowObj.student_created || new Date().toLocaleDateString('en-GB'),
+            RequestDate: (() => {
+              const fullDateStr = formatWaitlistDate(rowObj.request_date || rowObj.student_created);
+              if (fullDateStr && fullDateStr.includes('-')) {
+                const datePart = fullDateStr.split(' ')[0];
+                const parts = datePart.split('-');
+                return `${parts[2]}/${parts[1]}/${parts[0]}`;
+              }
+              return new Date().toLocaleDateString('en-GB');
+            })(),
             OK_TO_ISSUE_BOOKS: rowObj.ok_to_issue_books || 'NO',
             STATIONARY_ISSUED: rowObj.stationary_issued || 'NO',
             BOOKS_ISSUED: rowObj.books_issued || 'NO',
@@ -484,7 +540,7 @@ export const spreadsheetService = {
             gender: gender,
             DATE_OF_BIRTH: dob,
             prev_bm_school_class: prevClass,
-            student_created: studCreated || new Date().toISOString().replace('T', ' ').substring(0, 19),
+            student_created: formatWaitlistDate(studCreated) || new Date().toISOString().replace('T', ' ').substring(0, 19),
             mainstream_school_name: mainstreamSch,
             mainstream_school_class: mainstreamGrade,
             class_name: stage,
