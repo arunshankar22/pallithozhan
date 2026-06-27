@@ -375,8 +375,13 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
         return;
       } else if (importRole === 'student') {
         for (const record of importPreview) {
-          const existingStudent = dbUsers.find(u => u.uid === record.uid || u.email.toLowerCase() === record.email.toLowerCase());
+          const existingStudent = dbUsers.find(u => 
+            u.uid === record.uid || 
+            (u.email && record.email && u.email.toLowerCase() === record.email.toLowerCase()) ||
+            (u.role === 'student' && u.fullName && record.fullName && u.fullName.toLowerCase().trim() === record.fullName.toLowerCase().trim())
+          );
           if (existingStudent) {
+            record.uid = existingStudent.uid; // Align UID for parent and class linkages
             const updatedData = {
               fullName: record.fullName,
               fullNameTamil: record.fullNameTamil || existingStudent.fullNameTamil || '',
@@ -422,8 +427,11 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
 
           if (record.parent1) {
             const p1 = record.parent1;
-            const existingP = dbUsers.find(u => u.email.toLowerCase() === p1.email.toLowerCase());
-            const batchP = parentEmailMap[p1.email.toLowerCase()];
+            const existingP = dbUsers.find(u => 
+              (u.email && p1.email && u.email.toLowerCase() === p1.email.toLowerCase()) ||
+              (u.role === 'parent' && u.fullName && p1.fullName && u.fullName.toLowerCase().trim() === p1.fullName.toLowerCase().trim())
+            );
+            const batchP = parentEmailMap[p1.email.toLowerCase()] || Object.values(parentEmailMap).find(p => p.fullName && p1.fullName && p.fullName.toLowerCase().trim() === p1.fullName.toLowerCase().trim());
 
             if (existingP) {
               const currentStudents = existingP.associatedStudents || [];
@@ -434,7 +442,7 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
               };
               if (!currentStudents.includes(record.uid)) {
                 updatedData.associatedStudents = [...currentStudents, record.uid];
-                logs.push(`🔗 Sibling detected: Linked existing Parent ${p1.fullName} (email: ${p1.email}) to Child UID: ${record.uid}`);
+                logs.push(`🔗 Sibling detected: Linked existing Parent ${p1.fullName} (email: ${existingP.email || p1.email}) to Child UID: ${record.uid}`);
               } else {
                 logs.push(`🔄 Parent ${p1.fullName} already linked. Merged details with sheet data.`);
               }
@@ -462,8 +470,11 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
 
           if (record.parent2) {
             const p2 = record.parent2;
-            const existingP = dbUsers.find(u => u.email.toLowerCase() === p2.email.toLowerCase());
-            const batchP = parentEmailMap[p2.email.toLowerCase()];
+            const existingP = dbUsers.find(u => 
+              (u.email && p2.email && u.email.toLowerCase() === p2.email.toLowerCase()) ||
+              (u.role === 'parent' && u.fullName && p2.fullName && u.fullName.toLowerCase().trim() === p2.fullName.toLowerCase().trim())
+            );
+            const batchP = parentEmailMap[p2.email.toLowerCase()] || Object.values(parentEmailMap).find(p => p.fullName && p2.fullName && p.fullName.toLowerCase().trim() === p2.fullName.toLowerCase().trim());
 
             if (existingP) {
               const currentStudents = existingP.associatedStudents || [];
@@ -474,7 +485,7 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
               };
               if (!currentStudents.includes(record.uid)) {
                 updatedData.associatedStudents = [...currentStudents, record.uid];
-                logs.push(`🔗 Sibling detected: Linked existing Parent ${p2.fullName} (email: ${p2.email}) to Child UID: ${record.uid}`);
+                logs.push(`🔗 Sibling detected: Linked existing Parent ${p2.fullName} (email: ${existingP.email || p2.email}) to Child UID: ${record.uid}`);
               } else {
                 logs.push(`🔄 Parent ${p2.fullName} already linked. Merged details with sheet data.`);
               }
@@ -499,6 +510,7 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
               parentsCreated++;
             }
           }
+
 
           if (record.className) {
             const targetClassName = record.className.trim();
@@ -541,8 +553,13 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
 
       } else {
         for (const record of importPreview) {
-          const existingUser = dbUsers.find(u => u.uid === record.uid || u.email.toLowerCase() === record.email.toLowerCase());
+          const existingUser = dbUsers.find(u => 
+            u.uid === record.uid || 
+            (u.email && record.email && u.email.toLowerCase() === record.email.toLowerCase()) ||
+            (u.role === record.role && u.fullName && record.fullName && u.fullName.toLowerCase().trim() === record.fullName.toLowerCase().trim())
+          );
           if (existingUser) {
+            record.uid = existingUser.uid; // Align UID for classroom and schedule stage linkages
             const updatedData = {
               fullName: record.fullName,
               phone: record.phone || existingUser.phone || '',
@@ -778,12 +795,73 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
     setLoading(false);
   };
 
+  const [selectedWaitlistUids, setSelectedWaitlistUids] = useState<Record<string, boolean>>({});
+
+  const handleToggleWaitlistSelection = (uid: string) => {
+    setSelectedWaitlistUids(prev => ({
+      ...prev,
+      [uid]: !prev[uid]
+    }));
+  };
+
+  const selectedWaitlistCount = Object.keys(selectedWaitlistUids).filter(id => selectedWaitlistUids[id]).length;
+
+  const handleToggleWaitlistSelectAll = (currentFiltered: any[]) => {
+    const isAll = currentFiltered.length > 0 && currentFiltered.every(w => selectedWaitlistUids[w.uid]);
+    if (isAll) {
+      setSelectedWaitlistUids(prev => {
+        const next = { ...prev };
+        currentFiltered.forEach(w => {
+          delete next[w.uid];
+        });
+        return next;
+      });
+    } else {
+      setSelectedWaitlistUids(prev => {
+        const next = { ...prev };
+        currentFiltered.forEach(w => {
+          next[w.uid] = true;
+        });
+        return next;
+      });
+    }
+  };
+
+  const handleDeleteSelectedWaitlist = async () => {
+    const uidsToDelete = Object.keys(selectedWaitlistUids).filter(id => selectedWaitlistUids[id]);
+    if (uidsToDelete.length === 0) return;
+
+    const confirmed = Platform.OS === 'web'
+      ? window.confirm(`Are you sure you want to delete ${uidsToDelete.length} selected waitlist entry/entries?`)
+      : true;
+
+    if (!confirmed) return;
+
+    setLoading(true);
+    try {
+      for (const uid of uidsToDelete) {
+        await waitlistService.deleteWaitlist(uid);
+      }
+      showToast(`${uidsToDelete.length} waitlist entry/entries removed successfully.`, 'success');
+      setSelectedWaitlistUids({});
+      await refreshData();
+    } catch (e) {
+      showToast('Failed to delete selected waitlist entries.', 'error');
+    }
+    setLoading(false);
+  };
+
   const handleDeleteWaitlist = async (uid: string) => {
     const confirmed = Platform.OS === 'web' ? window.confirm('Are you sure you want to delete this waitlist entry?') : true;
     if (!confirmed) return;
     try {
       await waitlistService.deleteWaitlist(uid);
       showToast('Waitlist entry has been deleted.', 'success');
+      setSelectedWaitlistUids(prev => {
+        const next = { ...prev };
+        delete next[uid];
+        return next;
+      });
       refreshData();
     } catch (e) {
       showToast('Failed to delete waitlist entry.', 'error');
@@ -800,6 +878,25 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
       showToast('Failed to update status.', 'error');
     }
   };
+
+  const queryClean = waitlistSearchQuery.toLowerCase().trim();
+  const filteredWaitlist = waitlist.filter(w => {
+    if (!queryClean) return true;
+    return (
+      (w.given_name || '').toLowerCase().includes(queryClean) ||
+      (w.family_name || '').toLowerCase().includes(queryClean) ||
+      (w.student_email || '').toLowerCase().includes(queryClean) ||
+      (w.parent1_name || '').toLowerCase().includes(queryClean) ||
+      (w.parent1_email || '').toLowerCase().includes(queryClean) ||
+      (w.parent2_name || '').toLowerCase().includes(queryClean)
+    );
+  }).sort((a, b) => {
+    const dateA = a.student_created || a.createdAt || '';
+    const dateB = b.student_created || b.createdAt || '';
+    return dateA.localeCompare(dateB);
+  });
+
+  const isAllWaitlistSelected = filteredWaitlist.length > 0 && filteredWaitlist.every(w => selectedWaitlistUids[w.uid]);
 
   const handleAdmitWaitlist = async (w: any) => {
     const confirmed = Platform.OS === 'web' ? window.confirm(`Admit ${w.given_name} ${w.family_name} to the active school directory?`) : true;
@@ -2235,25 +2332,66 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
             </Pressable>
           </View>
 
+          {/* Waitlist Bulk Action Bar */}
+          {selectedWaitlistCount > 0 && (
+            <View style={[
+              {
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: 12,
+                borderRadius: 12,
+                marginBottom: 12,
+                borderWidth: 1,
+                borderColor: colors.danger || '#FF4D4D',
+                backgroundColor: colors.dangerLight || 'rgba(255, 77, 77, 0.12)',
+              }
+            ]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Pressable
+                  onPress={() => handleToggleWaitlistSelectAll(filteredWaitlist)}
+                  style={{
+                    width: 18,
+                    height: 18,
+                    borderWidth: 2,
+                    borderColor: colors.danger || '#FF4D4D',
+                    borderRadius: 4,
+                    backgroundColor: isAllWaitlistSelected ? (colors.danger || '#FF4D4D') : 'transparent',
+                    justifyContent: 'center',
+                    alignItems: 'center'
+                  }}
+                >
+                  {isAllWaitlistSelected && <CheckCircle size={12} color="#FFF" />}
+                </Pressable>
+                <ThemedText style={{ fontSize: 13, fontWeight: '700', color: colors.danger || '#FF4D4D' }}>
+                  Selected {selectedWaitlistCount} Waitlist Entry/Entries for Deletion
+                </ThemedText>
+              </View>
+              <Pressable
+                onPress={handleDeleteSelectedWaitlist}
+                style={({ pressed }) => [
+                  {
+                    backgroundColor: colors.danger || '#FF4D4D',
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 6,
+                    paddingVertical: 6,
+                    paddingHorizontal: 12,
+                    borderRadius: 8,
+                  },
+                  { opacity: pressed ? 0.9 : 1 }
+                ]}
+              >
+                <Trash2 size={13} color="#FFF" />
+                <ThemedText style={{ color: '#FFF', fontSize: 12, fontWeight: '700' }}>
+                  Delete Selected
+                </ThemedText>
+              </Pressable>
+            </View>
+          )}
+
           {/* Waitlist List/Table */}
           {(() => {
-            const queryClean = waitlistSearchQuery.toLowerCase().trim();
-            const filteredWaitlist = waitlist.filter(w => {
-              if (!queryClean) return true;
-              return (
-                (w.given_name || '').toLowerCase().includes(queryClean) ||
-                (w.family_name || '').toLowerCase().includes(queryClean) ||
-                (w.student_email || '').toLowerCase().includes(queryClean) ||
-                (w.parent1_name || '').toLowerCase().includes(queryClean) ||
-                (w.parent1_email || '').toLowerCase().includes(queryClean) ||
-                (w.parent2_name || '').toLowerCase().includes(queryClean)
-              );
-            }).sort((a, b) => {
-              const dateA = a.student_created || a.createdAt || '';
-              const dateB = b.student_created || b.createdAt || '';
-              return dateA.localeCompare(dateB);
-            });
-
             if (filteredWaitlist.length === 0) {
               return (
                 <ThemedText style={{ textAlign: 'center', marginVertical: Spacing.three, color: colors.textSecondary }}>
@@ -2265,8 +2403,29 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
             const waitlistListContent = (
               <View style={{ gap: Spacing.two }}>
                 {filteredWaitlist.map((w) => {
+                  const isChecked = !!selectedWaitlistUids[w.uid];
                   return (
-                    <View key={w.uid} style={[{ padding: 16, borderRadius: 12, borderWidth: 1, backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+                    <View key={w.uid} style={[{ padding: 16, borderRadius: 12, borderWidth: 1, backgroundColor: colors.cardBg, borderColor: colors.border, flexDirection: 'row', gap: 12, alignItems: 'flex-start' }]}>
+                      {/* Checkbox Column */}
+                      <Pressable
+                        onPress={() => handleToggleWaitlistSelection(w.uid)}
+                        style={{
+                          width: 18,
+                          height: 18,
+                          borderWidth: 2,
+                          borderColor: isChecked ? colors.secondary : colors.border,
+                          borderRadius: 4,
+                          backgroundColor: isChecked ? colors.secondary : 'transparent',
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          marginTop: 4
+                        }}
+                      >
+                        {isChecked && <CheckCircle size={12} color="#FFF" />}
+                      </Pressable>
+                      
+                      {/* Rest of Card Content */}
+                      <View style={{ flex: 1 }}>
                       {/* Top row: Name & badge, purpose/request */}
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
                         <View style={{ gap: 2 }}>
@@ -2401,7 +2560,8 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
                         })}
                       </View>
                     </View>
-                  );
+                  </View>
+                );
                 })}
               </View>
             );
@@ -2413,6 +2573,24 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
                     <View style={{ flexDirection: 'column' }}>
                       {/* Header Row */}
                       <View style={{ flexDirection: 'row', backgroundColor: colors.background, borderBottomWidth: 2, borderBottomColor: colors.border, paddingVertical: 10, alignItems: 'center' }}>
+                        {/* Select All Checkbox Column */}
+                        <View style={{ width: 40, paddingHorizontal: 10, justifyContent: 'center', alignItems: 'center' }}>
+                          <Pressable
+                            onPress={() => handleToggleWaitlistSelectAll(filteredWaitlist)}
+                            style={{
+                              width: 16,
+                              height: 16,
+                              borderWidth: 2,
+                              borderColor: colors.secondary,
+                              borderRadius: 4,
+                              backgroundColor: isAllWaitlistSelected ? colors.secondary : 'transparent',
+                              justifyContent: 'center',
+                              alignItems: 'center'
+                            }}
+                          >
+                            {isAllWaitlistSelected && <CheckCircle size={10} color="#FFF" />}
+                          </Pressable>
+                        </View>
                         {[
                           { label: 'Actions', width: 140 },
                           { label: 'Given Name', width: 130 },
@@ -2445,8 +2623,27 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
 
                       {/* Rows */}
                       {filteredWaitlist.map((w) => {
+                        const isChecked = !!selectedWaitlistUids[w.uid];
                         return (
                           <View key={w.uid} style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: 8, alignItems: 'center' }}>
+                            {/* Checkbox Column */}
+                            <View style={{ width: 40, paddingHorizontal: 10, justifyContent: 'center', alignItems: 'center' }}>
+                              <Pressable
+                                onPress={() => handleToggleWaitlistSelection(w.uid)}
+                                style={{
+                                  width: 16,
+                                  height: 16,
+                                  borderWidth: 2,
+                                  borderColor: isChecked ? colors.secondary : colors.border,
+                                  borderRadius: 4,
+                                  backgroundColor: isChecked ? colors.secondary : 'transparent',
+                                  justifyContent: 'center',
+                                  alignItems: 'center'
+                                }}
+                              >
+                                {isChecked && <CheckCircle size={10} color="#FFF" />}
+                              </Pressable>
+                            </View>
                             {/* Actions */}
                             <View style={{ width: 140, paddingHorizontal: 10, flexDirection: 'row', gap: 6, alignItems: 'center' }}>
                               <Pressable
