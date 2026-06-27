@@ -151,9 +151,14 @@ export const waitlistService = {
       list.push({ uid: docSnap.id, ...docSnap.data() });
     });
     if (list.length === 0) {
-      for (const w of DEFAULT_WAITLIST) {
-        await waitlistService.submitWaitlist(w);
-        list.push(w);
+      const seedDocRef = doc(db, 'metadata', 'waitlist_seeded');
+      const seedSnap = await getDoc(seedDocRef);
+      if (!seedSnap.exists()) {
+        for (const w of DEFAULT_WAITLIST) {
+          await waitlistService.submitWaitlist(w);
+          list.push(w);
+        }
+        await setDoc(seedDocRef, { seeded: true });
       }
     }
     return list;
