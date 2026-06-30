@@ -682,9 +682,13 @@ export default function HomeScreen() {
         }
       }
 
-      const cls = await mockDb.getClasses();
-      setClasses(cls);
-      await reloadDashboardData();
+      try {
+        const cls = await mockDb.getClasses();
+        setClasses(cls);
+        await reloadDashboardData();
+      } catch (err) {
+        console.warn('Failed to load main data on startup (possibly unauthenticated):', err);
+      }
     };
     loadMainData();
   }, []);
@@ -727,16 +731,20 @@ export default function HomeScreen() {
   useEffect(() => {
     if (user?.role === 'parent') {
       const loadParentProfiles = async () => {
-        const profiles = [];
-        if (user.associatedStudents) {
-          for (const sId of user.associatedStudents) {
-            const p = await mockDb.getUser(sId);
-            if (p) profiles.push(p);
+        try {
+          const profiles = [];
+          if (user.associatedStudents) {
+            for (const sId of user.associatedStudents) {
+              const p = await mockDb.getUser(sId);
+              if (p) profiles.push(p);
+            }
           }
-        }
-        setStudentProfiles(profiles);
-        if (profiles.length > 0) {
-          setActiveStudentId(profiles[0].uid);
+          setStudentProfiles(profiles);
+          if (profiles.length > 0) {
+            setActiveStudentId(profiles[0].uid);
+          }
+        } catch (e) {
+          console.error('Failed to load parent child profiles:', e);
         }
       };
       loadParentProfiles();
