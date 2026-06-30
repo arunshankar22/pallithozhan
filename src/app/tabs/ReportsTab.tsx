@@ -301,16 +301,24 @@ export function ReportsTab({
   const [editRowName, setEditRowName] = useState('');
   const [editRowTamil, setEditRowTamil] = useState('');
   const [editRowAwardName, setEditRowAwardName] = useState('');
+  const [editRowAwardNameTa, setEditRowAwardNameTa] = useState('');
   const [editRowRank, setEditRowRank] = useState('');
   const [editRowSchool, setEditRowSchool] = useState('');
+  const [editRowNotesEn, setEditRowNotesEn] = useState('');
+  const [editRowNotesTa, setEditRowNotesTa] = useState('');
+  const [isTranslatingInline, setIsTranslatingInline] = useState(false);
+  const [isTranslatingPreview, setIsTranslatingPreview] = useState(false);
 
   const handleStartInlineEdit = (index: number, row: any) => {
     setEditingRowIndex(index);
     setEditRowName(row.studentName || '');
     setEditRowTamil(row.studentTamil || '');
     setEditRowAwardName(row.awardName || '');
+    setEditRowAwardNameTa(row.awardNameTa || row.awardName || '');
     setEditRowRank(row.rank || '');
     setEditRowSchool(row.school || '');
+    setEditRowNotesEn(row.notes || '');
+    setEditRowNotesTa(row.notesTa || '');
   };
 
   const handleSaveInlineEdit = (index: number) => {
@@ -320,11 +328,136 @@ export function ReportsTab({
       studentName: editRowName,
       studentTamil: editRowTamil,
       awardName: editRowAwardName,
+      awardNameTa: editRowAwardNameTa,
       rank: editRowRank,
-      school: editRowSchool
+      school: editRowSchool,
+      notes: editRowNotesEn,
+      notesTa: editRowNotesTa
     };
     setBulkImportPreview(updatedPreview);
     setEditingRowIndex(null);
+  };
+
+  const handleSelectStudent = (studentId: string) => {
+    setFormStudentId(studentId);
+    if (studentId) {
+      const studentClass = classes.find(c => (c.studentIds || []).includes(studentId));
+      if (studentClass) {
+        setFormClassId(studentClass.classId);
+      }
+    }
+  };
+
+  const handleTranslateInlineAward = async () => {
+    setIsTranslatingInline(true);
+    try {
+      if (editRowAwardName && !editRowAwardNameTa) {
+        const res = await translateWithGemini(editRowAwardName);
+        setEditRowAwardNameTa(res);
+      } else if (editRowAwardNameTa && !editRowAwardName) {
+        const res = await translateWithGemini(editRowAwardNameTa);
+        setEditRowAwardName(res);
+      } else if (editRowAwardName) {
+        const hasTamil = /[\u0B80-\u0BFF]/.test(editRowAwardName);
+        const res = await translateWithGemini(editRowAwardName);
+        if (hasTamil) {
+          setEditRowAwardName(res);
+        } else {
+          setEditRowAwardNameTa(res);
+        }
+      }
+    } catch (err) {
+      console.error('Inline award translation error:', err);
+    } finally {
+      setIsTranslatingInline(false);
+    }
+  };
+
+  const handleTranslateInlineNotes = async () => {
+    setIsTranslatingInline(true);
+    try {
+      if (editRowNotesEn && !editRowNotesTa) {
+        const res = await translateWithGemini(editRowNotesEn);
+        setEditRowNotesTa(res);
+      } else if (editRowNotesTa && !editRowNotesEn) {
+        const res = await translateWithGemini(editRowNotesTa);
+        setEditRowNotesEn(res);
+      } else if (editRowNotesEn) {
+        const hasTamil = /[\u0B80-\u0BFF]/.test(editRowNotesEn);
+        const res = await translateWithGemini(editRowNotesEn);
+        if (hasTamil) {
+          setEditRowNotesEn(res);
+        } else {
+          setEditRowNotesTa(res);
+        }
+      }
+    } catch (err) {
+      console.error('Inline notes translation error:', err);
+    } finally {
+      setIsTranslatingInline(false);
+    }
+  };
+
+  const translatePreviewRecords = async (records: any[]) => {
+    setIsTranslatingPreview(true);
+    try {
+      const translated = [];
+      for (const rec of records) {
+        let awardNameEn = rec.awardName || '';
+        let awardNameTa = rec.awardNameTa || rec.awardName || '';
+        let notesEn = rec.notes || '';
+        let notesTa = rec.notesTa || rec.notes || '';
+
+        const awardHasTamil = /[\u0B80-\u0BFF]/.test(rec.awardName || '');
+        if (awardHasTamil) {
+          try {
+            const trans = await translateWithGemini(rec.awardName);
+            awardNameEn = trans || rec.awardName;
+          } catch (e) {
+            console.error('Error translating award name:', e);
+          }
+        } else {
+          try {
+            const trans = await translateWithGemini(rec.awardName);
+            awardNameTa = trans || rec.awardName;
+          } catch (e) {
+            console.error('Error translating award name:', e);
+          }
+        }
+
+        if (rec.notes) {
+          const notesHasTamil = /[\u0B80-\u0BFF]/.test(rec.notes);
+          if (notesHasTamil) {
+            try {
+              const trans = await translateWithGemini(rec.notes);
+              notesEn = trans || rec.notes;
+            } catch (e) {
+              console.error('Error translating notes:', e);
+            }
+          } else {
+            try {
+              const trans = await translateWithGemini(rec.notes);
+              notesTa = trans || rec.notes;
+            } catch (e) {
+              console.error('Error translating notes:', e);
+            }
+          }
+        }
+
+        translated.push({
+          ...rec,
+          awardName: awardNameEn,
+          awardNameTa: awardNameTa,
+          notes: notesEn,
+          notesTa: notesTa
+        });
+      }
+      setBulkImportPreview(translated);
+    } catch (err) {
+      console.error('Failed to translate preview records:', err);
+    } finally {
+      setIsTranslatingPreview(false);
+    }
   };
 
   // Debouncing for Translation Triggers
@@ -606,9 +739,12 @@ export function ReportsTab({
         ? parentStudents.find(s => s.uid === formStudentId)
         : students.find(s => s.uid === formStudentId);
       
+      const studentClass = classes.find(c => (c.studentIds || []).includes(formStudentId));
+
       const payload: any = {
         studentId: formStudentId,
         studentName: selectedStudent?.fullName || 'Student',
+        classId: studentClass ? studentClass.classId : '',
         awardName: formAwardNameEn,
         awardNameTa: formAwardNameTa || undefined,
         awardType: formAwardType,
@@ -696,6 +832,7 @@ export function ReportsTab({
       setBulkImportPreview([]);
     } else {
       setBulkImportPreview(parsed.records);
+      translatePreviewRecords(parsed.records);
     }
   };
 
@@ -725,7 +862,8 @@ export function ReportsTab({
               setBulkImportPreview([]);
             } else {
               setBulkImportPreview(parsed.records);
-              showToast(`Parsed ${parsed.records.length} bulk achievements successfully! Check preview below.`, 'success');
+              showToast(`Parsed ${parsed.records.length} bulk achievements successfully! Running auto-translations...`, 'success');
+              translatePreviewRecords(parsed.records);
             }
           };
           
@@ -1659,9 +1797,14 @@ export function ReportsTab({
                   {/* Bulk Preview */}
                   {bulkImportPreview.length > 0 && (
                     <View style={{ gap: Spacing.two, marginTop: Spacing.one }}>
-                      <ThemedText style={{ fontSize: 13, fontWeight: '800', color: colors.secondary }}>
-                        👀 Ready to Import: {bulkImportPreview.length} achievements parsed
-                      </ThemedText>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <ThemedText style={{ fontSize: 13, fontWeight: '800', color: colors.secondary }}>
+                          👀 Ready to Import: {bulkImportPreview.length} achievements parsed
+                        </ThemedText>
+                        {isTranslatingPreview && (
+                          <ActivityIndicator size="small" color={colors.secondary} />
+                        )}
+                      </View>
 
                       {/* Preview List */}
                       <View style={{ maxHeight: 200, borderWidth: 1, borderColor: colors.border, borderRadius: 10, overflow: 'hidden' }}>
@@ -1673,71 +1816,125 @@ export function ReportsTab({
                             return (
                               <View key={idx} style={{ paddingVertical: 8, borderBottomWidth: 1, borderColor: colors.border, gap: 4 }}>
                                 {editingRowIndex === idx ? (
-                                  <View style={{ gap: 6, padding: 4 }}>
+                                  <View style={{ gap: 8, padding: 6, backgroundColor: colors.background, borderRadius: 8, borderWidth: 1, borderColor: colors.border }}>
+                                    {/* Competitor Section */}
                                     <View style={{ flexDirection: 'row', gap: 6 }}>
                                       <View style={{ flex: 1 }}>
-                                        <ThemedText style={{ fontSize: 9, fontWeight: '700', color: colors.textSecondary }}>Competitor / Tamil Name</ThemedText>
+                                        <ThemedText style={{ fontSize: 9, fontWeight: '700', color: colors.textSecondary }}>Competitor (Tamil)</ThemedText>
                                         <TextInput
-                                          style={{ height: 28, borderWidth: 1, borderColor: colors.border, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2, fontSize: 11, color: colors.text, backgroundColor: colors.background }}
+                                          style={{ height: 28, borderWidth: 1, borderColor: colors.border, borderRadius: 4, paddingHorizontal: 6, fontSize: 11, color: colors.text, backgroundColor: colors.background }}
                                           value={editRowTamil}
                                           onChangeText={setEditRowTamil}
                                           placeholder="Tamil Name"
-                                          placeholderTextColor={colors.textSecondary}
                                         />
+                                      </View>
+                                      <View style={{ flex: 1 }}>
+                                        <ThemedText style={{ fontSize: 9, fontWeight: '700', color: colors.textSecondary }}>Competitor (English)</ThemedText>
                                         <TextInput
-                                          style={{ height: 28, borderWidth: 1, borderColor: colors.border, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2, fontSize: 10, color: colors.text, backgroundColor: colors.background, marginTop: 4 }}
+                                          style={{ height: 28, borderWidth: 1, borderColor: colors.border, borderRadius: 4, paddingHorizontal: 6, fontSize: 11, color: colors.text, backgroundColor: colors.background }}
                                           value={editRowName}
                                           onChangeText={setEditRowName}
                                           placeholder="English Name (Optional)"
-                                          placeholderTextColor={colors.textSecondary}
-                                        />
-                                      </View>
-                                      <View style={{ flex: 1 }}>
-                                        <ThemedText style={{ fontSize: 9, fontWeight: '700', color: colors.textSecondary }}>Competition Name</ThemedText>
-                                        <TextInput
-                                          style={{ height: 28, borderWidth: 1, borderColor: colors.border, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2, fontSize: 11, color: colors.text, backgroundColor: colors.background }}
-                                          value={editRowAwardName}
-                                          onChangeText={setEditRowAwardName}
-                                          placeholder="Competition"
-                                          placeholderTextColor={colors.textSecondary}
                                         />
                                       </View>
                                     </View>
-                                    <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+
+                                    {/* Award Title Section */}
+                                    <View style={{ gap: 4 }}>
+                                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <ThemedText style={{ fontSize: 9, fontWeight: '700', color: colors.textSecondary }}>Award Title (English / Tamil)</ThemedText>
+                                        <Pressable 
+                                          disabled={isTranslatingInline}
+                                          onPress={handleTranslateInlineAward}
+                                          style={{ backgroundColor: colors.primaryLight, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}
+                                        >
+                                          {isTranslatingInline ? (
+                                            <ActivityIndicator size="small" color={colors.primary} />
+                                          ) : (
+                                            <ThemedText style={{ fontSize: 8, fontWeight: '700', color: colors.primary }}>🌐 Auto-Translate Title</ThemedText>
+                                          )}
+                                        </Pressable>
+                                      </View>
+                                      <TextInput
+                                        style={{ height: 28, borderWidth: 1, borderColor: colors.border, borderRadius: 4, paddingHorizontal: 6, fontSize: 11, color: colors.text, backgroundColor: colors.background }}
+                                        value={editRowAwardName}
+                                        onChangeText={setEditRowAwardName}
+                                        placeholder="Award Title in English"
+                                      />
+                                      <TextInput
+                                        style={{ height: 28, borderWidth: 1, borderColor: colors.border, borderRadius: 4, paddingHorizontal: 6, fontSize: 11, color: colors.text, backgroundColor: colors.background }}
+                                        value={editRowAwardNameTa}
+                                        onChangeText={setEditRowAwardNameTa}
+                                        placeholder="Award Title in Tamil"
+                                      />
+                                    </View>
+
+                                    {/* Rank and School */}
+                                    <View style={{ flexDirection: 'row', gap: 6 }}>
                                       <View style={{ flex: 1 }}>
                                         <ThemedText style={{ fontSize: 9, fontWeight: '700', color: colors.textSecondary }}>Rank</ThemedText>
                                         <TextInput
-                                          style={{ height: 28, borderWidth: 1, borderColor: colors.border, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2, fontSize: 10, color: colors.text, backgroundColor: colors.background }}
+                                          style={{ height: 28, borderWidth: 1, borderColor: colors.border, borderRadius: 4, paddingHorizontal: 6, fontSize: 10, color: colors.text, backgroundColor: colors.background }}
                                           value={editRowRank}
                                           onChangeText={setEditRowRank}
                                           placeholder="Rank"
-                                          placeholderTextColor={colors.textSecondary}
                                         />
                                       </View>
                                       <View style={{ flex: 1 }}>
                                         <ThemedText style={{ fontSize: 9, fontWeight: '700', color: colors.textSecondary }}>School</ThemedText>
                                         <TextInput
-                                          style={{ height: 28, borderWidth: 1, borderColor: colors.border, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2, fontSize: 10, color: colors.text, backgroundColor: colors.background }}
+                                          style={{ height: 28, borderWidth: 1, borderColor: colors.border, borderRadius: 4, paddingHorizontal: 6, fontSize: 10, color: colors.text, backgroundColor: colors.background }}
                                           value={editRowSchool}
                                           onChangeText={setEditRowSchool}
                                           placeholder="School"
-                                          placeholderTextColor={colors.textSecondary}
                                         />
                                       </View>
-                                      <View style={{ flexDirection: 'row', gap: 6, marginTop: 12 }}>
-                                        <Pressable
-                                          onPress={() => handleSaveInlineEdit(idx)}
-                                          style={{ backgroundColor: '#10B981', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 4 }}
+                                    </View>
+
+                                    {/* Details (Notes) Section */}
+                                    <View style={{ gap: 4 }}>
+                                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <ThemedText style={{ fontSize: 9, fontWeight: '700', color: colors.textSecondary }}>Details / Description (Optional)</ThemedText>
+                                        <Pressable 
+                                          disabled={isTranslatingInline}
+                                          onPress={handleTranslateInlineNotes}
+                                          style={{ backgroundColor: colors.primaryLight, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}
                                         >
-                                          <ThemedText style={{ color: '#FFF', fontSize: 10, fontWeight: '700' }}>Save</ThemedText>
-                                        </Pressable>
-                                        <Pressable
-                                          onPress={() => setEditingRowIndex(null)}
-                                          style={{ backgroundColor: '#EF4444', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 4 }}
-                                        >
-                                          <ThemedText style={{ color: '#FFF', fontSize: 10, fontWeight: '700' }}>Cancel</ThemedText>
+                                          {isTranslatingInline ? (
+                                            <ActivityIndicator size="small" color={colors.primary} />
+                                          ) : (
+                                            <ThemedText style={{ fontSize: 8, fontWeight: '700', color: colors.primary }}>🌐 Auto-Translate Details</ThemedText>
+                                          )}
                                         </Pressable>
                                       </View>
+                                      <TextInput
+                                        style={{ height: 28, borderWidth: 1, borderColor: colors.border, borderRadius: 4, paddingHorizontal: 6, fontSize: 10, color: colors.text, backgroundColor: colors.background }}
+                                        value={editRowNotesEn}
+                                        onChangeText={setEditRowNotesEn}
+                                        placeholder="Details in English"
+                                      />
+                                      <TextInput
+                                        style={{ height: 28, borderWidth: 1, borderColor: colors.border, borderRadius: 4, paddingHorizontal: 6, fontSize: 10, color: colors.text, backgroundColor: colors.background }}
+                                        value={editRowNotesTa}
+                                        onChangeText={setEditRowNotesTa}
+                                        placeholder="Details in Tamil"
+                                      />
+                                    </View>
+
+                                    {/* Save and Cancel Row */}
+                                    <View style={{ flexDirection: 'row', gap: 6, justifyContent: 'flex-end', marginTop: 4 }}>
+                                      <Pressable
+                                        onPress={() => handleSaveInlineEdit(idx)}
+                                        style={{ backgroundColor: '#10B981', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 4 }}
+                                      >
+                                        <ThemedText style={{ color: '#FFF', fontSize: 10, fontWeight: '700' }}>Save</ThemedText>
+                                      </Pressable>
+                                      <Pressable
+                                        onPress={() => setEditingRowIndex(null)}
+                                        style={{ backgroundColor: '#EF4444', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 4 }}
+                                      >
+                                        <ThemedText style={{ color: '#FFF', fontSize: 10, fontWeight: '700' }}>Cancel</ThemedText>
+                                      </Pressable>
                                     </View>
                                   </View>
                                 ) : (
@@ -1873,7 +2070,7 @@ export function ReportsTab({
                         ? (i18n.language === 'ta' ? 'குழந்தையைத் தேர்ந்தெடுக்கவும்' : 'Select Child')
                         : (i18n.language === 'ta' ? 'மாணவரைத் தேர்ந்தெடுக்கவும்' : 'Select Student'),
                       studentOptions,
-                      setFormStudentId
+                      handleSelectStudent
                     );
                   }}
                   style={[
@@ -1939,7 +2136,9 @@ export function ReportsTab({
                   {['Medal', 'Ribbon', 'Trophy', 'Certificate', 'Special Mention'].map((type) => {
                     const meta = getAwardMeta(type);
                     const IconComp = meta.icon;
-                    const isSelected = formAwardType === type;
+                    const isSelected = 
+                      formAwardType?.toLowerCase() === type.toLowerCase() ||
+                      (type === 'Special Mention' && !['medal', 'ribbon', 'trophy', 'certificate'].includes(formAwardType?.toLowerCase() || ''));
                     
                     return (
                       <Pressable
