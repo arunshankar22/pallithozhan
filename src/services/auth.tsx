@@ -76,16 +76,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } else {
         // Enforce Firebase production sync
         fbAuth.onAuthStateChanged(async (fbUser: any) => {
-          if (fbUser) {
-            // Fetch profile from Firestore mock/production
-            const profile = await mockDb.getUser(fbUser.uid);
-            if (profile) {
-              setUser(resolveUserProfile(profile));
-              i18n.changeLanguage(profile.languagePreference);
+          try {
+            if (fbUser) {
+              // Fetch profile from Firestore mock/production
+              const profile = await mockDb.getUser(fbUser.uid);
+              if (profile) {
+                setUser(resolveUserProfile(profile));
+                i18n.changeLanguage(profile.languagePreference);
+              } else {
+                setUser(null);
+              }
             } else {
               setUser(null);
             }
-          } else {
+          } catch (err) {
+            console.warn('Failed to load user profile from Firestore on auth sync:', err);
+            // Gracefully clear the invalid/outdated session to fall back to login screen
+            fbAuth.signOut().catch(() => {});
             setUser(null);
           }
         });
