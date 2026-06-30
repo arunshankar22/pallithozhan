@@ -1040,5 +1040,70 @@ export const spreadsheetService = {
     });
 
     return csvRows.join('\r\n');
+  },
+
+  /**
+   * Parses CSV/TSV achievement results sheet back into records
+   */
+  parseAchievementsCSV: (text: string): { records: any[]; error: string } => {
+    const lines = spreadsheetService.splitLines(text);
+    if (lines.length === 0) {
+      return { records: [], error: 'File is empty.' };
+    }
+
+    const firstLine = lines[0];
+    const delimiter = firstLine.includes('\t') ? '\t' : ',';
+    const headers = spreadsheetService.parseRow(firstLine, delimiter).map(h => h.trim().toLowerCase());
+
+    const studentIdIdx = headers.findIndex(h => ['studentid', 'studentuid', 'uid', 'id'].includes(h.replace(/[\s\-_]/g, '')));
+    const studentTamilIdx = headers.findIndex(h => ['studentnametamil', 'tamilname', 'studenttamilname', 'போட்டியாளர்'].includes(h.replace(/[\s\-_]/g, '')));
+    const studentNameIdx = headers.findIndex(h => ['studentname', 'name', 'givenname', 'fullname'].includes(h.replace(/[\s\-_]/g, '')));
+    const awardNameIdx = headers.findIndex(h => ['awardname', 'award', 'competition', 'event', 'போட்டி'].includes(h.replace(/[\s\-_]/g, '')));
+    const awardTypeIdx = headers.findIndex(h => ['awardtype', 'type'].includes(h.replace(/[\s\-_]/g, '')));
+    const rankIdx = headers.findIndex(h => ['awardlevel', 'rank', 'level', 'grade', 'result', 'தரநிலை', 'தரவரிசை'].includes(h.replace(/[\s\-_]/g, '').replace('/', '')));
+    const dateIdx = headers.findIndex(h => ['datereceived', 'date'].includes(h.replace(/[\s\-_]/g, '')));
+    const schoolIdx = headers.findIndex(h => ['school', 'branch', 'பள்ளி'].includes(h.replace(/[\s\-_]/g, '')));
+    const notesIdx = headers.findIndex(h => ['notes', 'description'].includes(h.replace(/[\s\-_]/g, '')));
+
+    if (studentTamilIdx === -1 && studentNameIdx === -1 && studentIdIdx === -1) {
+      return { records: [], error: 'Could not find student name or ID column in headers. Found headers: ' + headers.join(', ') };
+    }
+    if (awardNameIdx === -1) {
+      return { records: [], error: 'Could not find award or competition column in headers.' };
+    }
+
+    const records: any[] = [];
+    for (let i = 1; i < lines.length; i++) {
+      const cells = spreadsheetService.parseRow(lines[i], delimiter);
+      if (cells.length === 0 || !lines[i].trim()) continue;
+
+      const studentId = studentIdIdx !== -1 ? cells[studentIdIdx]?.trim() : '';
+      const studentTamil = studentTamilIdx !== -1 ? cells[studentTamilIdx]?.trim() : '';
+      const studentName = studentNameIdx !== -1 ? cells[studentNameIdx]?.trim() : '';
+      
+      const rawAward = cells[awardNameIdx]?.trim() || '';
+      const rawType = awardTypeIdx !== -1 ? cells[awardTypeIdx]?.trim() : 'Competition';
+      const rawRank = rankIdx !== -1 ? cells[rankIdx]?.trim() : '';
+      const rawDate = dateIdx !== -1 ? cells[dateIdx]?.trim() : new Date().toISOString().split('T')[0];
+      const rawSchool = schoolIdx !== -1 ? cells[schoolIdx]?.trim() : '';
+      const rawNotes = notesIdx !== -1 ? cells[notesIdx]?.trim() : '';
+
+      if (!studentId && !studentTamil && !studentName) continue;
+      if (!rawAward) continue;
+
+      records.push({
+        studentId,
+        studentTamil,
+        studentName,
+        awardName: rawAward,
+        awardType: rawType,
+        rank: rawRank,
+        dateReceived: rawDate,
+        school: rawSchool,
+        notes: rawNotes
+      });
+    }
+
+    return { records, error: '' };
   }
 };

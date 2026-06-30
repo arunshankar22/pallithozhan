@@ -38,6 +38,7 @@ import { ThemedText } from '@/components/themed-text';
 import { TabProps, getGlassStyle } from '@/app/sharedTypes';
 import { styles as globalStyles } from '@/app/styles';
 import { mockDb } from '@/services/mockBackend';
+import { spreadsheetService } from '@/services/spreadsheetService';
 import { Spacing } from '@/constants/theme';
 import * as ImagePicker from 'expo-image-picker';
 import { auditLogService } from '@/services/auditLogService';
@@ -150,6 +151,13 @@ export function ReportsTab({
   const [pickerItems, setPickerItems] = useState<{ label: string; value: string }[]>([]);
   const [pickerTitle, setPickerTitle] = useState('');
   const [onPickerSelect, setOnPickerSelect] = useState<(value: string) => void>(() => {});
+
+  // Bulk Import States
+  const [isBulkImportMode, setIsBulkImportMode] = useState(false);
+  const [bulkImportText, setBulkImportText] = useState('');
+  const [bulkImportPreview, setBulkImportPreview] = useState<any[]>([]);
+  const [bulkImporting, setBulkImporting] = useState(false);
+  const [bulkImportLogs, setBulkImportLogs] = useState<string[]>([]);
 
   // Debouncing for Translation Triggers
   const debouncedAwardNameEn = useDebounce(formAwardNameEn, 700);
@@ -503,6 +511,176 @@ export function ReportsTab({
       setFormStudentId(parentStudents[0].uid);
     } else if (students.length > 0) {
       setFormStudentId(students[0].uid);
+    }
+  };
+
+  const handleImportTextChange = (text: string) => {
+    setBulkImportText(text);
+    if (!text.trim()) {
+      setBulkImportPreview([]);
+      return;
+    }
+    const parsed = spreadsheetService.parseAchievementsCSV(text);
+    if (parsed.error) {
+      if (text.length > 50) {
+        showToast(parsed.error, 'error');
+      }
+      setBulkImportPreview([]);
+    } else {
+      setBulkImportPreview(parsed.records);
+    }
+  };
+
+  const triggerAchievementsBulkFileUpload = () => {
+    if (Platform.OS === 'web') {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.xlsx,.xls,.csv,.tsv,.txt';
+      input.onchange = (event: any) => {
+        const file = event.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
+          
+          reader.onload = (e) => {
+            let text = '';
+            if (isExcel) {
+              text = spreadsheetService.parseExcelToText(e.target?.result as ArrayBuffer);
+            } else {
+              text = e.target?.result as string;
+            }
+            setBulkImportText(text);
+            
+            const parsed = spreadsheetService.parseAchievementsCSV(text);
+            if (parsed.error) {
+              showToast(parsed.error, 'error');
+              setBulkImportPreview([]);
+            } else {
+              setBulkImportPreview(parsed.records);
+              showToast(`Parsed ${parsed.records.length} bulk achievements successfully! Check preview below.`, 'success');
+            }
+          };
+          
+          if (isExcel) {
+            reader.readAsArrayBuffer(file);
+          } else {
+            reader.readAsText(file);
+          }
+        }
+      };
+      input.click();
+    } else {
+      showToast('File uploads only supported in web environment.', 'warning');
+    }
+  };
+
+  const handleExecuteAchievementsImport = async () => {
+    if (bulkImportPreview.length === 0) return;
+    setBulkImporting(true);
+    setBulkImportLogs([]);
+
+    const logs: string[] = [];
+    const addLog = (msg: string) => {
+      logs.push(msg);
+      setBulkImportLogs([...logs]);
+    };
+
+    addLog('Starting bulk achievements import...');
+
+    let successCount = 0;
+    let skipCount = 0;
+
+    try {
+      const { pointsService } = require('@/services/pointsService');
+      const pointsConfig = await pointsService.getPointsConfig();
+      const pointsValue = pointsConfig.automatedPoints.achievement || 15;
+
+      for (const row of bulkImportPreview) {
+        // Find matching student
+        let matchedStudent = null;
+        
+        // Match by studentId if provided
+        if (row.studentId) {
+          matchedStudent = students.find(s => s.uid === row.studentId);
+        }
+
+        // Match by Tamil Name
+        if (!matchedStudent && row.studentTamil) {
+          const cleanTamil = row.studentTamil.replace(/\s+/g, '').toLowerCase();
+          matchedStudent = students.find(s => {
+            const studentTamil = (s.fullNameTamil || '').replace(/\s+/g, '').toLowerCase();
+            return studentTamil === cleanTamil;
+          });
+        }
+
+        // Match by English Name (fallback)
+        if (!matchedStudent && row.studentName) {
+          const cleanName = row.studentName.replace(/\s+/g, '').toLowerCase();
+          matchedStudent = students.find(s => {
+            const studentName = (s.fullName || '').replace(/\s+/g, '').toLowerCase();
+            return studentName === cleanName;
+          });
+        }
+
+        if (!matchedStudent) {
+          addLog(`❌ Skipped: Could not find student matching name "${row.studentTamil || row.studentName || 'Unknown'}" in student directory.`);
+          skipCount++;
+          continue;
+        }
+
+        // Build notes & notesTa
+        const notesEn = `Event: ${row.awardName || 'BMTC 2026'}, Level: ${row.rank || 'Distinction'}, School: ${row.school || 'Parramatta'}. ${row.notes || ''}`.trim();
+        const notesTa = `போட்டி: ${row.awardName || ''}, தரநிலை: ${row.rank || ''}, பள்ளி: ${row.school || ''}. ${row.notes || ''}`.trim();
+
+        // Create achievement record
+        const payload = {
+          studentId: matchedStudent.uid,
+          studentName: matchedStudent.fullName,
+          awardName: `BMTC 2026 - ${row.awardName}`,
+          awardNameTa: `BMTC 2026 - ${row.awardName}`,
+          awardType: 'Competition',
+          dateReceived: row.dateReceived || new Date().toISOString().split('T')[0],
+          notes: notesEn,
+          notesTa: notesTa,
+          recordedBy: user?.fullName || 'Staff Member',
+          status: 'approved' as const
+        };
+
+        // Create the achievement doc in Firestore
+        const createdAch = await mockDb.createAchievement(payload);
+
+        // Award points
+        try {
+          await pointsService.awardPoints(
+            matchedStudent.uid,
+            pointsValue,
+            'achievement',
+            `Approved student achievement: "${payload.awardName}" (ID: ${createdAch.achievementId})`,
+            user?.uid || 'system',
+            user?.fullName || 'System'
+          );
+          addLog(`✅ Saved: ${matchedStudent.fullName} - ${payload.awardName} (+${pointsValue} points)`);
+        } catch (ptsErr: any) {
+          addLog(`⚠️ Saved: ${matchedStudent.fullName} - ${payload.awardName} (Failed to award points: ${ptsErr.message || ptsErr})`);
+        }
+
+        successCount++;
+      }
+
+      addLog(`\n🎉 Bulk import completed successfully. Processed ${successCount} achievements, skipped ${skipCount} entries.`);
+      showToast(`Imported ${successCount} achievements successfully!`, 'success');
+      
+      // Clear preview
+      setBulkImportPreview([]);
+      setBulkImportText('');
+      
+      // Refresh database
+      loadData();
+    } catch (err: any) {
+      addLog(`❌ Critical Error: ${err.message || err}`);
+      showToast('Failed to execute bulk achievements import.', 'error');
+    } finally {
+      setBulkImporting(false);
     }
   };
 
@@ -1245,13 +1423,187 @@ export function ReportsTab({
                 <ThemedText style={{ fontSize: 16, fontWeight: '800', color: colors.text }}>
                   {editingAchievementId 
                     ? (i18n.language === 'ta' ? 'சாதனை விவரங்களை திருத்தவும்' : 'Edit Achievement Details')
-                    : isParent 
-                      ? (i18n.language === 'ta' ? 'சாதனையை சமர்ப்பிக்கவும்' : 'Submit Achievement') 
-                      : (i18n.language === 'ta' ? 'புதிய சாதனை விவரம்' : 'Record Achievement')}
+                    : isBulkImportMode
+                      ? (i18n.language === 'ta' ? 'மொத்தமாக சாதனைகள் பதிவேற்றம்' : 'Bulk Import Achievements')
+                      : isParent 
+                        ? (i18n.language === 'ta' ? 'சாதனையை சமர்ப்பிக்கவும்' : 'Submit Achievement') 
+                        : (i18n.language === 'ta' ? 'புதிய சாதனை விவரம்' : 'Record Achievement')}
                 </ThemedText>
               </View>
 
-              {/* Form Input fields */}
+              {!isParent && !editingAchievementId && (
+                <View style={{ flexDirection: 'row', gap: Spacing.two, marginBottom: Spacing.three }}>
+                  <Pressable
+                    onPress={() => setIsBulkImportMode(false)}
+                    style={[
+                      { flex: 1, paddingVertical: 10, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+                      !isBulkImportMode ? { backgroundColor: colors.primary, borderColor: colors.primary } : { borderColor: colors.border }
+                    ]}
+                  >
+                    <ThemedText style={{ color: !isBulkImportMode ? '#FFF' : colors.text, fontSize: 12, fontWeight: '700' }}>
+                      {i18n.language === 'ta' ? 'தனி சாதனைப் பதிவு' : 'Record Single Award'}
+                    </ThemedText>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => setIsBulkImportMode(true)}
+                    style={[
+                      { flex: 1, paddingVertical: 10, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+                      isBulkImportMode ? { backgroundColor: colors.primary, borderColor: colors.primary } : { borderColor: colors.border }
+                    ]}
+                  >
+                    <ThemedText style={{ color: isBulkImportMode ? '#FFF' : colors.text, fontSize: 12, fontWeight: '700' }}>
+                      {i18n.language === 'ta' ? 'மொத்தமாக CSV இறக்குமதி' : 'Bulk Import CSV/Excel'}
+                    </ThemedText>
+                  </Pressable>
+                </View>
+              )}
+
+              {isBulkImportMode && !isParent && (
+                <View style={{ gap: Spacing.three }}>
+                  {/* File Pick and Upload row */}
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: Spacing.two }}>
+                    <ThemedText style={{ fontSize: 13, fontWeight: '700', color: colors.textSecondary, flex: 1 }}>
+                      {i18n.language === 'ta' 
+                        ? 'Excel அல்லது CSV கோப்பை மொத்தமாகப் பதிவேற்றவும்' 
+                        : 'Upload achievements bulk Excel/CSV file:'}
+                    </ThemedText>
+                    
+                    <Pressable
+                      onPress={triggerAchievementsBulkFileUpload}
+                      style={({ pressed }) => [
+                        { borderStyle: 'dashed', borderWidth: 1, borderColor: colors.secondary, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 },
+                        { opacity: pressed ? 0.8 : 1 }
+                      ]}
+                    >
+                      <ThemedText style={{ fontSize: 11, fontWeight: '700', color: colors.secondary }}>📁 Choose File (.csv, .xlsx)</ThemedText>
+                    </Pressable>
+                  </View>
+
+                  {/* Paste Box */}
+                  <View style={localStyles.formGroup}>
+                    <ThemedText style={[localStyles.inputLabel, { color: colors.textSecondary }]}>
+                      {i18n.language === 'ta' 
+                        ? 'அல்லது விரிதாள் நெடுவரிசைகளை (போட்டி, போட்டியாளர், பள்ளி, தரநிலை) இங்கே ஒட்டவும்:' 
+                        : 'Or paste spreadsheet columns (Competition, Competitor, School, Result) here:'}
+                    </ThemedText>
+                    <TextInput
+                      style={[
+                        localStyles.textInput, 
+                        { 
+                          color: colors.text, 
+                          borderColor: colors.border, 
+                          backgroundColor: colors.background, 
+                          height: 120, 
+                          paddingTop: 10,
+                          textAlignVertical: 'top',
+                          fontSize: 11, 
+                          fontFamily: Platform.OS === 'web' ? 'monospace' : 'default' 
+                        }
+                      ]}
+                      multiline
+                      placeholder="e.g.
+போட்டி	போட்டியாளர்	பள்ளி	தரநிலை/தர வரிசை
+குழந்தைப் பாட்டுப்போட்டி - அ பிரிவு	ரயன் ராம்கோபால்	பரமட்டா	உயர் நிலை
+குழந்தைப் பாட்டுப்போட்டி - அ பிரிவு	குரு தேவ் ஹரிஹரசங்கர்	பரமட்டா	உயர் நிலை"
+                      placeholderTextColor={colors.textSecondary}
+                      value={bulkImportText}
+                      onChangeText={handleImportTextChange}
+                    />
+                  </View>
+
+                  {/* Bulk Preview */}
+                  {bulkImportPreview.length > 0 && (
+                    <View style={{ gap: Spacing.two, marginTop: Spacing.one }}>
+                      <ThemedText style={{ fontSize: 13, fontWeight: '800', color: colors.secondary }}>
+                        👀 Ready to Import: {bulkImportPreview.length} achievements parsed
+                      </ThemedText>
+
+                      {/* Preview List */}
+                      <View style={{ maxHeight: 200, borderWidth: 1, borderColor: colors.border, borderRadius: 10, overflow: 'hidden' }}>
+                        <ScrollView style={{ padding: 8, backgroundColor: colors.background }}>
+                          {bulkImportPreview.map((row, idx) => {
+                            // Find student match status
+                            let matched = null;
+                            if (row.studentId) {
+                              matched = students.find(s => s.uid === row.studentId);
+                            }
+                            if (!matched && row.studentTamil) {
+                              const cleanTamil = row.studentTamil.replace(/\s+/g, '').toLowerCase();
+                              matched = students.find(s => (s.fullNameTamil || '').replace(/\s+/g, '').toLowerCase() === cleanTamil);
+                            }
+                            if (!matched && row.studentName) {
+                              const cleanName = row.studentName.replace(/\s+/g, '').toLowerCase();
+                              matched = students.find(s => (s.fullName || '').replace(/\s+/g, '').toLowerCase() === cleanName);
+                            }
+
+                            return (
+                              <View key={idx} style={{ paddingVertical: 6, borderBottomWidth: 1, borderColor: colors.border, flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+                                <View style={{ flex: 1 }}>
+                                  <ThemedText style={{ fontSize: 11, fontWeight: '700' }}>
+                                    {row.awardName}
+                                  </ThemedText>
+                                  <ThemedText style={{ fontSize: 10, color: colors.textSecondary }}>
+                                    {row.rank} | {row.school}
+                                  </ThemedText>
+                                </View>
+                                <View style={{ alignItems: 'flex-end', minWidth: 120 }}>
+                                  {matched ? (
+                                    <View style={{ backgroundColor: '#D1FAE5', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                                      <ThemedText style={{ fontSize: 9, color: '#065F46', fontWeight: '700' }}>
+                                        ✅ {matched.fullName}
+                                      </ThemedText>
+                                    </View>
+                                  ) : (
+                                    <View style={{ backgroundColor: '#FEE2E2', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                                      <ThemedText style={{ fontSize: 9, color: '#991B1B', fontWeight: '700' }}>
+                                        ❌ Unmatched: {row.studentTamil || row.studentName}
+                                      </ThemedText>
+                                    </View>
+                                  )}
+                                </View>
+                              </View>
+                            );
+                          })}
+                        </ScrollView>
+                      </View>
+
+                      {/* Confirm and execute button */}
+                      <Pressable
+                        onPress={handleExecuteAchievementsImport}
+                        disabled={bulkImporting}
+                        style={({ pressed }) => [
+                          { backgroundColor: colors.primary, paddingVertical: 12, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginTop: 6 },
+                          { opacity: pressed || bulkImporting ? 0.9 : 1 }
+                        ]}
+                      >
+                        {bulkImporting ? (
+                          <ActivityIndicator size="small" color="#FFF" />
+                        ) : (
+                          <ThemedText style={{ color: '#FFF', fontWeight: '800', fontSize: 13 }}>🚀 Confirm & Save Bulk Achievements</ThemedText>
+                        )}
+                      </Pressable>
+                    </View>
+                  )}
+
+                  {/* Logs Console */}
+                  {bulkImportLogs.length > 0 && (
+                    <View style={{ gap: 4, marginTop: Spacing.two }}>
+                      <ThemedText style={{ fontSize: 11, fontWeight: '700', color: colors.text }}>⚙️ Import Process Logs:</ThemedText>
+                      <ScrollView style={{ height: 120, backgroundColor: '#1e1e1e', borderRadius: 8, padding: 8, borderWidth: 1, borderColor: '#333' }}>
+                        {bulkImportLogs.map((log, idx) => (
+                          <ThemedText key={idx} style={{ color: log.startsWith('❌') ? '#ff6b6b' : log.startsWith('⚠️') ? '#ffd23f' : log.startsWith('✅') ? '#51cf66' : '#dcdcdc', fontSize: 10, fontFamily: Platform.OS === 'web' ? 'monospace' : 'default', marginBottom: 2 }}>
+                            {log}
+                          </ThemedText>
+                        ))}
+                      </ScrollView>
+                    </View>
+                  )}
+                </View>
+              )}
+
+              {!isBulkImportMode && (
+                <View style={{ gap: 0 }}>
+                  {/* Form Input fields */}
               
               {/* Class Selector (Staff Only) */}
               {!isParent && (
@@ -1558,6 +1910,8 @@ export function ReportsTab({
                   </ThemedText>
                 </Pressable>
               </View>
+            </View>
+          )}
             </View>
           )}
         </ScrollView>
