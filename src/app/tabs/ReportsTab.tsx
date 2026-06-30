@@ -971,6 +971,19 @@ export function ReportsTab({
   const handleStartEdit = (ach: any) => {
     setEditingAchievementId(ach.achievementId);
     setFormStudentId(ach.studentId);
+    
+    // Auto-select Class based on student
+    if (ach.studentId) {
+      const studentClass = classes.find(c => (c.studentIds || []).includes(ach.studentId));
+      if (studentClass) {
+        setFormClassId(studentClass.classId);
+      } else {
+        setFormClassId('');
+      }
+    } else {
+      setFormClassId('');
+    }
+
     setFormAwardNameEn(ach.awardName);
     setFormAwardNameTa(ach.awardNameTa || '');
     setAwardNameTaDirty(true);

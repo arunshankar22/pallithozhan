@@ -1,11 +1,13 @@
 export const API_URL = (() => {
   if (typeof window !== 'undefined' && window.location && window.location.hostname) {
     const hostname = window.location.hostname;
-    // On Vercel deployments (previews and custom domains ending in vercel.app),
-    // always use the same domain to call serverless backend endpoints.
-    if (hostname.endsWith('.vercel.app') || hostname === 'pallithozhan.vercel.app') {
-      return `${window.location.origin}/api`;
+    // For local development on expo dev server (e.g. localhost:8081 / 192.168.x.x)
+    // call the local express server on port 5000.
+    // For Vercel hosting environments, call same domain endpoint /api.
+    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.168.')) {
+      return 'http://localhost:5000/api';
     }
+    return `${window.location.origin}/api`;
   }
 
   if (process.env.EXPO_PUBLIC_API_URL) {
