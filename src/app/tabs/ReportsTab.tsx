@@ -296,6 +296,37 @@ export function ReportsTab({
   const [bulkImporting, setBulkImporting] = useState(false);
   const [bulkImportLogs, setBulkImportLogs] = useState<string[]>([]);
 
+  // Inline edit state for bulk preview
+  const [editingRowIndex, setEditingRowIndex] = useState<number | null>(null);
+  const [editRowName, setEditRowName] = useState('');
+  const [editRowTamil, setEditRowTamil] = useState('');
+  const [editRowAwardName, setEditRowAwardName] = useState('');
+  const [editRowRank, setEditRowRank] = useState('');
+  const [editRowSchool, setEditRowSchool] = useState('');
+
+  const handleStartInlineEdit = (index: number, row: any) => {
+    setEditingRowIndex(index);
+    setEditRowName(row.studentName || '');
+    setEditRowTamil(row.studentTamil || '');
+    setEditRowAwardName(row.awardName || '');
+    setEditRowRank(row.rank || '');
+    setEditRowSchool(row.school || '');
+  };
+
+  const handleSaveInlineEdit = (index: number) => {
+    const updatedPreview = [...bulkImportPreview];
+    updatedPreview[index] = {
+      ...updatedPreview[index],
+      studentName: editRowName,
+      studentTamil: editRowTamil,
+      awardName: editRowAwardName,
+      rank: editRowRank,
+      school: editRowSchool
+    };
+    setBulkImportPreview(updatedPreview);
+    setEditingRowIndex(null);
+  };
+
   // Debouncing for Translation Triggers
   const debouncedAwardNameEn = useDebounce(formAwardNameEn, 700);
   const debouncedNotesEn = useDebounce(formNotesEn, 850);
@@ -1640,30 +1671,110 @@ export function ReportsTab({
                             const matched = findMatchingStudent(row, students);
 
                             return (
-                              <View key={idx} style={{ paddingVertical: 6, borderBottomWidth: 1, borderColor: colors.border, flexDirection: 'row', gap: 6, alignItems: 'center' }}>
-                                <View style={{ flex: 1 }}>
-                                  <ThemedText style={{ fontSize: 11, fontWeight: '700' }}>
-                                    {row.awardName}
-                                  </ThemedText>
-                                  <ThemedText style={{ fontSize: 10, color: colors.textSecondary }}>
-                                    {row.rank} | {row.school}
-                                  </ThemedText>
-                                </View>
-                                <View style={{ alignItems: 'flex-end', minWidth: 120 }}>
-                                  {matched ? (
-                                    <View style={{ backgroundColor: '#D1FAE5', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                                      <ThemedText style={{ fontSize: 9, color: '#065F46', fontWeight: '700' }}>
-                                        ✅ {matched.fullName}
+                              <View key={idx} style={{ paddingVertical: 8, borderBottomWidth: 1, borderColor: colors.border, gap: 4 }}>
+                                {editingRowIndex === idx ? (
+                                  <View style={{ gap: 6, padding: 4 }}>
+                                    <View style={{ flexDirection: 'row', gap: 6 }}>
+                                      <View style={{ flex: 1 }}>
+                                        <ThemedText style={{ fontSize: 9, fontWeight: '700', color: colors.textSecondary }}>Competitor / Tamil Name</ThemedText>
+                                        <TextInput
+                                          style={{ height: 28, borderWidth: 1, borderColor: colors.border, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2, fontSize: 11, color: colors.text, backgroundColor: colors.background }}
+                                          value={editRowTamil}
+                                          onChangeText={setEditRowTamil}
+                                          placeholder="Tamil Name"
+                                          placeholderTextColor={colors.textSecondary}
+                                        />
+                                        <TextInput
+                                          style={{ height: 28, borderWidth: 1, borderColor: colors.border, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2, fontSize: 10, color: colors.text, backgroundColor: colors.background, marginTop: 4 }}
+                                          value={editRowName}
+                                          onChangeText={setEditRowName}
+                                          placeholder="English Name (Optional)"
+                                          placeholderTextColor={colors.textSecondary}
+                                        />
+                                      </View>
+                                      <View style={{ flex: 1 }}>
+                                        <ThemedText style={{ fontSize: 9, fontWeight: '700', color: colors.textSecondary }}>Competition Name</ThemedText>
+                                        <TextInput
+                                          style={{ height: 28, borderWidth: 1, borderColor: colors.border, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2, fontSize: 11, color: colors.text, backgroundColor: colors.background }}
+                                          value={editRowAwardName}
+                                          onChangeText={setEditRowAwardName}
+                                          placeholder="Competition"
+                                          placeholderTextColor={colors.textSecondary}
+                                        />
+                                      </View>
+                                    </View>
+                                    <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+                                      <View style={{ flex: 1 }}>
+                                        <ThemedText style={{ fontSize: 9, fontWeight: '700', color: colors.textSecondary }}>Rank</ThemedText>
+                                        <TextInput
+                                          style={{ height: 28, borderWidth: 1, borderColor: colors.border, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2, fontSize: 10, color: colors.text, backgroundColor: colors.background }}
+                                          value={editRowRank}
+                                          onChangeText={setEditRowRank}
+                                          placeholder="Rank"
+                                          placeholderTextColor={colors.textSecondary}
+                                        />
+                                      </View>
+                                      <View style={{ flex: 1 }}>
+                                        <ThemedText style={{ fontSize: 9, fontWeight: '700', color: colors.textSecondary }}>School</ThemedText>
+                                        <TextInput
+                                          style={{ height: 28, borderWidth: 1, borderColor: colors.border, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2, fontSize: 10, color: colors.text, backgroundColor: colors.background }}
+                                          value={editRowSchool}
+                                          onChangeText={setEditRowSchool}
+                                          placeholder="School"
+                                          placeholderTextColor={colors.textSecondary}
+                                        />
+                                      </View>
+                                      <View style={{ flexDirection: 'row', gap: 6, marginTop: 12 }}>
+                                        <Pressable
+                                          onPress={() => handleSaveInlineEdit(idx)}
+                                          style={{ backgroundColor: '#10B981', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 4 }}
+                                        >
+                                          <ThemedText style={{ color: '#FFF', fontSize: 10, fontWeight: '700' }}>Save</ThemedText>
+                                        </Pressable>
+                                        <Pressable
+                                          onPress={() => setEditingRowIndex(null)}
+                                          style={{ backgroundColor: '#EF4444', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 4 }}
+                                        >
+                                          <ThemedText style={{ color: '#FFF', fontSize: 10, fontWeight: '700' }}>Cancel</ThemedText>
+                                        </Pressable>
+                                      </View>
+                                    </View>
+                                  </View>
+                                ) : (
+                                  <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center', width: '100%' }}>
+                                    <View style={{ flex: 1 }}>
+                                      <ThemedText style={{ fontSize: 11, fontWeight: '700', color: colors.text }}>
+                                        {row.awardName}
+                                      </ThemedText>
+                                      <ThemedText style={{ fontSize: 10, color: colors.textSecondary }}>
+                                        {row.rank} | {row.school}
                                       </ThemedText>
                                     </View>
-                                  ) : (
-                                    <View style={{ backgroundColor: '#FEE2E2', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                                      <ThemedText style={{ fontSize: 9, color: '#991B1B', fontWeight: '700' }}>
-                                        ❌ Unmatched: {row.studentTamil || row.studentName}
-                                      </ThemedText>
+                                    <View style={{ alignItems: 'flex-end', minWidth: 140, gap: 4 }}>
+                                      {matched ? (
+                                        <View style={{ backgroundColor: '#D1FAE5', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                                          <ThemedText style={{ fontSize: 9, color: '#065F46', fontWeight: '700' }}>
+                                            ✅ {matched.fullName}
+                                          </ThemedText>
+                                        </View>
+                                      ) : (
+                                        <View style={{ backgroundColor: '#FEE2E2', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                                          <ThemedText style={{ fontSize: 9, color: '#991B1B', fontWeight: '700' }}>
+                                            ❌ Unmatched: {row.studentTamil || row.studentName}
+                                          </ThemedText>
+                                        </View>
+                                      )}
+                                      <Pressable
+                                        onPress={() => handleStartInlineEdit(idx, row)}
+                                        style={{ marginTop: 2 }}
+                                      >
+                                        <ThemedText style={{ fontSize: 10, color: colors.secondary, fontWeight: '700', textDecorationLine: 'underline' }}>
+                                          ✏️ Edit Record
+                                        </ThemedText>
+                                      </Pressable>
                                     </View>
-                                  )}
-                                </View>
+                                  </View>
+                                )}
                               </View>
                             );
                           })}
