@@ -630,7 +630,9 @@ async function handleApiRoutes(req, res, pathname, method, dbData, writeDb, urlO
           body: JSON.stringify({
             contents: [{
               parts: [{
-                text: `Translate this educational school text to standard Tamil meaning. Keep the numbers as numbers (e.g. 'Term 2 Week 7' becomes 'பருவம் 2 வாரம் 7'). Respond ONLY with the final translated Tamil text, without any additional explanations, notes, markdown formatting, or chat prefixes.\n\nText:\n${text}`
+                text: /[\u0B80-\u0BFF]/.test(text)
+                  ? `Translate this Tamil text to standard English meaning. Keep the numbers as numbers. Respond ONLY with the final translated English text, without any additional explanations, notes, markdown formatting, or chat prefixes.\n\nText:\n${text}`
+                  : `Translate this educational school text to standard Tamil meaning. Keep the numbers as numbers (e.g. 'Term 2 Week 7' becomes 'பருவம் 2 வாரம் 7'). Respond ONLY with the final translated Tamil text, without any additional explanations, notes, markdown formatting, or chat prefixes.\n\nText:\n${text}`
               }]
             }],
             generationConfig: {
