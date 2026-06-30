@@ -97,6 +97,143 @@ const getAwardMeta = (type: string) => {
   }
 };
 
+const findMatchingStudent = (row: any, students: any[]) => {
+  if (row.studentId) {
+    const matched = students.find(s => s.uid === row.studentId);
+    if (matched) return matched;
+  }
+
+  // Helper to normalize Tamil pulli/anusvara differences
+  // Unicode U+0B82 (ஂ) is Tamil Anusvara. Unicode U+0BCD (்) is Tamil Pulli.
+  const normalizeTamilSpelling = (str: string) => {
+    if (!str) return '';
+    return str
+      .replace(/ஂ/g, '்') // Convert anusvara to pulli
+      .replace(/[^a-zA-Z0-9\u0B80-\u0BFF]/g, '') // Keep alphanumeric and Tamil block only
+      .toLowerCase();
+  };
+
+  const getLevenshteinDistance = (a: string, b: string): number => {
+    const matrix = [];
+    for (let i = 0; i <= b.length; i++) matrix[i] = [i];
+    for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+    for (let i = 1; i <= b.length; i++) {
+      for (let j = 1; j <= a.length; j++) {
+        if (b.charAt(i - 1) === a.charAt(j - 1)) {
+          matrix[i][j] = matrix[i - 1][j - 1];
+        } else {
+          matrix[i][j] = Math.min(
+            matrix[i - 1][j - 1] + 1,
+            matrix[i][j - 1] + 1,
+            matrix[i - 1][j] + 1
+          );
+        }
+      }
+    }
+    return matrix[b.length][a.length];
+  };
+
+  const getSimilarity = (a: string, b: string): number => {
+    if (a === b) return 1.0;
+    if (a.length === 0 || b.length === 0) return 0.0;
+    const dist = getLevenshteinDistance(a, b);
+    return 1 - dist / Math.max(a.length, b.length);
+  };
+
+  // Helper to phonetically approximate Tamil names to English
+  const transliterateTamilToEnglish = (tamilStr: string): string => {
+    const norm = normalizeTamilSpelling(tamilStr);
+    return norm
+      .replace(/சிதிக்ஷா/g, 'sidhiksha').replace(/சிதிக்ஷ/g, 'sidhiksha')
+      .replace(/சித்தரஞ்சன்/g, 'siddharanjan').replace(/சித்தரஞ்ஜன்/g, 'siddharanjan')
+      .replace(/கவின்/g, 'kavin').replace(/ராஜகோபால்/g, 'rajagopal')
+      .replace(/ஸ்மிருதி/g, 'smriti').replace(/ராகவன்/g, 'raghavan')
+      .replace(/கவினேஷ்/g, 'kavinesh').replace(/சித்தூராஜன்/g, 'chithurajan')
+      .replace(/அ/g, 'a').replace(/ஆ/g, 'a').replace(/இ/g, 'i').replace(/ஈ/g, 'i')
+      .replace(/உ/g, 'u').replace(/ஊ/g, 'u').replace(/எ/g, 'e').replace(/ஏ/g, 'e')
+      .replace(/ஒ/g, 'o').replace(/ஓ/g, 'o').replace(/ஔ/g, 'au')
+      .replace(/க/g, 'k').replace(/ங/g, 'ng').replace(/ச/g, 's').replace(/ஞ/g, 'gn')
+      .replace(/ட/g, 't').replace(/ண/g, 'n').replace(/த/g, 'th').replace(/ந/g, 'n')
+      .replace(/ப/g, 'p').replace(/ம/g, 'm').replace(/ய/g, 'y').replace(/ர/g, 'r')
+      .replace(/ல/g, 'l').replace(/வ/g, 'v').replace(/ழ/g, 'zh').replace(/ள/g, 'l')
+      .replace(/ற/g, 'r').replace(/ன/g, 'n')
+      .replace(/ஜ/g, 'j').replace(/ஷ/g, 'sh').replace(/ஸ/g, 's').replace(/ஹ/g, 'h')
+      .replace(/க்ஷ/g, 'ksh')
+      .replace(/்/g, '');
+  };
+
+  // 1. Exact match on Tamil Name
+  if (row.studentTamil) {
+    const cleanTamil = row.studentTamil.replace(/\s+/g, '').toLowerCase();
+    const matched = students.find(s => (s.fullNameTamil || '').replace(/\s+/g, '').toLowerCase() === cleanTamil);
+    if (matched) return matched;
+  }
+
+  // 2. Exact match on English Name
+  if (row.studentName) {
+    const cleanName = row.studentName.replace(/\s+/g, '').toLowerCase();
+    const matched = students.find(s => (s.fullName || '').replace(/\s+/g, '').toLowerCase() === cleanName);
+    if (matched) return matched;
+  }
+
+  // 3. Try Normalized exact match in Tamil
+  if (row.studentTamil) {
+    const normInputTamil = normalizeTamilSpelling(row.studentTamil);
+    let matched = students.find(s => normalizeTamilSpelling(s.fullNameTamil) === normInputTamil);
+    if (matched) return matched;
+    
+    // 4. Try Fuzzy match in Tamil (similarity >= 0.85)
+    matched = students.find(s => {
+      const normDbTamil = normalizeTamilSpelling(s.fullNameTamil);
+      return normDbTamil && getSimilarity(normDbTamil, normInputTamil) >= 0.85;
+    });
+    if (matched) return matched;
+
+    // 5. Try to match Tamil input against English DB names by transliterating
+    const transliteratedInput = transliterateTamilToEnglish(row.studentTamil);
+    matched = students.find(s => {
+      const normDbEnglish = (s.fullName || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const normDbTamilTrans = transliterateTamilToEnglish(s.fullNameTamil || '');
+      
+      return (normDbEnglish && getSimilarity(normDbEnglish, transliteratedInput) >= 0.85) ||
+             (normDbTamilTrans && getSimilarity(normDbTamilTrans, transliteratedInput) >= 0.85);
+    });
+    if (matched) return matched;
+  }
+
+  // 6. Try word-by-word intersection match for English/Tamil mixed database entries (like "Kavin ராஜகோபால்" / "கவின்")
+  if (row.studentTamil || row.studentName) {
+    const inputWords = (row.studentTamil || row.studentName || '')
+      .split(/[\s,.\u00A0\u200B]+/g)
+      .map((w: string) => w.trim())
+      .filter((w: string) => w.length > 1);
+
+    if (inputWords.length > 0) {
+      const matched = students.find(s => {
+        const dbWords = `${s.fullName || ''} ${s.fullNameTamil || ''}`
+          .split(/[\s,.\u00A0\u200B]+/g)
+          .map((w: string) => w.trim())
+          .filter((w: string) => w.length > 1);
+        
+        let overlaps = 0;
+        inputWords.forEach((iWord: string) => {
+          const normIWord = normalizeTamilSpelling(iWord) || iWord.toLowerCase();
+          const hasMatch = dbWords.some((dbWord: string) => {
+            const normDbWord = normalizeTamilSpelling(dbWord) || dbWord.toLowerCase();
+            return normDbWord.includes(normIWord) || normIWord.includes(normDbWord) || getSimilarity(normDbWord, normIWord) >= 0.85;
+          });
+          if (hasMatch) overlaps++;
+        });
+
+        return overlaps >= Math.min(2, inputWords.length);
+      });
+      if (matched) return matched;
+    }
+  }
+
+  return null;
+};
+
 export function ReportsTab({
   user,
   colors,
@@ -597,30 +734,7 @@ export function ReportsTab({
 
       for (const row of bulkImportPreview) {
         // Find matching student
-        let matchedStudent = null;
-        
-        // Match by studentId if provided
-        if (row.studentId) {
-          matchedStudent = students.find(s => s.uid === row.studentId);
-        }
-
-        // Match by Tamil Name
-        if (!matchedStudent && row.studentTamil) {
-          const cleanTamil = row.studentTamil.replace(/\s+/g, '').toLowerCase();
-          matchedStudent = students.find(s => {
-            const studentTamil = (s.fullNameTamil || '').replace(/\s+/g, '').toLowerCase();
-            return studentTamil === cleanTamil;
-          });
-        }
-
-        // Match by English Name (fallback)
-        if (!matchedStudent && row.studentName) {
-          const cleanName = row.studentName.replace(/\s+/g, '').toLowerCase();
-          matchedStudent = students.find(s => {
-            const studentName = (s.fullName || '').replace(/\s+/g, '').toLowerCase();
-            return studentName === cleanName;
-          });
-        }
+        const matchedStudent = findMatchingStudent(row, students);
 
         if (!matchedStudent) {
           addLog(`❌ Skipped: Could not find student matching name "${row.studentTamil || row.studentName || 'Unknown'}" in student directory.`);
@@ -1523,18 +1637,7 @@ export function ReportsTab({
                         <ScrollView style={{ padding: 8, backgroundColor: colors.background }}>
                           {bulkImportPreview.map((row, idx) => {
                             // Find student match status
-                            let matched = null;
-                            if (row.studentId) {
-                              matched = students.find(s => s.uid === row.studentId);
-                            }
-                            if (!matched && row.studentTamil) {
-                              const cleanTamil = row.studentTamil.replace(/\s+/g, '').toLowerCase();
-                              matched = students.find(s => (s.fullNameTamil || '').replace(/\s+/g, '').toLowerCase() === cleanTamil);
-                            }
-                            if (!matched && row.studentName) {
-                              const cleanName = row.studentName.replace(/\s+/g, '').toLowerCase();
-                              matched = students.find(s => (s.fullName || '').replace(/\s+/g, '').toLowerCase() === cleanName);
-                            }
+                            const matched = findMatchingStudent(row, students);
 
                             return (
                               <View key={idx} style={{ paddingVertical: 6, borderBottomWidth: 1, borderColor: colors.border, flexDirection: 'row', gap: 6, alignItems: 'center' }}>
