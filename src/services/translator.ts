@@ -665,8 +665,9 @@ export async function translateWithGemini(text: string): Promise<string> {
     return DICTIONARY[trimmed];
   }
 
-  // 2. Hybrid Lookup: If all words exist in local dictionary, use local autoTranslate instantly
-  if (!hasUnmatchedWords(text)) {
+  // 2. Hybrid Lookup: If all words exist in local dictionary, use local autoTranslate instantly (English only)
+  const isTamil = /[\u0B80-\u0BFF]/.test(text);
+  if (!isTamil && !hasUnmatchedWords(text)) {
     return autoTranslate(text);
   }
 
