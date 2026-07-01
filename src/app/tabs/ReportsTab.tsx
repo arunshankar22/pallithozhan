@@ -983,12 +983,6 @@ export function ReportsTab({
           }
         }
 
-        // Build notes & notesTa
-        const rawNotesEn = row.notes || '';
-        const rawNotesTa = row.notesTa || row.notes || '';
-        const notesEn = `Event: ${row.awardName || 'BMTC 2026'}, Level: ${row.rank || 'Distinction'}, School: ${row.school || 'Parramatta'}. ${rawNotesEn}`.trim();
-        const notesTa = `போட்டி: ${row.awardNameTa || row.awardName || ''}, தரநிலை: ${row.rank || ''}, பள்ளி: ${row.school || ''}. ${rawNotesTa}`.trim();
-
         // Helper to format title prefix safely
         const formatTitle = (title: string) => {
           if (!title) return '';
@@ -996,13 +990,50 @@ export function ReportsTab({
           return `BMTC 2026 - ${title}`;
         };
 
+        // Save-time translations for English / Tamil fields
+        let awardEn = row.awardName || '';
+        let awardTa = row.awardNameTa || row.awardName || '';
+        if (/[\u0B80-\u0BFF]/.test(awardEn)) {
+          const trans = await translateWithGemini(awardEn).catch(() => '');
+          if (trans) awardEn = trans;
+        }
+        if (!/[\u0B80-\u0BFF]/.test(awardTa)) {
+          const trans = await translateWithGemini(awardTa).catch(() => '');
+          if (trans) awardTa = trans;
+        }
+
+        let schoolEn = row.school || 'Parramatta';
+        let schoolTa = row.school || 'பரமாட்டா';
+        if (/[\u0B80-\u0BFF]/.test(schoolEn)) {
+          const trans = await translateWithGemini(schoolEn).catch(() => '');
+          if (trans) schoolEn = trans;
+        }
+        if (!/[\u0B80-\u0BFF]/.test(schoolTa)) {
+          const trans = await translateWithGemini(schoolTa).catch(() => '');
+          if (trans) schoolTa = trans;
+        }
+
+        let rawNotesEn = row.notes || '';
+        let rawNotesTa = row.notesTa || row.notes || '';
+        if (/[\u0B80-\u0BFF]/.test(rawNotesEn)) {
+          const trans = await translateWithGemini(rawNotesEn).catch(() => '');
+          if (trans) rawNotesEn = trans;
+        }
+        if (!/[\u0B80-\u0BFF]/.test(rawNotesTa)) {
+          const trans = await translateWithGemini(rawNotesTa).catch(() => '');
+          if (trans) rawNotesTa = trans;
+        }
+
+        const notesEn = `Event: ${awardEn}, Level: ${row.rank || 'Distinction'}, School: ${schoolEn}. ${rawNotesEn}`.trim();
+        const notesTa = `போட்டி: ${awardTa}, தரநிலை: ${row.rank || ''}, பள்ளி: ${schoolTa}. ${rawNotesTa}`.trim();
+
         // Create achievement record
         const payload = {
           studentId: matchedStudent.uid,
           studentName: matchedStudent.fullName,
           classId: classId,
-          awardName: formatTitle(row.awardName),
-          awardNameTa: formatTitle(row.awardNameTa || row.awardName),
+          awardName: formatTitle(awardEn),
+          awardNameTa: formatTitle(awardTa),
           awardType: 'Competition',
           dateReceived: row.dateReceived || new Date().toISOString().split('T')[0],
           notes: notesEn,
