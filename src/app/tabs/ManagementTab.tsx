@@ -97,6 +97,7 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
   const [bulkImportText, setBulkImportText] = useState('');
   const [bulkImportLogs, setBulkImportLogs] = useState<string[]>([]);
   const [bulkImportPreview, setBulkImportPreview] = useState<any[]>([]);
+  const [bulkImportStrategy, setBulkImportStrategy] = useState<'all' | 'missing'>('all');
 
   useEffect(() => {
     if (!importText.trim()) {
@@ -306,7 +307,7 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
     };
 
     try {
-      const result = await mockDb.importBulkAttendanceData(bulkImportPreview, user, onProgressLog);
+      const result = await mockDb.importBulkAttendanceData(bulkImportPreview, user, onProgressLog, bulkImportStrategy);
       showToast(`Successfully imported rolls for ${result.updatedCount} entries across ${result.datesCount} dates!`, 'success');
       setBulkImportText('');
       setBulkImportPreview([]);
@@ -2257,6 +2258,37 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
                     <ThemedText style={{ fontSize: 11, fontWeight: '700', color: colors.secondary }}>
                       👀 Ready to Import: {bulkImportPreview.length} user rows matched
                     </ThemedText>
+
+                    <View style={{ gap: 6, marginVertical: 4, padding: 10, borderRadius: 8, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background }}>
+                      <ThemedText style={{ fontSize: 10, fontWeight: '700', color: colors.textSecondary }}>
+                        {i18n.language === 'ta' ? 'இறக்குமதி உத்தியைத் தேர்ந்தெடுக்கவும்:' : 'Select Merge Strategy / இறக்குமதி விருப்பம்:'}
+                      </ThemedText>
+                      <View style={{ flexDirection: 'row', gap: 16, marginTop: 4, flexWrap: 'wrap' }}>
+                        <Pressable 
+                          onPress={() => setBulkImportStrategy('all')}
+                          style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
+                        >
+                          <View style={{ width: 14, height: 14, borderRadius: 7, borderWidth: 2, borderColor: colors.primary, justifyContent: 'center', alignItems: 'center' }}>
+                            {bulkImportStrategy === 'all' && <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.primary }} />}
+                          </View>
+                          <ThemedText style={{ fontSize: 11, fontWeight: '600', color: colors.text }}>
+                            {i18n.language === 'ta' ? 'அனைத்து தேதிகளும் (மேலெழுது)' : 'All Dates (Overwrite)'}
+                          </ThemedText>
+                        </Pressable>
+
+                        <Pressable 
+                          onPress={() => setBulkImportStrategy('missing')}
+                          style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
+                        >
+                          <View style={{ width: 14, height: 14, borderRadius: 7, borderWidth: 2, borderColor: colors.primary, justifyContent: 'center', alignItems: 'center' }}>
+                            {bulkImportStrategy === 'missing' && <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.primary }} />}
+                          </View>
+                          <ThemedText style={{ fontSize: 11, fontWeight: '600', color: colors.text }}>
+                            {i18n.language === 'ta' ? 'விடுபட்ட தேதிகள் மட்டும்' : 'Missing Dates Only'}
+                          </ThemedText>
+                        </Pressable>
+                      </View>
+                    </View>
 
                     <Pressable
                       onPress={handleExecuteBulkImport}

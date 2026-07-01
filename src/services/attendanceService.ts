@@ -521,7 +521,8 @@ export const attendanceService = {
   importBulkAttendanceData: async (
     rows: any[],
     currentUser?: any,
-    onProgressLog?: (log: string) => void
+    onProgressLog?: (log: string) => void,
+    importMode: 'all' | 'missing' = 'all'
   ): Promise<{ updatedCount: number; datesCount: number }> => {
     if (!db) throw new Error('Firestore database is not initialized');
     const log = (msg: string) => {
@@ -645,6 +646,11 @@ export const attendanceService = {
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
           existingRecord = { recordId: docSnap.id, ...docSnap.data() };
+        }
+
+        if (importMode === 'missing' && existingRecord) {
+          log(`⚠️ Skipping existing attendance record for Class "${classId}" on date ${date}`);
+          continue;
         }
 
         const mergedRolls: Record<string, 'present' | 'absent'> = {};
