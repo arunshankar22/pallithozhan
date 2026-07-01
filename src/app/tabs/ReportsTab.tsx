@@ -300,6 +300,7 @@ export function ReportsTab({
   const [editingRowIndex, setEditingRowIndex] = useState<number | null>(null);
   const [editRowName, setEditRowName] = useState('');
   const [editRowTamil, setEditRowTamil] = useState('');
+  const [editRowClassId, setEditRowClassId] = useState('');
   const [editRowAwardName, setEditRowAwardName] = useState('');
   const [editRowAwardNameTa, setEditRowAwardNameTa] = useState('');
   const [editRowRank, setEditRowRank] = useState('');
@@ -319,6 +320,19 @@ export function ReportsTab({
     setEditRowSchool(row.school || '');
     setEditRowNotesEn(row.notes || '');
     setEditRowNotesTa(row.notesTa || '');
+
+    // Set Class ID based on matched student if not set, or direct classId
+    let resolvedClassId = row.classId || '';
+    if (!resolvedClassId) {
+      const matched = findMatchingStudent(row, students);
+      if (matched) {
+        const studentClass = classes.find(c => (c.studentIds || []).includes(matched.uid));
+        if (studentClass) {
+          resolvedClassId = studentClass.classId;
+        }
+      }
+    }
+    setEditRowClassId(resolvedClassId);
   };
 
   const handleSaveInlineEdit = (index: number) => {
@@ -327,6 +341,7 @@ export function ReportsTab({
       ...updatedPreview[index],
       studentName: editRowName,
       studentTamil: editRowTamil,
+      classId: editRowClassId,
       awardName: editRowAwardName,
       awardNameTa: editRowAwardNameTa,
       rank: editRowRank,
@@ -408,6 +423,16 @@ export function ReportsTab({
         let notesEn = rec.notes || '';
         let notesTa = rec.notesTa || rec.notes || '';
 
+        // Match student and resolve class ID during load
+        const matchedStudent = findMatchingStudent(rec, students);
+        let classId = rec.classId || '';
+        if (matchedStudent) {
+          const studentClass = classes.find(c => (c.studentIds || []).includes(matchedStudent.uid));
+          if (studentClass) {
+            classId = studentClass.classId;
+          }
+        }
+
         const awardHasTamil = /[\u0B80-\u0BFF]/.test(rec.awardName || '');
         if (awardHasTamil) {
           try {
@@ -446,6 +471,7 @@ export function ReportsTab({
 
         translated.push({
           ...rec,
+          classId: classId,
           awardName: awardNameEn,
           awardNameTa: awardNameTa,
           notes: notesEn,
@@ -1904,6 +1930,31 @@ export function ReportsTab({
                                       </View>
                                     </View>
 
+                                    {/* Class Selection Dropdown in Inline Editor */}
+                                    <View style={{ gap: 4 }}>
+                                      <ThemedText style={{ fontSize: 9, fontWeight: '700', color: colors.textSecondary }}>Class (Auto-selected)</ThemedText>
+                                      <Pressable
+                                        onPress={() => {
+                                          const classOptions = [
+                                            { label: 'No Class / Optional', value: '' },
+                                            ...classes.map(c => ({ label: c.className, value: c.classId }))
+                                          ];
+                                          openCustomPicker(
+                                            'Select Class',
+                                            classOptions,
+                                            setEditRowClassId
+                                          );
+                                        }}
+                                        style={{ height: 28, borderWidth: 1, borderColor: colors.border, borderRadius: 4, paddingHorizontal: 6, justifyContent: 'center', backgroundColor: colors.background }}
+                                      >
+                                        <ThemedText style={{ fontSize: 11, color: colors.text }}>
+                                          {editRowClassId 
+                                            ? (classes.find(c => c.classId === editRowClassId)?.className || 'Select Class')
+                                            : 'Select Class'}
+                                        </ThemedText>
+                                      </Pressable>
+                                    </View>
+
                                     {/* Details (Notes) Section */}
                                     <View style={{ gap: 4 }}>
                                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1960,12 +2011,17 @@ export function ReportsTab({
                                         {row.rank} | {row.school}
                                       </ThemedText>
                                     </View>
-                                    <View style={{ alignItems: 'flex-end', minWidth: 140, gap: 4 }}>
+                                    <View style={{ alignItems: 'flex-end', minWidth: 150, gap: 4 }}>
                                       {matched ? (
-                                        <View style={{ backgroundColor: '#D1FAE5', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                                        <View style={{ backgroundColor: '#D1FAE5', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, gap: 2 }}>
                                           <ThemedText style={{ fontSize: 9, color: '#065F46', fontWeight: '700' }}>
                                             ✅ {matched.fullName}
                                           </ThemedText>
+                                          {classes.find(c => c.classId === row.classId) && (
+                                            <ThemedText style={{ fontSize: 8, color: '#047857', fontWeight: '500' }}>
+                                              🏫 {classes.find(c => c.classId === row.classId)?.className}
+                                            </ThemedText>
+                                          )}
                                         </View>
                                       ) : (
                                         <View style={{ backgroundColor: '#FEE2E2', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
