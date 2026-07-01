@@ -603,11 +603,14 @@ export function ReportsTab({
 
   // Filter logic based on active tab and search/category criteria
   const isParent = user?.role === 'parent';
+  const isStudent = user?.role === 'student';
   const associatedStudentIds = user?.associatedStudents || [];
   
-  const visibleAchievements = isParent
-    ? achievements.filter((ach: any) => associatedStudentIds.includes(ach.studentId))
-    : achievements;
+  const visibleAchievements = isStudent
+    ? achievements.filter((ach: any) => ach.studentId === user?.uid)
+    : isParent
+      ? achievements.filter((ach: any) => associatedStudentIds.includes(ach.studentId))
+      : achievements;
 
   // Filter achievements by approved status vs pending status depending on active sub-tab
   const statusFiltered = visibleAchievements.filter((ach: any) => {
@@ -1572,7 +1575,7 @@ export function ReportsTab({
               </Pressable>
 
               {/* Class Filter for Staff OR Child Filter for Parent */}
-              {isParent ? (
+              {isStudent ? null : isParent ? (
                 /* Parent Child Filter if they have more than 1 student associated */
                 parentStudents.length > 1 && (
                   <Pressable
