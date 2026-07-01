@@ -5,6 +5,27 @@
 import { API_URL } from './dbCommon';
 
 const DICTIONARY: Record<string, string> = {
+  // Exact Tamil-to-English translation mappings for common BMTC awards
+  "கதை எழுதும் போட்டி - அ பிரிவு": "Story Writing Competition - Section A",
+  "பழமொழி - பொன் மொழிகள் - உ பிரிவு": "Proverbs and Golden Words - Section U",
+  "கதை எழுதும் போட்டி": "Story Writing Competition",
+  "பேச்சுப் போட்டி": "Speech Competition",
+  "திருக்குறள் போட்டி": "Thirukkural Competition",
+  "பழமொழி": "Proverbs",
+  "பொன் மொழிகள்": "Golden Words",
+  "அ பிரிவு": "Section A",
+  "ஆ பிரிவு": "Section B",
+  "இ பிரிவு": "Section C",
+  "ஈ பிரிவு": "Section D",
+  "உ பிரிவு": "Section E",
+  "ஊ பிரிவு": "Section F",
+  "பரமாட்டா": "Parramatta",
+
+  // Bidirectional English-to-Tamil equivalents for matching
+  "story writing competition - section a": "கதை எழுதும் போட்டி - அ பிரிவு",
+  "proverbs and golden words - section u": "பழமொழி - பொன் மொழிகள் - உ பிரிவு",
+  "proverbs and golden words - u section": "பழமொழி - பொன் மொழிகள் - உ பிரிவு",
+
   // Common School Terms
   "school": "பள்ளி",
   "tamil school": "தமிழ்ப் பள்ளி",
@@ -634,7 +655,29 @@ export async function translateWithGemini(text: string): Promise<string> {
     console.warn('Backend translation failed, checking direct client-side Gemini API...', err);
   }
 
-  // 4. Client-side direct fallback if EXPO_PUBLIC_GEMINI_API_KEY is configured
+  // 4. Fallback to production API endpoint if local fails
+  if (API_URL.includes('localhost') || API_URL.includes('127.0.0.1')) {
+    try {
+      const response = await fetch('https://pallithozhan.3stech.ai/api/translate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ text })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data && data.translation) {
+          return data.translation;
+        }
+      }
+    } catch (prodErr) {
+      console.warn('Production backend translation failed, falling back to direct client key:', prodErr);
+    }
+  }
+
+  // 5. Client-side direct fallback if EXPO_PUBLIC_GEMINI_API_KEY is configured
   const clientKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
   if (clientKey) {
     try {
