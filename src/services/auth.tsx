@@ -41,6 +41,7 @@ interface AuthContextType {
   updateProfile: (fullName: string, phone: string, profilePicture?: string) => Promise<void>;
   updateAuthPassword: (newPassword: string) => Promise<void>;
   switchRole: (role: 'superadmin' | 'admin' | 'teacher' | 'volunteer' | 'parent' | 'student') => void;
+  resetPassword: (email: string) => Promise<void>;
   isLoading: boolean;
 }
 
@@ -344,8 +345,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const resetPassword = async (emailStr: string): Promise<void> => {
+    if (isDemoMode) {
+      const users = await mockDb.getUsers();
+      const matched = users.find((u: any) => u.email.toLowerCase() === emailStr.toLowerCase());
+      if (!matched) {
+        throw new Error('User not found. Reset email cannot be sent.');
+      }
+      console.log(`Demo: password reset email sent to ${emailStr}`);
+      return;
+    } else {
+      const { sendPasswordResetEmail } = require('firebase/auth');
+      await sendPasswordResetEmail(fbAuth, emailStr);
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, updateLanguage, updateProfile, updateAuthPassword, switchRole, isLoading }}>
+    <AuthContext.Provider value={{ user, login, register, logout, updateLanguage, updateProfile, updateAuthPassword, switchRole, resetPassword, isLoading }}>
       {children}
     </AuthContext.Provider>
   );

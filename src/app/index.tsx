@@ -249,6 +249,7 @@ export default function HomeScreen() {
       const allHomework = await mockDb.getHomework();
       const allAttendance = await mockDb.getAttendance();
       const allClassList = await mockDb.getClasses();
+      setClasses(allClassList);
       const allEvents = await mockDb.getEvents();
 
       // Load points config
