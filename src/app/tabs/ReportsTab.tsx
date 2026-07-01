@@ -295,6 +295,7 @@ export function ReportsTab({
   const [bulkImportPreview, setBulkImportPreview] = useState<any[]>([]);
   const [bulkImporting, setBulkImporting] = useState(false);
   const [bulkImportLogs, setBulkImportLogs] = useState<string[]>([]);
+  const [selectedAchievementIds, setSelectedAchievementIds] = useState<string[]>([]);
 
   // Inline edit state for bulk preview
   const [editingRowIndex, setEditingRowIndex] = useState<number | null>(null);
@@ -1014,6 +1015,7 @@ export function ReportsTab({
 
   // Edit Trigger (pre-populates form)
   const handleStartEdit = (ach: any) => {
+    setIsBulkImportMode(false); // Make sure bulk upload mode is disabled so the edit form displays correctly
     setEditingAchievementId(ach.achievementId);
     setFormStudentId(ach.studentId);
     
@@ -1201,6 +1203,40 @@ export function ReportsTab({
           }
         }
       ]);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedAchievementIds.length === 0) return;
+    
+    const message = i18n.language === 'ta'
+      ? `தேர்ந்தெடுக்கப்பட்ட ${selectedAchievementIds.length} சாதனைகளை நிரந்தரமாக நீக்க விரும்புகிறீர்களா?`
+      : `Are you sure you want to permanently delete the selected ${selectedAchievementIds.length} achievement records?`;
+
+    const confirmAction = Platform.OS === 'web' ? confirm(message) : true;
+    
+    if (confirmAction) {
+      try {
+        setLoading(true);
+        for (const id of selectedAchievementIds) {
+          await mockDb.deleteAchievement(id);
+          if (user) {
+            auditLogService.logAchievementAction(user, 'Deleted', id).catch(e => console.error(e));
+          }
+        }
+        showToast(
+          i18n.language === 'ta'
+            ? 'தேர்ந்தெடுக்கப்பட்ட சாதனைகள் நீக்கப்பட்டன.'
+            : 'Selected records deleted successfully.',
+          'success'
+        );
+        setSelectedAchievementIds([]);
+        loadData();
+      } catch (err) {
+        showToast('Failed to delete some records.', 'error');
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -1509,6 +1545,65 @@ export function ReportsTab({
             )}
           </View>
 
+          {/* Bulk Action Selection Panel */}
+          {!isParent && filteredAchievements.length > 0 && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.two, paddingVertical: 8, backgroundColor: colors.cardBg, borderBottomWidth: 1, borderColor: colors.border }}>
+              <Pressable
+                onPress={() => {
+                  const allSelected = filteredAchievements.every(ach => selectedAchievementIds.includes(ach.achievementId));
+                  if (allSelected) {
+                    // Deselect all current view IDs
+                    const currentIds = filteredAchievements.map(ach => ach.achievementId);
+                    setSelectedAchievementIds(selectedAchievementIds.filter(id => !currentIds.includes(id)));
+                  } else {
+                    // Select all current view IDs
+                    const currentIds = filteredAchievements.map(ach => ach.achievementId);
+                    const unique = Array.from(new Set([...selectedAchievementIds, ...currentIds]));
+                    setSelectedAchievementIds(unique);
+                  }
+                }}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
+              >
+                <View style={{
+                  width: 16,
+                  height: 16,
+                  borderWidth: 1.5,
+                  borderColor: colors.textSecondary,
+                  borderRadius: 4,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: filteredAchievements.every(ach => selectedAchievementIds.includes(ach.achievementId)) ? colors.primary : 'transparent'
+                }}>
+                  {filteredAchievements.every(ach => selectedAchievementIds.includes(ach.achievementId)) && (
+                    <Check size={12} color="#FFF" />
+                  )}
+                </View>
+                <ThemedText style={{ fontSize: 12, fontWeight: '700', color: colors.text }}>
+                  {filteredAchievements.every(ach => selectedAchievementIds.includes(ach.achievementId))
+                    ? (i18n.language === 'ta' ? 'அனைத்தையும் நீக்கு' : 'Deselect All')
+                    : (i18n.language === 'ta' ? 'அனைத்தையும் தேர்ந்தெடு' : 'Select All')}
+                </ThemedText>
+              </Pressable>
+
+              {selectedAchievementIds.length > 0 && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <ThemedText style={{ fontSize: 11, color: colors.textSecondary, fontWeight: '700' }}>
+                    Selected: {selectedAchievementIds.length}
+                  </ThemedText>
+                  <Pressable
+                    onPress={handleBulkDelete}
+                    style={{ backgroundColor: colors.danger, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6, flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                  >
+                    <Trash2 size={12} color="#FFF" />
+                    <ThemedText style={{ color: '#FFF', fontSize: 11, fontWeight: '800' }}>
+                      {i18n.language === 'ta' ? 'தேர்ந்தெடுக்கப்பட்டதை நீக்கு' : 'Delete Selected'}
+                    </ThemedText>
+                  </Pressable>
+                </View>
+              )}
+            </View>
+          )}
+
           {/* Achievement List */}
           <ScrollView contentContainerStyle={{ gap: Spacing.two, paddingBottom: 100 }}>
             {filteredAchievements.length === 0 ? (
@@ -1539,6 +1634,35 @@ export function ReportsTab({
                     ]}
                   >
                     <View style={localStyles.achCardRow}>
+                      {/* Checkbox (Staff Only) */}
+                      {!isParent && (
+                        <Pressable
+                          onPress={() => {
+                            if (selectedAchievementIds.includes(ach.achievementId)) {
+                              setSelectedAchievementIds(selectedAchievementIds.filter(id => id !== ach.achievementId));
+                            } else {
+                              setSelectedAchievementIds([...selectedAchievementIds, ach.achievementId]);
+                            }
+                          }}
+                          style={{ marginRight: Spacing.two, justifyContent: 'center' }}
+                        >
+                          <View style={{
+                            width: 20,
+                            height: 20,
+                            borderWidth: 1.5,
+                            borderColor: selectedAchievementIds.includes(ach.achievementId) ? colors.primary : colors.textSecondary,
+                            borderRadius: 6,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            backgroundColor: selectedAchievementIds.includes(ach.achievementId) ? colors.primary : 'transparent'
+                          }}>
+                            {selectedAchievementIds.includes(ach.achievementId) && (
+                              <Check size={14} color="#FFF" />
+                            )}
+                          </View>
+                        </Pressable>
+                      )}
+
                       {/* Left Badge icon */}
                       <View style={[localStyles.achIconWrapper, { backgroundColor: meta.bgColor }]}>
                         <IconComponent size={24} color={meta.iconColor} />
