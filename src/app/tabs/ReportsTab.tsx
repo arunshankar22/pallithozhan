@@ -937,16 +937,35 @@ export function ReportsTab({
           continue;
         }
 
+        // Resolve class ID
+        let classId = row.classId || '';
+        if (!classId) {
+          const studentClass = classes.find(c => (c.studentIds || []).includes(matchedStudent.uid));
+          if (studentClass) {
+            classId = studentClass.classId;
+          }
+        }
+
         // Build notes & notesTa
-        const notesEn = `Event: ${row.awardName || 'BMTC 2026'}, Level: ${row.rank || 'Distinction'}, School: ${row.school || 'Parramatta'}. ${row.notes || ''}`.trim();
-        const notesTa = `போட்டி: ${row.awardName || ''}, தரநிலை: ${row.rank || ''}, பள்ளி: ${row.school || ''}. ${row.notes || ''}`.trim();
+        const rawNotesEn = row.notes || '';
+        const rawNotesTa = row.notesTa || row.notes || '';
+        const notesEn = `Event: ${row.awardName || 'BMTC 2026'}, Level: ${row.rank || 'Distinction'}, School: ${row.school || 'Parramatta'}. ${rawNotesEn}`.trim();
+        const notesTa = `போட்டி: ${row.awardNameTa || row.awardName || ''}, தரநிலை: ${row.rank || ''}, பள்ளி: ${row.school || ''}. ${rawNotesTa}`.trim();
+
+        // Helper to format title prefix safely
+        const formatTitle = (title: string) => {
+          if (!title) return '';
+          if (title.toLowerCase().startsWith('bmtc')) return title;
+          return `BMTC 2026 - ${title}`;
+        };
 
         // Create achievement record
         const payload = {
           studentId: matchedStudent.uid,
           studentName: matchedStudent.fullName,
-          awardName: `BMTC 2026 - ${row.awardName}`,
-          awardNameTa: `BMTC 2026 - ${row.awardName}`,
+          classId: classId,
+          awardName: formatTitle(row.awardName),
+          awardNameTa: formatTitle(row.awardNameTa || row.awardName),
           awardType: 'Competition',
           dateReceived: row.dateReceived || new Date().toISOString().split('T')[0],
           notes: notesEn,
