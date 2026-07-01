@@ -297,6 +297,11 @@ export function ReportsTab({
   const [bulkImportLogs, setBulkImportLogs] = useState<string[]>([]);
   const [selectedAchievementIds, setSelectedAchievementIds] = useState<string[]>([]);
 
+  // List View Display Mode and Sorting States
+  const [displayMode, setDisplayMode] = useState<'card' | 'table'>('card');
+  const [sortField, setSortField] = useState<string>('dateReceived');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+
   // Inline edit state for bulk preview
   const [editingRowIndex, setEditingRowIndex] = useState<number | null>(null);
   const [editRowName, setEditRowName] = useState('');
@@ -644,6 +649,36 @@ export function ReportsTab({
     }
 
     return matchesSearch && matchesType && matchesTarget;
+  });
+
+  const sortedAchievements = [...filteredAchievements].sort((a: any, b: any) => {
+    let valA = '';
+    let valB = '';
+
+    if (sortField === 'studentName') {
+      valA = a.studentName || '';
+      valB = b.studentName || '';
+    } else if (sortField === 'awardName') {
+      valA = i18n.language === 'ta' && a.awardNameTa ? a.awardNameTa : (a.awardName || '');
+      valB = i18n.language === 'ta' && b.awardNameTa ? b.awardNameTa : (b.awardName || '');
+    } else if (sortField === 'dateReceived') {
+      valA = a.dateReceived || '';
+      valB = b.dateReceived || '';
+    } else if (sortField === 'awardType') {
+      valA = a.awardType || '';
+      valB = b.awardType || '';
+    } else if (sortField === 'class') {
+      const clsA = classes.find(c => (c.studentIds || []).includes(a.studentId))?.className || '';
+      const clsB = classes.find(c => (c.studentIds || []).includes(b.studentId))?.className || '';
+      valA = clsA;
+      valB = clsB;
+    }
+
+    if (sortDirection === 'asc') {
+      return valA.localeCompare(valB);
+    } else {
+      return valB.localeCompare(valA);
+    }
   });
 
   const pendingCount = visibleAchievements.filter((a: any) => a.status === 'pending' || a.status === 'pending_deletion').length;
@@ -1541,6 +1576,41 @@ export function ReportsTab({
               )}
             </View>
 
+            {/* Display Mode Toggle */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: Spacing.two, borderTopWidth: 1, borderColor: colors.border, paddingTop: Spacing.two }}>
+              <ThemedText style={{ fontSize: 12, fontWeight: '700', color: colors.textSecondary }}>
+                {i18n.language === 'ta' ? 'காட்சி முறை:' : 'Display Mode:'}
+              </ThemedText>
+              <View style={{ flexDirection: 'row', gap: 6 }}>
+                <Pressable
+                  onPress={() => setDisplayMode('card')}
+                  style={{
+                    paddingHorizontal: 10,
+                    paddingVertical: 5,
+                    borderRadius: 6,
+                    borderWidth: 1,
+                    borderColor: displayMode === 'card' ? colors.primary : colors.border,
+                    backgroundColor: displayMode === 'card' ? colors.primary + '15' : 'transparent'
+                  }}
+                >
+                  <ThemedText style={{ fontSize: 11, fontWeight: '700', color: displayMode === 'card' ? colors.primary : colors.textSecondary }}>🪪 Cards</ThemedText>
+                </Pressable>
+                <Pressable
+                  onPress={() => setDisplayMode('table')}
+                  style={{
+                    paddingHorizontal: 10,
+                    paddingVertical: 5,
+                    borderRadius: 6,
+                    borderWidth: 1,
+                    borderColor: displayMode === 'table' ? colors.primary : colors.border,
+                    backgroundColor: displayMode === 'table' ? colors.primary + '15' : 'transparent'
+                  }}
+                >
+                  <ThemedText style={{ fontSize: 11, fontWeight: '700', color: displayMode === 'table' ? colors.primary : colors.textSecondary }}>📊 Table / Grid</ThemedText>
+                </Pressable>
+              </View>
+            </View>
+
             {/* Export actions (retained from original reports screen, only active for Approved) */}
             {activeSubTab === 'active' && !isParent && (
               <View style={{ flexDirection: 'row', gap: Spacing.one, marginTop: Spacing.two, borderTopWidth: 1, borderColor: colors.border, paddingTop: Spacing.two }}>
@@ -1632,8 +1702,137 @@ export function ReportsTab({
                     : 'No achievements found matching the filters.'}
                 </ThemedText>
               </View>
+            ) : displayMode === 'table' ? (
+              <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 10, overflow: 'hidden', backgroundColor: colors.cardBg }}>
+                {/* Table Header */}
+                <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderColor: colors.border, backgroundColor: colors.background, paddingVertical: 10, paddingHorizontal: 12, alignItems: 'center' }}>
+                  {/* Select Checkbox spacer (Staff Only) */}
+                  {!isParent && <View style={{ width: 30 }} />}
+                  
+                  {/* Sortable headers */}
+                  {[
+                    { label: i18n.language === 'ta' ? 'மாணவர்' : 'Student', field: 'studentName', flex: 1.5 },
+                    { label: i18n.language === 'ta' ? 'விருது' : 'Award Title', field: 'awardName', flex: 2 },
+                    { label: i18n.language === 'ta' ? 'வகுப்பு' : 'Class', field: 'class', flex: 1.2 },
+                    { label: i18n.language === 'ta' ? 'தேதி' : 'Date', field: 'dateReceived', flex: 1 },
+                    { label: i18n.language === 'ta' ? 'வகை' : 'Type', field: 'awardType', flex: 1 }
+                  ].map((col) => (
+                    <Pressable
+                      key={col.field}
+                      onPress={() => {
+                        if (sortField === col.field) {
+                          setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+                        } else {
+                          setSortField(col.field);
+                          setSortDirection('asc');
+                        }
+                      }}
+                      style={{ flex: col.flex, flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                    >
+                      <ThemedText style={{ fontSize: 11, fontWeight: '800', color: colors.text }}>{col.label}</ThemedText>
+                      {sortField === col.field ? (
+                        <ThemedText style={{ fontSize: 9, color: colors.primary }}>
+                          {sortDirection === 'asc' ? '▲' : '▼'}
+                        </ThemedText>
+                      ) : null}
+                    </Pressable>
+                  ))}
+                  
+                  {/* Actions Column header */}
+                  <View style={{ width: 80, alignItems: 'center' }}>
+                    <ThemedText style={{ fontSize: 11, fontWeight: '800', color: colors.text }}>
+                      {i18n.language === 'ta' ? 'செயல்கள்' : 'Actions'}
+                    </ThemedText>
+                  </View>
+                </View>
+
+                {/* Table Body */}
+                {sortedAchievements.map((ach) => {
+                  const meta = getAwardMeta(ach.awardType);
+                  const isSelected = selectedAchievementIds.includes(ach.achievementId);
+                  const studentClass = classes.find(c => (c.studentIds || []).includes(ach.studentId));
+
+                  return (
+                    <View key={ach.achievementId} style={{ flexDirection: 'row', borderBottomWidth: 1, borderColor: colors.border, paddingVertical: 10, paddingHorizontal: 12, alignItems: 'center', backgroundColor: isSelected ? colors.primaryLight + '20' : 'transparent' }}>
+                      {/* Checkbox (Staff Only) */}
+                      {!isParent && (
+                        <Pressable
+                          onPress={() => {
+                            if (isSelected) {
+                              setSelectedAchievementIds(selectedAchievementIds.filter(id => id !== ach.achievementId));
+                            } else {
+                              setSelectedAchievementIds([...selectedAchievementIds, ach.achievementId]);
+                            }
+                          }}
+                          style={{ width: 30 }}
+                        >
+                          <View style={{
+                            width: 16,
+                            height: 16,
+                            borderWidth: 1.5,
+                            borderColor: isSelected ? colors.primary : colors.textSecondary,
+                            borderRadius: 4,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            backgroundColor: isSelected ? colors.primary : 'transparent'
+                          }}>
+                            {isSelected && <Check size={11} color="#FFF" />}
+                          </View>
+                        </Pressable>
+                      )}
+
+                      {/* Student Name */}
+                      <View style={{ flex: 1.5 }}>
+                        <ThemedText style={{ fontSize: 11, fontWeight: '700', color: colors.primary }} numberOfLines={1}>
+                          {ach.studentName}
+                        </ThemedText>
+                      </View>
+
+                      {/* Award Title */}
+                      <View style={{ flex: 2 }}>
+                        <ThemedText style={{ fontSize: 11, fontWeight: '500', color: colors.text }} numberOfLines={1}>
+                          {i18n.language === 'ta' && ach.awardNameTa ? ach.awardNameTa : ach.awardName}
+                        </ThemedText>
+                      </View>
+
+                      {/* Class */}
+                      <View style={{ flex: 1.2 }}>
+                        <ThemedText style={{ fontSize: 11, color: colors.textSecondary }} numberOfLines={1}>
+                          {studentClass?.className || 'N/A'}
+                        </ThemedText>
+                      </View>
+
+                      {/* Date */}
+                      <View style={{ flex: 1 }}>
+                        <ThemedText style={{ fontSize: 11, color: colors.textSecondary }}>
+                          {ach.dateReceived}
+                        </ThemedText>
+                      </View>
+
+                      {/* Type */}
+                      <View style={{ flex: 1 }}>
+                        <View style={{ backgroundColor: meta.bgColor, alignSelf: 'flex-start', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                          <ThemedText style={{ fontSize: 9, color: meta.iconColor, fontWeight: '700' }}>
+                            {i18n.language === 'ta' ? meta.labelTa : meta.labelEn}
+                          </ThemedText>
+                        </View>
+                      </View>
+
+                      {/* Actions */}
+                      <View style={{ width: 80, flexDirection: 'row', justifyContent: 'center', gap: 8 }}>
+                        <Pressable onPress={() => handleStartEdit(ach)}>
+                          <Edit2 size={12} color={colors.primary} />
+                        </Pressable>
+                        <Pressable onPress={() => handleDelete(ach.achievementId)}>
+                          <Trash2 size={12} color={colors.danger} />
+                        </Pressable>
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
             ) : (
-              filteredAchievements.map((ach) => {
+              sortedAchievements.map((ach) => {
                 const meta = getAwardMeta(ach.awardType);
                 const IconComponent = meta.icon;
                 
