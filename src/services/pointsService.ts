@@ -193,12 +193,33 @@ export const pointsService = {
       const studentIds: string[] = classData.studentIds || [];
       if (studentIds.length === 0) return [];
 
-      // Fetch profiles of all students in the class
+      // Fetch all users to map roll numbers/codes to their Firestore user documents
+      const querySnapshot = await getDocs(collection(db, 'users'));
+      const allUsers: any[] = [];
+      querySnapshot.forEach((docSnap) => {
+        allUsers.push({ uid: docSnap.id, ...docSnap.data() });
+      });
+
       const studentsList: any[] = [];
       for (const sId of studentIds) {
-        const studentSnap = await getDoc(doc(db, 'users', sId));
-        if (studentSnap.exists()) {
-          studentsList.push({ uid: sId, ...studentSnap.data() });
+        let matchedUser = allUsers.find(u => u.uid === sId || u.studentCode === sId);
+        if (matchedUser) {
+          studentsList.push(matchedUser);
+        } else {
+          // Fallback: search achievements for a student matching this code to get their name
+          const achSnap = await getDocs(query(collection(db, 'achievements'), where('studentId', '==', sId)));
+          let foundName = sId;
+          if (!achSnap.empty) {
+            const firstDoc = achSnap.docs[0].data();
+            if (firstDoc.studentName) {
+              foundName = firstDoc.studentName;
+            }
+          }
+          studentsList.push({
+            uid: sId,
+            fullName: foundName,
+            points: 0
+          });
         }
       }
 

@@ -30,6 +30,7 @@ export interface UserProfile {
   requirePasswordChange?: boolean;
   profilePicture?: string;
   parentVolunteer?: boolean;
+  studentCode?: string;
 }
 
 interface AuthContextType {
@@ -82,6 +83,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               // Fetch profile from Firestore mock/production
               const profile = await mockDb.getUser(fbUser.uid);
               if (profile) {
+                if (profile.role === 'student' && !profile.studentCode) {
+                  try {
+                    const { achievementService } = require('./achievementService');
+                    const achs = await achievementService.getAchievements();
+                    const match = achs.find((a: any) => a.studentName && a.studentName.toLowerCase().trim() === profile.fullName.toLowerCase().trim());
+                    if (match && match.studentId && match.studentId !== profile.uid) {
+                      console.log(`[Self-Healing] Mapping student UID ${profile.uid} to roll number ${match.studentId}`);
+                      await mockDb.updateUser(profile.uid, { studentCode: match.studentId });
+                      profile.studentCode = match.studentId;
+                    }
+                  } catch (e) {
+                    console.warn('[Self-Healing] Failed to map student code:', e);
+                  }
+                }
                 setUser(resolveUserProfile(profile));
                 i18n.changeLanguage(profile.languagePreference);
               } else {

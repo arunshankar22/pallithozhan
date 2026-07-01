@@ -1244,7 +1244,12 @@ export default function HomeScreen() {
           const handleOpenLeaderboard = async () => {
             setLoadingLeaderboard(true);
             try {
-              const studentClass = classes.find((c: any) => c.studentIds && c.studentIds.includes(targetStudent.uid));
+              const studentClass = classes.find((c: any) => 
+                c.studentIds && (
+                  c.studentIds.includes(targetStudent.uid) || 
+                  (targetStudent.studentCode && c.studentIds.includes(targetStudent.studentCode))
+                )
+              );
               if (!studentClass) {
                 Alert.alert(
                   isTa ? 'வகுப்பு காணப்படவில்லை' : 'Class Not Found',

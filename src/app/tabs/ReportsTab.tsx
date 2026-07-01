@@ -607,7 +607,11 @@ export function ReportsTab({
   const associatedStudentIds = user?.associatedStudents || [];
   
   const visibleAchievements = isStudent
-    ? achievements.filter((ach: any) => ach.studentId === user?.uid)
+    ? achievements.filter((ach: any) => 
+        ach.studentId === user?.uid || 
+        (user?.studentCode && ach.studentId === user.studentCode) ||
+        (ach.studentName && user?.fullName && ach.studentName.toLowerCase().trim() === user.fullName.toLowerCase().trim())
+      )
     : isParent
       ? achievements.filter((ach: any) => associatedStudentIds.includes(ach.studentId))
       : achievements;
