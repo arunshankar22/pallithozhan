@@ -6,6 +6,12 @@ import { API_URL } from './dbCommon';
 
 const DICTIONARY: Record<string, string> = {
   // Exact Tamil-to-English translation mappings for common BMTC awards
+  "அடிப்படை எழுத்து அறிவுப் போட்டி - ஆ பிரிவு": "Basic Literacy Competition - Section B",
+  "அடிப்படை எழுத்து அறிவுப் போட்டி": "Basic Literacy Competition",
+  "அடிப்படை": "Basic",
+  "எழுத்து": "Literacy",
+  "அறிவுப் போட்டி": "Knowledge Competition",
+  "அறிவு": "Knowledge",
   "கதை எழுதும் போட்டி - அ பிரிவு": "Story Writing Competition - Section A",
   "பழமொழி - பொன் மொழிகள் - உ பிரிவு": "Proverbs and Golden Words - Section U",
   "கதை எழுதும் போட்டி": "Story Writing Competition",
@@ -590,6 +596,35 @@ export function autoTranslate(text: string): string {
 }
 
 /**
+ * Fallback to translate Tamil text to English based on local dictionary keywords/phrases.
+ */
+export function autoTranslateTaToEn(text: string): string {
+  if (!text || !text.trim()) return "";
+  
+  const trimmed = text.trim();
+  
+  // 1. Direct dictionary match of full string
+  if (DICTIONARY[trimmed]) {
+    return DICTIONARY[trimmed];
+  }
+  
+  // 2. Phrase matching (replace longest matches first)
+  let result = text;
+  const sortedKeys = Object.keys(DICTIONARY)
+    .filter(key => /[\u0B80-\u0BFF]/.test(key)) // Only Tamil keys
+    .sort((a, b) => b.length - a.length);
+    
+  sortedKeys.forEach(key => {
+    // Replace key occurrences in text safely
+    const escapedKey = key.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+    const regex = new RegExp(escapedKey, 'gi');
+    result = result.replace(regex, DICTIONARY[key]);
+  });
+  
+  return result;
+}
+
+/**
  * Helper to check if any words in the input text are not covered by the local dictionary.
  */
 export function hasUnmatchedWords(text: string): boolean {
@@ -718,6 +753,7 @@ export async function translateWithGemini(text: string): Promise<string> {
   }
 
   // Fallback to local autoTranslate on connection error or API failure
-  return autoTranslate(text);
+  const hasTamil = /[\u0B80-\u0BFF]/.test(text);
+  return hasTamil ? autoTranslateTaToEn(text) : autoTranslate(text);
 }
 
