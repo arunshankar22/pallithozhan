@@ -306,18 +306,19 @@ export function UserModal({
     }
   };
 
-  const getParentLastName = (nameStr: string) => {
-    const parts = nameStr.trim().split(/\s+/);
-    return parts.length > 1 ? parts[parts.length - 1].toLowerCase() : '';
-  };
-
-  const parentLastName = getParentLastName(fullName);
   const suggestedStudents = users.filter(s => {
     if (s.role !== 'student') return false;
     if (associatedStudents.includes(s.uid)) return false;
-    if (!parentLastName) return false;
+    
+    // Extract all words from the parent/user's full name (length > 2 to avoid initials)
+    const parentWords = fullName.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+    if (parentWords.length === 0) return false;
+    
+    // Check if any word from the child's name matches any word from the parent's name
     const sParts = s.fullName.toLowerCase().split(/\s+/);
-    return sParts.some((part: string) => part.includes(parentLastName) || parentLastName.includes(part));
+    return sParts.some((part: string) => 
+      parentWords.some(pw => part.includes(pw) || pw.includes(part))
+    );
   });
 
   const filteredStudents = users.filter(s => {

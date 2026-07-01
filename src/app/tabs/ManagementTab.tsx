@@ -1313,7 +1313,7 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
                             </View>
                           </View>
                           <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>✉️ {u.email}  |  📞 {u.phone || 'No phone'}</ThemedText>
-                          {u.role === 'parent' && u.associatedStudents && u.associatedStudents.length > 0 && (
+                          {u.associatedStudents && u.associatedStudents.length > 0 && (
                             <ThemedText style={{ fontSize: 11, color: colors.secondary, fontWeight: '600' }}>
                               🔗 Children: {u.associatedStudents.map((sId: string) => users.find(x => x.uid === sId)?.fullName || sId).join(', ')}
                             </ThemedText>
