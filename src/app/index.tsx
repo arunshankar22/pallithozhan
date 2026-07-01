@@ -1157,7 +1157,7 @@ export default function HomeScreen() {
           </View>
           
           <ThemedText style={{ color: '#FFF', fontSize: 22, fontWeight: '800', lineHeight: 28 }}>
-            Welcome,{"\n"}{activeStudentName}!
+            {i18n.language === 'ta' ? 'வரவேற்கிறோம்,' : 'Welcome,'}{"\n"}{activeStudentName}!
           </ThemedText>
 
           <View style={{
@@ -1677,20 +1677,27 @@ export default function HomeScreen() {
             </ThemedText>
             <Pressable onPress={() => setActiveTab('full-newsfeed')}>
               <ThemedText style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>
-                View All
+                {i18n.language === 'ta' ? 'அனைத்தையும் பார்' : 'View All'}
               </ThemedText>
             </Pressable>
           </View>
 
           {newsPosts.length === 0 ? (
             <View style={{ padding: 24, alignItems: 'center', backgroundColor: colors.cardBg, borderRadius: 16, borderWidth: 1, borderColor: colors.border }}>
-              <ThemedText style={{ color: colors.textSecondary, fontSize: 12 }}>No announcements posted yet.</ThemedText>
+              <ThemedText style={{ color: colors.textSecondary, fontSize: 12 }}>
+                {i18n.language === 'ta' ? 'இன்னும் அறிவிப்புகள் எதுவும் வெளியிடப்படவில்லை.' : 'No announcements posted yet.'}
+              </ThemedText>
             </View>
           ) : (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingBottom: 8 }}>
               {newsPosts.map((post) => {
-                const titleText = post.title?.en || post.title || 'Announcement';
-                const contentText = post.content?.en || post.content || '';
+                const isTa = i18n.language === 'ta';
+                const titleText = isTa 
+                  ? (post.title?.ta || post.title?.en || post.title || 'அறிவிப்பு')
+                  : (post.title?.en || post.title || 'Announcement');
+                const contentText = isTa 
+                  ? (post.content?.ta || post.content?.en || post.content || '')
+                  : (post.content?.en || post.content || '');
                 const mediaUrl = post.mediaUrl || 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&q=80&w=800';
                 
                 return (
@@ -1726,7 +1733,7 @@ export default function HomeScreen() {
                       borderRadius: 6
                     }}>
                       <ThemedText style={{ color: '#FFF', fontSize: 8, fontWeight: '800', textTransform: 'uppercase' }}>
-                        Announcement
+                        {isTa ? 'அறிவிப்பு' : 'Announcement'}
                       </ThemedText>
                     </View>
 
@@ -1770,7 +1777,7 @@ export default function HomeScreen() {
                         }}
                       >
                         <ThemedText style={{ color: colors.primary, fontWeight: '700', fontSize: 11 }}>
-                          Read More
+                          {isTa ? 'மேலும் வாசிக்க' : 'Read More'}
                         </ThemedText>
                       </Pressable>
                     </View>
@@ -2356,13 +2363,13 @@ export default function HomeScreen() {
                 <View style={{ flex: 1 }}>
                   <ThemedText style={[styles.footerActionText, { color: colors.primary, fontWeight: '700', fontSize: 11 }]}>
                     {user?.role === 'parent' 
-                      ? `Switch to ${user?.originalRole?.toUpperCase()}`
-                      : 'Switch View Role / பொறுப்பை மாற்று'}
+                      ? (i18n.language === 'ta' ? `${user?.originalRole?.toUpperCase()} பொறுப்பிற்கு மாற்றவும்` : `Switch to ${user?.originalRole?.toUpperCase()}`)
+                      : (i18n.language === 'ta' ? 'பார்வை பொறுப்பை மாற்று' : 'Switch View Role / பொறுப்பை மாற்று')}
                   </ThemedText>
                   <ThemedText style={{ fontSize: 9, color: colors.textSecondary, marginTop: 1 }}>
                     {user?.role === 'parent' 
-                      ? `Viewing as Parent` 
-                      : `Viewing as ${user?.role?.toUpperCase()} (Switch to Parent View)`}
+                      ? (i18n.language === 'ta' ? 'பெற்றோராக பார்க்கப்படுகிறது' : 'Viewing as Parent') 
+                      : (i18n.language === 'ta' ? `${user?.role?.toUpperCase()} ஆக பார்க்கப்படுகிறது (பெற்றோர் பார்வைக்கு மாற்றவும்)` : `Viewing as ${user?.role?.toUpperCase()} (Switch to Parent View)`)}
                   </ThemedText>
                 </View>
               </Pressable>
@@ -2371,7 +2378,7 @@ export default function HomeScreen() {
             <Pressable onPress={logout} style={styles.footerAction}>
               <LogOut size={16} color={colors.danger} />
               <ThemedText style={[styles.footerActionText, { color: colors.danger }]}>
-                Sign Out
+                {i18n.language === 'ta' ? 'வெளியேறு' : 'Sign Out'}
               </ThemedText>
             </Pressable>
 
