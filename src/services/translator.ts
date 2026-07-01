@@ -631,7 +631,47 @@ export async function translateWithGemini(text: string): Promise<string> {
       }
     }
   } catch (err) {
-    console.error('Failed to translate with Gemini, falling back to local autoTranslate:', err);
+    console.warn('Backend translation failed, checking direct client-side Gemini API...', err);
+  }
+
+  // 4. Client-side direct fallback if EXPO_PUBLIC_GEMINI_API_KEY is configured
+  const clientKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
+  if (clientKey) {
+    try {
+      const isTamil = /[\u0B80-\u0BFF]/.test(text);
+      const promptText = isTamil
+        ? `Translate this Tamil text to standard English meaning. Keep the numbers as numbers. Respond ONLY with the final translated English text, without any additional explanations, notes, markdown formatting, or chat prefixes.\n\nText:\n${text}`
+        : `Translate this educational school text to standard Tamil meaning. Keep the numbers as numbers (e.g. 'Term 2 Week 7' becomes 'பருவம் 2 வாரம் 7'). Respond ONLY with the final translated Tamil text, without any additional explanations, notes, markdown formatting, or chat prefixes.\n\nText:\n${text}`;
+
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${clientKey}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            contents: [{
+              parts: [{
+                text: promptText
+              }]
+            }],
+            generationConfig: {
+              temperature: 0.1,
+              maxOutputTokens: 8192
+            }
+          })
+        }
+      );
+
+      if (res.ok) {
+        const data = await res.json();
+        const translation = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
+        if (translation) return translation;
+      }
+    } catch (clientErr) {
+      console.error('Direct client-side translation failed:', clientErr);
+    }
   }
 
   // Fallback to local autoTranslate on connection error or API failure

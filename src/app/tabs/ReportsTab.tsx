@@ -962,6 +962,7 @@ export function ReportsTab({
       const { pointsService } = require('@/services/pointsService');
       const pointsConfig = await pointsService.getPointsConfig();
       const pointsValue = pointsConfig.automatedPoints.achievement || 15;
+      const savedInBatch: { studentId: string; classId: string; awardName: string; awardNameTa: string }[] = [];
 
       for (const row of bulkImportPreview) {
         // Find matching student
@@ -1010,10 +1011,10 @@ export function ReportsTab({
           status: 'approved' as const
         };
 
-        // Duplication check (name, award title, class - ignoring date)
-        const isDuplicate = achievements.some(ach => 
+        // Duplication check (name, award title, class - ignoring date, lenient check on empty classIds)
+        const isDbDuplicate = achievements.some(ach => 
           ach.studentId === matchedStudent.uid &&
-          ach.classId === classId &&
+          (!classId || !ach.classId || ach.classId === classId) &&
           (
             ach.awardName?.toLowerCase() === payload.awardName.toLowerCase() ||
             ach.awardNameTa?.toLowerCase() === payload.awardNameTa.toLowerCase() ||
@@ -1022,13 +1023,30 @@ export function ReportsTab({
           )
         );
 
-        if (isDuplicate) {
+        const isBatchDuplicate = savedInBatch.some(item => 
+          item.studentId === payload.studentId &&
+          (!classId || !item.classId || item.classId === classId) &&
+          (
+            item.awardName.toLowerCase() === payload.awardName.toLowerCase() ||
+            item.awardNameTa.toLowerCase() === payload.awardNameTa.toLowerCase() ||
+            item.awardName.toLowerCase() === payload.awardNameTa.toLowerCase() ||
+            item.awardNameTa.toLowerCase() === payload.awardName.toLowerCase()
+          )
+        );
+
+        if (isDbDuplicate || isBatchDuplicate) {
           addLog(`ℹ️ Skipped (already exists): ${matchedStudent.fullName} - ${payload.awardName}`);
           continue;
         }
 
         // Create the achievement doc in Firestore
         const createdAch = await mockDb.createAchievement(payload);
+        savedInBatch.push({
+          studentId: payload.studentId,
+          classId: payload.classId,
+          awardName: payload.awardName,
+          awardNameTa: payload.awardNameTa
+        });
 
         // Award points
         try {
