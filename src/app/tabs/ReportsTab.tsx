@@ -975,6 +975,23 @@ export function ReportsTab({
           status: 'approved' as const
         };
 
+        // Duplication check (name, award title, class - ignoring date)
+        const isDuplicate = achievements.some(ach => 
+          ach.studentId === matchedStudent.uid &&
+          ach.classId === classId &&
+          (
+            ach.awardName?.toLowerCase() === payload.awardName.toLowerCase() ||
+            ach.awardNameTa?.toLowerCase() === payload.awardNameTa.toLowerCase() ||
+            ach.awardName?.toLowerCase() === payload.awardNameTa.toLowerCase() ||
+            ach.awardNameTa?.toLowerCase() === payload.awardName.toLowerCase()
+          )
+        );
+
+        if (isDuplicate) {
+          addLog(`ℹ️ Skipped (already exists): ${matchedStudent.fullName} - ${payload.awardName}`);
+          continue;
+        }
+
         // Create the achievement doc in Firestore
         const createdAch = await mockDb.createAchievement(payload);
 
