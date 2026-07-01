@@ -22,20 +22,34 @@ export const DEFAULT_NEWSFEED = [
   }
 ];
 
-const uploadPostMedia = async (postId: string, mediaAttachments: any[], storage: any, mediaUrlObj: { mediaUrl?: string }) => {
+const uploadPostMedia = async (
+  postId: string, 
+  mediaAttachments: any[], 
+  storage: any, 
+  mediaUrlObj: { mediaUrl?: string },
+  dateStr?: string,
+  authorName?: string,
+  title?: string
+) => {
   if (!storage || !mediaAttachments || mediaAttachments.length === 0) return;
   
   const { ref, uploadString, uploadBytes, getDownloadURL } = require('firebase/storage');
+  
+  const dateFolder = (dateStr || new Date().toISOString()).split('T')[0];
+  const userFolder = (authorName || 'Staff').replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+  const titleFolder = (title || 'Post').replace(/[^a-zA-Z0-9]/g, '_').toLowerCase().substring(0, 30);
   
   for (let i = 0; i < mediaAttachments.length; i++) {
     const att = mediaAttachments[i];
     if (!att.url) continue;
     
+    const storagePath = `newsfeed/${dateFolder}/${userFolder}/${titleFolder}/${postId}_${i}_${att.name}`;
+    
     if (att.url.startsWith('data:')) {
       // Base64 Web upload
       try {
-        console.log(`Uploading Web Base64 attachment ${att.name} to Firebase Storage...`);
-        const fileRef = ref(storage, `newsfeed/${postId}_${i}_${att.name}`);
+        console.log(`Uploading Web Base64 attachment to path: ${storagePath}...`);
+        const fileRef = ref(storage, storagePath);
         await uploadString(fileRef, att.url, 'data_url');
         const downloadUrl = await getDownloadURL(fileRef);
         att.url = downloadUrl;
@@ -63,8 +77,8 @@ const uploadPostMedia = async (postId: string, mediaAttachments: any[], storage:
     ) {
       // Local native file URI (starts with file://, content://, etc.)
       try {
-        console.log(`Uploading local file attachment ${att.name} to Firebase Storage...`);
-        const fileRef = ref(storage, `newsfeed/${postId}_${i}_${att.name}`);
+        console.log(`Uploading local file attachment to path: ${storagePath}...`);
+        const fileRef = ref(storage, storagePath);
         
         const response = await fetch(att.url);
         const blob = await response.blob();
@@ -133,7 +147,7 @@ export const newsfeedService = {
 
     if (storage && newPost.mediaAttachments && newPost.mediaAttachments.length > 0) {
       const mediaUrlObj = { mediaUrl: newPost.mediaUrl };
-      await uploadPostMedia(postId, newPost.mediaAttachments, storage, mediaUrlObj);
+      await uploadPostMedia(postId, newPost.mediaAttachments, storage, mediaUrlObj, newPost.createdAt, newPost.authorName, newPost.title);
       newPost.mediaUrl = mediaUrlObj.mediaUrl || '';
     }
 
@@ -151,7 +165,7 @@ export const newsfeedService = {
 
     if (storage && updatedPost.mediaAttachments && updatedPost.mediaAttachments.length > 0) {
       const mediaUrlObj = { mediaUrl: updatedPost.mediaUrl };
-      await uploadPostMedia(postId, updatedPost.mediaAttachments, storage, mediaUrlObj);
+      await uploadPostMedia(postId, updatedPost.mediaAttachments, storage, mediaUrlObj, updatedPost.createdAt, updatedPost.authorName, updatedPost.title);
       updatedPost.mediaUrl = mediaUrlObj.mediaUrl || '';
     }
 
