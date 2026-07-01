@@ -29,7 +29,7 @@ const uploadPostMedia = async (
   mediaUrlObj: { mediaUrl?: string },
   dateStr?: string,
   authorName?: string,
-  title?: string
+  title?: any
 ) => {
   if (!storage || !mediaAttachments || mediaAttachments.length === 0) return;
   
@@ -37,7 +37,10 @@ const uploadPostMedia = async (
   
   const dateFolder = (dateStr || new Date().toISOString()).split('T')[0];
   const userFolder = (authorName || 'Staff').replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
-  const titleFolder = (title || 'Post').replace(/[^a-zA-Z0-9]/g, '_').toLowerCase().substring(0, 30);
+  const titleStr = typeof title === 'object' 
+    ? (title.en || title.ta || 'Post') 
+    : String(title || 'Post');
+  const titleFolder = titleStr.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase().substring(0, 30);
   
   for (let i = 0; i < mediaAttachments.length; i++) {
     const att = mediaAttachments[i];
