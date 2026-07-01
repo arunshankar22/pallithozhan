@@ -328,7 +328,8 @@ export const attendanceService = {
   importAttendanceData: async (
     classId: string,
     parsedRecords: any[], // array of { userId: string, userName: string, rolls: { [date]: 'present'|'absent' } }
-    currentUser: any
+    currentUser: any,
+    importMode: 'all' | 'missing' = 'all'
   ): Promise<{ updatedCount: number; datesCount: number }> => {
     if (!db) throw new Error('Firestore database is not initialized');
     
@@ -393,6 +394,7 @@ export const attendanceService = {
 
     // 5. Save rolls date-by-date
     let updatedCount = 0;
+    let importedDatesCount = 0;
     for (const date of datesToSave) {
       const docId = `${classId}_${date}`;
       const docRef = doc(db, 'attendance', docId);
@@ -400,6 +402,10 @@ export const attendanceService = {
       let existingRecord: any = null;
       if (docSnap.exists()) {
         existingRecord = { recordId: docSnap.id, ...docSnap.data() };
+      }
+
+      if (importMode === 'missing' && existingRecord) {
+        continue;
       }
 
       const mergedRolls: Record<string, 'present' | 'absent' | 'late'> = {};
@@ -433,10 +439,11 @@ export const attendanceService = {
         };
         await attendanceService.saveAttendance(saveRecord);
         updatedCount += Object.keys(newRollsForDate).length;
+        importedDatesCount++;
       }
     }
 
-    return { updatedCount, datesCount: datesToSave.length };
+    return { updatedCount, datesCount: importedDatesCount };
   },
 
   exportBulkAttendanceData: async (termSelection: string): Promise<{ list: any[]; schoolDates: any[]; attendanceRecords: any[] }> => {

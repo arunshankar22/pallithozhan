@@ -7,7 +7,7 @@ import {
   Platform,
   Dimensions
 } from 'react-native';
-import { AlertTriangle, CheckCircle, Clock } from 'lucide-react-native';
+import { AlertTriangle, CheckCircle, Clock, X } from 'lucide-react-native';
 import { ThemedText } from '@/components/themed-text';
 import { TabProps } from '@/app/sharedTypes';
 import { styles } from '@/app/styles';
@@ -34,6 +34,9 @@ export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentI
   const [exportTerm, setExportTerm] = useState<'all' | '1' | '2' | '3' | '4' | 'selected'>('all');
   const [exportFormat, setExportFormat] = useState<'csv' | 'xlsx'>('xlsx');
   const [showDatePickerModal, setShowDatePickerModal] = useState(false);
+  const [showImportConfirmModal, setShowImportConfirmModal] = useState(false);
+  const [pendingTsvText, setPendingTsvText] = useState('');
+  const [importStrategy, setImportStrategy] = useState<'all' | 'missing'>('all');
 
   // Custom School Session Dates States
   const [schoolDates, setSchoolDates] = useState<any[]>([]);
@@ -319,7 +322,9 @@ export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentI
                 showToast('Failed to read Excel worksheet data.', 'error');
                 return;
               }
-              await processImportedAttendance(tsvText);
+              setPendingTsvText(tsvText);
+              setImportStrategy('all');
+              setShowImportConfirmModal(true);
             } catch (err) {
               console.error('Excel import failed:', err);
               showToast('Failed to process Excel file.', 'error');
@@ -330,7 +335,9 @@ export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentI
           reader.onload = async (event: any) => {
             try {
               const text = event.target.result;
-              await processImportedAttendance(text);
+              setPendingTsvText(text);
+              setImportStrategy('all');
+              setShowImportConfirmModal(true);
             } catch (err) {
               console.error('CSV import failed:', err);
               showToast('Failed to process CSV file.', 'error');
@@ -345,7 +352,7 @@ export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentI
     }
   };
 
-  const processImportedAttendance = async (tsvText: string) => {
+  const processImportedAttendance = async (tsvText: string, strategy: 'all' | 'missing') => {
     try {
       const { records, error } = spreadsheetService.parseAttendanceCSV(tsvText);
       if (error) {
@@ -362,7 +369,8 @@ export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentI
       const { updatedCount, datesCount } = await attendanceService.importAttendanceData(
         selectedClassId,
         records,
-        user
+        user,
+        strategy
       );
 
       showToast(`Successfully imported rolls for ${updatedCount} entries across ${datesCount} dates!`, 'success');
@@ -661,6 +669,177 @@ export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentI
           >
             <ThemedText style={{ color: '#FFF', fontWeight: '700' }}>Close / மூடுக</ThemedText>
           </Pressable>
+        </View>
+      </View>
+    );
+  };
+
+  const renderImportConfirmModal = () => {
+    if (!showImportConfirmModal) return null;
+
+    const handleConfirm = async () => {
+      setShowImportConfirmModal(false);
+      if (pendingTsvText) {
+        await processImportedAttendance(pendingTsvText, importStrategy);
+        setPendingTsvText('');
+      }
+    };
+
+    return (
+      <View style={{
+        position: Platform.OS === 'web' ? 'fixed' : 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 9999,
+        padding: 16
+      }}>
+        <View style={{
+          backgroundColor: colors.cardBg,
+          borderColor: colors.border,
+          borderWidth: 1,
+          borderRadius: 16,
+          padding: 24,
+          width: '100%',
+          maxWidth: 480,
+          gap: 16,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.1,
+          shadowRadius: 12,
+          elevation: 5
+        }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <ThemedText style={{ fontSize: 16, fontWeight: '800', color: colors.text }}>
+              {i18n.language === 'ta' ? 'இறக்குமதி உத்தியைத் தேர்ந்தெடுக்கவும்' : 'Select Import Strategy'}
+            </ThemedText>
+            <Pressable onPress={() => setShowImportConfirmModal(false)} style={{ padding: 4 }}>
+              <X size={18} color={colors.textSecondary} />
+            </Pressable>
+          </View>
+
+          <ThemedText style={{ fontSize: 13, color: colors.textSecondary, lineHeight: 18 }}>
+            {i18n.language === 'ta' 
+              ? 'பதிவேற்றப்படும் தாள் ஏற்கனவே குறிக்கப்பட்ட தேதிகளையும் கொண்டிருக்கலாம். உங்களது இறக்குமதி விருப்பத்தை தேர்வு செய்யவும்:' 
+              : 'The uploaded file contains attendance data. Choose how you want to merge this with existing logs:'}
+          </ThemedText>
+
+          <View style={{ gap: 10, marginTop: 4 }}>
+            {/* Strategy ALL option */}
+            <Pressable
+              onPress={() => setImportStrategy('all')}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 12,
+                padding: 14,
+                borderRadius: 10,
+                borderWidth: 1.5,
+                borderColor: importStrategy === 'all' ? colors.primary : colors.border,
+                backgroundColor: importStrategy === 'all' ? colors.primaryLight + '10' : 'transparent'
+              }}
+            >
+              <View style={{
+                width: 18,
+                height: 18,
+                borderRadius: 9,
+                borderWidth: 2,
+                borderColor: importStrategy === 'all' ? colors.primary : colors.textSecondary,
+                justifyContent: 'center',
+                alignItems: 'center'
+              }}>
+                {importStrategy === 'all' && (
+                  <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: colors.primary }} />
+                )}
+              </View>
+              <View style={{ flex: 1, gap: 2 }}>
+                <ThemedText style={{ fontSize: 13, fontWeight: '700', color: colors.text }}>
+                  {i18n.language === 'ta' ? 'அனைத்து தேதிகளையும் புதுப்பி / மேலெழுது' : 'Update & Overwrite All Dates'}
+                </ThemedText>
+                <ThemedText style={{ fontSize: 10, color: colors.textSecondary }}>
+                  {i18n.language === 'ta' 
+                    ? 'தாளில் உள்ள அனைத்து தேதிகளுக்கான பதிவுகளையும் கணினியில் மேலெழுதும்.' 
+                    : 'Overwrites existing attendance logs in the database for all dates found in the sheet.'}
+                </ThemedText>
+              </View>
+            </Pressable>
+
+            {/* Strategy MISSING option */}
+            <Pressable
+              onPress={() => setImportStrategy('missing')}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 12,
+                padding: 14,
+                borderRadius: 10,
+                borderWidth: 1.5,
+                borderColor: importStrategy === 'missing' ? colors.primary : colors.border,
+                backgroundColor: importStrategy === 'missing' ? colors.primaryLight + '10' : 'transparent'
+              }}
+            >
+              <View style={{
+                width: 18,
+                height: 18,
+                borderRadius: 9,
+                borderWidth: 2,
+                borderColor: importStrategy === 'missing' ? colors.primary : colors.textSecondary,
+                justifyContent: 'center',
+                alignItems: 'center'
+              }}>
+                {importStrategy === 'missing' && (
+                  <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: colors.primary }} />
+                )}
+              </View>
+              <View style={{ flex: 1, gap: 2 }}>
+                <ThemedText style={{ fontSize: 13, fontWeight: '700', color: colors.text }}>
+                  {i18n.language === 'ta' ? 'விடுபட்ட தேதிகள் மட்டும் பதிவேற்று' : 'Import Missing Dates Only'}
+                </ThemedText>
+                <ThemedText style={{ fontSize: 10, color: colors.textSecondary }}>
+                  {i18n.language === 'ta' 
+                    ? 'ஏற்கனவே வருகைப்பதிவு செய்யப்படாத விடுபட்ட தேதிகளை மட்டும் பதிவேற்றும்; பழைய பதிவுகள் மாறாது.' 
+                    : 'Only imports dates with no existing logs in the system; previously marked rolls will be preserved.'}
+                </ThemedText>
+              </View>
+            </Pressable>
+          </View>
+
+          <View style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}>
+            <Pressable
+              onPress={() => setShowImportConfirmModal(false)}
+              style={{
+                flex: 1,
+                paddingVertical: 10,
+                borderRadius: 8,
+                borderWidth: 1,
+                borderColor: colors.border,
+                alignItems: 'center'
+              }}
+            >
+              <ThemedText style={{ fontSize: 13, fontWeight: '700', color: colors.textSecondary }}>
+                {i18n.language === 'ta' ? 'ரத்துசெய்' : 'Cancel'}
+              </ThemedText>
+            </Pressable>
+
+            <Pressable
+              onPress={handleConfirm}
+              style={{
+                flex: 1,
+                paddingVertical: 10,
+                borderRadius: 8,
+                backgroundColor: colors.primary,
+                alignItems: 'center'
+              }}
+            >
+              <ThemedText style={{ fontSize: 13, fontWeight: '700', color: '#FFF' }}>
+                {i18n.language === 'ta' ? 'உறுதி செய்' : 'Confirm'}
+              </ThemedText>
+            </Pressable>
+          </View>
         </View>
       </View>
     );
@@ -1231,6 +1410,7 @@ export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentI
       </ScrollView>
       {renderExportModal()}
       {renderDatePickerModal()}
+      {renderImportConfirmModal()}
     </View>
   );
 }
