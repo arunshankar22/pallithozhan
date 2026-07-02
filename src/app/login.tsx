@@ -234,9 +234,17 @@ export default function LoginScreen({ onNavigateToRegister, onNavigateToWaitlist
       ]}>
         {showConfirmReset ? (
           <>
-            <ThemedText style={styles.cardHeader}>
-              {i18n.language === 'ta' ? 'புதிய கடவுச்சொல்லை அமை' : 'Set New Password'}
-            </ThemedText>
+            <View style={{ alignItems: 'center', marginBottom: Spacing.three, gap: 4 }}>
+              <Image 
+                source={scheme === 'dark' 
+                  ? require('../../assets/images/balarmalar_logo_dark.png') 
+                  : require('../../assets/images/balarmalar_logo.png')} 
+                style={{ width: 140, height: 40, resizeMode: 'contain' }}
+              />
+              <ThemedText style={{ fontSize: 13, fontWeight: '800', color: colors.primary, marginTop: 4 }}>
+                {i18n.language === 'ta' ? 'கடவுச்சொல் மீட்டமைப்பு' : 'Password Reset Service'}
+              </ThemedText>
+            </View>
 
             {errorMsg ? (
               <View style={[styles.errorContainer, { backgroundColor: colors.danger + '15' }]}>
