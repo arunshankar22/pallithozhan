@@ -43,6 +43,7 @@ interface AuthContextType {
   updateAuthPassword: (newPassword: string) => Promise<void>;
   switchRole: (role: 'superadmin' | 'admin' | 'teacher' | 'volunteer' | 'parent' | 'student') => void;
   resetPassword: (email: string) => Promise<void>;
+  confirmPasswordResetInApp: (oobCode: string, newPasswordStr: string) => Promise<void>;
   isLoading: boolean;
 }
 
@@ -371,12 +372,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     } else {
       const { sendPasswordResetEmail } = require('firebase/auth');
-      await sendPasswordResetEmail(fbAuth, emailStr);
+      
+      // Determine base URL dynamically (for web redirection)
+      let baseUrl = 'https://pallithozhan.3tech.ai';
+      if (typeof window !== 'undefined' && window.location) {
+        baseUrl = window.location.origin;
+      }
+      
+      const actionCodeSettings = {
+        url: `${baseUrl}/?mode=resetPassword`,
+        handleCodeInApp: true
+      };
+      
+      await sendPasswordResetEmail(fbAuth, emailStr, actionCodeSettings);
     }
   };
 
+  const confirmPasswordResetInApp = async (oobCode: string, newPasswordStr: string): Promise<void> => {
+    if (isDemoMode) {
+      console.log('Demo mode password reset confirm: successfully updated password.');
+      return;
+    }
+    const { confirmPasswordReset } = require('firebase/auth');
+    await confirmPasswordReset(fbAuth, oobCode, newPasswordStr);
+  };
+
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, updateLanguage, updateProfile, updateAuthPassword, switchRole, resetPassword, isLoading }}>
+    <AuthContext.Provider value={{ user, login, register, logout, updateLanguage, updateProfile, updateAuthPassword, switchRole, resetPassword, confirmPasswordResetInApp, isLoading }}>
       {children}
     </AuthContext.Provider>
   );

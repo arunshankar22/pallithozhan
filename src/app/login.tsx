@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, TextInput, Pressable, useColorScheme, ActivityIndicator, Image, ScrollView, Platform } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useAuth, getSchoolIdFromBranch } from '@/services/auth';
@@ -15,7 +16,7 @@ interface LoginScreenProps {
 
 export default function LoginScreen({ onNavigateToRegister, onNavigateToWaitlist }: LoginScreenProps) {
   const { t, i18n } = useTranslation();
-  const { login, logout, updateLanguage, resetPassword } = useAuth();
+  const { login, logout, updateLanguage, resetPassword, confirmPasswordResetInApp } = useAuth();
   const scheme = useColorScheme();
   const theme = scheme === 'dark' ? 'dark' : 'light';
   const colors = Colors[theme];
@@ -25,6 +26,33 @@ export default function LoginScreen({ onNavigateToRegister, onNavigateToWaitlist
   const [resetEmail, setResetEmail] = useState('');
   const [resetLoading, setResetLoading] = useState(false);
   const [resetSuccess, setResetSuccess] = useState(false);
+
+  // custom password reset handling states
+  const [showConfirmReset, setShowConfirmReset] = useState(false);
+  const [confirmOobCode, setConfirmOobCode] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [confirmResetLoading, setConfirmResetLoading] = useState(false);
+  const [confirmResetSuccess, setConfirmResetSuccess] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.location) {
+      const params = new URLSearchParams(window.location.search);
+      const mode = params.get('mode');
+      const oobCode = params.get('oobCode');
+      if (mode === 'resetPassword' && oobCode) {
+        setConfirmOobCode(oobCode);
+        setShowConfirmReset(true);
+        // Clear query parameters from URL without reloading so the user doesn't trigger it again
+        try {
+          const cleanUrl = window.location.pathname + window.location.hash;
+          window.history.replaceState({}, document.title, cleanUrl);
+        } catch (e) {
+          console.warn('Failed to clear search parameters', e);
+        }
+      }
+    }
+  }, []);
 
   const handleResetPassword = async () => {
     if (!resetEmail) {
@@ -47,6 +75,45 @@ export default function LoginScreen({ onNavigateToRegister, onNavigateToWaitlist
       setErrorMsg(cleanMsg);
     } finally {
       setResetLoading(false);
+    }
+  };
+
+  const handleConfirmReset = async () => {
+    if (!newPassword || !confirmPassword) {
+      setErrorMsg(i18n.language === 'ta' ? 'அனைத்து புலங்களையும் நிரப்பவும்' : 'Please fill all password fields');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setErrorMsg(i18n.language === 'ta' ? 'கடவுச்சொற்கள் பொருந்தவில்லை' : 'Passwords do not match');
+      return;
+    }
+    if (newPassword.length < 6) {
+      setErrorMsg(i18n.language === 'ta' ? 'கடவுச்சொல் குறைந்தது 6 எழுத்துக்களைக் கொண்டிருக்க வேண்டும்' : 'Password must be at least 6 characters');
+      return;
+    }
+
+    setErrorMsg('');
+    setConfirmResetLoading(true);
+    try {
+      await confirmPasswordResetInApp(confirmOobCode, newPassword);
+      setConfirmResetSuccess(true);
+      setErrorMsg('');
+      setTimeout(() => {
+        setShowConfirmReset(false);
+        setConfirmResetSuccess(false);
+        setNewPassword('');
+        setConfirmPassword('');
+      }, 3000);
+    } catch (e: any) {
+      let cleanMsg = e.message || 'Reset failed';
+      if (cleanMsg.includes('auth/invalid-action-code') || cleanMsg.toLowerCase().includes('invalid-action-code')) {
+        cleanMsg = i18n.language === 'ta' 
+          ? 'இந்த மீட்டமைப்பு இணைப்பு தவறானது அல்லது காலாவதியானது.' 
+          : 'This reset link is invalid or has expired.';
+      }
+      setErrorMsg(cleanMsg);
+    } finally {
+      setConfirmResetLoading(false);
     }
   };
 
@@ -165,7 +232,112 @@ export default function LoginScreen({ onNavigateToRegister, onNavigateToWaitlist
           })
         }
       ]}>
-        {showReset ? (
+        {showConfirmReset ? (
+          <>
+            <ThemedText style={styles.cardHeader}>
+              {i18n.language === 'ta' ? 'புதிய கடவுச்சொல்லை அமை' : 'Set New Password'}
+            </ThemedText>
+
+            {errorMsg ? (
+              <View style={[styles.errorContainer, { backgroundColor: colors.danger + '15' }]}>
+                <ThemedText style={[styles.errorText, { color: colors.danger }]}>{errorMsg}</ThemedText>
+              </View>
+            ) : null}
+
+            {confirmResetSuccess ? (
+              <View style={{ marginBottom: Spacing.four, padding: Spacing.three, backgroundColor: colors.success + '15', borderRadius: 12 }}>
+                <ThemedText style={{ fontSize: 13, color: colors.success, fontWeight: '700', textAlign: 'center' }}>
+                  {i18n.language === 'ta' 
+                    ? 'கடவுச்சொல் வெற்றிகரமாக மாற்றப்பட்டது! நீங்கள் இப்போது உள்நுழையலாம்.' 
+                    : 'Password successfully updated! Redirecting to login page...'}
+                </ThemedText>
+              </View>
+            ) : (
+              <>
+                <ThemedText style={{ fontSize: 13, color: colors.textSecondary, marginBottom: Spacing.three, textAlign: 'left' }}>
+                  {i18n.language === 'ta' 
+                    ? 'உங்கள் புதிய கடவுச்சொல்லை கீழே உள்ளிட்டு உறுதிப்படுத்தவும்.' 
+                    : 'Please enter and confirm your new password below.'}
+                </ThemedText>
+
+                {/* New Password */}
+                <View style={styles.inputLabelContainer}>
+                  <ThemedText style={styles.inputLabel}>
+                    {i18n.language === 'ta' ? 'புதிய கடவுச்சொல்' : 'New Password'}
+                  </ThemedText>
+                </View>
+                <View style={[
+                  styles.inputWrapper, 
+                  { 
+                    backgroundColor: scheme === 'dark' ? 'rgba(19, 21, 18, 0.45)' : 'rgba(253, 252, 247, 0.5)', 
+                    borderColor: scheme === 'dark' ? 'rgba(255, 255, 255, 0.06)' : 'rgba(234, 83, 48, 0.15)',
+                  }
+                ]}>
+                  <Lock size={18} color={colors.textSecondary} style={styles.inputIcon} />
+                  <TextInput
+                    style={[styles.input, { color: colors.text }]}
+                    placeholder="••••••••"
+                    placeholderTextColor={colors.textSecondary}
+                    value={newPassword}
+                    onChangeText={setNewPassword}
+                    secureTextEntry
+                  />
+                </View>
+
+                {/* Confirm Password */}
+                <View style={styles.inputLabelContainer}>
+                  <ThemedText style={styles.inputLabel}>
+                    {i18n.language === 'ta' ? 'கடவுச்சொல்லை உறுதிப்படுத்து' : 'Confirm Password'}
+                  </ThemedText>
+                </View>
+                <View style={[
+                  styles.inputWrapper, 
+                  { 
+                    backgroundColor: scheme === 'dark' ? 'rgba(19, 21, 18, 0.45)' : 'rgba(253, 252, 247, 0.5)', 
+                    borderColor: scheme === 'dark' ? 'rgba(255, 255, 255, 0.06)' : 'rgba(234, 83, 48, 0.15)',
+                  }
+                ]}>
+                  <Lock size={18} color={colors.textSecondary} style={styles.inputIcon} />
+                  <TextInput
+                    style={[styles.input, { color: colors.text }]}
+                    placeholder="••••••••"
+                    placeholderTextColor={colors.textSecondary}
+                    value={confirmPassword}
+                    onChangeText={setConfirmPassword}
+                    secureTextEntry
+                  />
+                </View>
+
+                <Pressable 
+                  onPress={handleConfirmReset} 
+                  style={({ pressed }) => [styles.submitButton, { backgroundColor: colors.primary, opacity: pressed ? 0.9 : 1, marginTop: Spacing.two }]}
+                  disabled={confirmResetLoading}
+                >
+                  {confirmResetLoading ? (
+                    <ActivityIndicator size="small" color="#FFF" />
+                  ) : (
+                    <ThemedText style={styles.submitButtonText}>
+                      {i18n.language === 'ta' ? 'கடவுச்சொல்லைப் புதுப்பி' : 'Update Password'}
+                    </ThemedText>
+                  )}
+                </Pressable>
+              </>
+            )}
+
+            <Pressable 
+              onPress={() => {
+                setShowConfirmReset(false);
+                setConfirmResetSuccess(false);
+                setErrorMsg('');
+              }} 
+              style={{ marginTop: Spacing.three, alignItems: 'center' }}
+            >
+              <ThemedText style={{ fontSize: 13, color: colors.primary, fontWeight: '700' }}>
+                {i18n.language === 'ta' ? '← உள்நுழைவு பக்கத்திற்குத் திரும்பு' : '← Back to Login'}
+              </ThemedText>
+            </Pressable>
+          </>
+        ) : showReset ? (
           <>
             <ThemedText style={styles.cardHeader}>
               {i18n.language === 'ta' ? 'கடவுச்சொல்லை மீட்டமை' : 'Reset Password'}
