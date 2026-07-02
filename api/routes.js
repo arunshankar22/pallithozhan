@@ -688,7 +688,14 @@ async function handleApiRoutes(req, res, pathname, method, dbData, writeDb, urlO
       // Initialize Firebase Admin
       const admin = require('firebase-admin');
       if (!admin.apps.length) {
-        const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+        let serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
+        if (typeof serviceAccount === 'string') {
+          serviceAccount = JSON.parse(serviceAccount);
+        }
+        if (serviceAccount && serviceAccount.private_key) {
+          // Fix Vercel's double-escaped newlines in private key
+          serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+        }
         admin.initializeApp({
           credential: admin.credential.cert(serviceAccount)
         });
