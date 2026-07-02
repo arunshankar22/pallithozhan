@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import i18n from './i18n';
 import { isDemoMode, auth as fbAuth } from './firebase';
+import { API_URL } from './dbCommon';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updatePassword as fbUpdatePassword } from 'firebase/auth';
 import { mockDb } from './mockBackend';
 import { auditLogService } from './auditLogService';
@@ -371,28 +372,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log(`Demo: password reset email sent to ${emailStr}`);
       return;
     } else {
-      const { sendPasswordResetEmail } = require('firebase/auth');
-      
-      // Determine base URL dynamically (for web redirection)
-      let baseUrl = 'https://pallithozhan.3tech.ai';
-      if (typeof window !== 'undefined' && window.location) {
-        baseUrl = window.location.origin;
-      }
-      
-      const actionCodeSettings = {
-        url: `${baseUrl}/?mode=resetPassword`,
-        handleCodeInApp: true
-      };
-      
       try {
-        await sendPasswordResetEmail(fbAuth, emailStr, actionCodeSettings);
-      } catch (err: any) {
-        if (err.code === 'auth/unauthorized-continue-uri' || String(err).includes('unauthorized-continue-uri')) {
-          console.warn('Redirect domain is not allowlisted in Firebase. Falling back to default email reset.');
-          // Fall back to standard reset email without redirection settings
+        const response = await fetch(`${API_URL}/auth/send-reset-email`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ email: emailStr })
+        });
+        
+        if (response.status === 501) {
+          console.warn('Backend custom reset email service is not configured yet. Falling back to client-side Firebase reset.');
+          const { sendPasswordResetEmail } = require('firebase/auth');
           await sendPasswordResetEmail(fbAuth, emailStr);
-        } else {
-          throw err;
+          return;
+        }
+        
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.error || errData.message || 'Backend reset service failed');
+        }
+        
+        console.log('Branded custom reset password email sent successfully via backend!');
+      } catch (err: any) {
+        console.warn('Backend custom reset failed or is unconfigured. Falling back to default clientside Firebase reset.', err);
+        const { sendPasswordResetEmail } = require('firebase/auth');
+        try {
+          let baseUrl = 'https://pallithozhan.3tech.ai';
+          if (typeof window !== 'undefined' && window.location) {
+            baseUrl = window.location.origin;
+          }
+          const actionCodeSettings = {
+            url: `${baseUrl}/?mode=resetPassword`,
+            handleCodeInApp: true
+          };
+          await sendPasswordResetEmail(fbAuth, emailStr, actionCodeSettings);
+        } catch (innerErr: any) {
+          await sendPasswordResetEmail(fbAuth, emailStr);
         }
       }
     }

@@ -660,6 +660,109 @@ async function handleApiRoutes(req, res, pathname, method, dbData, writeDb, urlO
     return true;
   }
 
+  // POST /api/auth/send-reset-email
+  if (pathname === '/api/auth/send-reset-email' && method === 'POST') {
+    try {
+      const body = await parseBody(req);
+      const email = body.email;
+      if (!email) {
+        sendJson(res, 400, { error: 'Email parameter is required.' });
+        return true;
+      }
+
+      console.log(`Backend processing password reset request for: ${email}`);
+
+      // Check if Firebase admin settings are defined
+      const hasFirebaseAdmin = process.env.FIREBASE_SERVICE_ACCOUNT;
+      const hasResend = process.env.RESEND_API_KEY;
+
+      if (!hasFirebaseAdmin || !hasResend) {
+        console.warn('Backend password reset environment variables are missing. Service account or Resend API key is not configured.');
+        sendJson(res, 501, {
+          error: 'Backend password reset is not configured.',
+          message: 'Please add FIREBASE_SERVICE_ACCOUNT and RESEND_API_KEY environment variables to your Vercel panel.'
+        });
+        return true;
+      }
+
+      // Initialize Firebase Admin
+      const admin = require('firebase-admin');
+      if (!admin.apps.length) {
+        const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+        admin.initializeApp({
+          credential: admin.credential.cert(serviceAccount)
+        });
+      }
+
+      // Generate secure action code link redirecting to our custom domain
+      const actionCodeSettings = {
+        url: 'https://pallithozhan.3stech.com.au/',
+        handleCodeInApp: true
+      };
+
+      const actionLink = await admin.auth().generatePasswordResetLink(email, actionCodeSettings);
+      console.log('Successfully generated password reset action link.');
+
+      // Build custom HTML email message
+      const htmlContent = `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 580px; margin: 0 auto; padding: 32px 20px; background-color: #FDFCF7; border: 1px solid #EAE2D5; border-radius: 16px;">
+          <div style="text-align: center; margin-bottom: 24px;">
+            <h1 style="color: #EA5330; font-size: 24px; margin: 0; font-weight: 800; letter-spacing: -0.5px;">Balar Malar Tamil School</h1>
+            <p style="color: #6C7063; font-size: 13px; margin: 4px 0 0 0; font-weight: 600;">Portal / பள்ளித் தோழன்</p>
+          </div>
+          
+          <div style="background-color: #FFFFFF; border: 1px solid #EAE2D5; border-radius: 12px; padding: 24px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);">
+            <h2 style="font-size: 18px; font-weight: 700; color: #1E201B; margin-top: 0; margin-bottom: 12px;">Reset Your Password / கடவுச்சொல் மீட்டமைப்பு</h2>
+            <p style="font-size: 14px; line-height: 20px; color: #44473F; margin-bottom: 20px;">
+              Hello,<br><br>
+              We received a request to reset your Balar Malar portal account password. Click the button below to choose a new password:
+            </p>
+            
+            <div style="text-align: center; margin: 24px 0;">
+              <a href="${actionLink}" style="display: inline-block; background-color: #EA5330; color: #FFFFFF; text-decoration: none; padding: 12px 28px; font-size: 14px; font-weight: 700; border-radius: 8px; box-shadow: 0 4px 12px rgba(234, 83, 48, 0.25);">
+                Set New Password / கடவுச்சொல்லை அமை
+              </a>
+            </div>
+            
+            <p style="font-size: 12px; line-height: 18px; color: #6C7063; margin-top: 20px;">
+              If you didn't request a password reset, you can safely ignore this email. Your password won't change until you click the link and complete the form.
+            </p>
+          </div>
+          
+          <div style="text-align: center; margin-top: 24px; font-size: 11px; color: #8F9288;">
+            <p>© 2026 Balar Malar Tamil School. All rights reserved.</p>
+          </div>
+        </div>
+      `;
+
+      // Call Resend REST API using native fetch
+      const resendResponse = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.RESEND_API_KEY}`
+        },
+        body: JSON.stringify({
+          from: 'Balar Malar School <noreply@pallithozhan.3stech.com.au>',
+          to: email,
+          subject: 'Reset your Pallithozhan Password / கடவுச்சொல் மீட்டமைப்பு',
+          html: htmlContent
+        })
+      });
+
+      if (!resendResponse.ok) {
+        const resendErr = await resendResponse.text();
+        throw new Error(`Resend API Error: ${resendErr}`);
+      }
+
+      sendJson(res, 200, { message: 'Branded reset password email successfully dispatched via Resend.' });
+    } catch (err) {
+      console.error('Error in /api/auth/send-reset-email:', err);
+      sendJson(res, 500, { error: 'Failed to process password reset email request.', message: err.message });
+    }
+    return true;
+  }
+
   return false;
 }
 
