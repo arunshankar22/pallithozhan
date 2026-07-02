@@ -1689,8 +1689,8 @@ export default function HomeScreen() {
               </ThemedText>
             </View>
           ) : (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingBottom: 8 }}>
-              {newsPosts.map((post) => {
+            <View style={{ gap: 12 }}>
+              {newsPosts.slice(0, 3).map((post) => {
                 const isTa = i18n.language === 'ta';
                 const titleText = isTa 
                   ? (post.title?.ta || post.title?.en || post.title || 'அறிவிப்பு')
@@ -1704,7 +1704,6 @@ export default function HomeScreen() {
                   <View
                     key={post.postId}
                     style={{
-                      width: 260,
                       borderRadius: 18,
                       backgroundColor: colors.cardBg,
                       borderWidth: 1,
@@ -1714,66 +1713,58 @@ export default function HomeScreen() {
                       shadowOffset: { width: 0, height: 4 },
                       shadowOpacity: 0.03,
                       shadowRadius: 8,
-                      elevation: 2
+                      elevation: 2,
+                      flexDirection: 'row',
+                      minHeight: 120
                     }}
                   >
                     <Image
                       source={{ uri: mediaUrl }}
-                      style={{ width: '100%', height: 130 }}
+                      style={{ width: 120, height: '100%', minHeight: 120 }}
                       resizeMode="cover"
                     />
                     
-                    <View style={{
-                      position: 'absolute',
-                      top: 10,
-                      left: 10,
-                      backgroundColor: colors.primary,
-                      paddingHorizontal: 8,
-                      paddingVertical: 3,
-                      borderRadius: 6
-                    }}>
-                      <ThemedText style={{ color: '#FFF', fontSize: 8, fontWeight: '800', textTransform: 'uppercase' }}>
-                        {isTa ? 'அறிவிப்பு' : 'Announcement'}
-                      </ThemedText>
-                    </View>
-
-                    {['admin', 'teacher', 'volunteer'].includes(user?.role || '') && (
-                      <View style={{
-                        position: 'absolute',
-                        top: 10,
-                        right: 10,
-                        flexDirection: 'row',
-                        gap: 6,
-                        backgroundColor: 'rgba(0, 0, 0, 0.6)',
-                        paddingHorizontal: 6,
-                        paddingVertical: 4,
-                        borderRadius: 8
-                      }}>
-                        <Pressable onPress={() => handleDashboardEditPost(post)} style={{ padding: 2 }}>
-                          <Edit size={12} color="#FFF" />
-                        </Pressable>
-                        <Pressable onPress={() => handleDashboardDeletePost(post.postId)} style={{ padding: 2 }}>
-                          <Trash2 size={12} color="#FF8E8E" />
-                        </Pressable>
+                    <View style={{ flex: 1, padding: 12, justifyContent: 'space-between', gap: 6 }}>
+                      <View style={{ gap: 4 }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <View style={{
+                            backgroundColor: colors.primary + '15',
+                            paddingHorizontal: 6,
+                            paddingVertical: 2,
+                            borderRadius: 4
+                          }}>
+                            <ThemedText style={{ color: colors.primary, fontSize: 8, fontWeight: '800', textTransform: 'uppercase' }}>
+                              {isTa ? 'அறிவிப்பு' : 'Announcement'}
+                            </ThemedText>
+                          </View>
+                          
+                          {['admin', 'teacher', 'volunteer'].includes(user?.role || '') && (
+                            <View style={{ flexDirection: 'row', gap: 8 }}>
+                              <Pressable onPress={() => handleDashboardEditPost(post)} style={{ padding: 2 }}>
+                                <Edit size={12} color={colors.textSecondary} />
+                              </Pressable>
+                              <Pressable onPress={() => handleDashboardDeletePost(post.postId)} style={{ padding: 2 }}>
+                                <Trash2 size={12} color="#FF6B6B" />
+                              </Pressable>
+                            </View>
+                          )}
+                        </View>
+                        
+                        <ThemedText style={{ fontSize: 13, fontWeight: '700', color: colors.text }} numberOfLines={1}>
+                          {titleText}
+                        </ThemedText>
+                        <ThemedText style={{ fontSize: 11, color: colors.textSecondary, lineHeight: 15 }} numberOfLines={2}>
+                          {contentText}
+                        </ThemedText>
                       </View>
-                    )}
-
-                    <View style={{ padding: 12, gap: 6 }}>
-                      <ThemedText style={{ fontSize: 13, fontWeight: '700', color: colors.text }} numberOfLines={1}>
-                        {titleText}
-                      </ThemedText>
-                      <ThemedText style={{ fontSize: 11, color: colors.textSecondary, lineHeight: 15 }} numberOfLines={2}>
-                        {contentText}
-                      </ThemedText>
                       
                       <Pressable
                         onPress={() => setSelectedPost(post)}
                         style={{
-                          backgroundColor: '#FFF0ED',
-                          paddingVertical: 6,
+                          backgroundColor: colors.primaryLight + '10',
+                          paddingVertical: 5,
                           borderRadius: 8,
-                          alignItems: 'center',
-                          marginTop: 6
+                          alignItems: 'center'
                         }}
                       >
                         <ThemedText style={{ color: colors.primary, fontWeight: '700', fontSize: 11 }}>
@@ -1784,7 +1775,7 @@ export default function HomeScreen() {
                   </View>
                 );
               })}
-            </ScrollView>
+            </View>
           )}
         </View>
 

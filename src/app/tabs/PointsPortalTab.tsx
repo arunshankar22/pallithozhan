@@ -442,7 +442,7 @@ export function PointsPortalTab({ user, colors, t, showToast, i18n }: TabProps) 
               <ThemedText style={{ fontSize: 11, fontWeight: 'bold', marginBottom: 6, color: colors.text + '99', textTransform: 'uppercase' }}>
                 {isTa ? 'வகுப்பைத் தேர்ந்தெடுக்கவும்' : 'Select Class'}
               </ThemedText>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 6 }}>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingBottom: 6 }}>
                 {classes.map(c => {
                   const isSel = selectedClassId === c.classId;
                   return (
@@ -467,7 +467,7 @@ export function PointsPortalTab({ user, colors, t, showToast, i18n }: TabProps) 
                     </Pressable>
                   );
                 })}
-              </ScrollView>
+              </View>
             </View>
 
             {/* Student Search */}
