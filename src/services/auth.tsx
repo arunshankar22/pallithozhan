@@ -384,7 +384,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         handleCodeInApp: true
       };
       
-      await sendPasswordResetEmail(fbAuth, emailStr, actionCodeSettings);
+      try {
+        await sendPasswordResetEmail(fbAuth, emailStr, actionCodeSettings);
+      } catch (err: any) {
+        if (err.code === 'auth/unauthorized-continue-uri' || String(err).includes('unauthorized-continue-uri')) {
+          console.warn('Redirect domain is not allowlisted in Firebase. Falling back to default email reset.');
+          // Fall back to standard reset email without redirection settings
+          await sendPasswordResetEmail(fbAuth, emailStr);
+        } else {
+          throw err;
+        }
+      }
     }
   };
 

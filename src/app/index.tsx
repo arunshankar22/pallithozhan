@@ -1677,7 +1677,9 @@ export default function HomeScreen() {
             </ThemedText>
             <Pressable onPress={() => setActiveTab('full-newsfeed')}>
               <ThemedText style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>
-                {i18n.language === 'ta' ? 'அனைத்தையும் பார்' : 'View All'}
+                {i18n.language === 'ta' 
+                  ? `அனைத்தையும் பார் (${newsPosts.length})` 
+                  : `View All (${newsPosts.length})`}
               </ThemedText>
             </Pressable>
           </View>
@@ -1775,6 +1777,31 @@ export default function HomeScreen() {
                   </View>
                 );
               })}
+
+              {newsPosts.length > 3 && (
+                <Pressable
+                  onPress={() => setActiveTab('full-newsfeed')}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    paddingVertical: 12,
+                    borderRadius: 12,
+                    borderWidth: 1.5,
+                    borderStyle: 'dashed',
+                    borderColor: colors.primary,
+                    backgroundColor: colors.primaryLight + '05',
+                    marginTop: 4,
+                    gap: 6
+                  }}
+                >
+                  <ThemedText style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>
+                    {i18n.language === 'ta'
+                      ? `மேலும் ${newsPosts.length - 3} அறிவிப்புகளைக் காண இங்கே கிளிக் செய்யவும் →`
+                      : `View ${newsPosts.length - 3} more announcements →`}
+                  </ThemedText>
+                </Pressable>
+              )}
             </View>
           )}
         </View>
