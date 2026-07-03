@@ -148,6 +148,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const userCredential = await signInWithEmailAndPassword(fbAuth, email, password);
           const fbUser = userCredential.user;
           let profile = await mockDb.getUser(fbUser.uid);
+          if (profile && profile.authProvider === 'google') {
+            profile.authProvider = 'both';
+            await mockDb.createUser(profile);
+          }
           if (!profile) {
             console.log(`Profile not found in Firestore for authenticated UID: ${fbUser.uid}. Auto-creating default profile...`);
             let role: 'superadmin' | 'admin' | 'teacher' | 'volunteer' | 'parent' | 'student' = 'parent';
@@ -202,10 +206,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 // Map Firestore profile to the newly created Auth UID
                 const oldUid = matchedImported.uid;
                 const newProfile: UserProfile = {
-                  ...matchedImported,
-                  uid: fbUser.uid,
-                  requirePasswordChange: true // Flag to force password change!
-                };
+                   ...matchedImported,
+                   uid: fbUser.uid,
+                   requirePasswordChange: true, // Flag to force password change!
+                   authProvider: 'password'
+                 };
                 
                 // Save updated user to Firestore
                 await mockDb.createUser(newProfile);
@@ -459,7 +464,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const oldUid = matchedImported.uid;
             profile = {
               ...matchedImported,
-              uid: fbUser.uid
+              uid: fbUser.uid,
+              authProvider: 'google'
             };
             await mockDb.createUser(profile);
             if (oldUid !== fbUser.uid) {
