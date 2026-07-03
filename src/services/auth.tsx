@@ -466,17 +466,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               await mockDb.deleteUser(oldUid);
             }
           } else {
-            profile = {
-              uid: fbUser.uid,
-              email: fbUser.email || '',
-              fullName: fbUser.displayName || 'Google User',
-              role: 'parent',
-              phone: fbUser.phoneNumber || '',
-              schoolId: 'school_main',
-              languagePreference: 'ta',
-              associatedStudents: []
-            };
-            await mockDb.createUser(profile);
+            try {
+              await fbUser.delete();
+            } catch (delErr) {
+              console.warn('Failed to delete unregistered auth user:', delErr);
+            }
+            throw new Error('user-not-registered');
           }
         }
         

@@ -203,7 +203,15 @@ export default function LoginScreen({ onNavigateToRegister, onNavigateToWaitlist
     } catch (e: any) {
       console.error('Google login catch error:', e);
       let cleanMsg = e.message || 'Google Sign-In failed';
-      if (cleanMsg.includes('auth/popup-closed-by-user') || cleanMsg.toLowerCase().includes('popup-closed-by-user')) {
+      if (cleanMsg.includes('user-not-registered') || cleanMsg.toLowerCase().includes('user-not-registered')) {
+        cleanMsg = i18n.language === 'ta'
+          ? 'இந்த மின்னஞ்சல் முகவரி பள்ளிப் பதிவேட்டில் இல்லை. தயவுசெய்து முதலில் பதிவு செய்யவும் அல்லது பள்ளி நிர்வாகியைத் தொடர்பு கொள்ளவும்.'
+          : 'This email address is not registered in the portal. Please register your account first or contact your school branch administrator.';
+      } else if (cleanMsg.includes('account-exists-with-different-credential') || cleanMsg.toLowerCase().includes('account-exists-with-different-credential')) {
+        cleanMsg = i18n.language === 'ta'
+          ? 'இந்த மின்னஞ்சல் முகவரி ஏற்கனவே மற்றொரு உள்நுழைவு முறையைப் (மின்னஞ்சல்/கடவுச்சொல்) பயன்படுத்தி உருவாக்கப்பட்டுள்ளது. தயவுசெய்து கடவுச்சொல் மூலம் உள்நுழையவும்.'
+          : 'An account already exists with this email address using a different login method (such as password). Please sign in using your password.';
+      } else if (cleanMsg.includes('auth/popup-closed-by-user') || cleanMsg.toLowerCase().includes('popup-closed-by-user')) {
         cleanMsg = i18n.language === 'ta'
           ? 'உள்நுழைவு சாளரம் மூடப்பட்டது. தயவுசெய்து மீண்டும் முயற்சிக்கவும்.'
           : 'Login popup closed. Please try again.';
