@@ -99,10 +99,14 @@ export default function LoginScreen({ onNavigateToRegister, onNavigateToWaitlist
       setConfirmResetSuccess(true);
       setErrorMsg('');
       setTimeout(() => {
-        setShowConfirmReset(false);
-        setConfirmResetSuccess(false);
-        setNewPassword('');
-        setConfirmPassword('');
+        if (typeof window !== 'undefined' && window.location) {
+          window.location.href = window.location.origin;
+        } else {
+          setShowConfirmReset(false);
+          setConfirmResetSuccess(false);
+          setNewPassword('');
+          setConfirmPassword('');
+        }
       }, 3000);
     } catch (e: any) {
       let cleanMsg = e.message || 'Reset failed';

@@ -701,21 +701,35 @@ async function handleApiRoutes(req, res, pathname, method, dbData, writeDb, urlO
         });
       }
 
-      // Generate secure action code link redirecting to our custom domain
+      // Generate standard link using default domain
       const actionCodeSettings = {
         url: 'https://pallithozhan.3stech.com.au/',
         handleCodeInApp: true
       };
 
-      const actionLink = await admin.auth().generatePasswordResetLink(email, actionCodeSettings);
+      const firebaseLink = await admin.auth().generatePasswordResetLink(email, actionCodeSettings);
+      
+      // Parse query params to build direct custom link to our portal (bypassing firebaseapp.com UI)
+      let actionLink = firebaseLink;
+      try {
+        const tempUrl = new URL(firebaseLink);
+        const oobCode = tempUrl.searchParams.get('oobCode');
+        const apiKey = tempUrl.searchParams.get('apiKey');
+        if (oobCode && apiKey) {
+          actionLink = `https://pallithozhan.3stech.com.au/?mode=resetPassword&oobCode=${oobCode}&apiKey=${apiKey}`;
+        }
+      } catch (err) {
+        console.warn('Failed to parse oobCode from firebaseLink, falling back to original link', err);
+      }
+
       console.log('Successfully generated password reset action link.');
 
       // Build custom HTML email message
       const htmlContent = `
         <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 580px; margin: 0 auto; padding: 32px 20px; background-color: #FDFCF7; border: 1px solid #EAE2D5; border-radius: 16px;">
           <div style="text-align: center; margin-bottom: 24px;">
-            <h1 style="color: #EA5330; font-size: 24px; margin: 0; font-weight: 800; letter-spacing: -0.5px;">Balar Malar Tamil School</h1>
-            <p style="color: #6C7063; font-size: 13px; margin: 4px 0 0 0; font-weight: 600;">Portal / பள்ளித் தோழன்</p>
+            <h1 style="color: #EA5330; font-size: 24px; margin: 0; font-weight: 800; letter-spacing: -0.5px;">Balar Malar Tamil School - Parramatta</h1>
+            <p style="color: #6C7063; font-size: 13px; margin: 4px 0 0 0; font-weight: 600;">Pallithozhan Portal / பள்ளித் தோழன்</p>
           </div>
           
           <div style="background-color: #FFFFFF; border: 1px solid #EAE2D5; border-radius: 12px; padding: 24px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);">
@@ -737,7 +751,7 @@ async function handleApiRoutes(req, res, pathname, method, dbData, writeDb, urlO
           </div>
           
           <div style="text-align: center; margin-top: 24px; font-size: 11px; color: #8F9288;">
-            <p>© 2026 Balar Malar Tamil School. All rights reserved.</p>
+            <p>© 2026 Pallithozhan Balar Malar Tamil School - Parramatta. All rights reserved.</p>
           </div>
         </div>
       `;
@@ -751,7 +765,7 @@ async function handleApiRoutes(req, res, pathname, method, dbData, writeDb, urlO
           'Authorization': `Bearer ${process.env.RESEND_API_KEY}`
         },
         body: JSON.stringify({
-          from: `Balar Malar School <${senderEmail}>`,
+          from: `pallithozhan app from Balar Malar Tamil School - Parramatta <${senderEmail}>`,
           to: email,
           subject: 'Reset your Pallithozhan Password / கடவுச்சொல் மீட்டமைப்பு',
           html: htmlContent
