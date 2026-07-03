@@ -28,9 +28,17 @@ export const databaseId = process.env.EXPO_PUBLIC_FIREBASE_FIRESTORE_DATABASE_ID
 const rawStorageBucket = process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET || defaultStorageBucket;
 export const storageBucketId = rawStorageBucket.startsWith('gs://') ? rawStorageBucket.substring(5) : rawStorageBucket;
 
+let resolvedAuthDomain = process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN || "";
+if (typeof window !== 'undefined' && window.location) {
+  const hostname = window.location.hostname;
+  if (hostname && (hostname.includes('3stech') || hostname.includes('pallithozhan'))) {
+    resolvedAuthDomain = 'pallithozhan.3stech.com.au';
+  }
+}
+
 export const firebaseConfig = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY || "",
-  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN || "",
+  authDomain: resolvedAuthDomain,
   projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID || "",
   storageBucket: storageBucketId,
   messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "",
