@@ -455,6 +455,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const fbUser = result.user;
         
         let profile = await mockDb.getUser(fbUser.uid);
+        if (profile) {
+          if (profile.authProvider !== 'google' && profile.authProvider !== 'both') {
+            profile.authProvider = 'google';
+            await mockDb.createUser(profile);
+          }
+        }
+
         if (!profile) {
           const allUsers = await mockDb.getUsers();
           const matchedImported = allUsers.find((u: any) => u.email && fbUser.email && u.email.toLowerCase() === fbUser.email.toLowerCase());
