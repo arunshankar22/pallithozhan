@@ -79,9 +79,18 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
     if (typeof window !== 'undefined' && window.location) {
       const params = new URLSearchParams(window.location.search);
       const mode = params.get('mode');
-      if (mode === 'resetPassword') {
+      const openLogin = params.get('openLogin');
+      if (mode === 'resetPassword' || openLogin === 'true') {
         setPortalVisible(true);
         setAuthMode('login');
+        if (openLogin === 'true') {
+          try {
+            const cleanUrl = window.location.pathname + window.location.hash;
+            window.history.replaceState({}, document.title, cleanUrl);
+          } catch (e) {
+            console.warn('Failed to clear search parameters', e);
+          }
+        }
       }
     }
   }, []);

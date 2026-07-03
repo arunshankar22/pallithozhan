@@ -100,7 +100,7 @@ export default function LoginScreen({ onNavigateToRegister, onNavigateToWaitlist
       setErrorMsg('');
       setTimeout(() => {
         if (typeof window !== 'undefined' && window.location) {
-          window.location.href = window.location.origin;
+          window.location.href = window.location.origin + '/?openLogin=true';
         } else {
           setShowConfirmReset(false);
           setConfirmResetSuccess(false);
