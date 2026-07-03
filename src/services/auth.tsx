@@ -45,6 +45,7 @@ interface AuthContextType {
   switchRole: (role: 'superadmin' | 'admin' | 'teacher' | 'volunteer' | 'parent' | 'student') => void;
   resetPassword: (email: string) => Promise<void>;
   confirmPasswordResetInApp: (oobCode: string, newPasswordStr: string) => Promise<void>;
+  loginWithGoogle: () => Promise<UserProfile>;
   isLoading: boolean;
 }
 
@@ -423,8 +424,80 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await confirmPasswordReset(fbAuth, oobCode, newPasswordStr);
   };
 
+  const loginWithGoogle = async (): Promise<UserProfile> => {
+    try {
+      if (isDemoMode) {
+        const users = await mockDb.getUsers();
+        const matched = users.find((u: any) => u.email.toLowerCase() === 'parent@example.com');
+        if (!matched) {
+          throw new Error('Mock user parent@example.com not found for demo Google login.');
+        }
+        const resolved = resolveUserProfile(matched);
+        setUser(resolved);
+        i18n.changeLanguage(resolved.languagePreference);
+        if (typeof window !== 'undefined' && typeof window.localStorage !== 'undefined') {
+          window.localStorage.setItem('pallithozhan_session_uid', resolved.uid);
+        }
+        return resolved;
+      } else {
+        const { GoogleAuthProvider, signInWithPopup } = require('firebase/auth');
+        const provider = new GoogleAuthProvider();
+        provider.setCustomParameters({
+          prompt: 'select_account'
+        });
+        
+        const result = await signInWithPopup(fbAuth, provider);
+        const fbUser = result.user;
+        
+        let profile = await mockDb.getUser(fbUser.uid);
+        if (!profile) {
+          const allUsers = await mockDb.getUsers();
+          const matchedImported = allUsers.find((u: any) => u.email && fbUser.email && u.email.toLowerCase() === fbUser.email.toLowerCase());
+          
+          if (matchedImported) {
+            console.log(`Google Auth self-healing matched imported user email: ${fbUser.email}`);
+            const oldUid = matchedImported.uid;
+            profile = {
+              ...matchedImported,
+              uid: fbUser.uid
+            };
+            await mockDb.createUser(profile);
+            if (oldUid !== fbUser.uid) {
+              await mockDb.deleteUser(oldUid);
+            }
+          } else {
+            profile = {
+              uid: fbUser.uid,
+              email: fbUser.email || '',
+              fullName: fbUser.displayName || 'Google User',
+              role: 'parent',
+              phone: fbUser.phoneNumber || '',
+              schoolId: 'school_main',
+              languagePreference: 'ta',
+              associatedStudents: []
+            };
+            await mockDb.createUser(profile);
+          }
+        }
+        
+        const resolved = resolveUserProfile(profile);
+        setUser(resolved);
+        i18n.changeLanguage(resolved.languagePreference || 'ta');
+        
+        auditLogService.logLogin(resolved, 'Google Auth').catch(err => 
+          console.error('Failed to log login:', err)
+        );
+        
+        return resolved;
+      }
+    } catch (error: any) {
+      console.error('Google Sign-In Error:', error);
+      throw error;
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, updateLanguage, updateProfile, updateAuthPassword, switchRole, resetPassword, confirmPasswordResetInApp, isLoading }}>
+    <AuthContext.Provider value={{ user, login, register, logout, updateLanguage, updateProfile, updateAuthPassword, switchRole, resetPassword, confirmPasswordResetInApp, loginWithGoogle, isLoading }}>
       {children}
     </AuthContext.Provider>
   );

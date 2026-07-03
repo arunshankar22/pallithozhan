@@ -16,10 +16,13 @@ interface LoginScreenProps {
 
 export default function LoginScreen({ onNavigateToRegister, onNavigateToWaitlist }: LoginScreenProps) {
   const { t, i18n } = useTranslation();
-  const { login, logout, updateLanguage, resetPassword, confirmPasswordResetInApp } = useAuth();
+  const { login, logout, updateLanguage, resetPassword, confirmPasswordResetInApp, loginWithGoogle } = useAuth();
   const scheme = useColorScheme();
   const theme = scheme === 'dark' ? 'dark' : 'light';
   const colors = Colors[theme];
+
+  // Google Loading state
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   // Reset Password states
   const [showReset, setShowReset] = useState(false);
@@ -173,6 +176,41 @@ export default function LoginScreen({ onNavigateToRegister, onNavigateToWaitlist
       setErrorMsg(cleanMsg);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setErrorMsg('');
+    setGoogleLoading(true);
+    try {
+      const loggedUser = await loginWithGoogle();
+      const expectedSchoolId = getSchoolIdFromBranch(activeBranch);
+      if (expectedSchoolId && loggedUser && loggedUser.schoolId && loggedUser.role !== 'admin') {
+        const userSchoolLower = loggedUser.schoolId.toLowerCase().trim();
+        const expectedSchoolLower = expectedSchoolId.toLowerCase().trim();
+        if (userSchoolLower !== expectedSchoolLower) {
+          await logout();
+          const branchLabels: Record<string, string> = {
+            'balarmalar parramatta branch': 'Parramatta',
+            'balarmalar seven hills branch': 'Seven Hills',
+            'balarmalar blacktown branch': 'Blacktown'
+          };
+          const userBranchLabel = branchLabels[userSchoolLower] || loggedUser.schoolId;
+          setErrorMsg(`Google login failed: This account is registered under the "${userBranchLabel}" branch, not the selected branch.`);
+          return;
+        }
+      }
+    } catch (e: any) {
+      console.error('Google login catch error:', e);
+      let cleanMsg = e.message || 'Google Sign-In failed';
+      if (cleanMsg.includes('auth/popup-closed-by-user') || cleanMsg.toLowerCase().includes('popup-closed-by-user')) {
+        cleanMsg = i18n.language === 'ta'
+          ? 'உள்நுழைவு சாளரம் மூடப்பட்டது. தயவுசெய்து மீண்டும் முயற்சிக்கவும்.'
+          : 'Login popup closed. Please try again.';
+      }
+      setErrorMsg(cleanMsg);
+    } finally {
+      setGoogleLoading(false);
     }
   };
 
@@ -563,12 +601,60 @@ export default function LoginScreen({ onNavigateToRegister, onNavigateToWaitlist
                   })
                 }
               ]}
-              disabled={loading}
+              disabled={loading || googleLoading}
             >
               {loading ? (
                 <ActivityIndicator size="small" color="#FFF" />
               ) : (
                 <ThemedText style={styles.submitButtonText}>{t('auth.login')}</ThemedText>
+              )}
+            </Pressable>
+
+            {/* Divider */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 14 }}>
+              <View style={{ flex: 1, height: 1, backgroundColor: colors.border + '50' }} />
+              <ThemedText style={{ marginHorizontal: 12, fontSize: 11, color: colors.textSecondary, fontWeight: '600' }}>
+                {i18n.language === 'ta' ? 'அல்லது' : 'or'}
+              </ThemedText>
+              <View style={{ flex: 1, height: 1, backgroundColor: colors.border + '50' }} />
+            </View>
+
+            {/* Google Sign-in Button */}
+            <Pressable
+              onPress={() => handleGoogleLogin()}
+              style={({ pressed }) => [
+                styles.submitButton,
+                {
+                  backgroundColor: scheme === 'dark' ? 'rgba(255, 255, 255, 0.08)' : '#FFFFFF',
+                  borderWidth: 1.5,
+                  borderColor: colors.border,
+                  opacity: pressed ? 0.9 : 1,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 10,
+                  ...Platform.select({
+                    web: {
+                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.02)',
+                      transition: 'all 0.2s ease',
+                    }
+                  })
+                }
+              ]}
+              disabled={loading || googleLoading}
+            >
+              {googleLoading ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : (
+                <>
+                  <Image
+                    source={{ uri: 'https://images.squarespace-cdn.com/content/v1/5fbfd4fa6e4548483f982928/1614713180424-P9T1U8ZTLD7ZOH3FKBK7/Google-Icon.png' }}
+                    style={{ width: 16, height: 16, resizeMode: 'contain' }}
+                  />
+                  <ThemedText style={{ color: colors.text, fontWeight: '700', fontSize: 13 }}>
+                    {i18n.language === 'ta' ? 'கூகிள் மூலம் தொடரவும்' : 'Continue with Google'}
+                  </ThemedText>
+                </>
               )}
             </Pressable>
 
