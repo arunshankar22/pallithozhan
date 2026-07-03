@@ -30,7 +30,7 @@ export const storageBucketId = rawStorageBucket.startsWith('gs://') ? rawStorage
 
 export const firebaseConfig = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY || "",
-  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN || "pallithozhan.firebaseapp.com",
+  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN || "auth.pallithozhan.3stech.com.au",
   projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID || "",
   storageBucket: storageBucketId,
   messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "",
