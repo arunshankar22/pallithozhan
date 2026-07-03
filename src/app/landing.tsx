@@ -33,6 +33,7 @@ import {
 import LoginScreen from './login';
 import RegisterScreen from './register';
 import WaitlistScreen from './waitlist';
+import { useRouter } from 'expo-router';
 
 const { width: windowWidth } = Dimensions.get('window');
 
@@ -41,6 +42,7 @@ interface LandingScreenProps {
 }
 
 export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
+  const router = useRouter();
   const { t, i18n } = useTranslation();
   const scheme = useColorScheme();
   const theme = scheme === 'dark' ? 'dark' : 'light';
@@ -862,10 +864,22 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
           </View>
 
           {/* Footer Bottom copyright */}
-          <View style={[styles.footerBottom, { borderTopColor: 'rgba(255,255,255,0.1)' }]}>
+          <View style={[styles.footerBottom, { borderTopColor: 'rgba(255,255,255,0.1)', flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 12 }]}>
             <ThemedText style={styles.footerCopyrightText}>
               © 2026 Balar Malar Tamil School (NSW) Inc. All Rights Reserved.
             </ThemedText>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+              <Pressable onPress={() => router.replace('/privacy')}>
+                <ThemedText style={[styles.footerCopyrightText, { textDecorationLine: 'underline' }]}>
+                  {i18n.language === 'ta' ? 'தனியுரிமைக் கொள்கை' : 'Privacy Policy'}
+                </ThemedText>
+              </Pressable>
+              <Pressable onPress={() => router.replace('/terms')}>
+                <ThemedText style={[styles.footerCopyrightText, { textDecorationLine: 'underline' }]}>
+                  {i18n.language === 'ta' ? 'விதிமுறைகள்' : 'Terms of Service'}
+                </ThemedText>
+              </Pressable>
+            </View>
           </View>
         </View>
 
