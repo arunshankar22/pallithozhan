@@ -6,7 +6,7 @@ import { useAuth, getSchoolIdFromBranch } from '@/services/auth';
 import { Colors, Spacing } from '@/constants/theme';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { isDemoMode } from '@/services/firebase';
+import { isDemoMode, auth } from '@/services/firebase';
 import { Mail, Lock, Languages, BookOpen } from 'lucide-react-native';
 
 interface LoginScreenProps {
@@ -168,10 +168,24 @@ export default function LoginScreen({ onNavigateToRegister, onNavigateToWaitlist
       }
     } catch (e: any) {
       let cleanMsg = e.message || 'Login failed';
-      if (cleanMsg.includes('auth/invalid-credential') || cleanMsg.toLowerCase().includes('invalid-credential')) {
-        cleanMsg = i18n.language === 'ta' 
-          ? 'கடவுச்சொல் அல்லது மின்னஞ்சல் தவறானது. தயவுசெய்து மீண்டும் முயற்சிக்கவும்.' 
-          : 'Incorrect email or password. Please try again.';
+      if (cleanMsg.includes('auth/invalid-credential') || cleanMsg.toLowerCase().includes('invalid-credential') || cleanMsg.includes('auth/user-not-found')) {
+        try {
+          const { fetchSignInMethodsForEmail } = require('firebase/auth');
+          const methods = await fetchSignInMethodsForEmail(auth, eEmail);
+          if (methods && methods.includes('google.com') && !methods.includes('password')) {
+            cleanMsg = i18n.language === 'ta'
+              ? 'இந்த கணக்கு கூகிள் உள்நுழைவு மூலம் பதிவு செய்யப்பட்டுள்ளது. தயவுசெய்து "கூகிள் மூலம் தொடரவும்" பொத்தானைப் பயன்படுத்தவும்.'
+              : 'This account is registered using Google Sign-In. Please click the "Continue with Google" button to log in.';
+          } else {
+            cleanMsg = i18n.language === 'ta' 
+              ? 'கடவுச்சொல் அல்லது மின்னஞ்சல் தவறானது. தயவுசெய்து மீண்டும் முயற்சிக்கவும்.' 
+              : 'Incorrect email or password. Please try again.';
+          }
+        } catch (fetchErr) {
+          cleanMsg = i18n.language === 'ta' 
+            ? 'கடவுச்சொல் அல்லது மின்னஞ்சல் தவறானது. தயவுசெய்து மீண்டும் முயற்சிக்கவும்.' 
+            : 'Incorrect email or password. Please try again.';
+        }
       }
       setErrorMsg(cleanMsg);
     } finally {
