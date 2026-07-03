@@ -75,6 +75,17 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
     return () => clearInterval(timer);
   }, []);
 
+  React.useEffect(() => {
+    if (typeof window !== 'undefined' && window.location) {
+      const params = new URLSearchParams(window.location.search);
+      const mode = params.get('mode');
+      if (mode === 'resetPassword') {
+        setPortalVisible(true);
+        setAuthMode('login');
+      }
+    }
+  }, []);
+
   const toggleLanguage = () => {
     const nextLang = i18n.language === 'ta' ? 'en' : 'ta';
     i18n.changeLanguage(nextLang);
