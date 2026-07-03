@@ -8,14 +8,34 @@ import '@/services/i18n';
 
 import { AuthProvider, useAuth } from '@/services/auth';
 import { Colors } from '@/constants/theme';
+import { usePathname } from 'expo-router';
 import HomeScreen from './index';
 import LandingScreen from './landing';
+import PrivacyScreen from './privacy';
+import TermsScreen from './terms';
 
 function AppContent() {
   const { user, isLoading } = useAuth();
   const scheme = useColorScheme();
   const theme = scheme === 'dark' ? 'dark' : 'light';
   const colors = Colors[theme];
+  const pathname = usePathname();
+
+  if (pathname === '/privacy') {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+        <PrivacyScreen />
+      </SafeAreaView>
+    );
+  }
+
+  if (pathname === '/terms') {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+        <TermsScreen />
+      </SafeAreaView>
+    );
+  }
 
   if (isLoading) {
     return (
