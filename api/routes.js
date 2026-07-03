@@ -742,6 +742,7 @@ async function handleApiRoutes(req, res, pathname, method, dbData, writeDb, urlO
         </div>
       `;
 
+      const senderEmail = process.env.SENDER_EMAIL || 'noreply@3stech.com.au';
       // Call Resend REST API using native fetch
       const resendResponse = await fetch('https://api.resend.com/emails', {
         method: 'POST',
@@ -750,7 +751,7 @@ async function handleApiRoutes(req, res, pathname, method, dbData, writeDb, urlO
           'Authorization': `Bearer ${process.env.RESEND_API_KEY}`
         },
         body: JSON.stringify({
-          from: 'Balar Malar School <noreply@pallithozhan.3stech.com.au>',
+          from: `Balar Malar School <${senderEmail}>`,
           to: email,
           subject: 'Reset your Pallithozhan Password / கடவுச்சொல் மீட்டமைப்பு',
           html: htmlContent
