@@ -289,7 +289,7 @@ export const spreadsheetService = {
         });
 
         if (role === 'student') {
-          const email = rowObj.student_email || '';
+          const email = rowObj.student_email || (rowObj.student_id ? `${rowObj.student_id.trim().toLowerCase()}@balarmalar.nsw.edu.au` : `student_${Date.now()}_${i}@balarmalar.nsw.edu.au`);
           const givenName = rowObj.given_name || '';
           const familyName = rowObj.family_name || '';
           const fullName = `${givenName} ${familyName}`.trim();
