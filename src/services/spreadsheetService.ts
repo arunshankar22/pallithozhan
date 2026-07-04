@@ -250,9 +250,10 @@ export const spreadsheetService = {
     };
 
     const normalizedRowCells = firstRowCells.map(normalizeHeader);
-    const hasHeader = normalizedRowCells.some(cell => 
-      ['givenname', 'firstname', 'name', 'email', 'studentemail', 'wwc', 'dob', 'dateofbirth', 'id', 'role', 'schoolcode', 'requestdate', 'request', 'registered'].includes(cell)
-    );
+    const matchedHeaderCount = normalizedRowCells.filter(cell => 
+      ['givenname', 'familyname', 'firstname', 'lastname', 'name', 'email', 'studentemail', 'wwc', 'dob', 'dateofbirth', 'schoolcode', 'studentid', 'requestdate', 'registered'].includes(cell)
+    ).length;
+    const hasHeader = matchedHeaderCount >= 2;
 
     const records: any[] = [];
 
