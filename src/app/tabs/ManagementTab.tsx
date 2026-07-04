@@ -89,6 +89,7 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
   const [importSuccess, setImportSuccess] = useState(false);
   const [importLogs, setImportLogs] = useState<string[]>([]);
   const [importing, setImporting] = useState(false);
+  const [importWarnings, setImportWarnings] = useState<string[]>([]);
 
   // Bulk Attendance Import & Export States
   const [bulkTerm, setBulkTerm] = useState<'all' | '1' | '2' | '3' | '4'>('all');
@@ -103,6 +104,7 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
     if (!importText.trim()) {
       setImportPreview([]);
       setImportError('');
+      setImportWarnings([]);
       return;
     }
     
@@ -110,9 +112,11 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
       const parsed = spreadsheetService.parseSheetText(importText, importRole);
       setImportPreview(parsed.records);
       setImportError(parsed.error || '');
+      setImportWarnings(parsed.warnings || []);
     } catch (e: any) {
       setImportError(`Parsing error: ${e.message}`);
       setImportPreview([]);
+      setImportWarnings([]);
     }
   }, [importText, importRole]);
 
@@ -147,10 +151,12 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
               const parsed = spreadsheetService.parseExcelBinary(e.target?.result as ArrayBuffer, importRole);
               if (parsed.error) {
                 setImportError(parsed.error);
+                setImportWarnings([]);
                 showToast(parsed.error, 'error');
               } else {
                 setImportPreview(parsed.records);
                 setImportError('');
+                setImportWarnings(parsed.warnings || []);
                 showToast(`Parsed Excel ${file.name} successfully! Check preview below.`, 'success');
               }
             } else {
@@ -2066,6 +2072,19 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
                   <ThemedText style={{ fontSize: 12, fontWeight: '700', color: colors.secondary }}>
                     👀 Ready to Import: {importPreview.length} record(s) parsed
                   </ThemedText>
+                  
+                  {importWarnings.length > 0 ? (
+                    <View style={{ backgroundColor: '#fff3cd', padding: 8, borderRadius: 8, borderWidth: 1, borderColor: '#ffeeba', gap: 4, marginVertical: 4 }}>
+                      <ThemedText style={{ fontSize: 10, fontWeight: '700', color: '#856404' }}>
+                        ⚠️ Warning: {importWarnings.length} row(s) skipped during parsing:
+                      </ThemedText>
+                      <ScrollView style={{ maxHeight: 60 }} nestedScrollEnabled>
+                        {importWarnings.map((warn, wIdx) => (
+                          <ThemedText key={wIdx} style={{ fontSize: 9, color: '#856404' }}>• {warn}</ThemedText>
+                        ))}
+                      </ScrollView>
+                    </View>
+                  ) : null}
                   {/* Small Preview Grid */}
                   <ScrollView horizontal style={{ maxHeight: 110, borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 6, backgroundColor: colors.background }}>
                     <View style={{ gap: 4 }}>

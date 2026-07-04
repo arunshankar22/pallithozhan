@@ -151,10 +151,11 @@ export const spreadsheetService = {
   /**
    * Parses raw copy-pasted or file text string (CSV/TSV)
    */
-  parseSheetText: (text: string, role: 'student' | 'teacher' | 'volunteer' | 'waitlist'): { records: any[]; error: string } => {
+  parseSheetText: (text: string, role: 'student' | 'teacher' | 'volunteer' | 'waitlist'): { records: any[]; error: string; warnings?: string[] } => {
     const lines = spreadsheetService.splitLines(text);
+    const warnings: string[] = [];
     if (lines.length === 0) {
-      return { records: [], error: 'Sheet is empty or contains no active rows.' };
+      return { records: [], error: 'Sheet is empty or contains no active rows.', warnings };
     }
 
     const firstLine = lines[0];
@@ -294,7 +295,12 @@ export const spreadsheetService = {
           const familyName = rowObj.family_name || '';
           const fullName = `${givenName} ${familyName}`.trim();
           
-          if (!fullName || !email) continue;
+          if (!fullName || !email) {
+            const rowNumber = i + 1;
+            const rowDesc = rowObj.student_id ? `ID: ${rowObj.student_id}` : `Row ${rowNumber}`;
+            warnings.push(`${rowDesc}: Skipped because Student Name is empty.`);
+            continue;
+          }
 
           records.push({
             uid: rowObj.student_id || `student_${Date.now()}_${i}`,
@@ -333,7 +339,11 @@ export const spreadsheetService = {
           const familyName = rowObj.family_name || '';
           const studentEmail = rowObj.student_email || '';
           
-          if (!givenName && !familyName) continue;
+          if (!givenName && !familyName) {
+            const rowNumber = i + 1;
+            warnings.push(`Row ${rowNumber}: Skipped because Student Name is empty.`);
+            continue;
+          }
 
           records.push({
             uid: rowObj.student_id || rowObj.uid || `waitlist_${Date.now()}_${i}`,
@@ -379,7 +389,11 @@ export const spreadsheetService = {
         } else {
           const name = rowObj.name || '';
           const email = rowObj.email || '';
-          if (!name || !email) continue;
+          if (!name || !email) {
+            const rowNumber = i + 1;
+            warnings.push(`Row ${rowNumber}: Skipped because Name or Email is empty.`);
+            continue;
+          }
 
           records.push({
             uid: rowObj.id ? `${role}_${rowObj.id}` : `${role}_${Date.now()}_${i}`,
@@ -500,7 +514,10 @@ export const spreadsheetService = {
           }
         });
 
-        if (!name && !email) continue;
+        if (!name && !email) {
+          warnings.push(`Row ${i + 1}: Skipped because both Name and Email could not be auto-detected.`);
+          continue;
+        }
         const uid = `imported_${parsedRole}_${Date.now()}_${i}`;
 
         if (role === 'student') {
@@ -580,13 +597,13 @@ export const spreadsheetService = {
       }
     }
 
-    return { records, error: '' };
+    return { records, error: '', warnings };
   },
 
   /**
    * Parses binary Excel files (.xlsx, .xls) using SheetJS
    */
-  parseExcelBinary: (arrayBuffer: ArrayBuffer, role: 'student' | 'teacher' | 'volunteer' | 'waitlist'): { records: any[]; error: string } => {
+  parseExcelBinary: (arrayBuffer: ArrayBuffer, role: 'student' | 'teacher' | 'volunteer' | 'waitlist'): { records: any[]; error: string; warnings?: string[] } => {
     try {
       const data = new Uint8Array(arrayBuffer);
       const workbook = XLSX.read(data, { type: 'array' });
