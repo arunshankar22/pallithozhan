@@ -10,7 +10,8 @@ import {
   ActivityIndicator,
   Image,
   StyleSheet,
-  Linking
+  Linking,
+  useWindowDimensions
 } from 'react-native';
 import {
   Award,
@@ -32,8 +33,10 @@ import {
   Clock,
   Sparkles,
   ExternalLink,
-  Edit2
+  Edit2,
+  HelpCircle
 } from 'lucide-react-native';
+import { HelperTooltip } from '@/components/HelperTooltip';
 import { ThemedText } from '@/components/themed-text';
 import { TabProps, getGlassStyle } from '@/app/sharedTypes';
 import { styles as globalStyles } from '@/app/styles';
@@ -244,11 +247,27 @@ export function ReportsTab({
   initialSubTab,
   clearInitialParams
 }: TabProps & {
-  initialSubTab?: 'active' | 'pending' | 'record';
+  initialSubTab?: 'active' | 'pending' | 'record' | 'progress-report';
   clearInitialParams?: () => void;
 }) {
+  const { width: windowWidth } = useWindowDimensions();
+  const isLargeScreen = windowWidth >= 768;
+
   // Database States
   const [achievements, setAchievements] = useState<any[]>([]);
+  const [showHelp, setShowHelp] = useState(() => {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      return window.localStorage.getItem('pallithozhan_help_achievements') !== 'hidden';
+    }
+    return true;
+  });
+
+  const dismissHelp = () => {
+    setShowHelp(false);
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem('pallithozhan_help_achievements', 'hidden');
+    }
+  };
   const [students, setStudents] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
   const [parentStudents, setParentStudents] = useState<any[]>([]);
@@ -256,7 +275,7 @@ export function ReportsTab({
   // UI States
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [activeSubTab, setActiveSubTab] = useState<'active' | 'pending' | 'record'>('active');
+  const [activeSubTab, setActiveSubTab] = useState<'active' | 'pending' | 'record' | 'progress-report'>('active');
 
   // Filter States
   const [searchText, setSearchText] = useState('');
@@ -282,6 +301,48 @@ export function ReportsTab({
   const [formNotesTa, setFormNotesTa] = useState('');
   const [notesTaDirty, setNotesTaDirty] = useState(false);
   const [isNotesTranslating, setIsNotesTranslating] = useState(false);
+
+  // --- Progress Report States ---
+  const [reportStudentId, setReportStudentId] = useState('');
+  const [reportTerm, setReportTerm] = useState(2);
+  const [reportAttendance, setReportAttendance] = useState('');
+  const [reportComments, setReportComments] = useState('');
+  const [reportTeacherSig, setReportTeacherSig] = useState('');
+  const [reportPrincipalSig, setReportPrincipalSig] = useState('');
+  const [reportParentSigned, setReportParentSigned] = useState(false);
+  const [reportParentSigDate, setReportParentSigDate] = useState('');
+  const [reportLoading, setReportLoading] = useState(false);
+  const [isPrinting, setIsPrinting] = useState(false);
+
+  // Skills evaluation state values (A/B/C/D/E)
+  const [skillSpeaking1, setSkillSpeaking1] = useState('');
+  const [skillSpeaking2, setSkillSpeaking2] = useState('');
+  const [skillSpeaking3, setSkillSpeaking3] = useState('');
+
+  const [skillListening1, setSkillListening1] = useState('');
+  const [skillListening2, setSkillListening2] = useState('');
+  const [skillListening3, setSkillListening3] = useState('');
+
+  const [skillReading1, setSkillReading1] = useState('');
+  const [skillReading2, setSkillReading2] = useState('');
+  const [skillReading3, setSkillReading3] = useState('');
+
+  const [skillWriting1, setSkillWriting1] = useState('');
+  const [skillWriting2, setSkillWriting2] = useState('');
+  const [skillWriting3, setSkillWriting3] = useState('');
+
+  // Attitudes evaluation state values (A/U/S)
+  const [attitudePunctuality, setAttitudePunctuality] = useState('');
+  const [attitudeEnthusiasm, setAttitudeEnthusiasm] = useState('');
+  const [attitudePeerInteraction, setAttitudePeerInteraction] = useState('');
+  const [attitudeKindLanguage, setAttitudeKindLanguage] = useState('');
+  const [attitudeConfidence, setAttitudeConfidence] = useState('');
+  const [attitudeHomework, setAttitudeHomework] = useState('');
+
+  // Progress Reports Class View States
+  const [progressViewMode, setProgressViewMode] = useState<'single' | 'class-table'>('single');
+  const [classReports, setClassReports] = useState<any[]>([]);
+  const [classReportsLoading, setClassReportsLoading] = useState(false);
 
   // Custom Dropdown Modal States
   const [pickerVisible, setPickerVisible] = useState(false);
@@ -603,6 +664,28 @@ export function ReportsTab({
 
   // Filter logic based on active tab and search/category criteria
   const isParent = user?.role === 'parent';
+  const isReadOnly = isParent || isPrinting;
+  
+  const formatSkillGrade = (grade: string) => {
+    if (!grade) return '-';
+    const upper = grade.toUpperCase();
+    if (upper === 'A') return i18n.language === 'ta' ? 'A - உன்னதசித்தி (EXCELLENT)' : 'A - EXCELLENT (உன்னதசித்தி)';
+    if (upper === 'B') return i18n.language === 'ta' ? 'B - மிகநன்று (VERY GOOD)' : 'B - VERY GOOD (மிகநன்று)';
+    if (upper === 'C') return i18n.language === 'ta' ? 'C - நன்று (GOOD)' : 'C - GOOD (நன்று)';
+    if (upper === 'D') return i18n.language === 'ta' ? 'D - திருப்தி (SATISFACTORY)' : 'D - SATISFACTORY (திருப்தி)';
+    if (upper === 'E') return i18n.language === 'ta' ? 'E - முன்னேற்றம் தேவை (IMPROVEMENT NEEDED)' : 'E - IMPROVEMENT NEEDED (முன்னேற்றம் தேவை)';
+    return grade;
+  };
+
+  const formatAttitudeGrade = (value: string) => {
+    if (!value) return '-';
+    const upper = value.toUpperCase();
+    if (upper === 'A') return i18n.language === 'ta' ? 'A - எப்போதும் (Always)' : 'A - Always (எப்போதும்)';
+    if (upper === 'U') return i18n.language === 'ta' ? 'U - வழக்கமாக (Usually)' : 'U - Usually (வழக்கமாக)';
+    if (upper === 'S') return i18n.language === 'ta' ? 'S - சிலவேளை (Sometimes)' : 'S - Sometimes (சிலவேளை)';
+    return value;
+  };
+
   const isStudent = user?.role === 'student';
   const associatedStudentIds = user?.associatedStudents || [];
   
@@ -1436,6 +1519,1652 @@ export function ReportsTab({
       })
     : students;
 
+  // --- Progress Report Lifecycle & Logic ---
+
+  // Set default reportStudentId
+  useEffect(() => {
+    if (isParent) {
+      if (parentStudents.length > 0 && !reportStudentId) {
+        setReportStudentId(parentStudents[0].uid);
+      }
+    } else {
+      if (students.length > 0 && !reportStudentId) {
+        setReportStudentId(students[0].uid);
+      }
+    }
+  }, [students, parentStudents, isParent]);
+
+  // Fetch class reports helper
+  const fetchClassReports = React.useCallback(async () => {
+    if (activeSubTab !== 'progress-report') return;
+    setClassReportsLoading(true);
+    try {
+      const targetClassId = isParent ? 'parent' : (user?.role === 'teacher' ? (
+        classes.find((c: any) => c.teacherId === user?.uid || (c.teacherIds && c.teacherIds.includes(user?.uid)))?.classId || 'All'
+      ) : filterClassId);
+      
+      const targetStudents = targetClassId && targetClassId !== 'All'
+        ? students.filter((s: any) => {
+            const cls = classes.find((c: any) => c.classId === targetClassId);
+            return cls?.studentIds?.includes(s.uid);
+          })
+        : students;
+
+      const reportsList: any[] = [];
+      for (const s of targetStudents) {
+        const rep = await mockDb.getProgressReport(s.uid, reportTerm, 2026);
+        if (rep) {
+          reportsList.push(rep);
+        }
+      }
+      setClassReports(reportsList);
+    } catch (err) {
+      console.error('Error loading class reports:', err);
+    } finally {
+      setClassReportsLoading(false);
+    }
+  }, [activeSubTab, filterClassId, reportTerm, students, classes, user, isParent]);
+
+  // Load progress reports for all students in the selected class for Term Table view
+  useEffect(() => {
+    fetchClassReports();
+  }, [fetchClassReports]);
+
+  // Load progress report from Cloud Firestore when student or term changes
+  useEffect(() => {
+    if (!reportStudentId) return;
+    
+    const loadReport = async () => {
+      setReportLoading(true);
+      try {
+        const report = await mockDb.getProgressReport(reportStudentId, reportTerm, 2026);
+        if (report) {
+          setReportAttendance(report.attendance || '');
+          setReportComments(report.teacherComments || '');
+          setReportTeacherSig(report.teacherSignature || '');
+          setReportPrincipalSig(report.principalSignature || '');
+          setReportParentSigned(report.parentSigned || false);
+          setReportParentSigDate(report.parentSignatureDate || '');
+          
+          setSkillSpeaking1(report.skills?.speaking?.bodyLanguage || '');
+          setSkillSpeaking2(report.skills?.speaking?.vocabulary || '');
+          setSkillSpeaking3(report.skills?.speaking?.conversation || '');
+          
+          setSkillListening1(report.skills?.listening?.visualComprehension || '');
+          setSkillListening2(report.skills?.listening?.oralUnderstanding || '');
+          setSkillListening3(report.skills?.listening?.responseAccuracy || '');
+          
+          setSkillReading1(report.skills?.reading?.fluency || '');
+          setSkillReading2(report.skills?.reading?.vocabularyComprehension || '');
+          setSkillReading3(report.skills?.reading?.grammarConventions || '');
+          
+          setSkillWriting1(report.skills?.writing?.wordAccuracy || '');
+          setSkillWriting2(report.skills?.writing?.sentenceArrangement || '');
+          setSkillWriting3(report.skills?.writing?.grammarAccuracy || '');
+          
+          setAttitudePunctuality(report.attitudes?.punctuality || '');
+          setAttitudeEnthusiasm(report.attitudes?.enthusiasm || '');
+          setAttitudePeerInteraction(report.attitudes?.peerInteraction || '');
+          setAttitudeKindLanguage(report.attitudes?.kindLanguage || '');
+          setAttitudeConfidence(report.attitudes?.expressingConfidence || '');
+          setAttitudeHomework(report.attitudes?.homeworkCompletion || '');
+        } else {
+          // Reset form to defaults
+          setReportAttendance('');
+          setReportComments('');
+          setReportTeacherSig('');
+          setReportPrincipalSig('');
+          setReportParentSigned(false);
+          setReportParentSigDate('');
+          
+          setSkillSpeaking1('');
+          setSkillSpeaking2('');
+          setSkillSpeaking3('');
+          setSkillListening1('');
+          setSkillListening2('');
+          setSkillListening3('');
+          setSkillReading1('');
+          setSkillReading2('');
+          setSkillReading3('');
+          setSkillWriting1('');
+          setSkillWriting2('');
+          setSkillWriting3('');
+          
+          setAttitudePunctuality('');
+          setAttitudeEnthusiasm('');
+          setAttitudePeerInteraction('');
+          setAttitudeKindLanguage('');
+          setAttitudeConfidence('');
+          setAttitudeHomework('');
+        }
+      } catch (err) {
+        console.error('Error loading report card:', err);
+      } finally {
+        setReportLoading(false);
+      }
+    };
+    
+    loadReport();
+  }, [reportStudentId, reportTerm]);
+
+  // Inject web print CSS rules
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      const styleId = 'progress-report-print-style';
+      if (!document.getElementById(styleId)) {
+        const style = document.createElement('style');
+        style.id = styleId;
+        style.type = 'text/css';
+        style.innerHTML = `
+          @media print {
+            body * {
+              visibility: hidden;
+            }
+            #print-report-card, #print-report-card * {
+              visibility: visible;
+            }
+            #print-report-card {
+              position: absolute;
+              left: 0;
+              top: 0;
+              width: 100%;
+              margin: 0;
+              padding: 20px;
+              background: #fff !important;
+              color: #000 !important;
+              box-shadow: none !important;
+              border: none !important;
+            }
+            .no-print {
+              display: none !important;
+            }
+          }
+        `;
+        document.head.appendChild(style);
+      }
+    }
+  }, []);
+
+  // Save Progress Report (Teacher)
+  const handleSubmitReport = async () => {
+    if (!reportStudentId) {
+      showToast(i18n.language === 'ta' ? 'தயவுசெய்து ஒரு மாணவரைத் தேர்ந்தெடுக்கவும்' : 'Please select a student', 'error');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const studentObj = students.find((s: any) => s.uid === reportStudentId) || parentStudents.find((s: any) => s.uid === reportStudentId);
+      const studentName = studentObj ? studentObj.fullName : 'Unknown';
+      
+      const newReport = {
+        studentId: reportStudentId,
+        classId: studentObj?.className || 'Year 3 / Year 4',
+        academicYear: 2026,
+        term: reportTerm,
+        attendance: reportAttendance,
+        skills: {
+          speaking: {
+            bodyLanguage: skillSpeaking1,
+            vocabulary: skillSpeaking2,
+            conversation: skillSpeaking3
+          },
+          listening: {
+            visualComprehension: skillListening1,
+            oralUnderstanding: skillListening2,
+            responseAccuracy: skillListening3
+          },
+          reading: {
+            fluency: skillReading1,
+            vocabularyComprehension: skillReading2,
+            grammarConventions: skillReading3
+          },
+          writing: {
+            wordAccuracy: skillWriting1,
+            sentenceArrangement: skillWriting2,
+            grammarAccuracy: skillWriting3
+          }
+        },
+        attitudes: {
+          punctuality: attitudePunctuality,
+          enthusiasm: attitudeEnthusiasm,
+          peerInteraction: attitudePeerInteraction,
+          kindLanguage: attitudeKindLanguage,
+          expressingConfidence: attitudeConfidence,
+          homeworkCompletion: attitudeHomework
+        },
+        teacherComments: reportComments,
+        teacherSignature: reportTeacherSig || user?.fullName || '',
+        principalSignature: reportPrincipalSig || 'Balar Malar Principal',
+        parentSigned: reportParentSigned,
+        parentSignatureDate: reportParentSigDate || undefined,
+        updatedAt: new Date().toISOString()
+      };
+
+      await mockDb.saveProgressReport(newReport);
+      await fetchClassReports();
+      
+      await auditLogService.logAction(
+        user?.uid || 'system',
+        user?.fullName || 'System User',
+        user?.email || 'system@example.com',
+        user?.role || 'system',
+        'Save Progress Report',
+        `Saved progress report for ${studentName} - Term ${reportTerm}`
+      );
+
+      showToast(
+        i18n.language === 'ta' 
+          ? 'முன்னேற்ற அறிக்கை வெற்றிகரமாக சேமிக்கப்பட்டது!' 
+          : 'Progress report saved successfully!', 
+        'success'
+      );
+    } catch (err) {
+      console.error('Error saving progress report:', err);
+      showToast(
+        i18n.language === 'ta' 
+          ? 'சேமிப்பதில் பிழை ஏற்பட்டது!' 
+          : 'Error occurred while saving progress report!', 
+        'error'
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Sign & Acknowledge Report (Parent)
+  const handleParentAcknowledge = async () => {
+    if (!reportStudentId) return;
+    setSubmitting(true);
+    try {
+      const termReport = await mockDb.getProgressReport(reportStudentId, reportTerm, 2026);
+      if (!termReport) {
+        showToast('No report card found for this term yet / இந்த தவணைக்கான அறிக்கை இன்னும் உருவாக்கப்படவில்லை', 'error');
+        return;
+      }
+      
+      const updated = {
+        ...termReport,
+        parentSigned: true,
+        parentSignatureDate: new Date().toISOString()
+      };
+      
+      await mockDb.saveProgressReport(updated);
+      await fetchClassReports();
+      setReportParentSigned(true);
+      setReportParentSigDate(updated.parentSignatureDate);
+      
+      await auditLogService.logAction(
+        user?.uid || 'parent',
+        user?.fullName || 'Parent User',
+        user?.email || 'parent@example.com',
+        user?.role || 'parent',
+        'Sign Progress Report',
+        `Acknowledged and signed progress report for student ID: ${reportStudentId} - Term ${reportTerm}`
+      );
+      
+      showToast('Successfully signed report card / அறிக்கை அட்டை வெற்றிகரமாக அங்கீகரிக்கப்பட்டது', 'success');
+    } catch (err) {
+      console.error('Error signing report card:', err);
+      showToast('Error signing report card / கையொப்பமிடுவதில் பிழை', 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Trigger web print dialogue
+  const handlePrintReportCard = () => {
+    if (Platform.OS !== 'web') {
+      showToast('Printing is only supported on Web version / அச்சிடுதல் கணினி பதிப்பில் மட்டுமே ஆதரவுடையது', 'warning');
+      return;
+    }
+
+    setIsPrinting(true);
+
+    // Wait for state change to render clean read-only components
+    setTimeout(() => {
+      const printElement = document.getElementById('print-report-card');
+      if (!printElement) {
+        showToast('Report card element not found / அறிக்கை அட்டை உறுப்பு காணப்படவில்லை', 'error');
+        setIsPrinting(false);
+        return;
+      }
+
+      // Clone the print element so we can mutate it safely before printing
+      const printClone = printElement.cloneNode(true) as HTMLElement;
+
+      // Sync and replace selects with clean inline static values from NodeList index matching
+      const liveSelects = printElement.querySelectorAll('select');
+      const cloneSelects = printClone.querySelectorAll('select');
+      cloneSelects.forEach((cloneSel, idx) => {
+        const liveSel = liveSelects[idx];
+        if (liveSel) {
+          const val = liveSel.value;
+          const text = val ? val : '-';
+          const txtNode = document.createElement('span');
+          txtNode.innerText = text;
+          txtNode.setAttribute('style', 'font-weight: 800; font-size: 16px; color: #b91c1c; text-align: right; min-width: 60px; display: inline-block;');
+          cloneSel.parentNode?.replaceChild(txtNode, cloneSel);
+        }
+      });
+
+      // Sync and replace textareas with clean comments blocks
+      const liveTextareas = printElement.querySelectorAll('textarea');
+      const cloneTextareas = printClone.querySelectorAll('textarea');
+      cloneTextareas.forEach((cloneTa, idx) => {
+        const liveTa = liveTextareas[idx];
+        if (liveTa) {
+          const val = liveTa.value;
+          const txtNode = document.createElement('div');
+          txtNode.innerText = val ? val : 'No comments / கருத்துக்கள் இல்லை';
+          txtNode.setAttribute('style', 'font-size: 11px; color: #374151; white-space: pre-wrap; padding: 12px; background-color: #f9fafb; border-radius: 8px; border: 1px solid #e5e7eb; width: 100%; box-sizing: border-box;');
+          cloneTa.parentNode?.replaceChild(txtNode, cloneTa);
+        }
+      });
+
+      // Sync and replace text inputs with clean signature/attendance text
+      const liveInputs = printElement.querySelectorAll('input');
+      const cloneInputs = printClone.querySelectorAll('input');
+      cloneInputs.forEach((cloneInp, idx) => {
+        const liveInp = liveInputs[idx];
+        if (liveInp) {
+          const val = liveInp.value;
+          const txtNode = document.createElement('span');
+          txtNode.innerText = val ? val : '-';
+          txtNode.setAttribute('style', 'font-weight: 700; font-size: 12px; color: #1f2937; border-bottom: 1px dashed #ccc; padding-bottom: 2px;');
+          cloneInp.parentNode?.replaceChild(txtNode, cloneInp);
+        }
+      });
+
+      // Hide interactive edit buttons/action buttons
+      printClone.querySelectorAll('button, [role="button"], [class*="submitButton"], .no-print').forEach((btn) => {
+        (btn as HTMLElement).style.display = 'none';
+      });
+
+      // Open print window
+      const printWindow = window.open('', '_blank', 'width=900,height=1000');
+      if (!printWindow) {
+        showToast('Please allow popups for printing / அச்சிட பாப்-அப்களை அனுமதிக்கவும்', 'error');
+        setIsPrinting(false);
+        return;
+      }
+
+      let stylesHtml = '';
+      document.querySelectorAll('style, link[rel="stylesheet"]').forEach((styleEl) => {
+        stylesHtml += styleEl.outerHTML;
+      });
+
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Balar Malar Student Progress Report</title>
+            ${stylesHtml}
+            <style>
+              html, body {
+                background: white !important;
+                color: black !important;
+                height: auto !important;
+                max-height: none !important;
+                overflow: visible !important;
+                margin: 0 !important;
+                padding: 20px !important;
+                font-family: system-ui, -apple-system, sans-serif;
+              }
+              div, span {
+                height: auto !important;
+                max-height: none !important;
+                overflow: visible !important;
+              }
+              .css-view-175oi2r, [class*="css-view"] {
+                height: auto !important;
+                max-height: none !important;
+                overflow: visible !important;
+              }
+              #print-report-card {
+                display: block !important;
+                width: 100% !important;
+                height: auto !important;
+                border: none !important;
+                box-shadow: none !important;
+                margin: 0 !important;
+                padding: 0 !important;
+              }
+              .no-print {
+                display: none !important;
+              }
+              
+              /* Custom print table and meta grid overrides */
+              .print-meta-grid {
+                display: table !important;
+                width: 100% !important;
+                border-collapse: collapse !important;
+                margin-top: 15px !important;
+                margin-bottom: 15px !important;
+                background-color: #f9fafb !important;
+                border-radius: 8px !important;
+                padding: 6px !important;
+              }
+              .print-meta-row {
+                display: table-row !important;
+              }
+              .print-meta-cell {
+                display: table-cell !important;
+                padding: 6px 12px !important;
+                vertical-align: middle !important;
+              }
+              .print-meta-label {
+                font-weight: 700 !important;
+                color: #4b5563 !important;
+                width: 35% !important;
+                text-align: left !important;
+              }
+              .print-meta-value {
+                font-weight: 800 !important;
+                color: #1f2937 !important;
+                text-align: left !important;
+              }
+
+              .print-table {
+                display: table !important;
+                width: 100% !important;
+                border-collapse: collapse !important;
+                border: 1px solid #e5e7eb !important;
+                border-radius: 8px !important;
+                box-sizing: border-box !important;
+                margin-bottom: 15px !important;
+              }
+              .print-table-row {
+                display: table-row !important;
+                width: 100% !important;
+                border-bottom: 1px solid #e5e7eb !important;
+                page-break-inside: avoid !important;
+              }
+              .print-table-cell-left {
+                display: table-cell !important;
+                width: 60% !important;
+                text-align: left !important;
+                vertical-align: middle !important;
+                padding: 10px 12px !important;
+                box-sizing: border-box !important;
+              }
+              .print-table-cell-right {
+                display: table-cell !important;
+                width: 40% !important;
+                text-align: right !important;
+                vertical-align: middle !important;
+                padding: 10px 12px !important;
+                box-sizing: border-box !important;
+              }
+            </style>
+          </head>
+          <body>
+            <div id="print-report-card">
+              ${printClone.innerHTML}
+            </div>
+            <script>
+              window.addEventListener('load', () => {
+                setTimeout(() => {
+                  window.print();
+                  window.close();
+                }, 800);
+              });
+            </script>
+          </body>
+        </html>
+      `);
+
+      printWindow.document.close();
+      setIsPrinting(false);
+    }, 100);
+  };
+
+  // Inline Grade select dropdown
+  const renderGradeDropdown = (
+    label: string, 
+    value: string, 
+    onSelect: (val: string) => void
+  ) => {
+    const items = [
+      { value: '', label: i18n.language === 'ta' ? 'தேர்ந்தெடுக்கவும் / Select Grade' : 'Select Grade / தேர்ந்தெடுக்கவும்' },
+      { value: 'A', label: i18n.language === 'ta' ? 'A - உன்னதசித்தி (EXCELLENT)' : 'A - EXCELLENT (உன்னதசித்தி)' },
+      { value: 'B', label: i18n.language === 'ta' ? 'B - மிகநன்று (VERY GOOD)' : 'B - VERY GOOD (மிகநன்று)' },
+      { value: 'C', label: i18n.language === 'ta' ? 'C - நன்று (GOOD)' : 'C - GOOD (நன்று)' },
+      { value: 'D', label: i18n.language === 'ta' ? 'D - திருப்தி (SATISFACTORY)' : 'D - SATISFACTORY (திருப்தி)' },
+      { value: 'E', label: i18n.language === 'ta' ? 'E - முன்னேற்றம் தேவை (IMPROVEMENT NEEDED)' : 'E - IMPROVEMENT NEEDED (முன்னேற்றம் தேவை)' }
+    ];
+
+    if (Platform.OS === 'web') {
+      return (
+        <select
+          value={value}
+          onChange={(e) => onSelect(e.target.value)}
+          style={{
+            padding: '6px 8px',
+            borderRadius: '6px',
+            border: `1px solid ${colors.border}`,
+            backgroundColor: colors.background,
+            color: colors.text,
+            fontSize: '11px',
+            width: '100%',
+            maxWidth: 320,
+            outline: 'none'
+          }}
+        >
+          {items.map(item => (
+            <option key={item.value} value={item.value}>{item.label}</option>
+          ))}
+        </select>
+      );
+    }
+
+    const selectedItem = items.find(item => item.value === value);
+
+    return (
+      <Pressable
+        onPress={() => openCustomPicker(label, items, onSelect)}
+        style={{
+          borderWidth: 1,
+          borderColor: colors.border,
+          borderRadius: 6,
+          paddingHorizontal: 8,
+          paddingVertical: 6,
+          backgroundColor: colors.background,
+          width: '100%',
+          maxWidth: 320,
+          justifyContent: 'center'
+        }}
+      >
+        <ThemedText style={{ fontSize: 11, color: colors.text }}>
+          {selectedItem ? selectedItem.label : (i18n.language === 'ta' ? 'தேர்ந்தெடுக்கவும் / Select Grade' : 'Select Grade / தேர்ந்தெடுக்கவும்')}
+        </ThemedText>
+      </Pressable>
+    );
+  };
+
+  // Render Always / Usually / Sometimes segmented toggles
+  const renderAttitudeToggle = (value: string, onChange: (val: string) => void) => {
+    const states = ['A', 'U', 'S'];
+
+    return (
+      <View style={[localStyles.attitudeToggles, { flexDirection: 'row' }]}>
+        {states.map(st => {
+          const isActive = value === st;
+          let btnColor = colors.border;
+          let textColor = colors.textSecondary;
+          let activeBg = colors.primaryLight;
+          
+          if (isActive) {
+            textColor = colors.primary;
+            btnColor = colors.primary;
+          }
+          
+          if (isParent) {
+            return (
+              <View
+                key={st}
+                style={[
+                  localStyles.attitudeToggleBtn,
+                  {
+                    borderColor: isActive ? colors.primary : colors.border + '30',
+                    backgroundColor: isActive ? colors.primaryLight : 'transparent'
+                  }
+                ]}
+              >
+                <ThemedText style={{ fontSize: 10, fontWeight: '800', color: isActive ? colors.primary : colors.textSecondary + '30' }}>
+                  {st}
+                </ThemedText>
+              </View>
+            );
+          }
+
+          return (
+            <Pressable
+              key={st}
+              onPress={() => {
+                if (isActive) {
+                  onChange('');
+                } else {
+                  onChange(st);
+                }
+              }}
+              style={[
+                localStyles.attitudeToggleBtn,
+                {
+                  borderColor: btnColor,
+                  backgroundColor: isActive ? activeBg : colors.background
+                }
+              ]}
+            >
+              <ThemedText style={{ fontSize: 10, fontWeight: '800', color: textColor }}>
+                {st}
+              </ThemedText>
+            </Pressable>
+          );
+        })}
+      </View>
+    );
+  };
+
+  // Render Class Summary Table Grid
+  const renderClassSummaryTable = () => {
+    const teacherClass = user?.role === 'teacher'
+      ? classes.find((c: any) => c.teacherId === user?.uid || (c.teacherIds && c.teacherIds.includes(user?.uid)))
+      : null;
+
+    const targetClassId = teacherClass ? teacherClass.classId : filterClassId;
+    
+    const targetStudents = targetClassId && targetClassId !== 'All'
+      ? students.filter((s: any) => {
+          const cls = classes.find((c: any) => c.classId === targetClassId);
+          return cls?.studentIds?.includes(s.uid);
+        })
+      : students;
+
+    const selectedClassName = targetClassId && targetClassId !== 'All'
+      ? (classes.find((c: any) => c.classId === targetClassId)?.className || '')
+      : (i18n.language === 'ta' ? 'அனைத்து வகுப்புகளும்' : 'All Classes');
+
+    return (
+      <View style={{ gap: Spacing.three }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: colors.border, paddingBottom: 10 }}>
+          <ThemedText style={{ fontSize: 14, fontWeight: '800', color: colors.primary }}>
+            {selectedClassName} - {i18n.language === 'ta' ? `வகுப்பு சுருக்கம் (தவணை ${reportTerm})` : `Class Summary Table (Term ${reportTerm})`}
+          </ThemedText>
+        </View>
+
+        {classReportsLoading ? (
+          <View style={{ paddingVertical: 50, justifyContent: 'center', alignItems: 'center' }}>
+            <ActivityIndicator size="large" color={colors.primary} />
+          </View>
+        ) : targetStudents.length === 0 ? (
+          <View style={{ paddingVertical: 30, justifyContent: 'center', alignItems: 'center' }}>
+            <ThemedText style={{ color: colors.textSecondary }}>
+              {i18n.language === 'ta' ? 'இந்த வகுப்பில் மாணவர்கள் இல்லை' : 'No students found in this class'}
+            </ThemedText>
+          </View>
+        ) : (
+          <ScrollView horizontal style={{ width: '100%' }}>
+            <View style={[localStyles.reportTable, { borderColor: colors.border, minWidth: 900 }]}>
+              {/* Header row */}
+              <View style={[localStyles.reportTableHeader, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
+                <ThemedText style={{ flex: 2, fontWeight: '800', color: colors.textSecondary, fontSize: 10 }}>Student Name</ThemedText>
+                <ThemedText style={{ flex: 1.2, fontWeight: '800', color: colors.textSecondary, fontSize: 10, textAlign: 'center' }}>Speaking</ThemedText>
+                <ThemedText style={{ flex: 1.2, fontWeight: '800', color: colors.textSecondary, fontSize: 10, textAlign: 'center' }}>Listening</ThemedText>
+                <ThemedText style={{ flex: 1.2, fontWeight: '800', color: colors.textSecondary, fontSize: 10, textAlign: 'center' }}>Reading</ThemedText>
+                <ThemedText style={{ flex: 1.2, fontWeight: '800', color: colors.textSecondary, fontSize: 10, textAlign: 'center' }}>Writing</ThemedText>
+                <ThemedText style={{ flex: 1, fontWeight: '800', color: colors.textSecondary, fontSize: 10, textAlign: 'center' }}>Attendance</ThemedText>
+                <ThemedText style={{ flex: 1, fontWeight: '800', color: colors.textSecondary, fontSize: 10, textAlign: 'center' }}>Parent Signed</ThemedText>
+                <ThemedText style={{ flex: 1, fontWeight: '800', color: colors.textSecondary, fontSize: 10, textAlign: 'center' }}>Actions</ThemedText>
+              </View>
+
+              {/* Data rows */}
+              {targetStudents.map((s: any) => {
+                const rep = classReports.find((r: any) => r.studentId === s.uid);
+                
+                const formatGrades = (group: 'speaking' | 'listening' | 'reading' | 'writing') => {
+                  if (!rep?.skills?.[group]) return '- / - / -';
+                  const g = rep.skills[group];
+                  if (group === 'speaking') {
+                    return `${g.bodyLanguage || '-'} / ${g.vocabulary || '-'} / ${g.conversation || '-'}`;
+                  }
+                  if (group === 'listening') {
+                    return `${g.visualComprehension || '-'} / ${g.oralUnderstanding || '-'} / ${g.responseAccuracy || '-'}`;
+                  }
+                  if (group === 'reading') {
+                    return `${g.fluency || '-'} / ${g.vocabularyComprehension || '-'} / ${g.grammarConventions || '-'}`;
+                  }
+                  if (group === 'writing') {
+                    return `${g.wordAccuracy || '-'} / ${g.sentenceArrangement || '-'} / ${g.grammarAccuracy || '-'}`;
+                  }
+                  return '- / - / -';
+                };
+
+                return (
+                  <View key={s.uid} style={[localStyles.reportTableRow, { borderBottomColor: colors.border }]}>
+                    <View style={{ flex: 2 }}>
+                      <ThemedText style={{ fontSize: 11, fontWeight: '700', color: colors.text }}>
+                        {s.fullName}
+                      </ThemedText>
+                      {!!s.fullNameTamil && (
+                        <ThemedText style={{ fontSize: 9, color: colors.textSecondary }}>
+                          {s.fullNameTamil}
+                        </ThemedText>
+                      )}
+                    </View>
+                    <ThemedText style={{ flex: 1.2, fontSize: 10, textAlign: 'center', color: colors.text }}>
+                      {formatGrades('speaking')}
+                    </ThemedText>
+                    <ThemedText style={{ flex: 1.2, fontSize: 10, textAlign: 'center', color: colors.text }}>
+                      {formatGrades('listening')}
+                    </ThemedText>
+                    <ThemedText style={{ flex: 1.2, fontSize: 10, textAlign: 'center', color: colors.text }}>
+                      {formatGrades('reading')}
+                    </ThemedText>
+                    <ThemedText style={{ flex: 1.2, fontSize: 10, textAlign: 'center', color: colors.text }}>
+                      {formatGrades('writing')}
+                    </ThemedText>
+                    <ThemedText style={{ flex: 1, fontSize: 10, textAlign: 'center', color: colors.text }}>
+                      {rep?.attendance || '-'}
+                    </ThemedText>
+                    <View style={{ flex: 1, alignItems: 'center' }}>
+                      <ThemedText style={{ fontSize: 10, fontWeight: '700', color: rep?.parentSigned ? '#10B981' : colors.textSecondary }}>
+                        {rep?.parentSigned ? '✓ Signed' : 'Pending'}
+                      </ThemedText>
+                    </View>
+                    <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'center' }}>
+                      <Pressable
+                        onPress={() => {
+                          setReportStudentId(s.uid);
+                          setProgressViewMode('single');
+                        }}
+                        style={{ backgroundColor: colors.primaryLight, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 4 }}
+                      >
+                        <ThemedText style={{ fontSize: 9, fontWeight: '700', color: colors.primary }}>
+                          {i18n.language === 'ta' ? 'அறிக்கை' : 'Open'}
+                        </ThemedText>
+                      </Pressable>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          </ScrollView>
+        )}
+      </View>
+    );
+  };
+
+  // Main Progress Reports Portal Rendering
+  const renderProgressReports = () => {
+    // 1. Resolve teacher's assigned class student roster restriction
+    const teacherClass = user?.role === 'teacher'
+      ? classes.find((c: any) => c.teacherId === user?.uid || (c.teacherIds && c.teacherIds.includes(user?.uid)))
+      : null;
+
+    const filteredReportStudents = isParent ? parentStudents : (
+      teacherClass
+        ? students.filter((s: any) => teacherClass.studentIds?.includes(s.uid))
+        : (
+          filterClassId && filterClassId !== 'All'
+            ? students.filter((s: any) => {
+                const cls = classes.find((c: any) => c.classId === filterClassId);
+                return cls?.studentIds?.includes(s.uid);
+              })
+            : students
+        )
+    );
+
+    const studentList = filteredReportStudents;
+    const activeStudentObj = studentList.find((s: any) => s.uid === reportStudentId);
+    
+    return (
+      <ScrollView contentContainerStyle={{ paddingBottom: Spacing.four }} style={{ flex: 1 }}>
+        <View style={[localStyles.reportContainer, { flexDirection: isLargeScreen ? 'row' : 'column' }]}>
+          
+          {/* Left Sidebar: Controls */}
+          <View style={[localStyles.reportSidebar, { backgroundColor: colors.cardBg, borderColor: colors.border }]} className="no-print">
+            <ThemedText style={{ fontSize: 13, fontWeight: '700', color: colors.text }}>
+              {i18n.language === 'ta' ? 'அறிக்கை கட்டுப்பாடுகள்' : 'Report Controls'}
+            </ThemedText>
+
+            {/* View Mode Toggle (Staff/Admins/Volunteers only) */}
+            {!isParent && (
+              <View style={{ gap: 4 }}>
+                <ThemedText style={{ fontSize: 11, fontWeight: '700', color: colors.textSecondary }}>
+                  {i18n.language === 'ta' ? 'பார்வை முறை' : 'View Mode'}
+                </ThemedText>
+                <View style={{ flexDirection: 'row', gap: 6 }}>
+                  <Pressable
+                    onPress={() => setProgressViewMode('single')}
+                    style={{
+                      flex: 1,
+                      paddingVertical: 8,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: progressViewMode === 'single' ? colors.primary : colors.border,
+                      backgroundColor: progressViewMode === 'single' ? colors.primaryLight : colors.background,
+                      alignItems: 'center'
+                    }}
+                  >
+                    <ThemedText style={{ fontSize: 10, fontWeight: '700', color: progressViewMode === 'single' ? colors.primary : colors.text }}>
+                      {i18n.language === 'ta' ? 'தனிநபர்' : 'Single Card'}
+                    </ThemedText>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => setProgressViewMode('class-table')}
+                    style={{
+                      flex: 1,
+                      paddingVertical: 8,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: progressViewMode === 'class-table' ? colors.primary : colors.border,
+                      backgroundColor: progressViewMode === 'class-table' ? colors.primaryLight : colors.background,
+                      alignItems: 'center'
+                    }}
+                  >
+                    <ThemedText style={{ fontSize: 10, fontWeight: '700', color: progressViewMode === 'class-table' ? colors.primary : colors.text }}>
+                      {i18n.language === 'ta' ? 'வகுப்பு அட்டவணை' : 'Class Table'}
+                    </ThemedText>
+                  </Pressable>
+                </View>
+              </View>
+            )}
+
+            {/* Class Filter (Admins/Volunteers/Superadmins only) */}
+            {['admin', 'superadmin', 'volunteer'].includes(user?.role || '') && (
+              <View style={{ gap: 4 }}>
+                <ThemedText style={{ fontSize: 11, fontWeight: '700', color: colors.textSecondary }}>
+                  {i18n.language === 'ta' ? 'வகுப்பு' : 'Filter by Class'}
+                </ThemedText>
+                {Platform.OS === 'web' ? (
+                  <select
+                    value={filterClassId}
+                    onChange={(e) => {
+                      setFilterClassId(e.target.value);
+                      setReportStudentId('');
+                    }}
+                    style={{
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      border: `1px solid ${colors.border}`,
+                      backgroundColor: colors.background,
+                      color: colors.text,
+                      fontSize: '12px',
+                      outline: 'none',
+                      width: '100%'
+                    }}
+                  >
+                    <option value="All">{i18n.language === 'ta' ? 'அனைத்து வகுப்புகள்' : 'All Classes'}</option>
+                    {classes.map((c: any) => (
+                      <option key={c.classId} value={c.classId}>{c.className}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <Pressable
+                    onPress={() => {
+                      const opts = [
+                        { label: i18n.language === 'ta' ? 'அனைத்து வகுப்புகள்' : 'All Classes', value: 'All' },
+                        ...classes.map((c: any) => ({ label: c.className, value: c.classId }))
+                      ];
+                      openCustomPicker(
+                        i18n.language === 'ta' ? 'வகுப்பைத் தேர்ந்தெடுக்கவும்' : 'Select Class',
+                        opts,
+                        (val) => {
+                          setFilterClassId(val);
+                          setReportStudentId('');
+                        }
+                      );
+                    }}
+                    style={{
+                      paddingHorizontal: 12,
+                      paddingVertical: 10,
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                      borderRadius: 8,
+                      backgroundColor: colors.background,
+                      flexDirection: 'row',
+                      justifyContent: 'space-between',
+                      alignItems: 'center'
+                    }}
+                  >
+                    <ThemedText style={{ fontSize: 12, color: colors.text }}>
+                      {filterClassId === 'All' ? 'All Classes' : (classes.find((c: any) => c.classId === filterClassId)?.className || 'Select Class')}
+                    </ThemedText>
+                    <ChevronDown size={14} color={colors.textSecondary} />
+                  </Pressable>
+                )}
+              </View>
+            )}
+
+            {/* Static class display for Teachers */}
+            {user?.role === 'teacher' && (
+              <View style={{ gap: 2 }}>
+                <ThemedText style={{ fontSize: 11, fontWeight: '700', color: colors.textSecondary }}>
+                  {i18n.language === 'ta' ? 'வகுப்பு' : 'Assigned Class'}
+                </ThemedText>
+                <ThemedText style={{ fontSize: 12, fontWeight: '800', color: colors.primary }}>
+                  {teacherClass?.className || 'Year 3 / Year 4'}
+                </ThemedText>
+              </View>
+            )}
+            
+            {/* Student Dropdown / Picker - only relevant if viewing single card */}
+            {(progressViewMode === 'single' || isParent) && (
+              <View style={{ gap: 4 }}>
+                <ThemedText style={{ fontSize: 11, fontWeight: '700', color: colors.textSecondary }}>
+                  {i18n.language === 'ta' ? 'மாணவர்' : 'Student'}
+                </ThemedText>
+                
+                {Platform.OS === 'web' ? (
+                  <select
+                    value={reportStudentId}
+                    onChange={(e) => setReportStudentId(e.target.value)}
+                    style={{
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      border: `1px solid ${colors.border}`,
+                      backgroundColor: colors.background,
+                      color: colors.text,
+                      fontSize: '12px',
+                      outline: 'none',
+                      width: '100%'
+                    }}
+                  >
+                    <option value="">{i18n.language === 'ta' ? 'மாணவரைத் தேர்ந்தெடுக்கவும்' : 'Select Student'}</option>
+                    {studentList.map((s: any) => (
+                      <option key={s.uid} value={s.uid}>{s.fullName} {s.fullNameTamil ? `(${s.fullNameTamil})` : ''}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <Pressable
+                    onPress={() => {
+                      const opts = studentList.map((s: any) => ({
+                        label: `${s.fullName} ${s.fullNameTamil ? `(${s.fullNameTamil})` : ''}`,
+                        value: s.uid
+                      }));
+                      openCustomPicker(
+                        i18n.language === 'ta' ? 'மாணவரைத் தேர்ந்தெடுக்கவும்' : 'Select Student',
+                        opts,
+                        setReportStudentId
+                      );
+                    }}
+                    style={{
+                      paddingHorizontal: 12,
+                      paddingVertical: 10,
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                      borderRadius: 8,
+                      backgroundColor: colors.background,
+                      flexDirection: 'row',
+                      justifyContent: 'space-between',
+                      alignItems: 'center'
+                    }}
+                  >
+                    <ThemedText style={{ fontSize: 12, color: colors.text }}>
+                      {activeStudentObj ? activeStudentObj.fullName : (i18n.language === 'ta' ? 'மாணவரைத் தேர்ந்தெடுக்கவும்' : 'Select Student')}
+                    </ThemedText>
+                    <ChevronDown size={14} color={colors.textSecondary} />
+                  </Pressable>
+                )}
+              </View>
+            )}
+
+            {/* Term Dropdown / Picker */}
+            <View style={{ gap: 4 }}>
+              <ThemedText style={{ fontSize: 11, fontWeight: '700', color: colors.textSecondary }}>
+                {i18n.language === 'ta' ? 'தவணை' : 'Term'}
+              </ThemedText>
+              
+              {Platform.OS === 'web' ? (
+                <select
+                  value={reportTerm.toString()}
+                  onChange={(e) => setReportTerm(parseInt(e.target.value))}
+                  style={{
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    border: `1px solid ${colors.border}`,
+                    backgroundColor: colors.background,
+                    color: colors.text,
+                    fontSize: '12px',
+                    outline: 'none',
+                    width: '100%'
+                  }}
+                >
+                  <option value="2">{i18n.language === 'ta' ? 'தவணை 2' : 'Term 2'}</option>
+                  <option value="3">{i18n.language === 'ta' ? 'தவணை 3' : 'Term 3'}</option>
+                  <option value="4">{i18n.language === 'ta' ? 'தவணை 4' : 'Term 4'}</option>
+                </select>
+              ) : (
+                <Pressable
+                  onPress={() => {
+                    const opts = [
+                      { label: i18n.language === 'ta' ? 'தவணை 2' : 'Term 2', value: '2' },
+                      { label: i18n.language === 'ta' ? 'தவணை 3' : 'Term 3', value: '3' },
+                      { label: i18n.language === 'ta' ? 'தவணை 4' : 'Term 4', value: '4' }
+                    ];
+                    openCustomPicker(
+                      i18n.language === 'ta' ? 'தவணையைத் தேர்ந்தெடுக்கவும்' : 'Select Term',
+                      opts,
+                      (val) => setReportTerm(parseInt(val))
+                    );
+                  }}
+                  style={{
+                    paddingHorizontal: 12,
+                    paddingVertical: 10,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                    borderRadius: 8,
+                    backgroundColor: colors.background,
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}
+                >
+                  <ThemedText style={{ fontSize: 12, color: colors.text }}>
+                    {reportTerm === 2 ? 'Term 2' : reportTerm === 3 ? 'Term 3' : 'Term 4'}
+                  </ThemedText>
+                  <ChevronDown size={14} color={colors.textSecondary} />
+                </Pressable>
+              )}
+            </View>
+
+            {/* Print action (Web only) */}
+            {Platform.OS === 'web' && reportStudentId && progressViewMode === 'single' ? (
+              <Pressable
+                onPress={handlePrintReportCard}
+                style={[localStyles.submitButton, { backgroundColor: colors.primary, marginTop: Spacing.two }]}
+              >
+                <Download size={16} color="#FFF" style={{ marginRight: 6 }} />
+                <ThemedText style={localStyles.submitButtonText}>
+                  {i18n.language === 'ta' ? 'அச்சிடு / PDF' : 'Print / Save PDF'}
+                </ThemedText>
+              </Pressable>
+            ) : null}
+          </View>
+
+          {/* Right Main Panel: Report Card / Class Summary Table */}
+          <View 
+            id="print-report-card" 
+            style={[localStyles.reportCardArea, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
+          >
+            {progressViewMode === 'class-table' && !isParent ? (
+              renderClassSummaryTable()
+            ) : reportLoading ? (
+              <View style={{ flex: 1, paddingVertical: 100, justifyContent: 'center', alignItems: 'center' }}>
+                <ActivityIndicator size="large" color={colors.primary} />
+                <ThemedText style={{ marginTop: 10, color: colors.textSecondary }}>
+                  Loading report card... / அறிக்கை அட்டை ஏற்றப்படுகிறது...
+                </ThemedText>
+              </View>
+            ) : !reportStudentId ? (
+              <View style={{ flex: 1, paddingVertical: 100, justifyContent: 'center', alignItems: 'center' }}>
+                <ThemedText style={{ color: colors.textSecondary }}>
+                  {i18n.language === 'ta' ? 'அறிக்கையைக் காண மாணவரைத் தேர்ந்தெடுக்கவும்' : 'Please select a student to view report card'}
+                </ThemedText>
+              </View>
+            ) : (
+              <View style={{ gap: Spacing.three }}>
+                
+                {/* 1. School Header Block */}
+                <View style={[localStyles.reportHeader, { borderBottomColor: colors.border }]}>
+                  <ThemedText style={{ fontSize: 13, fontWeight: '800', color: colors.primary, textAlign: 'center' }}>
+                    பாலர்மலர் தமிழ் பள்ளி பரமட்டா
+                  </ThemedText>
+                  <ThemedText style={{ fontSize: 11, fontWeight: '800', color: colors.primary, textAlign: 'center', letterSpacing: 0.5 }}>
+                    BALAR MALAR TAMIL SCHOOL PARRAMATTA
+                  </ThemedText>
+                  <ThemedText style={{ fontSize: 14, fontWeight: '800', color: colors.text, marginTop: Spacing.two, textAlign: 'center' }}>
+                    மாணவர் முன்னேற்ற அறிக்கை / STUDENT PROGRESS REPORT
+                  </ThemedText>
+                </View>
+
+                {/* 2. Metadata details (2-column details grid) */}
+                <View style={[localStyles.reportDetailsGrid, { backgroundColor: colors.background }]} className="print-meta-grid">
+                  <View style={[localStyles.reportDetailCell, { flexDirection: 'row', alignItems: 'center', gap: 6, minWidth: isLargeScreen ? '45%' : '100%', flexWrap: 'wrap' }]} className="print-meta-row">
+                    <ThemedText style={{ fontSize: 9, fontWeight: '700', color: colors.textSecondary }} className="print-meta-cell print-meta-label">மாணவர் பெயர் - STUDENT NAME:</ThemedText>
+                    <ThemedText style={{ fontSize: 11, fontWeight: '800', color: colors.text }} className="print-meta-cell print-meta-value">
+                      {activeStudentObj?.fullName || 'N/A'} {activeStudentObj?.fullNameTamil ? `/ ${activeStudentObj.fullNameTamil}` : ''}
+                    </ThemedText>
+                  </View>
+                  <View style={[localStyles.reportDetailCell, { flexDirection: 'row', alignItems: 'center', gap: 6, minWidth: isLargeScreen ? '45%' : '100%' }]} className="print-meta-row">
+                    <ThemedText style={{ fontSize: 9, fontWeight: '700', color: colors.textSecondary }} className="print-meta-cell print-meta-label">நிலை - Level:</ThemedText>
+                    <ThemedText style={{ fontSize: 11, fontWeight: '800', color: colors.text }} className="print-meta-cell print-meta-value">2</ThemedText>
+                  </View>
+                  <View style={[localStyles.reportDetailCell, { flexDirection: 'row', alignItems: 'center', gap: 6, minWidth: isLargeScreen ? '45%' : '100%' }]} className="print-meta-row">
+                    <ThemedText style={{ fontSize: 9, fontWeight: '700', color: colors.textSecondary }} className="print-meta-cell print-meta-label">வகுப்பு - Class / Year:</ThemedText>
+                    <ThemedText style={{ fontSize: 11, fontWeight: '800', color: colors.text }} className="print-meta-cell print-meta-value">
+                      {activeStudentObj?.className || 'ஆண்டு 3 / ஆண்டு 4 (Year 3 / Year 4)'}
+                    </ThemedText>
+                  </View>
+                  <View style={[localStyles.reportDetailCell, { flexDirection: 'row', alignItems: 'center', gap: 6, minWidth: isLargeScreen ? '45%' : '100%' }]} className="print-meta-row">
+                    <ThemedText style={{ fontSize: 9, fontWeight: '700', color: colors.textSecondary }} className="print-meta-cell print-meta-label">கல்வியாண்டு - Academic Year:</ThemedText>
+                    <ThemedText style={{ fontSize: 11, fontWeight: '800', color: colors.text }} className="print-meta-cell print-meta-value">2026</ThemedText>
+                  </View>
+                </View>
+
+                {/* 3. Term Header Title */}
+                <View style={{ paddingVertical: 6, borderBottomWidth: 2, borderBottomColor: colors.primary, marginTop: Spacing.one }}>
+                  <ThemedText style={{ fontSize: 13, fontWeight: '800', color: colors.primary }}>
+                    {reportTerm === 2 ? 'தவணை 2 (Term 2) - மாணவர் அறிக்கை (Student Report)' : reportTerm === 3 ? 'தவணை 3 (Term 3) - மாணவர் அறிக்கை (Student Report)' : 'தவணை 4 (Term 4) - மாணவர் அறிக்கை (Student Report)'}
+                  </ThemedText>
+                </View>
+
+                {/* 4. Grade Legend / Rubric Definition */}
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginVertical: 4 }}>
+                  <View style={{ backgroundColor: colors.primaryLight, padding: 6, borderRadius: 6, flex: 1, minWidth: 100, alignItems: 'center' }}>
+                    <ThemedText style={{ fontSize: 10, fontWeight: '800', color: colors.primary }}>A (100 - 90)</ThemedText>
+                    <ThemedText style={{ fontSize: 9, color: colors.text, fontWeight: '700' }}>EXCELLENT</ThemedText>
+                    <ThemedText style={{ fontSize: 8, color: colors.textSecondary }}>உன்னதசித்தி</ThemedText>
+                  </View>
+                  <View style={{ backgroundColor: colors.primaryLight, padding: 6, borderRadius: 6, flex: 1, minWidth: 100, alignItems: 'center' }}>
+                    <ThemedText style={{ fontSize: 10, fontWeight: '800', color: colors.primary }}>B (89 - 70)</ThemedText>
+                    <ThemedText style={{ fontSize: 9, color: colors.text, fontWeight: '700' }}>VERY GOOD</ThemedText>
+                    <ThemedText style={{ fontSize: 8, color: colors.textSecondary }}>மிகநன்று</ThemedText>
+                  </View>
+                  <View style={{ backgroundColor: colors.primaryLight, padding: 6, borderRadius: 6, flex: 1, minWidth: 100, alignItems: 'center' }}>
+                    <ThemedText style={{ fontSize: 10, fontWeight: '800', color: colors.primary }}>C (69 - 50)</ThemedText>
+                    <ThemedText style={{ fontSize: 9, color: colors.text, fontWeight: '700' }}>GOOD</ThemedText>
+                    <ThemedText style={{ fontSize: 8, color: colors.textSecondary }}>நன்று</ThemedText>
+                  </View>
+                  <View style={{ backgroundColor: colors.primaryLight, padding: 6, borderRadius: 6, flex: 1, minWidth: 100, alignItems: 'center' }}>
+                    <ThemedText style={{ fontSize: 10, fontWeight: '800', color: colors.primary }}>D (49 - 36)</ThemedText>
+                    <ThemedText style={{ fontSize: 9, color: colors.text, fontWeight: '700' }}>SATISFACTORY</ThemedText>
+                    <ThemedText style={{ fontSize: 8, color: colors.textSecondary }}>திருப்தி</ThemedText>
+                  </View>
+                  <View style={{ backgroundColor: colors.primaryLight, padding: 6, borderRadius: 6, flex: 1, minWidth: 100, alignItems: 'center' }}>
+                    <ThemedText style={{ fontSize: 10, fontWeight: '800', color: colors.primary }}>E (35 & LESS)</ThemedText>
+                    <ThemedText style={{ fontSize: 9, color: colors.text, fontWeight: '700' }}>IMPROVEMENT NEEDED</ThemedText>
+                    <ThemedText style={{ fontSize: 8, color: colors.textSecondary }}>முன்னேற்றம் தேவை</ThemedText>
+                  </View>
+                </View>
+
+                {/* 5. Skill Achievements - Evaluation Section */}
+                <ThemedText style={[localStyles.reportSectionTitle, { color: colors.primary }]}>
+                  திறன் அடைவுகள் - மதிப்பீடு (Skill Achievements - Evaluation):
+                </ThemedText>
+                
+                {/* Main Table Headers */}
+                <View style={[localStyles.reportTable, { borderColor: colors.border, borderBottomWidth: 0 }]} className="print-table">
+                  <View style={[localStyles.reportTableHeader, { backgroundColor: colors.background, borderBottomColor: colors.border }]} className="print-table-row">
+                    <ThemedText style={[localStyles.reportTableCellLeft, { fontWeight: '800', color: colors.textSecondary }]} className="print-table-cell-left">
+                      பாடத்திட்டத்திறன்கள் (Skills / Learning Outcomes)
+                    </ThemedText>
+                    <ThemedText style={[localStyles.reportTableCellRight, { fontWeight: '800', color: colors.textSecondary, flex: undefined, minWidth: 140, textAlign: 'right' }]} className="print-table-cell-right">
+                      புள்ளிகள் விகிதம் (Grade)
+                    </ThemedText>
+                  </View>
+                </View>
+
+                {/* Section A: Speaking */}
+                <View style={{ backgroundColor: colors.primaryLight + '30', paddingHorizontal: Spacing.two, paddingVertical: 6, borderLeftWidth: 1, borderRightWidth: 1, borderBottomWidth: 1, borderColor: colors.border }}>
+                  <ThemedText style={{ fontSize: 10, fontWeight: '800', color: colors.primary }}>உரையாடல் (Speaking / Conversation)</ThemedText>
+                </View>
+                <View style={[localStyles.reportTable, { borderColor: colors.border, borderTopWidth: 0, borderBottomWidth: 0 }]} className="print-table">
+                  <View style={[localStyles.reportTableRow, { borderBottomColor: colors.border, flexDirection: isReadOnly ? 'row' : 'column', alignItems: isReadOnly ? 'center' : 'stretch' }]} className="print-table-row">
+                    <View style={isReadOnly ? localStyles.reportTableCellLeft : { width: '100%', marginBottom: 4 }} className="print-table-cell-left">
+                      <ThemedText style={{ fontSize: 11, color: colors.text }}>உடல் மற்றும் முக பாவனைகளை சரியாக பயன்படுத்தி எண்ணங்களை வெளிப்படுத்துகிறார்</ThemedText>
+                      <ThemedText style={{ fontSize: 9, color: colors.textSecondary }}>(Uses appropriate body language and facial expressions to express thoughts)</ThemedText>
+                    </View>
+                    <View style={isReadOnly ? [localStyles.reportTableCellRight, { flex: undefined, minWidth: 140, alignItems: 'flex-end', justifyContent: 'center' }] : { width: '100%', marginTop: 4 }} className="print-table-cell-right">
+                      {!isReadOnly ? (
+                        renderGradeDropdown('Speaking Skill 1', skillSpeaking1, setSkillSpeaking1)
+                      ) : (
+                        <ThemedText style={{ fontWeight: '800', fontSize: 12, color: colors.primary, textAlign: 'right', minWidth: 60 }}>{formatSkillGrade(skillSpeaking1)}</ThemedText>
+                      )}
+                    </View>
+                  </View>
+
+                  <View style={[localStyles.reportTableRow, { borderBottomColor: colors.border, flexDirection: isReadOnly ? 'row' : 'column', alignItems: isReadOnly ? 'center' : 'stretch' }]} className="print-table-row">
+                    <View style={isReadOnly ? localStyles.reportTableCellLeft : { width: '100%', marginBottom: 4 }} className="print-table-cell-left">
+                      <ThemedText style={{ fontSize: 11, color: colors.text }}>புதிய சொற்களை பயன்படுத்தி கருத்துக்களை வெளிப்படுத்துகிறார்</ThemedText>
+                      <ThemedText style={{ fontSize: 9, color: colors.textSecondary }}>(Uses new vocabulary to express ideas)</ThemedText>
+                    </View>
+                    <View style={isReadOnly ? [localStyles.reportTableCellRight, { flex: undefined, minWidth: 140, alignItems: 'flex-end', justifyContent: 'center' }] : { width: '100%', marginTop: 4 }} className="print-table-cell-right">
+                      {!isReadOnly ? (
+                        renderGradeDropdown('Speaking Skill 2', skillSpeaking2, setSkillSpeaking2)
+                      ) : (
+                        <ThemedText style={{ fontWeight: '800', fontSize: 12, color: colors.primary, textAlign: 'right', minWidth: 60 }}>{formatSkillGrade(skillSpeaking2)}</ThemedText>
+                      )}
+                    </View>
+                  </View>
+
+                  <View style={[localStyles.reportTableRow, { borderBottomColor: colors.border, flexDirection: isReadOnly ? 'row' : 'column', alignItems: isReadOnly ? 'center' : 'stretch' }]} className="print-table-row">
+                    <View style={isReadOnly ? localStyles.reportTableCellLeft : { width: '100%', marginBottom: 4 }} className="print-table-cell-left">
+                      <ThemedText style={{ fontSize: 11, color: colors.text }}>சிறிய உரையாடல்களில் கலந்துகொண்டு தனது எண்ணங்களின் முக்கிய கருத்துக்களை வெளிப்படுத்துகிறார்</ThemedText>
+                      <ThemedText style={{ fontSize: 9, color: colors.textSecondary }}>(Participates in short conversations and expresses main points clearly)</ThemedText>
+                    </View>
+                    <View style={isReadOnly ? [localStyles.reportTableCellRight, { flex: undefined, minWidth: 140, alignItems: 'flex-end', justifyContent: 'center' }] : { width: '100%', marginTop: 4 }} className="print-table-cell-right">
+                      {!isReadOnly ? (
+                        renderGradeDropdown('Speaking Skill 3', skillSpeaking3, setSkillSpeaking3)
+                      ) : (
+                        <ThemedText style={{ fontWeight: '800', fontSize: 12, color: colors.primary, textAlign: 'right', minWidth: 60 }}>{formatSkillGrade(skillSpeaking3)}</ThemedText>
+                      )}
+                    </View>
+                  </View>
+                </View>
+
+                {/* Section B: Listening */}
+                <View style={{ backgroundColor: colors.primaryLight + '30', paddingHorizontal: Spacing.two, paddingVertical: 6, borderLeftWidth: 1, borderRightWidth: 1, borderBottomWidth: 1, borderColor: colors.border }}>
+                  <ThemedText style={{ fontSize: 10, fontWeight: '800', color: colors.primary }}>கேட்டு கிரகித்தல் (Listening Comprehension)</ThemedText>
+                </View>
+                <View style={[localStyles.reportTable, { borderColor: colors.border, borderTopWidth: 0, borderBottomWidth: 0 }]} className="print-table">
+                  <View style={[localStyles.reportTableRow, { borderBottomColor: colors.border, flexDirection: isReadOnly ? 'row' : 'column', alignItems: isReadOnly ? 'center' : 'stretch' }]} className="print-table-row">
+                    <View style={isReadOnly ? localStyles.reportTableCellLeft : { width: '100%', marginBottom: 4 }} className="print-table-cell-left">
+                      <ThemedText style={{ fontSize: 11, color: colors.text }}>கேட்கும் செய்திகளை படங்களின்/காட்சிகளின் உதவியுடன் புரிந்துகொள்கிறார்</ThemedText>
+                      <ThemedText style={{ fontSize: 9, color: colors.textSecondary }}>(Understands spoken messages with the help of pictures/visuals)</ThemedText>
+                    </View>
+                    <View style={isReadOnly ? [localStyles.reportTableCellRight, { flex: undefined, minWidth: 140, alignItems: 'flex-end', justifyContent: 'center' }] : { width: '100%', marginTop: 4 }} className="print-table-cell-right">
+                      {!isReadOnly ? (
+                        renderGradeDropdown('Listening Skill 1', skillListening1, setSkillListening1)
+                      ) : (
+                        <ThemedText style={{ fontWeight: '800', fontSize: 12, color: colors.primary, textAlign: 'right', minWidth: 60 }}>{formatSkillGrade(skillListening1)}</ThemedText>
+                      )}
+                    </View>
+                  </View>
+
+                  <View style={[localStyles.reportTableRow, { borderBottomColor: colors.border, flexDirection: isReadOnly ? 'row' : 'column', alignItems: isReadOnly ? 'center' : 'stretch' }]} className="print-table-row">
+                    <View style={isReadOnly ? localStyles.reportTableCellLeft : { width: '100%', marginBottom: 4 }} className="print-table-cell-left">
+                      <ThemedText style={{ fontSize: 11, color: colors.text }}>வாய்மொழி தொடர்பாடல்களை கவனமாக கேட்டு புரிந்துகொள்கிறார்</ThemedText>
+                      <ThemedText style={{ fontSize: 9, color: colors.textSecondary }}>(Listens carefully and understands oral communication)</ThemedText>
+                    </View>
+                    <View style={isReadOnly ? [localStyles.reportTableCellRight, { flex: undefined, minWidth: 140, alignItems: 'flex-end', justifyContent: 'center' }] : { width: '100%', marginTop: 4 }} className="print-table-cell-right">
+                      {!isReadOnly ? (
+                        renderGradeDropdown('Listening Skill 2', skillListening2, setSkillListening2)
+                      ) : (
+                        <ThemedText style={{ fontWeight: '800', fontSize: 12, color: colors.primary, textAlign: 'right', minWidth: 60 }}>{formatSkillGrade(skillListening2)}</ThemedText>
+                      )}
+                    </View>
+                  </View>
+
+                  <View style={[localStyles.reportTableRow, { borderBottomColor: colors.border, flexDirection: isReadOnly ? 'row' : 'column', alignItems: isReadOnly ? 'center' : 'stretch' }]} className="print-table-row">
+                    <View style={isReadOnly ? localStyles.reportTableCellLeft : { width: '100%', marginBottom: 4 }} className="print-table-cell-left">
+                      <ThemedText style={{ fontSize: 11, color: colors.text }}>கேள்விகளையும், கட்டளைகளையும், கோரிக்கைகளையும் புரிந்துகொண்டு சரியாக பதிலளிக்கிறார்</ThemedText>
+                      <ThemedText style={{ fontSize: 9, color: colors.textSecondary }}>(Understands and responds correctly to questions, instructions, and requests)</ThemedText>
+                    </View>
+                    <View style={isReadOnly ? [localStyles.reportTableCellRight, { flex: undefined, minWidth: 140, alignItems: 'flex-end', justifyContent: 'center' }] : { width: '100%', marginTop: 4 }} className="print-table-cell-right">
+                      {!isReadOnly ? (
+                        renderGradeDropdown('Listening Skill 3', skillListening3, setSkillListening3)
+                      ) : (
+                        <ThemedText style={{ fontWeight: '800', fontSize: 12, color: colors.primary, textAlign: 'right', minWidth: 60 }}>{formatSkillGrade(skillListening3)}</ThemedText>
+                      )}
+                    </View>
+                  </View>
+                </View>
+
+                {/* Section C: Reading */}
+                <View style={{ backgroundColor: colors.primaryLight + '30', paddingHorizontal: Spacing.two, paddingVertical: 6, borderLeftWidth: 1, borderRightWidth: 1, borderBottomWidth: 1, borderColor: colors.border }}>
+                  <ThemedText style={{ fontSize: 10, fontWeight: '800', color: colors.primary }}>வாசிப்பு (Reading)</ThemedText>
+                </View>
+                <View style={[localStyles.reportTable, { borderColor: colors.border, borderTopWidth: 0, borderBottomWidth: 0 }]} className="print-table">
+                  <View style={[localStyles.reportTableRow, { borderBottomColor: colors.border, flexDirection: isReadOnly ? 'row' : 'column', alignItems: isReadOnly ? 'center' : 'stretch' }]} className="print-table-row">
+                    <View style={isReadOnly ? localStyles.reportTableCellLeft : { width: '100%', marginBottom: 4 }} className="print-table-cell-left">
+                      <ThemedText style={{ fontSize: 11, color: colors.text }}>சரளமாக வாசிக்கிறார்; தொடர் வாக்கியங்களை வாசிக்கிறார்; படங்கள் மற்றும் காட்சிகளின் உதவியுடன் புரிந்து கொள்கிறார்</ThemedText>
+                      <ThemedText style={{ fontSize: 9, color: colors.textSecondary }}>(Reads fluently, reads continuous sentences, and understands with visual support)</ThemedText>
+                    </View>
+                    <View style={isReadOnly ? [localStyles.reportTableCellRight, { flex: undefined, minWidth: 140, alignItems: 'flex-end', justifyContent: 'center' }] : { width: '100%', marginTop: 4 }} className="print-table-cell-right">
+                      {!isReadOnly ? (
+                        renderGradeDropdown('Reading Skill 1', skillReading1, setSkillReading1)
+                      ) : (
+                        <ThemedText style={{ fontWeight: '800', fontSize: 12, color: colors.primary, textAlign: 'right', minWidth: 60 }}>{formatSkillGrade(skillReading1)}</ThemedText>
+                      )}
+                    </View>
+                  </View>
+
+                  <View style={[localStyles.reportTableRow, { borderBottomColor: colors.border, flexDirection: isReadOnly ? 'row' : 'column', alignItems: isReadOnly ? 'center' : 'stretch' }]} className="print-table-row">
+                    <View style={isReadOnly ? localStyles.reportTableCellLeft : { width: '100%', marginBottom: 4 }} className="print-table-cell-left">
+                      <ThemedText style={{ fontSize: 11, color: colors.text }}>புதிய/கடினச் சொற்களை பிழையின்றி வாசிக்கிறார், பொருள் உணர்ந்து வாசிக்கிறார்</ThemedText>
+                      <ThemedText style={{ fontSize: 9, color: colors.textSecondary }}>(Reads new/difficult words accurately and with comprehension)</ThemedText>
+                    </View>
+                    <View style={isReadOnly ? [localStyles.reportTableCellRight, { flex: undefined, minWidth: 140, alignItems: 'flex-end', justifyContent: 'center' }] : { width: '100%', marginTop: 4 }} className="print-table-cell-right">
+                      {!isReadOnly ? (
+                        renderGradeDropdown('Reading Skill 2', skillReading2, setSkillReading2)
+                      ) : (
+                        <ThemedText style={{ fontWeight: '800', fontSize: 12, color: colors.primary, textAlign: 'right', minWidth: 60 }}>{formatSkillGrade(skillReading2)}</ThemedText>
+                      )}
+                    </View>
+                  </View>
+
+                  <View style={[localStyles.reportTableRow, { borderBottomColor: colors.border, flexDirection: isReadOnly ? 'row' : 'column', alignItems: isReadOnly ? 'center' : 'stretch' }]} className="print-table-row">
+                    <View style={isReadOnly ? localStyles.reportTableCellLeft : { width: '100%', marginBottom: 4 }} className="print-table-cell-left">
+                      <ThemedText style={{ fontSize: 11, color: colors.text }}>வழக்கிலுள்ள எழுத்துமொழியின் அமைப்புகளையும், மரபுகளையும் அடையாளம் கண்டுகொள்கிறார்</ThemedText>
+                      <ThemedText style={{ fontSize: 9, color: colors.textSecondary }}>(Identifies standard written language structures and conventions)</ThemedText>
+                    </View>
+                    <View style={isReadOnly ? [localStyles.reportTableCellRight, { flex: undefined, minWidth: 140, alignItems: 'flex-end', justifyContent: 'center' }] : { width: '100%', marginTop: 4 }} className="print-table-cell-right">
+                      {!isReadOnly ? (
+                        renderGradeDropdown('Reading Skill 3', skillReading3, setSkillReading3)
+                      ) : (
+                        <ThemedText style={{ fontWeight: '800', fontSize: 12, color: colors.primary, textAlign: 'right', minWidth: 60 }}>{formatSkillGrade(skillReading3)}</ThemedText>
+                      )}
+                    </View>
+                  </View>
+                </View>
+
+                {/* Section D: Writing */}
+                <View style={{ backgroundColor: colors.primaryLight + '30', paddingHorizontal: Spacing.two, paddingVertical: 6, borderLeftWidth: 1, borderRightWidth: 1, borderBottomWidth: 1, borderColor: colors.border }}>
+                  <ThemedText style={{ fontSize: 10, fontWeight: '800', color: colors.primary }}>எழுத்து (Writing)</ThemedText>
+                </View>
+                <View style={[localStyles.reportTable, { borderColor: colors.border, borderTopWidth: 0 }]} className="print-table">
+                  <View style={[localStyles.reportTableRow, { borderBottomColor: colors.border, flexDirection: isReadOnly ? 'row' : 'column', alignItems: isReadOnly ? 'center' : 'stretch' }]} className="print-table-row">
+                    <View style={isReadOnly ? localStyles.reportTableCellLeft : { width: '100%', marginBottom: 4 }} className="print-table-cell-left">
+                      <ThemedText style={{ fontSize: 11, color: colors.text }}>புதிய/கடின சொற்களை பிழையின்றி எழுதுகிறார்; தொடர் வாக்கியங்களை எழுதுகிறார்</ThemedText>
+                      <ThemedText style={{ fontSize: 9, color: colors.textSecondary }}>(Writes new/difficult words without errors; writes full sentences)</ThemedText>
+                    </View>
+                    <View style={isReadOnly ? [localStyles.reportTableCellRight, { flex: undefined, minWidth: 140, alignItems: 'flex-end', justifyContent: 'center' }] : { width: '100%', marginTop: 4 }} className="print-table-cell-right">
+                      {!isReadOnly ? (
+                        renderGradeDropdown('Writing Skill 1', skillWriting1, setSkillWriting1)
+                      ) : (
+                        <ThemedText style={{ fontWeight: '800', fontSize: 12, color: colors.primary, textAlign: 'right', minWidth: 60 }}>{formatSkillGrade(skillWriting1)}</ThemedText>
+                      )}
+                    </View>
+                  </View>
+
+                  <View style={[localStyles.reportTableRow, { borderBottomColor: colors.border, flexDirection: isReadOnly ? 'row' : 'column', alignItems: isReadOnly ? 'center' : 'stretch' }]} className="print-table-row">
+                    <View style={isReadOnly ? localStyles.reportTableCellLeft : { width: '100%', marginBottom: 4 }} className="print-table-cell-left">
+                      <ThemedText style={{ fontSize: 11, color: colors.text }}>மாதிரி வசனங்களை பயன்படுத்தி கொடுக்கப்பட்ட சொற்களை தேர்ந்தெடுத்து/ஒழுங்கு செய்து புதிய வசனங்களை எழுதுவார்</ThemedText>
+                      <ThemedText style={{ fontSize: 9, color: colors.textSecondary }}>(Uses model sentences to select/arrange given words and write new sentences)</ThemedText>
+                    </View>
+                    <View style={isReadOnly ? [localStyles.reportTableCellRight, { flex: undefined, minWidth: 140, alignItems: 'flex-end', justifyContent: 'center' }] : { width: '100%', marginTop: 4 }} className="print-table-cell-right">
+                      {!isReadOnly ? (
+                        renderGradeDropdown('Writing Skill 2', skillWriting2, setSkillWriting2)
+                      ) : (
+                        <ThemedText style={{ fontWeight: '800', fontSize: 12, color: colors.primary, textAlign: 'right', minWidth: 60 }}>{formatSkillGrade(skillWriting2)}</ThemedText>
+                      )}
+                    </View>
+                  </View>
+
+                  <View style={[localStyles.reportTableRow, { borderBottomColor: 'transparent', flexDirection: isReadOnly ? 'row' : 'column', alignItems: isReadOnly ? 'center' : 'stretch' }]} className="print-table-row">
+                    <View style={isReadOnly ? localStyles.reportTableCellLeft : { width: '100%', marginBottom: 4 }} className="print-table-cell-left">
+                      <ThemedText style={{ fontSize: 11, color: colors.text }}>வழக்கிலுள்ள எழுத்து மொழியின் அமைப்புகளையும், விதிகளையும் பின்பற்றி இலக்கண பிழையில்லாமல் எழுதுகிறார்</ThemedText>
+                      <ThemedText style={{ fontSize: 9, color: colors.textSecondary }}>(Follows standard written rules and writes without grammatical errors)</ThemedText>
+                    </View>
+                    <View style={isReadOnly ? [localStyles.reportTableCellRight, { flex: undefined, minWidth: 140, alignItems: 'flex-end', justifyContent: 'center' }] : { width: '100%', marginTop: 4 }} className="print-table-cell-right">
+                      {!isReadOnly ? (
+                        renderGradeDropdown('Writing Skill 3', skillWriting3, setSkillWriting3)
+                      ) : (
+                        <ThemedText style={{ fontWeight: '800', fontSize: 12, color: colors.primary, textAlign: 'right', minWidth: 60 }}>{formatSkillGrade(skillWriting3)}</ThemedText>
+                      )}
+                    </View>
+                  </View>
+                </View>
+
+                {/* 6. Attitude and Values Understanding Section */}
+                <ThemedText style={[localStyles.reportSectionTitle, { color: colors.primary }]}>
+                  உளப்பாங்கு, விழுமியங்கள் புரிந்து கொள்ளல் (Attitude and Values Understanding):
+                </ThemedText>
+
+                <View style={[localStyles.reportTable, { borderColor: colors.border, paddingHorizontal: Spacing.two }]} className="print-table">
+                  <View style={[localStyles.reportTableHeader, { backgroundColor: colors.background, borderBottomColor: colors.border, marginHorizontal: -Spacing.two, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]} className="print-table-row">
+                    <ThemedText style={[localStyles.reportTableCellLeft, { fontWeight: '800', color: colors.textSecondary, paddingLeft: Spacing.two }]} className="print-table-cell-left">
+                      செயல்பாடு (Activity / Criteria)
+                    </ThemedText>
+                    {!isReadOnly ? (
+                      <View style={{ flexDirection: 'row', gap: 6, width: 108 }} className="print-table-cell-right">
+                        <ThemedText style={{ fontSize: 10, fontWeight: '800', width: 32, textAlign: 'center', color: colors.textSecondary }}>A</ThemedText>
+                        <ThemedText style={{ fontSize: 10, fontWeight: '800', width: 32, textAlign: 'center', color: colors.textSecondary }}>U</ThemedText>
+                        <ThemedText style={{ fontSize: 10, fontWeight: '800', width: 32, textAlign: 'center', color: colors.textSecondary }}>S</ThemedText>
+                      </View>
+                    ) : (
+                      <ThemedText style={[localStyles.reportTableCellRight, { fontWeight: '800', color: colors.textSecondary, flex: undefined, minWidth: 140, textAlign: 'right' }]} className="print-table-cell-right">
+                        மதிப்பீடு (Evaluation)
+                      </ThemedText>
+                    )}
+                  </View>
+
+                  <View style={[localStyles.attitudeRow, { borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]} className="print-table-row">
+                    <View style={localStyles.attitudeLabel} className="print-table-cell-left">
+                      <ThemedText style={{ fontSize: 11, color: colors.text }}>வகுப்பிற்கு நேரத்திற்கு வருதல்</ThemedText>
+                      <ThemedText style={{ fontSize: 9, color: colors.textSecondary }}>(Coming to class on time)</ThemedText>
+                    </View>
+                    <View style={isReadOnly ? { minWidth: 140, alignItems: 'flex-end', justifyContent: 'center' } : undefined} className="print-table-cell-right">
+                      {isReadOnly ? (
+                        <ThemedText style={{ fontSize: 12, fontWeight: '700', color: colors.primary, textAlign: 'right' }}>
+                          {formatAttitudeGrade(attitudePunctuality)}
+                        </ThemedText>
+                      ) : (
+                        renderAttitudeToggle(attitudePunctuality, setAttitudePunctuality)
+                      )}
+                    </View>
+                  </View>
+
+                  <View style={[localStyles.attitudeRow, { borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]} className="print-table-row">
+                    <View style={localStyles.attitudeLabel} className="print-table-cell-left">
+                      <ThemedText style={{ fontSize: 11, color: colors.text }}>மொழியை ஆர்வத்துடன் கற்றல்</ThemedText>
+                      <ThemedText style={{ fontSize: 9, color: colors.textSecondary }}>(Learning the language with enthusiasm)</ThemedText>
+                    </View>
+                    <View style={isReadOnly ? { minWidth: 140, alignItems: 'flex-end', justifyContent: 'center' } : undefined} className="print-table-cell-right">
+                      {isReadOnly ? (
+                        <ThemedText style={{ fontSize: 12, fontWeight: '700', color: colors.primary, textAlign: 'right' }}>
+                          {formatAttitudeGrade(attitudeEnthusiasm)}
+                        </ThemedText>
+                      ) : (
+                        renderAttitudeToggle(attitudeEnthusiasm, setAttitudeEnthusiasm)
+                      )}
+                    </View>
+                  </View>
+
+                  <View style={[localStyles.attitudeRow, { borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]} className="print-table-row">
+                    <View style={localStyles.attitudeLabel} className="print-table-cell-left">
+                      <ThemedText style={{ fontSize: 11, color: colors.text }}>சக மாணவர்களுடன் சேர்ந்து பழகுதலும் உதவுதலும்</ThemedText>
+                      <ThemedText style={{ fontSize: 9, color: colors.textSecondary }}>(Interacting and helping peers)</ThemedText>
+                    </View>
+                    <View style={isReadOnly ? { minWidth: 140, alignItems: 'flex-end', justifyContent: 'center' } : undefined} className="print-table-cell-right">
+                      {isReadOnly ? (
+                        <ThemedText style={{ fontSize: 12, fontWeight: '700', color: colors.primary, textAlign: 'right' }}>
+                          {formatAttitudeGrade(attitudePeerInteraction)}
+                        </ThemedText>
+                      ) : (
+                        renderAttitudeToggle(attitudePeerInteraction, setAttitudePeerInteraction)
+                      )}
+                    </View>
+                  </View>
+
+                  <View style={[localStyles.attitudeRow, { borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]} className="print-table-row">
+                    <View style={localStyles.attitudeLabel} className="print-table-cell-left">
+                      <ThemedText style={{ fontSize: 11, color: colors.text }}>இனிய சொற்களைப் பேசுதல்</ThemedText>
+                      <ThemedText style={{ fontSize: 9, color: colors.textSecondary }}>(Speaking kind words / pleasant language)</ThemedText>
+                    </View>
+                    <View style={isReadOnly ? { minWidth: 140, alignItems: 'flex-end', justifyContent: 'center' } : undefined} className="print-table-cell-right">
+                      {isReadOnly ? (
+                        <ThemedText style={{ fontSize: 12, fontWeight: '700', color: colors.primary, textAlign: 'right' }}>
+                          {formatAttitudeGrade(attitudeKindLanguage)}
+                        </ThemedText>
+                      ) : (
+                        renderAttitudeToggle(attitudeKindLanguage, setAttitudeKindLanguage)
+                      )}
+                    </View>
+                  </View>
+
+                  <View style={[localStyles.attitudeRow, { borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]} className="print-table-row">
+                    <View style={localStyles.attitudeLabel} className="print-table-cell-left">
+                      <ThemedText style={{ fontSize: 11, color: colors.text }}>எண்ணங்களைத் துணிவுடன் வெளிப்படுத்தல்</ThemedText>
+                      <ThemedText style={{ fontSize: 9, color: colors.textSecondary }}>(Expressing thoughts confidently)</ThemedText>
+                    </View>
+                    <View style={isReadOnly ? { minWidth: 140, alignItems: 'flex-end', justifyContent: 'center' } : undefined} className="print-table-cell-right">
+                      {isReadOnly ? (
+                        <ThemedText style={{ fontSize: 12, fontWeight: '700', color: colors.primary, textAlign: 'right' }}>
+                          {formatAttitudeGrade(attitudeConfidence)}
+                        </ThemedText>
+                      ) : (
+                        renderAttitudeToggle(attitudeConfidence, setAttitudeConfidence)
+                      )}
+                    </View>
+                  </View>
+
+                  <View style={[localStyles.attitudeRow, { borderBottomColor: 'transparent', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]} className="print-table-row">
+                    <View style={localStyles.attitudeLabel} className="print-table-cell-left">
+                      <ThemedText style={{ fontSize: 11, color: colors.text }}>வீட்டுப் பாடங்களைப் பூர்த்தி செய்தல்</ThemedText>
+                      <ThemedText style={{ fontSize: 9, color: colors.textSecondary }}>(Completing homework assignments)</ThemedText>
+                    </View>
+                    <View style={isReadOnly ? { minWidth: 140, alignItems: 'flex-end', justifyContent: 'center' } : undefined} className="print-table-cell-right">
+                      {isReadOnly ? (
+                        <ThemedText style={{ fontSize: 12, fontWeight: '700', color: colors.primary, textAlign: 'right' }}>
+                          {formatAttitudeGrade(attitudeHomework)}
+                        </ThemedText>
+                      ) : (
+                        renderAttitudeToggle(attitudeHomework, setAttitudeHomework)
+                      )}
+                    </View>
+                  </View>
+                </View>
+
+                <ThemedText style={{ fontSize: 10, color: colors.textSecondary, fontStyle: 'italic', marginTop: 4 }}>
+                  KEY: A - ALWAYS (எப்போதும்) | U - USUALLY (வழக்கமாக) | S - SOMETIMES (சிலவேளை)
+                </ThemedText>
+
+                {/* 7. Comments & Notes Box */}
+                <View style={{ gap: 4, marginTop: Spacing.two }}>
+                  <ThemedText style={{ fontSize: 11, fontWeight: '700', color: colors.textSecondary }}>
+                    குறிப்பு (Notes / Teacher's Comments):
+                  </ThemedText>
+                  {!isReadOnly ? (
+                    <TextInput
+                      style={{
+                        borderWidth: 1,
+                        borderColor: colors.border,
+                        borderRadius: 8,
+                        padding: 10,
+                        fontSize: 12,
+                        minHeight: 60,
+                        color: colors.text,
+                        backgroundColor: colors.background,
+                        textAlignVertical: 'top'
+                      }}
+                      multiline
+                      value={reportComments}
+                      onChangeText={setReportComments}
+                      placeholder="Enter teacher comments..."
+                      placeholderTextColor={colors.textSecondary}
+                    />
+                  ) : (
+                    <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 12, backgroundColor: colors.background }}>
+                      <ThemedText style={{ fontSize: 12, color: colors.text, lineHeight: 18 }}>
+                        {reportComments || (i18n.language === 'ta' ? 'கருத்துகள் எதுவும் இல்லை' : 'No comments provided')}
+                      </ThemedText>
+                    </View>
+                  )}
+                </View>
+
+                {/* 8. Attendance Details */}
+                <View style={{ gap: 4, marginTop: Spacing.one }}>
+                  <ThemedText style={{ fontSize: 11, fontWeight: '700', color: colors.textSecondary }}>
+                    வரவு (Attendance):
+                  </ThemedText>
+                  {!isReadOnly ? (
+                    <TextInput
+                      style={{
+                        borderWidth: 1,
+                        borderColor: colors.border,
+                        borderRadius: 6,
+                        paddingHorizontal: 8,
+                        paddingVertical: 6,
+                        fontSize: 12,
+                        color: colors.text,
+                        backgroundColor: colors.background
+                      }}
+                      value={reportAttendance}
+                      onChangeText={setReportAttendance}
+                      placeholder="e.g. 18 / 20 days or 90%"
+                      placeholderTextColor={colors.textSecondary}
+                    />
+                  ) : (
+                    <ThemedText style={{ fontSize: 12, fontWeight: '700', color: colors.text }}>
+                      {reportAttendance || 'N/A'}
+                    </ThemedText>
+                  )}
+                </View>
+
+                {/* 9. Signatures Area */}
+                <View style={[localStyles.signatureRow, { borderTopColor: colors.border }]}>
+                  <View style={localStyles.signatureBlock}>
+                    <ThemedText style={{ fontSize: 9, fontWeight: '700', color: colors.textSecondary }}>வகுப்பாசிரியர் கையொப்பம் (Teacher's Sign):</ThemedText>
+                    {!isReadOnly ? (
+                      <TextInput
+                        style={{
+                          borderWidth: 1,
+                          borderColor: colors.border,
+                          borderRadius: 4,
+                          paddingHorizontal: 6,
+                          paddingVertical: 4,
+                          fontSize: 11,
+                          color: colors.text,
+                          backgroundColor: colors.background
+                        }}
+                        value={reportTeacherSig}
+                        onChangeText={setReportTeacherSig}
+                        placeholder="Teacher signature name"
+                        placeholderTextColor={colors.textSecondary}
+                        autoComplete="off"
+                      />
+                    ) : (
+                      <ThemedText style={{ fontSize: 12, fontStyle: 'italic', fontWeight: '700', color: colors.text }}>
+                        {reportTeacherSig || user?.fullName || 'Suba shree'}
+                      </ThemedText>
+                    )}
+                  </View>
+
+                  <View style={localStyles.signatureBlock}>
+                    <ThemedText style={{ fontSize: 9, fontWeight: '700', color: colors.textSecondary }}>அதிபர் கையொப்பம் (Principal's Sign):</ThemedText>
+                    {!isReadOnly ? (
+                      <TextInput
+                        style={{
+                          borderWidth: 1,
+                          borderColor: colors.border,
+                          borderRadius: 4,
+                          paddingHorizontal: 6,
+                          paddingVertical: 4,
+                          fontSize: 11,
+                          color: colors.text,
+                          backgroundColor: colors.background
+                        }}
+                        value={reportPrincipalSig}
+                        onChangeText={setReportPrincipalSig}
+                        placeholder="Principal signature name"
+                        placeholderTextColor={colors.textSecondary}
+                        autoComplete="off"
+                      />
+                    ) : (
+                      <ThemedText style={{ fontSize: 12, fontStyle: 'italic', fontWeight: '700', color: colors.text }}>
+                        {reportPrincipalSig && reportPrincipalSig !== 'Balar Malar Principal' ? reportPrincipalSig : '___________________________'}
+                      </ThemedText>
+                    )}
+                  </View>
+
+                  <View style={localStyles.signatureBlock}>
+                    <ThemedText style={{ fontSize: 9, fontWeight: '700', color: colors.textSecondary }}>பெற்றோர் கையொப்பம் (Parent's Sign):</ThemedText>
+                    {reportParentSigned ? (
+                      <View style={{ gap: 2 }}>
+                        <ThemedText style={{ fontSize: 12, fontWeight: '700', color: '#10B981' }}>✓ Acknowledged & Signed</ThemedText>
+                        {!!reportParentSigDate && (
+                          <ThemedText style={{ fontSize: 8, color: colors.textSecondary }}>
+                            Date: {new Date(reportParentSigDate).toLocaleDateString()}
+                          </ThemedText>
+                        )}
+                      </View>
+                    ) : (
+                      <ThemedText style={{ fontSize: 11, color: colors.textSecondary, fontStyle: 'italic' }}>
+                        Pending signature / கையொப்பம் நிலுவையில் உள்ளது
+                      </ThemedText>
+                    )}
+                  </View>
+                </View>
+
+                {/* 10. Submission Actions buttons */}
+                <View style={{ marginTop: Spacing.three, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: Spacing.two }} className="no-print">
+                  {!isParent ? (
+                    <Pressable
+                      onPress={handleSubmitReport}
+                      disabled={submitting}
+                      style={[localStyles.submitButton, { backgroundColor: '#10B981', opacity: submitting ? 0.7 : 1 }]}
+                    >
+                      {submitting && <ActivityIndicator size="small" color="#FFF" style={{ marginRight: 6 }} />}
+                      <ThemedText style={localStyles.submitButtonText}>
+                        {submitting ? (i18n.language === 'ta' ? 'சேமிக்கப்படுகிறது...' : 'Saving Report...') : (i18n.language === 'ta' ? 'முன்னேற்ற அறிக்கையைச் சேமி' : 'Save Progress Report')}
+                      </ThemedText>
+                    </Pressable>
+                  ) : (
+                    !reportParentSigned && (
+                      <Pressable
+                        onPress={handleParentAcknowledge}
+                        disabled={submitting}
+                        style={[localStyles.submitButton, { backgroundColor: colors.primary, opacity: submitting ? 0.7 : 1 }]}
+                      >
+                        {submitting && <ActivityIndicator size="small" color="#FFF" style={{ marginRight: 6 }} />}
+                        <ThemedText style={localStyles.submitButtonText}>
+                          {i18n.language === 'ta' ? 'ஒப்புதல் அளித்து கையொப்பமிடு' : 'Acknowledge & Sign Report'}
+                        </ThemedText>
+                      </Pressable>
+                    )
+                  )}
+                </View>
+
+              </View>
+            )}
+          </View>
+
+        </View>
+      </ScrollView>
+    );
+  };
+
   if (loading) {
     return (
       <View style={[globalStyles.tabContentWrapper, { justifyContent: 'center', alignItems: 'center', flex: 1 }]}>
@@ -1452,84 +3181,134 @@ export function ReportsTab({
       {/* Title Header */}
       <View style={{ marginBottom: Spacing.three }}>
         <ThemedText style={globalStyles.sectionTitle}>{t('nav.reports')}</ThemedText>
-        <ThemedText style={[globalStyles.sectionSubtitle, { color: colors.textSecondary }]}>
+        <ThemedText style={[globalStyles.sectionSubtitle, { color: colors.textSecondary, marginBottom: Spacing.three }]}>
           {isParent
             ? (i18n.language === 'ta' ? 'உங்கள் குழந்தைகளின் சாதனைகள் மற்றும் விருதுகள்' : 'Track and celebrate your children\'s achievements and awards')
             : (i18n.language === 'ta' ? 'மாணவர்களின் விருதுகள் மற்றும் சாதனைகள் நிர்வாகம்' : 'Manage, review, and record student awards and milestones')}
         </ThemedText>
       </View>
 
-      {/* Sub tabs Navigation */}
-      <View style={[localStyles.subTabBar, { borderColor: colors.border }]}>
-        <Pressable
-          onPress={() => setActiveSubTab('active')}
-          style={[
-            localStyles.subTabBarItem,
-            activeSubTab === 'active' && { borderBottomColor: colors.primary, borderBottomWidth: 2 }
-          ]}
-        >
-          <ThemedText style={[
-            localStyles.subTabItemText,
-            { color: activeSubTab === 'active' ? colors.primary : colors.textSecondary, fontWeight: activeSubTab === 'active' ? '700' : '500' }
-          ]}>
-            {isParent 
-              ? (i18n.language === 'ta' ? 'விருதுகள்' : 'Approved Awards') 
-              : (i18n.language === 'ta' ? 'அங்கீகரிக்கப்பட்டவை' : 'Active Awards')}
-          </ThemedText>
-        </Pressable>
+      {showHelp && (
+        <View style={{
+          backgroundColor: colors.primaryLight,
+          borderWidth: 1,
+          borderColor: colors.border,
+          borderRadius: 12,
+          padding: Spacing.three,
+          marginBottom: Spacing.three,
+        }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <View style={{ flex: 1, paddingRight: Spacing.three }}>
+              <ThemedText style={{ fontWeight: '700', color: colors.primary, fontSize: 13, marginBottom: 4 }}>
+                ℹ️ Quick Guide / உதவிக்குறிப்பு
+              </ThemedText>
+              <ThemedText style={{ fontSize: 12, lineHeight: 18, color: colors.text }}>
+                Welcome to the Achievements & Awards Portal. Teachers and administrators can record awards (medals, certificates, trophies) and milestones for students. Parents can submit achievements earned by their children, which are published once approved.
+              </ThemedText>
+              <ThemedText style={{ fontSize: 12, lineHeight: 18, color: colors.textSecondary, marginTop: 4, fontStyle: 'italic' }}>
+                விருதுகள் மற்றும் சாதனைகள் பகுதிக்கு வரவேற்கிறோம். ஆசிரியர்களும் நிர்வாகிகளும் மாணவர்களின் சாதனைகள், பதக்கங்கள் மற்றும் சான்றிதழ்களைப் பதிவு செய்யலாம். பெற்றோர் தங்கள் குழந்தைகளின் சாதனைகளைச் சமர்ப்பிக்கலாம்.
+              </ThemedText>
+            </View>
+            <Pressable onPress={dismissHelp} style={{ padding: 4 }}>
+              <X size={16} color={colors.textSecondary} />
+            </Pressable>
+          </View>
+        </View>
+      )}
 
-        <Pressable
-          onPress={() => setActiveSubTab('pending')}
-          style={[
-            localStyles.subTabBarItem,
-            activeSubTab === 'pending' && { borderBottomColor: colors.primary, borderBottomWidth: 2 }
-          ]}
+
+      {/* Sub tabs Navigation */}
+      <View style={{ borderBottomWidth: 1, borderColor: colors.border, marginBottom: Spacing.three, width: '100%' }}>
+        <View
+          style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', width: '100%', rowGap: 8 }}
         >
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <Pressable
+            onPress={() => setActiveSubTab('active')}
+            style={[
+              localStyles.subTabBarItem,
+              activeSubTab === 'active' && { borderBottomColor: colors.primary, borderBottomWidth: 2 }
+            ]}
+          >
             <ThemedText style={[
               localStyles.subTabItemText,
-              { color: activeSubTab === 'pending' ? colors.primary : colors.textSecondary, fontWeight: activeSubTab === 'pending' ? '700' : '500' }
+              { color: activeSubTab === 'active' ? colors.primary : colors.textSecondary, fontWeight: activeSubTab === 'active' ? '700' : '500' }
             ]}>
               {isParent 
-                ? (i18n.language === 'ta' ? 'சரிபார்ப்பில்' : 'Submitted/Pending') 
-                : (i18n.language === 'ta' ? 'சரிபார்ப்பு காத்திருப்பவை' : 'Pending Approvals')}
+                ? (i18n.language === 'ta' ? 'விருதுகள்' : 'Approved Awards') 
+                : (i18n.language === 'ta' ? 'அங்கீகரிக்கப்பட்டவை' : 'Active Awards')}
             </ThemedText>
-            {pendingCount > 0 && (
-              <View style={[localStyles.badgeCount, { backgroundColor: colors.danger }]}>
-                <ThemedText style={localStyles.badgeCountText}>{pendingCount}</ThemedText>
-              </View>
-            )}
-          </View>
-        </Pressable>
+          </Pressable>
 
-        <Pressable
-          onPress={() => {
-            handleResetForm();
-            setActiveSubTab('record');
-          }}
-          style={[
-            localStyles.subTabBarItem,
-            activeSubTab === 'record' && { borderBottomColor: colors.primary, borderBottomWidth: 2 }
-          ]}
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-            <Plus size={14} color={activeSubTab === 'record' ? colors.primary : colors.textSecondary} />
+          <Pressable
+            onPress={() => setActiveSubTab('pending')}
+            style={[
+              localStyles.subTabBarItem,
+              activeSubTab === 'pending' && { borderBottomColor: colors.primary, borderBottomWidth: 2 }
+            ]}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <ThemedText style={[
+                localStyles.subTabItemText,
+                { color: activeSubTab === 'pending' ? colors.primary : colors.textSecondary, fontWeight: activeSubTab === 'pending' ? '700' : '500' }
+              ]}>
+                {isParent 
+                  ? (i18n.language === 'ta' ? 'சரிபார்ப்பில்' : 'Submitted/Pending') 
+                  : (i18n.language === 'ta' ? 'சரிபார்ப்பு காத்திருப்பவை' : 'Pending Approvals')}
+              </ThemedText>
+              {pendingCount > 0 && (
+                <View style={[localStyles.badgeCount, { backgroundColor: colors.danger }]}>
+                  <ThemedText style={localStyles.badgeCountText}>{pendingCount}</ThemedText>
+                </View>
+              )}
+            </View>
+          </Pressable>
+
+          <Pressable
+            onPress={() => {
+              handleResetForm();
+              setActiveSubTab('record');
+            }}
+            style={[
+              localStyles.subTabBarItem,
+              activeSubTab === 'record' && { borderBottomColor: colors.primary, borderBottomWidth: 2 }
+            ]}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Plus size={14} color={activeSubTab === 'record' ? colors.primary : colors.textSecondary} />
+              <ThemedText style={[
+                localStyles.subTabItemText,
+                { color: activeSubTab === 'record' ? colors.primary : colors.textSecondary, fontWeight: activeSubTab === 'record' ? '700' : '500' }
+              ]}>
+                {editingAchievementId 
+                  ? (i18n.language === 'ta' ? 'விருதை திருத்து' : 'Edit Award')
+                  : isParent 
+                    ? (i18n.language === 'ta' ? 'சமர்ப்பிக்க' : 'Submit Award') 
+                    : (i18n.language === 'ta' ? 'புதிய விருது' : 'Record Award')}
+              </ThemedText>
+            </View>
+          </Pressable>
+
+          <Pressable
+            onPress={() => setActiveSubTab('progress-report')}
+            style={[
+              localStyles.subTabBarItem,
+              activeSubTab === 'progress-report' && { borderBottomColor: colors.primary, borderBottomWidth: 2 }
+            ]}
+          >
             <ThemedText style={[
               localStyles.subTabItemText,
-              { color: activeSubTab === 'record' ? colors.primary : colors.textSecondary, fontWeight: activeSubTab === 'record' ? '700' : '500' }
+              { color: activeSubTab === 'progress-report' ? colors.primary : colors.textSecondary, fontWeight: activeSubTab === 'progress-report' ? '700' : '500' }
             ]}>
-              {editingAchievementId 
-                ? (i18n.language === 'ta' ? 'விருதை திருத்து' : 'Edit Award')
-                : isParent 
-                  ? (i18n.language === 'ta' ? 'சமர்ப்பிக்க' : 'Submit Award') 
-                  : (i18n.language === 'ta' ? 'புதிய விருது' : 'Record Award')}
+              {i18n.language === 'ta' ? 'முன்னேற்ற அறிக்கை' : 'Progress Reports'}
             </ThemedText>
-          </View>
-        </Pressable>
+          </Pressable>
+        </View>
       </View>
 
       {/* Main Tab Screens */}
-      {activeSubTab !== 'record' ? (
+      {activeSubTab === 'progress-report' ? (
+        renderProgressReports()
+      ) : activeSubTab !== 'record' ? (
         <View style={{ flex: 1 }}>
           {/* Filters Area */}
           <View style={[localStyles.filtersContainer, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
@@ -2166,7 +3945,13 @@ export function ReportsTab({
                         ? (i18n.language === 'ta' ? 'சாதனையை சமர்ப்பிக்கவும்' : 'Submit Achievement') 
                         : (i18n.language === 'ta' ? 'புதிய சாதனை விவரம்' : 'Record Achievement')}
                 </ThemedText>
+                <HelperTooltip 
+                  size={15}
+                  content="Enter details for student achievements (e.g. Tamil Competitions, Sports, Academic Awards). Single entries require student ID, class, award name (with Tamil translation auto-translate support), and optional attachments. Bulk import accepts copy-pasted spreadsheets."
+                  contentTa="மாணவரின் சாதனைகளைப் பதிவு செய்ய படிவத்தை நிரப்பவும். தமிழ் மொழிபெயர்ப்பு தானியங்கியாகச் செய்யப்படலாம்."
+                />
               </View>
+
 
               {!isParent && !editingAchievementId && (
                 <View style={{ flexDirection: 'row', gap: Spacing.two, marginBottom: Spacing.three }}>
@@ -3135,5 +4920,117 @@ const localStyles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 1,
     paddingHorizontal: 8,
+  },
+  // --- Progress Report Styles ---
+  reportContainer: {
+    flex: 1,
+    gap: Spacing.four,
+    marginTop: Spacing.two,
+  },
+  reportSidebar: {
+    width: Platform.OS === 'web' ? 240 : '100%',
+    padding: Spacing.three,
+    borderRadius: 16,
+    borderWidth: 1,
+    gap: Spacing.three,
+    alignSelf: 'flex-start',
+  },
+  reportCardArea: {
+    flex: 1,
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: Spacing.four,
+    gap: Spacing.four,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  reportHeader: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.one,
+    paddingBottom: Spacing.three,
+    borderBottomWidth: 1,
+  },
+  reportDetailsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.three,
+    marginVertical: Spacing.two,
+    padding: Spacing.three,
+    borderRadius: 8,
+  },
+  reportDetailCell: {
+    flex: 1,
+    minWidth: 140,
+    gap: 2,
+  },
+  reportSectionTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    marginTop: Spacing.two,
+    marginBottom: Spacing.one,
+  },
+  reportTable: {
+    borderWidth: 1,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  reportTableHeader: {
+    flexDirection: 'row',
+    padding: Spacing.two,
+    borderBottomWidth: 1,
+  },
+  reportTableRow: {
+    flexDirection: 'row',
+    padding: Spacing.two,
+    borderBottomWidth: 1,
+    alignItems: 'center',
+  },
+  reportTableCellLeft: {
+    flex: 2,
+  },
+  reportTableCellRight: {
+    flex: 1,
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+  },
+  attitudeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+  },
+  attitudeLabel: {
+    flex: 2,
+  },
+  attitudeToggles: {
+    flexDirection: 'row',
+    gap: 6,
+    width: 108,
+  },
+  attitudeToggleBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
+  signatureRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.three,
+    marginTop: Spacing.three,
+    paddingTop: Spacing.three,
+    borderTopWidth: 1,
+  },
+  signatureBlock: {
+    flex: 1,
+    minWidth: 150,
+    gap: Spacing.one,
   }
 });
