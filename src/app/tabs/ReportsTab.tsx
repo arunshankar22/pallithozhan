@@ -1891,26 +1891,26 @@ export function ReportsTab({
         if (!value) {
           return `
             <span class="eval-badge" style="background:#f3f4f6; color:#9ca3af;">-</span>
-            <span style="font-size:9px;font-family:'Noto Sans Tamil',sans-serif;">Pending</span>
+            <span style="font-size:9px;font-family:'Noto Sans Tamil',sans-serif;">Pending / நிலுவையில் உள்ளது</span>
           `;
         }
         const upper = value.toUpperCase();
         if (upper === 'A') {
           return `
             <span class="eval-badge eval-A">A</span>
-            <span style="font-size:9px;font-family:'Noto Sans Tamil',sans-serif;">எப்போதும்</span>
+            <span style="font-size:9px;font-family:'Noto Sans Tamil',sans-serif;">ALWAYS / எப்போதும்</span>
           `;
         }
         if (upper === 'U') {
           return `
             <span class="eval-badge eval-U">U</span>
-            <span style="font-size:9px;font-family:'Noto Sans Tamil',sans-serif;">வழக்கமாக</span>
+            <span style="font-size:9px;font-family:'Noto Sans Tamil',sans-serif;">USUALLY / வழக்கமாக</span>
           `;
         }
         if (upper === 'S') {
           return `
             <span class="eval-badge eval-S">S</span>
-            <span style="font-size:9px;font-family:'Noto Sans Tamil',sans-serif;">சிலவேளை</span>
+            <span style="font-size:9px;font-family:'Noto Sans Tamil',sans-serif;">SOMETIMES / சிலவேளை</span>
           `;
         }
         return `<span class="eval-badge">${value}</span>`;
