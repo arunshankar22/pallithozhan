@@ -1822,64 +1822,6 @@ export function ReportsTab({
 
     // Wait for state change to render clean read-only components
     setTimeout(() => {
-      const printElement = document.getElementById('print-report-card');
-      if (!printElement) {
-        showToast('Report card element not found / அறிக்கை அட்டை உறுப்பு காணப்படவில்லை', 'error');
-        setIsPrinting(false);
-        return;
-      }
-
-      // Clone the print element so we can mutate it safely before printing
-      const printClone = printElement.cloneNode(true) as HTMLElement;
-
-      // Sync and replace selects with clean inline static values from NodeList index matching
-      const liveSelects = printElement.querySelectorAll('select');
-      const cloneSelects = printClone.querySelectorAll('select');
-      cloneSelects.forEach((cloneSel, idx) => {
-        const liveSel = liveSelects[idx];
-        if (liveSel) {
-          const val = liveSel.value;
-          const text = val ? val : '-';
-          const txtNode = document.createElement('span');
-          txtNode.innerText = text;
-          txtNode.setAttribute('style', 'font-weight: 800; font-size: 16px; color: #b91c1c; text-align: right; min-width: 60px; display: inline-block;');
-          cloneSel.parentNode?.replaceChild(txtNode, cloneSel);
-        }
-      });
-
-      // Sync and replace textareas with clean comments blocks
-      const liveTextareas = printElement.querySelectorAll('textarea');
-      const cloneTextareas = printClone.querySelectorAll('textarea');
-      cloneTextareas.forEach((cloneTa, idx) => {
-        const liveTa = liveTextareas[idx];
-        if (liveTa) {
-          const val = liveTa.value;
-          const txtNode = document.createElement('div');
-          txtNode.innerText = val ? val : 'No comments / கருத்துக்கள் இல்லை';
-          txtNode.setAttribute('style', 'font-size: 11px; color: #374151; white-space: pre-wrap; padding: 12px; background-color: #f9fafb; border-radius: 8px; border: 1px solid #e5e7eb; width: 100%; box-sizing: border-box;');
-          cloneTa.parentNode?.replaceChild(txtNode, cloneTa);
-        }
-      });
-
-      // Sync and replace text inputs with clean signature/attendance text
-      const liveInputs = printElement.querySelectorAll('input');
-      const cloneInputs = printClone.querySelectorAll('input');
-      cloneInputs.forEach((cloneInp, idx) => {
-        const liveInp = liveInputs[idx];
-        if (liveInp) {
-          const val = liveInp.value;
-          const txtNode = document.createElement('span');
-          txtNode.innerText = val ? val : '-';
-          txtNode.setAttribute('style', 'font-weight: 700; font-size: 12px; color: #1f2937; border-bottom: 1px dashed #ccc; padding-bottom: 2px;');
-          cloneInp.parentNode?.replaceChild(txtNode, cloneInp);
-        }
-      });
-
-      // Hide interactive edit buttons/action buttons
-      printClone.querySelectorAll('button, [role="button"], [class*="submitButton"], .no-print').forEach((btn) => {
-        (btn as HTMLElement).style.display = 'none';
-      });
-
       // Open print window
       const printWindow = window.open('', '_blank', 'width=900,height=1000');
       if (!printWindow) {
@@ -1888,128 +1830,776 @@ export function ReportsTab({
         return;
       }
 
-      let stylesHtml = '';
-      document.querySelectorAll('style, link[rel="stylesheet"]').forEach((styleEl) => {
-        stylesHtml += styleEl.outerHTML;
-      });
+      // Gather student and class info
+      const activeStudentObj = students.find((s: any) => s.uid === reportStudentId) || parentStudents.find((s: any) => s.uid === reportStudentId);
+      const studentNameStr = activeStudentObj
+        ? `${activeStudentObj.fullName || 'N/A'}${activeStudentObj.fullNameTamil ? ' / ' + activeStudentObj.fullNameTamil : ''}`
+        : 'N/A';
+      const studentLevelStr = activeStudentObj?.level || '2';
+      const studentClassStr = activeStudentObj?.className || 'Year 2';
+      const academicYearStr = '2026';
+      const termStr = reportTerm === 2
+        ? 'தவணை 2 (Term 2)'
+        : reportTerm === 3
+        ? 'தவணை 3 (Term 3)'
+        : 'தவணை 4 (Term 4)';
+
+      // Helper for grade badges
+      const getGradeHtml = (grade: string) => {
+        if (!grade) {
+          return `
+            <span class="grade-badge" style="background:#f3f4f6; color:#9ca3af;">-</span>
+            <span class="grade-label">Pending<br>நிலுவையில் உள்ளது</span>
+          `;
+        }
+        const upper = grade.toUpperCase();
+        if (upper === 'A') {
+          return `
+            <span class="grade-badge grade-A">A</span>
+            <span class="grade-label">EXCELLENT<br>உன்னதசித்தி</span>
+          `;
+        }
+        if (upper === 'B') {
+          return `
+            <span class="grade-badge grade-B">B</span>
+            <span class="grade-label">VERY GOOD<br>மிகநன்று</span>
+          `;
+        }
+        if (upper === 'C') {
+          return `
+            <span class="grade-badge grade-C">C</span>
+            <span class="grade-label">GOOD<br>நன்று</span>
+          `;
+        }
+        if (upper === 'D') {
+          return `
+            <span class="grade-badge grade-D">D</span>
+            <span class="grade-label">SATISFACTORY<br>திருப்தி</span>
+          `;
+        }
+        if (upper === 'E') {
+          return `
+            <span class="grade-badge grade-E">E</span>
+            <span class="grade-label">NEEDS IMPROVEMENT<br>முன்னேற்றம் தேவை</span>
+          `;
+        }
+        return `<span class="grade-badge">${grade}</span>`;
+      };
+
+      // Helper for attitude evaluation badges
+      const getAttitudeHtml = (value: string) => {
+        if (!value) {
+          return `
+            <span class="eval-badge" style="background:#f3f4f6; color:#9ca3af;">-</span>
+            <span style="font-size:9px;font-family:'Noto Sans Tamil',sans-serif;">Pending</span>
+          `;
+        }
+        const upper = value.toUpperCase();
+        if (upper === 'A') {
+          return `
+            <span class="eval-badge eval-A">A</span>
+            <span style="font-size:9px;font-family:'Noto Sans Tamil',sans-serif;">எப்போதும்</span>
+          `;
+        }
+        if (upper === 'U') {
+          return `
+            <span class="eval-badge eval-U">U</span>
+            <span style="font-size:9px;font-family:'Noto Sans Tamil',sans-serif;">வழக்கமாக</span>
+          `;
+        }
+        if (upper === 'S') {
+          return `
+            <span class="eval-badge eval-S">S</span>
+            <span style="font-size:9px;font-family:'Noto Sans Tamil',sans-serif;">சிலவேளை</span>
+          `;
+        }
+        return `<span class="eval-badge">${value}</span>`;
+      };
+
+      // Signature calculations
+      const teacherSigVal = reportTeacherSig || user?.fullName || 'Suba Shree';
+      const principalSigVal = reportPrincipalSig || '&nbsp;';
+      const parentSigVal = reportParentSigned
+        ? 'Signed' + (reportParentSigDate ? ' (' + reportParentSigDate + ')' : '')
+        : 'Pending / நிலுவையில் உள்ளது';
+
+      const commentsVal = reportComments
+        ? reportComments.replace(/\n/g, '<br>')
+        : 'No comments provided / கருத்துக்கள் இல்லை';
+      const attendanceVal = reportAttendance || 'N/A';
 
       printWindow.document.write(`
-        <html>
-          <head>
-            <title>Balar Malar Student Progress Report</title>
-            ${stylesHtml}
-            <style>
-              html, body {
-                background: white !important;
-                color: black !important;
-                height: auto !important;
-                max-height: none !important;
-                overflow: visible !important;
-                margin: 0 !important;
-                padding: 20px !important;
-                font-family: system-ui, -apple-system, sans-serif;
-              }
-              div, span {
-                height: auto !important;
-                max-height: none !important;
-                overflow: visible !important;
-              }
-              .css-view-175oi2r, [class*="css-view"] {
-                height: auto !important;
-                max-height: none !important;
-                overflow: visible !important;
-              }
-              #print-report-card {
-                display: block !important;
-                width: 100% !important;
-                height: auto !important;
-                border: none !important;
-                box-shadow: none !important;
-                margin: 0 !important;
-                padding: 0 !important;
-              }
-              .no-print {
-                display: none !important;
-              }
-              
-              /* Custom print table and meta grid overrides */
-              .print-meta-grid {
-                display: table !important;
-                width: 100% !important;
-                border-collapse: collapse !important;
-                margin-top: 15px !important;
-                margin-bottom: 15px !important;
-                background-color: #f9fafb !important;
-                border-radius: 8px !important;
-                padding: 6px !important;
-              }
-              .print-meta-row {
-                display: table-row !important;
-              }
-              .print-meta-cell {
-                display: table-cell !important;
-                padding: 6px 12px !important;
-                vertical-align: middle !important;
-              }
-              .print-meta-label {
-                font-weight: 700 !important;
-                color: #4b5563 !important;
-                width: 35% !important;
-                text-align: left !important;
-              }
-              .print-meta-value {
-                font-weight: 800 !important;
-                color: #1f2937 !important;
-                text-align: left !important;
-              }
+<!DOCTYPE html>
+<html lang="ta">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Student Progress Report — Balar Malar Parramatta</title>
+<style>
+  /* ── Google Fonts for Tamil ── */
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Tamil:wght@400;600;700&family=Noto+Sans:wght@400;600;700&display=swap');
 
-              .print-table {
-                display: table !important;
-                width: 100% !important;
-                border-collapse: collapse !important;
-                border: 1px solid #e5e7eb !important;
-                border-radius: 8px !important;
-                box-sizing: border-box !important;
-                margin-bottom: 15px !important;
-              }
-              .print-table-row {
-                display: table-row !important;
-                width: 100% !important;
-                border-bottom: 1px solid #e5e7eb !important;
-                page-break-inside: avoid !important;
-              }
-              .print-table-cell-left {
-                display: table-cell !important;
-                width: 60% !important;
-                text-align: left !important;
-                vertical-align: middle !important;
-                padding: 10px 12px !important;
-                box-sizing: border-box !important;
-              }
-              .print-table-cell-right {
-                display: table-cell !important;
-                width: 40% !important;
-                text-align: right !important;
-                vertical-align: middle !important;
-                padding: 10px 12px !important;
-                box-sizing: border-box !important;
-              }
-            </style>
-          </head>
-          <body>
-            <div id="print-report-card">
-              ${printClone.innerHTML}
-            </div>
-            <script>
-              window.addEventListener('load', () => {
-                setTimeout(() => {
-                  window.print();
-                  window.close();
-                }, 800);
-              });
-            </script>
-          </body>
-        </html>
+  /* ── Reset ── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  /* ── Page setup ── */
+  body {
+    font-family: 'Noto Sans', 'Noto Sans Tamil', Arial, sans-serif;
+    font-size: 11px;
+    color: #1a1a1a;
+    background: #f5f5f5;
+    padding: 20px;
+  }
+
+  .page {
+    width: 210mm;
+    min-height: 297mm;
+    background: #fff;
+    margin: 0 auto;
+    padding: 12mm 14mm 12mm 14mm;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.12);
+  }
+
+  /* ── School header ── */
+  .school-header {
+    background: linear-gradient(135deg, #8B0000 0%, #6B0000 100%);
+    color: #fff;
+    text-align: center;
+    padding: 10px 14px 8px;
+    border-radius: 6px 6px 0 0;
+    margin-bottom: 0;
+  }
+  .school-header .school-ta {
+    font-family: 'Noto Sans Tamil', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    margin-bottom: 2px;
+  }
+  .school-header .school-en {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    opacity: 0.92;
+    margin-bottom: 4px;
+  }
+  .school-header .report-title {
+    font-size: 10px;
+    font-family: 'Noto Sans Tamil', sans-serif;
+    background: rgba(255,255,255,0.15);
+    display: inline-block;
+    padding: 2px 12px;
+    border-radius: 10px;
+    letter-spacing: 0.4px;
+  }
+
+  /* ── Grade legend ── */
+  .grade-legend {
+    display: flex;
+    border: 1px solid #ccc;
+    border-top: none;
+    margin-bottom: 8px;
+  }
+  .grade-legend .grade-cell {
+    flex: 1;
+    text-align: center;
+    padding: 4px 2px;
+    border-right: 1px solid #ccc;
+    font-size: 9px;
+    line-height: 1.4;
+  }
+  .grade-legend .grade-cell:last-child { border-right: none; }
+  .grade-legend .grade-cell .letter {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    margin-bottom: 1px;
+  }
+  .grade-legend .grade-cell .range { font-size: 8px; color: #555; }
+  .grade-legend .grade-cell .en { font-weight: 600; font-size: 8.5px; }
+  .grade-legend .grade-cell .ta {
+    font-family: 'Noto Sans Tamil', sans-serif;
+    font-size: 8px;
+    color: #444;
+  }
+  .ga { background: #d4edda; } .gb { background: #d1ecf1; }
+  .gc { background: #fff3cd; } .gd { background: #fde8c8; }
+  .ge { background: #f8d7da; }
+
+  /* ── Student info band ── */
+  .student-info {
+    border: 1px solid #ccc;
+    border-top: 3px solid #8B0000;
+    padding: 7px 10px;
+    margin-bottom: 8px;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 4px 12px;
+    background: #fafafa;
+  }
+  .info-field { display: flex; flex-direction: column; }
+  .info-field .label {
+    font-size: 8px;
+    color: #666;
+    font-family: 'Noto Sans Tamil', sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+  .info-field .value {
+    font-size: 11px;
+    font-weight: 700;
+    color: #1a1a1a;
+    font-family: 'Noto Sans Tamil', sans-serif;
+    border-bottom: 1px solid #ccc;
+    padding-bottom: 2px;
+    margin-top: 2px;
+  }
+  .info-field.wide { grid-column: span 2; }
+
+  /* ── Section heading ── */
+  .section-heading {
+    background: #8B0000;
+    color: #fff;
+    font-family: 'Noto Sans Tamil', sans-serif;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 4px 10px;
+    margin-bottom: 0;
+    letter-spacing: 0.3px;
+  }
+
+  /* ── Skills table ── */
+  .skills-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 8px;
+    table-layout: fixed;
+  }
+  .skills-table col.col-skill { width: 70%; }
+  .skills-table col.col-grade { width: 30%; }
+
+  .skills-table thead tr th {
+    background: #6B0000;
+    color: #fff;
+    font-family: 'Noto Sans Tamil', sans-serif;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 5px 8px;
+    text-align: left;
+    border: 1px solid #8B0000;
+  }
+
+  /* Skill category row */
+  .skills-table tr.category td {
+    background: #f0e6e6;
+    font-family: 'Noto Sans Tamil', sans-serif;
+    font-size: 10px;
+    font-weight: 700;
+    color: #8B0000;
+    padding: 5px 8px;
+    border: 1px solid #ddd;
+    border-left: 3px solid #8B0000;
+  }
+
+  /* Skill row */
+  .skills-table tr.skill-row td {
+    padding: 5px 8px;
+    border: 1px solid #ddd;
+    vertical-align: top;
+    line-height: 1.45;
+  }
+  .skills-table tr.skill-row:nth-child(even) td { background: #fafafa; }
+  .skills-table tr.skill-row:nth-child(odd) td { background: #fff; }
+
+  .skill-ta {
+    font-family: 'Noto Sans Tamil', sans-serif;
+    font-size: 10px;
+    color: #1a1a1a;
+    display: block;
+    margin-bottom: 2px;
+  }
+  .skill-en {
+    font-size: 9px;
+    color: #555;
+    display: block;
+    font-style: italic;
+  }
+
+  .grade-badge {
+    display: inline-block;
+    font-weight: 700;
+    font-size: 11px;
+    padding: 2px 7px;
+    border-radius: 3px;
+    margin-bottom: 2px;
+    white-space: nowrap;
+  }
+  .grade-label {
+    display: block;
+    font-family: 'Noto Sans Tamil', sans-serif;
+    font-size: 8px;
+    color: #444;
+    white-space: nowrap;
+  }
+  .grade-A { background: #d4edda; color: #155724; }
+  .grade-B { background: #d1ecf1; color: #0c5460; }
+  .grade-C { background: #fff3cd; color: #856404; }
+  .grade-D { background: #fde8c8; color: #7a4000; }
+  .grade-E { background: #f8d7da; color: #721c24; }
+
+  /* ── Attitude table ── */
+  .attitude-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 8px;
+    table-layout: fixed;
+  }
+  .attitude-table col.col-act  { width: 70%; }
+  .attitude-table col.col-eval { width: 30%; }
+
+  .attitude-table thead tr th {
+    background: #1a3a5c;
+    color: #fff;
+    font-family: 'Noto Sans Tamil', sans-serif;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 5px 8px;
+    text-align: left;
+    border: 1px solid #1a3a5c;
+  }
+  .attitude-table tr td {
+    padding: 5px 8px;
+    border: 1px solid #ddd;
+    vertical-align: middle;
+    line-height: 1.45;
+  }
+  .attitude-table tr:nth-child(even) td { background: #f0f5ff; }
+  .attitude-table tr:nth-child(odd) td { background: #fff; }
+
+  .eval-badge {
+    display: inline-block;
+    font-weight: 700;
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 3px;
+    white-space: nowrap;
+  }
+  .eval-A { background: #d4edda; color: #155724; }
+  .eval-U { background: #fff3cd; color: #856404; }
+  .eval-S { background: #fde8c8; color: #7a4000; }
+
+  .attitude-table .key-row td {
+    background: #eef2ff;
+    font-size: 8.5px;
+    font-family: 'Noto Sans Tamil', sans-serif;
+    color: #333;
+    text-align: center;
+    border-top: 2px solid #1a3a5c;
+  }
+
+  /* ── Notes & Attendance ── */
+  .notes-box {
+    border: 1px solid #ccc;
+    padding: 7px 10px;
+    margin-bottom: 8px;
+    background: #fafafa;
+    min-height: 36px;
+  }
+  .notes-box .notes-label {
+    font-family: 'Noto Sans Tamil', sans-serif;
+    font-size: 9px;
+    font-weight: 700;
+    color: #8B0000;
+    margin-bottom: 4px;
+  }
+  .notes-box .notes-value {
+    font-size: 10px;
+    color: #555;
+    font-style: italic;
+  }
+
+  /* ── Signatures ── */
+  .signatures {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+    margin-top: 8px;
+    border-top: 2px solid #8B0000;
+    padding-top: 8px;
+  }
+  .sig-box { text-align: center; }
+  .sig-line {
+    border-bottom: 1px solid #333;
+    height: 28px;
+    margin-bottom: 4px;
+  }
+  .sig-value {
+    font-size: 9px;
+    font-style: italic;
+    color: #555;
+    margin-bottom: 2px;
+    min-height: 14px;
+  }
+  .sig-label {
+    font-family: 'Noto Sans Tamil', sans-serif;
+    font-size: 8.5px;
+    color: #444;
+    line-height: 1.4;
+  }
+
+  /* ── PRINT STYLES ── */
+  @media print {
+    @page {
+      size: A4 portrait;
+      margin: 10mm 12mm 10mm 12mm;
+    }
+    body {
+      background: #fff;
+      padding: 0;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .page {
+      width: 100%;
+      min-height: auto;
+      padding: 0;
+      box-shadow: none;
+      margin: 0;
+    }
+
+    /* Force table layout to stay fixed on print */
+    table { table-layout: fixed !important; width: 100% !important; }
+    td, th { word-wrap: break-word; overflow-wrap: break-word; }
+
+    /* Prevent rows from splitting across pages */
+    tr { page-break-inside: avoid; }
+    .section-heading { page-break-after: avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- School Header -->
+  <div class="school-header">
+    <div class="school-ta">பாலர்மலர் தமிழ் பள்ளி பரமட்டா</div>
+    <div class="school-en">BALAR MALAR TAMIL SCHOOL PARRAMATTA</div>
+    <div class="report-title">மாணவர் முன்னேற்ற அறிக்கை &nbsp;/&nbsp; STUDENT PROGRESS REPORT</div>
+  </div>
+
+  <!-- Grade Legend -->
+  <div class="grade-legend">
+    <div class="grade-cell ga">
+      <span class="letter">A</span>
+      <span class="range">(100–90)</span>
+      <span class="en">EXCELLENT</span>
+      <span class="ta">உன்னதசித்தி</span>
+    </div>
+    <div class="grade-cell gb">
+      <span class="letter">B</span>
+      <span class="range">(89–70)</span>
+      <span class="en">VERY GOOD</span>
+      <span class="ta">மிகநன்று</span>
+    </div>
+    <div class="grade-cell gc">
+      <span class="letter">C</span>
+      <span class="range">(69–50)</span>
+      <span class="en">GOOD</span>
+      <span class="ta">நன்று</span>
+    </div>
+    <div class="grade-cell gd">
+      <span class="letter">D</span>
+      <span class="range">(49–36)</span>
+      <span class="en">SATISFACTORY</span>
+      <span class="ta">திருப்தி</span>
+    </div>
+    <div class="grade-cell ge">
+      <span class="letter">E</span>
+      <span class="range">(35 &amp; less)</span>
+      <span class="en">NEEDS IMPROVEMENT</span>
+      <span class="ta">முன்னேற்றம் தேவை</span>
+    </div>
+  </div>
+
+  <!-- Student Info -->
+  <div class="student-info">
+    <div class="info-field wide">
+      <span class="label">மாணவர் பெயர் — Student Name</span>
+      <span class="value">${studentNameStr}</span>
+    </div>
+    <div class="info-field">
+      <span class="label">நிலை — Level</span>
+      <span class="value">${studentLevelStr}</span>
+    </div>
+    <div class="info-field">
+      <span class="label">வகுப்பு — Class / Year</span>
+      <span class="value">${studentClassStr}</span>
+    </div>
+    <div class="info-field">
+      <span class="label">கல்வியாண்டு — Academic Year</span>
+      <span class="value">${academicYearStr}</span>
+    </div>
+    <div class="info-field">
+      <span class="label">தவணை — Term</span>
+      <span class="value">${termStr}</span>
+    </div>
+  </div>
+
+  <!-- Section: Skill Achievements -->
+  <div class="section-heading">திறன் அடைவுகள் — மதிப்பீடு &nbsp;|&nbsp; Skill Achievements — Evaluation</div>
+  <table class="skills-table">
+    <colgroup>
+      <col class="col-skill">
+      <col class="col-grade">
+    </colgroup>
+    <thead>
+      <tr>
+        <th>பாடத்திட்டத்திறன்கள் — Skills / Learning Outcomes</th>
+        <th>புள்ளிகள் விகிதம் — Grade</th>
+      </tr>
+    </thead>
+    <tbody>
+
+      <!-- Speaking -->
+      <tr class="category">
+        <td colspan="2">உரையாடல் — Speaking / Conversation</td>
+      </tr>
+      <tr class="skill-row">
+        <td>
+          <span class="skill-ta">உடல் மற்றும் முக பாவனைகளை சரியாக பயன்படுத்தி எண்ணங்களை வெளிப்படுத்துகிறார்</span>
+          <span class="skill-en">Uses appropriate body language and facial expressions to express thoughts</span>
+        </td>
+        <td>
+          ${getGradeHtml(skillSpeaking1)}
+        </td>
+      </tr>
+      <tr class="skill-row">
+        <td>
+          <span class="skill-ta">புதிய சொற்களை பயன்படுத்தி கருத்துக்களை வெளிப்படுத்துகிறார்</span>
+          <span class="skill-en">Uses new vocabulary to express ideas</span>
+        </td>
+        <td>
+          ${getGradeHtml(skillSpeaking2)}
+        </td>
+      </tr>
+      <tr class="skill-row">
+        <td>
+          <span class="skill-ta">சிறிய உரையாடல்களில் கலந்துகொண்டு தனது எண்ணங்களின் முக்கிய கருத்துக்களை வெளிப்படுத்துகிறார்</span>
+          <span class="skill-en">Participates in short conversations and expresses main points clearly</span>
+        </td>
+        <td>
+          ${getGradeHtml(skillSpeaking3)}
+        </td>
+      </tr>
+
+      <!-- Listening -->
+      <tr class="category">
+        <td colspan="2">கேட்டு கிரகித்தல் — Listening Comprehension</td>
+      </tr>
+      <tr class="skill-row">
+        <td>
+          <span class="skill-ta">கேட்கும் செய்திகளை படங்களின்/காட்சிகளின் உதவியுடன் புரிந்துகொள்கிறார்</span>
+          <span class="skill-en">Understands spoken messages with the help of pictures / visuals</span>
+        </td>
+        <td>
+          ${getGradeHtml(skillListening1)}
+        </td>
+      </tr>
+      <tr class="skill-row">
+        <td>
+          <span class="skill-ta">வாய்மொழி தொடர்பாடல்களை கவனமாக கேட்டு புரிந்துகொள்கிறார்</span>
+          <span class="skill-en">Listens carefully and understands oral communication</span>
+        </td>
+        <td>
+          ${getGradeHtml(skillListening2)}
+        </td>
+      </tr>
+      <tr class="skill-row">
+        <td>
+          <span class="skill-ta">கேள்விகளையும், கட்டளைகளையும், வேரிக்கைகளையும் புரிந்துகொண்டு சரியாக பதிலளிக்கிறார்</span>
+          <span class="skill-en">Understands and responds correctly to questions, instructions, and requests</span>
+        </td>
+        <td>
+          ${getGradeHtml(skillListening3)}
+        </td>
+      </tr>
+
+      <!-- Reading -->
+      <tr class="category">
+        <td colspan="2">வாசிப்பு — Reading</td>
+      </tr>
+      <tr class="skill-row">
+        <td>
+          <span class="skill-ta">சரளமாக வாசிக்கிறார்; தொடர் வாக்கியங்களை வாசிக்கிறார்; படங்கள் மற்றும் காட்சிகளின் உதவியுடன் புரிந்துகொள்கிறார்</span>
+          <span class="skill-en">Reads fluently, reads continuous sentences, and understands with visual support</span>
+        </td>
+        <td>
+          ${getGradeHtml(skillReading1)}
+        </td>
+      </tr>
+      <tr class="skill-row">
+        <td>
+          <span class="skill-ta">புதிய/கடினச் சொற்களை பிழையின்றி வாசிக்கிறார், பொருள் உணர்ந்து வாசிக்கிறார்</span>
+          <span class="skill-en">Reads new/difficult words accurately and with comprehension</span>
+        </td>
+        <td>
+          ${getGradeHtml(skillReading2)}
+        </td>
+      </tr>
+      <tr class="skill-row">
+        <td>
+          <span class="skill-ta">வழக்கிலுள்ள எழுத்துமொழியின் அமைப்புகளையும், மரபுகளையும் அடையாளம் கண்டுகொள்கிறார்</span>
+          <span class="skill-en">Identifies standard written language structures and conventions</span>
+        </td>
+        <td>
+          ${getGradeHtml(skillReading3)}
+        </td>
+      </tr>
+
+      <!-- Writing -->
+      <tr class="category">
+        <td colspan="2">எழுத்து — Writing</td>
+      </tr>
+      <tr class="skill-row">
+        <td>
+          <span class="skill-ta">புதிய/கடின சொற்களை பிழையின்றி எழுதுகிறார்; தொடர் வாக்கியங்களை எழுதுகிறார்</span>
+          <span class="skill-en">Writes new/difficult words without errors; writes full sentences</span>
+        </td>
+        <td>
+          ${getGradeHtml(skillWriting1)}
+        </td>
+      </tr>
+      <tr class="skill-row">
+        <td>
+          <span class="skill-ta">மாதிரி வசனங்களை பயன்படுத்தி கொடுக்கப்பட்ட சொற்களை தேர்ந்தெடுத்து/ஒழுங்கு செய்து புதிய வசனங்களை எழுதுவார்</span>
+          <span class="skill-en">Uses model sentences to select/arrange given words and write new sentences</span>
+        </td>
+        <td>
+          ${getGradeHtml(skillWriting2)}
+        </td>
+      </tr>
+      <tr class="skill-row">
+        <td>
+          <span class="skill-ta">வழக்கிலுள்ள எழுத்துமொழியின் அமைப்புகளையும், விதிகளையும் பின்பற்றி இலக்கண பிழையில்லாமல் எழுதுகிறார்</span>
+          <span class="skill-en">Follows standard written rules and writes without grammatical errors</span>
+        </td>
+        <td>
+          ${getGradeHtml(skillWriting3)}
+        </td>
+      </tr>
+
+    </tbody>
+  </table>
+
+  <!-- Section: Attitude and Values -->
+  <div class="section-heading">உளப்பாங்கு, விழுமியங்கள் புரிந்துகொள்ளல் &nbsp;|&nbsp; Attitude and Values Understanding</div>
+  <table class="attitude-table">
+    <colgroup>
+      <col class="col-act">
+      <col class="col-eval">
+    </colgroup>
+    <thead>
+      <tr>
+        <th>செயல்பாடு — Activity / Criteria</th>
+        <th>மதிப்பீடு — Evaluation</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>
+          <span class="skill-ta">வகுப்பிற்கு நேரத்திற்கு வருதல்</span>
+          <span class="skill-en">Coming to class on time</span>
+        </td>
+        <td>${getAttitudeHtml(attitudePunctuality)}</td>
+      </tr>
+      <tr>
+        <td>
+          <span class="skill-ta">மொழியை ஆர்வத்துடன் கற்றல்</span>
+          <span class="skill-en">Learning the language with enthusiasm</span>
+        </td>
+        <td>${getAttitudeHtml(attitudeEnthusiasm)}</td>
+      </tr>
+      <tr>
+        <td>
+          <span class="skill-ta">சக மாணவர்களுடன் சேர்ந்து பழகுதலும் உதவுதலும்</span>
+          <span class="skill-en">Interacting and helping peers</span>
+        </td>
+        <td>${getAttitudeHtml(attitudePeerInteraction)}</td>
+      </tr>
+      <tr>
+        <td>
+          <span class="skill-ta">இனிய சொற்களை பேசுதல்</span>
+          <span class="skill-en">Speaking kind words / pleasant language</span>
+        </td>
+        <td>${getAttitudeHtml(attitudeKindLanguage)}</td>
+      </tr>
+      <tr>
+        <td>
+          <span class="skill-ta">எண்ணங்களை துணிவுடன் வெளிப்படுத்தல்</span>
+          <span class="skill-en">Expressing thoughts confidently</span>
+        </td>
+        <td>${getAttitudeHtml(attitudeConfidence)}</td>
+      </tr>
+      <tr>
+        <td>
+          <span class="skill-ta">வீட்டுப் பாடங்களை பூர்த்தி செய்தல்</span>
+          <span class="skill-en">Completing homework assignments</span>
+        </td>
+        <td>${getAttitudeHtml(attitudeHomework)}</td>
+      </tr>
+      <tr class="key-row">
+        <td colspan="2">
+          KEY: &nbsp;
+          <strong>A</strong> — ALWAYS (எப்போதும்) &nbsp;|&nbsp;
+          <strong>U</strong> — USUALLY (வழக்கமாக) &nbsp;|&nbsp;
+          <strong>S</strong> — SOMETIMES (சிலவேளை)
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- Notes & Attendance -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+    <div class="notes-box">
+      <div class="notes-label">குறிப்பு — Notes / Teacher's Comments</div>
+      <div class="notes-value">${commentsVal}</div>
+    </div>
+    <div class="notes-box">
+      <div class="notes-label">வரவு — Attendance</div>
+      <div class="notes-value">${attendanceVal}</div>
+    </div>
+  </div>
+
+  <!-- Signatures -->
+  <div class="signatures">
+    <div class="sig-box">
+      <div class="sig-line"></div>
+      <div class="sig-value">${teacherSigVal}</div>
+      <div class="sig-label">வகுப்பாசிரியர் கையெப்பம்<br>Teacher's Signature</div>
+    </div>
+    <div class="sig-box">
+      <div class="sig-line"></div>
+      <div class="sig-value">${principalSigVal}</div>
+      <div class="sig-label">அதிபர் கையெப்பம்<br>Principal's Signature</div>
+    </div>
+    <div class="sig-box">
+      <div class="sig-line"></div>
+      <div class="sig-value">${parentSigVal}</div>
+      <div class="sig-label">பெற்றோர் கையெப்பம்<br>Parent's Signature</div>
+    </div>
+  </div>
+
+</div>
+<script>
+  window.addEventListener('load', () => {
+    setTimeout(() => {
+      window.print();
+      window.close();
+    }, 800);
+  });
+</script>
+</body>
+</html>
       `);
 
       printWindow.document.close();
