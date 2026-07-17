@@ -31,10 +31,10 @@ export default function TermsScreen() {
           {isTa ? 'பயன்பாட்டு விதிமுறைகள்' : 'Terms of Service'}
         </ThemedText>
         <ThemedText style={styles.subtitle}>
-          {isTa ? 'பள்ளித் தோழன் செயலி - பாலர்மலர் தமிழ்ப் பள்ளி - பரமட்டா' : 'Pallithozhan App - Balar Malar Tamil School - Parramatta'}
+          {isTa ? 'பள்ளித் தோழன் (pallithozhan) செயலி - பாலர்மலர் தமிழ்ப் பள்ளி - பரமட்டா' : 'pallithozhan (Pallithozhan) App - Balar Malar Tamil School - Parramatta'}
         </ThemedText>
         <ThemedText style={styles.date}>
-          {isTa ? 'கடைசியாக புதுப்பிக்கப்பட்டது: ஜூலை 3, 2026' : 'Last Updated: July 3, 2026'}
+          {isTa ? 'கடைசியாக புதுப்பிக்கப்பட்டது: ஜூலை 17, 2026' : 'Last Updated: July 17, 2026'}
         </ThemedText>
       </View>
 
@@ -44,8 +44,8 @@ export default function TermsScreen() {
         </ThemedText>
         <ThemedText style={styles.paragraph}>
           {isTa 
-            ? 'பள்ளித் தோழன் செயலியைப் பயன்படுத்துவதன் மூலம், இந்த விதிமுறைகளுக்கு நீங்கள் ஒப்புக்கொள்கிறீர்கள்.' 
-            : 'By accessing or using the Pallithozhan Portal, you agree to comply with and be bound by these terms.'}
+            ? 'பள்ளித் தோழன் (pallithozhan) செயலியைப் பயன்படுத்துவதன் மூலம், இந்த விதிமுறைகளுக்கு நீங்கள் ஒப்புக்கொள்கிறீர்கள்.' 
+            : 'By accessing or using the pallithozhan (Pallithozhan) App, you agree to comply with and be bound by these terms.'}
         </ThemedText>
 
         <ThemedText style={styles.sectionTitle}>
@@ -81,7 +81,7 @@ export default function TermsScreen() {
 
       <View style={styles.footer}>
         <ThemedText style={styles.footerText}>
-          © 2026 Pallithozhan Balar Malar Tamil School - Parramatta. All rights reserved.
+          © 2026 pallithozhan (Pallithozhan) Balar Malar Tamil School - Parramatta. All rights reserved.
         </ThemedText>
       </View>
     </ScrollView>

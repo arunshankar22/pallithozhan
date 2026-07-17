@@ -60,6 +60,29 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
   const [activeInfoTopic, setActiveInfoTopic] = useState<string | null>(null);
   const [activeHeroIdx, setActiveHeroIdx] = useState(0);
 
+  const getGlassStyle = (bgColor: string, opacity: number = 0.75, blurVal = 20) => {
+    let cleanColor = bgColor;
+    if (bgColor.startsWith('#')) {
+      const hex = bgColor.replace('#', '');
+      const r = parseInt(hex.substring(0, 2), 16);
+      const g = parseInt(hex.substring(2, 4), 16);
+      const b = parseInt(hex.substring(4, 6), 16);
+      cleanColor = `rgba(${r}, ${g}, ${b}, ${opacity})`;
+    }
+    return Platform.select({
+      web: {
+        backdropFilter: `blur(${blurVal}px)`,
+        WebkitBackdropFilter: `blur(${blurVal}px)`,
+        backgroundColor: cleanColor,
+        borderWidth: 1,
+        borderColor: scheme === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(255, 255, 255, 0.25)',
+      },
+      default: {
+        backgroundColor: bgColor,
+      }
+    });
+  };
+
   React.useEffect(() => {
     const handleResize = () => {
       const width = Dimensions.get('window').width;
@@ -292,11 +315,9 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
             source={require('../../assets/images/pallithozhan_logo.png')} 
             style={{ width: 26, height: 26, borderRadius: 6 }} 
           />
-          {isLargeScreen && (
-            <ThemedText style={{ color: colors.primary, fontSize: 16, fontWeight: '800', letterSpacing: 0.5 }}>
-              Pallithozhan
-            </ThemedText>
-          )}
+          <ThemedText style={{ color: colors.primary, fontSize: 16, fontWeight: '800', letterSpacing: 0.5 }}>
+            Pallithozhan
+          </ThemedText>
         </View>
 
         <View style={styles.headbarActions}>
@@ -505,6 +526,88 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
               )}
             </View>
           )}
+        </View>
+
+        {/* PALLITHOZHAN PURPOSE & OAUTH DATA TRANSPARENCY SECTION */}
+        <View style={styles.mainGridWrapper}>
+          <View style={{
+            borderColor: colors.border,
+            borderWidth: 1,
+            borderRadius: 24,
+            padding: isLargeScreen ? Spacing.five : Spacing.four,
+            gap: Spacing.three,
+            ...getGlassStyle(colors.cardBg, 0.75, 20)
+          }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <Image 
+                source={require('../../assets/images/pallithozhan_logo.png')} 
+                style={{ width: 36, height: 36, borderRadius: 8 }} 
+              />
+              <View>
+                <ThemedText style={{ color: colors.primary, fontSize: 18, fontWeight: '800' }}>
+                  {i18n.language === 'ta' ? 'பள்ளித்தோழன் (pallithozhan) செயலி பற்றி' : 'About pallithozhan (Pallithozhan) App'}
+                </ThemedText>
+                <ThemedText style={{ color: colors.textSecondary, fontSize: 11, fontWeight: '600' }}>
+                  {i18n.language === 'ta' ? 'அதிகாரப்பூர்வ பள்ளி மேலாண்மை தளம்' : 'Official Balar Malar NSW Portal'}
+                </ThemedText>
+              </View>
+            </View>
+
+            <ThemedText style={{ color: colors.text, fontSize: 13, lineHeight: 20 }}>
+              {i18n.language === 'ta'
+                ? 'பள்ளித்தோழன் (pallithozhan / Pallithozhan) என்பது பாலர் மலர் தமிழ் பள்ளி (NSW) அமைப்பின் அதிகாரப்பூர்வ இணைய மற்றும் மொபைல் தளமாகும். இச்செயலி பள்ளி ஆசிரியர்கள், மாணவர்கள் மற்றும் பெற்றோர் இடையே கற்றல் மற்றும் பள்ளி நிர்வாக செயல்பாடுகளை எளிமையாக்குகிறது. வருகைப்பதிவு, வீட்டுப்பாடம், பருவத்தேர்வு மதிப்பெண்கள் மற்றும் பள்ளி அறிவிப்புகள் போன்ற வசதிகளை இது வழங்குகிறது.'
+                : 'pallithozhan (Pallithozhan, meaning School Companion) is the official education and administrative portal for Balar Malar Tamil School (NSW) Inc. Designed to streamline academic progress and school communication, it provides tools for digital attendance management, homework tracking, term progress reports, newsletter distribution, and student milestone points.'}
+            </ThemedText>
+
+            <View style={{ height: 1, backgroundColor: colors.border, marginVertical: Spacing.one }} />
+
+            <View style={{ gap: Spacing.two }}>
+              <ThemedText style={{ color: colors.text, fontSize: 14, fontWeight: '800' }}>
+                {i18n.language === 'ta' ? 'தரவு வெளிப்படைத்தன்மை & கூகுள் உள்நுழைவு (Google Sign-In)' : 'Data Privacy & Google OAuth Transparency'}
+              </ThemedText>
+              <ThemedText style={{ color: colors.textSecondary, fontSize: 12, lineHeight: 18 }}>
+                {i18n.language === 'ta'
+                  ? 'நாங்கள் உங்களின் தனியுரிமையை மதிக்கிறோம். நீங்கள் கூகுள் மூலம் உள்நுழையும்போது (Google Sign-In), பள்ளித்தோழன் (pallithozhan) செயலி உங்களின் கூகுள் மின்னஞ்சல் (email), பெயர் (name) மற்றும் சுயவிவரப் படம் (profile picture) ஆகிய அடிப்படை விவரங்களை மட்டுமே கோருகிறது. இந்த விவரங்கள் உங்களை அடையாளம் காணவும், பள்ளி அமைப்பில் உங்களுக்கான பொறுப்பை (ஆசிரியர், பெற்றோர் அல்லது மாணவர்) உறுதிப்படுத்தவும் மட்டுமே பயன்படுத்தப்படும். உங்களின் கூகுள் விவரங்கள் எக்காரணம் கொண்டும் மூன்றாம் தரப்பினருடன் பகிரப்படவோ அல்லது விளம்பர நோக்கங்களுக்காகப் பயன்படுத்தப்படவோ மாட்டாது.'
+                  : 'We respect your data privacy. When using Google Sign-In, the pallithozhan (Pallithozhan) app requests access to your basic Google profile details (email address, full name, and profile picture). This information is accessed solely to authenticate your identity, secure your login, and link your account to your designated role (Teacher, Volunteer, Parent, or Student) in our school system. No private information or OAuth data is ever shared with third parties or used for tracking.'}
+              </ThemedText>
+            </View>
+
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: Spacing.two }}>
+              <Pressable
+                onPress={() => router.replace('/privacy')}
+                style={({ pressed }) => [
+                  {
+                    backgroundColor: colors.primaryLight,
+                    paddingHorizontal: 16,
+                    paddingVertical: 10,
+                    borderRadius: 12,
+                    opacity: pressed ? 0.9 : 1
+                  }
+                ]}
+              >
+                <ThemedText style={{ color: colors.primary, fontSize: 12, fontWeight: '700' }}>
+                  {i18n.language === 'ta' ? 'தனியுரிமைக் கொள்கையை வாசிக்க' : 'Read Our Privacy Policy'}
+                </ThemedText>
+              </Pressable>
+              <Pressable
+                onPress={() => router.replace('/terms')}
+                style={({ pressed }) => [
+                  {
+                    borderColor: colors.border,
+                    borderWidth: 1,
+                    paddingHorizontal: 16,
+                    paddingVertical: 10,
+                    borderRadius: 12,
+                    opacity: pressed ? 0.9 : 1
+                  }
+                ]}
+              >
+                <ThemedText style={{ color: colors.text, fontSize: 12, fontWeight: '700' }}>
+                  {i18n.language === 'ta' ? 'விதிமுறைகள்' : 'Terms of Service'}
+                </ThemedText>
+              </Pressable>
+            </View>
+          </View>
         </View>
 
         {/* CORE FEATURES SECTION */}

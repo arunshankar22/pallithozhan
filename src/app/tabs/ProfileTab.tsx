@@ -9,7 +9,7 @@ import {
   Modal,
   ScrollView as RNScrollView
 } from 'react-native';
-import { Edit, Trash2, LogOut, AlertTriangle, CheckCircle, Lock, Shield, Award, Trophy, ChevronRight, Bell, Languages } from 'lucide-react-native';
+import { Edit, Trash2, LogOut, AlertTriangle, CheckCircle, Lock, Shield, Award, Trophy, ChevronRight, Bell, Languages, RefreshCw } from 'lucide-react-native';
 import { Switch } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { TabProps } from '@/app/sharedTypes';
@@ -25,8 +25,7 @@ export function ProfileTab({ user, colors, t, showToast, i18n, logout }: TabProp
   const [phone, setPhone] = useState(user?.phone || '');
   const [selectedLang, setSelectedLang] = useState<'ta' | 'en'>(user?.languagePreference || 'ta');
 
-  const canSwitchRole = (user?.originalRole === 'teacher' || user?.originalRole === 'volunteer' || user?.originalRole === 'admin') && 
-                        (user?.associatedStudents && user?.associatedStudents.length > 0);
+  const canSwitchRole = (user?.originalRole === 'superadmin' || user?.originalRole === 'admin' || user?.originalRole === 'teacher' || user?.originalRole === 'volunteer');
   const alternateRole = user?.role === 'parent' ? user?.originalRole : 'parent';
 
   // Profile Photo Upload states
@@ -627,6 +626,45 @@ export function ProfileTab({ user, colors, t, showToast, i18n, logout }: TabProp
           </Pressable>
 
           {/* Active Role Switcher Row for Dual Roles */}
+          {canSwitchRole && alternateRole && (
+            <Pressable
+              onPress={() => {
+                switchRole(alternateRole);
+                showToast(
+                  i18n.language === 'ta'
+                    ? `காட்சிப் பொறுப்பு ${alternateRole.toUpperCase()} ஆக மாற்றப்பட்டது!`
+                    : `Switched view context to ${alternateRole.toUpperCase()}!`,
+                  'success'
+                );
+              }}
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: Spacing.three,
+                borderBottomWidth: 1,
+                borderColor: colors.border,
+                backgroundColor: colors.primaryLight + '10'
+              }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <RefreshCw size={18} color={colors.primary} />
+                <View style={{ gap: 2 }}>
+                  <ThemedText style={{ fontSize: 13, fontWeight: '700', color: colors.primary }}>
+                    {user?.role === 'parent'
+                      ? (i18n.language === 'ta' ? `${user?.originalRole?.toUpperCase()} பொறுப்பிற்கு மாற்றவும்` : `Switch to ${user?.originalRole?.toUpperCase()}`)
+                      : (i18n.language === 'ta' ? 'பெற்றோர் பார்வைக்கு மாற்றவும்' : 'Switch to Parent View')}
+                  </ThemedText>
+                  <ThemedText style={{ fontSize: 11, color: colors.textSecondary }}>
+                    {user?.role === 'parent'
+                      ? (i18n.language === 'ta' ? 'தற்போது பெற்றோராக பார்க்கப்படுகிறது' : 'Currently viewing as Parent')
+                      : (i18n.language === 'ta' ? `${user?.role?.toUpperCase()} ஆக பார்க்கப்படுகிறது` : `Currently viewing as ${user?.role?.toUpperCase()}`)}
+                  </ThemedText>
+                </View>
+              </View>
+              <ChevronRight size={16} color={colors.primary} />
+            </Pressable>
+          )}
 
 
           <Pressable

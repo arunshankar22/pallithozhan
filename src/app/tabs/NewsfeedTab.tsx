@@ -33,8 +33,10 @@ import {
   Video,
   Image as ImageIcon,
   AlertTriangle,
-  CheckCircle
+  CheckCircle,
+  HelpCircle
 } from 'lucide-react-native';
+import { HelperTooltip } from '@/components/HelperTooltip';
 import { ThemedText } from '@/components/themed-text';
 import { TabProps, DriveItem, DRIVE_STRUCTURE, getCurrentFolderItems } from '@/app/sharedTypes';
 import { styles } from '@/app/styles';
@@ -88,7 +90,19 @@ export function NewsfeedTab({
   clearDashboardEditPost?: () => void;
 }) {
   const [posts, setPosts] = useState<any[]>([]);
+  const [showHelp, setShowHelp] = useState(() => {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      return window.localStorage.getItem('pallithozhan_help_newsfeed') !== 'hidden';
+    }
+    return true;
+  });
 
+  const dismissHelp = () => {
+    setShowHelp(false);
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem('pallithozhan_help_newsfeed', 'hidden');
+    }
+  };
   const handlePlayVideo = async (url: string) => {
     if (!url) return;
     if (url.startsWith('data:')) {
@@ -718,6 +732,34 @@ export function NewsfeedTab({
           </Pressable>
         )}
       </View>
+
+      {showHelp && (
+        <View style={{
+          backgroundColor: colors.primaryLight,
+          borderWidth: 1,
+          borderColor: colors.border,
+          borderRadius: 12,
+          padding: Spacing.three,
+          marginBottom: Spacing.three,
+        }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <View style={{ flex: 1, paddingRight: Spacing.three }}>
+              <ThemedText style={{ fontWeight: '700', color: colors.primary, fontSize: 13, marginBottom: 4 }}>
+                ℹ️ Quick Guide / உதவிக்குறிப்பு
+              </ThemedText>
+              <ThemedText style={{ fontSize: 12, lineHeight: 18, color: colors.text }}>
+                Welcome to the Announcement Board. Teachers and administrators post weekly branch updates, homework instructions, and school notices. You can view comments, play speech contest videos, or browse shared Google Drive assets.
+              </ThemedText>
+              <ThemedText style={{ fontSize: 12, lineHeight: 18, color: colors.textSecondary, marginTop: 4, fontStyle: 'italic' }}>
+                அறிவிப்புப் பலகைக்கு வரவேற்கிறோம். இங்கு நீங்கள் வாராந்திர அறிவிப்புகள், வீட்டுப்பாடங்கள் மற்றும் பள்ளித் தகவல்களைக் காணலாம்.
+              </ThemedText>
+            </View>
+            <Pressable onPress={dismissHelp} style={{ padding: 4 }}>
+              <X size={16} color={colors.textSecondary} />
+            </Pressable>
+          </View>
+        </View>
+      )}
 
       {/* Balar Malar Parramatta Premium Hero Banner Slider */}
       <View

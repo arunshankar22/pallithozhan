@@ -7,8 +7,10 @@ import {
   Platform,
   Dimensions
 } from 'react-native';
-import { AlertTriangle, CheckCircle, Clock, X } from 'lucide-react-native';
+
+import { AlertTriangle, CheckCircle, Clock, X, HelpCircle } from 'lucide-react-native';
 import { ThemedText } from '@/components/themed-text';
+import { HelperTooltip } from '@/components/HelperTooltip';
 import { TabProps } from '@/app/sharedTypes';
 import { styles } from '@/app/styles';
 import { mockDb } from '@/services/mockBackend';
@@ -22,6 +24,19 @@ export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentI
   const { width: windowWidth } = Dimensions.get('window');
   const isLargeScreen = windowWidth >= 768;
   const [classes, setClasses] = useState<any[]>([]);
+  const [showHelp, setShowHelp] = useState(() => {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      return window.localStorage.getItem('pallithozhan_help_attendance') !== 'hidden';
+    }
+    return true;
+  });
+
+  const dismissHelp = () => {
+    setShowHelp(false);
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem('pallithozhan_help_attendance', 'hidden');
+    }
+  };
   const [selectedClassId, setSelectedClassId] = useState('');
   const [studentList, setStudentList] = useState<any[]>([]);
   const [rolls, setRolls] = useState<Record<string, 'present' | 'absent' | 'late'>>({});
@@ -416,9 +431,16 @@ export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentI
           gap: 20
         }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-            <ThemedText style={{ fontSize: 18, fontWeight: '800', color: colors.text }}>
-              Export Attendance / வருகைப்பதிவு
-            </ThemedText>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <ThemedText style={{ fontSize: 18, fontWeight: '800', color: colors.text }}>
+                Export Attendance / வருகைப்பதிவு
+              </ThemedText>
+              <HelperTooltip 
+                size={16}
+                content="Choose to export the attendance register for all terms combined, or a specific term only. Excel (.xlsx) and CSV formats are supported."
+                contentTa="வருகைப்பதிவு கோப்பை Excel அல்லது CSV வடிவில் பதிவிறக்க காலத்தைத் தேர்ந்தெடுக்கவும்."
+              />
+            </View>
             <Pressable onPress={() => setShowExportModal(false)} style={{ padding: 4 }}>
               <ThemedText style={{ fontSize: 18, color: colors.textSecondary, fontWeight: '700' }}>✕</ThemedText>
             </Pressable>
@@ -989,16 +1011,44 @@ export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentI
         }}
       >
         <View style={styles.tabContentWrapper}>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: Spacing.two }}>
-        <View>
-          <ThemedText style={styles.sectionTitle}>{t('attendance.title')}</ThemedText>
-          <ThemedText style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>
-            Attendance logs and real-time alerts
-          </ThemedText>
-        </View>
-      </View>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: Spacing.two }}>
+            <View>
+              <ThemedText style={styles.sectionTitle}>{t('attendance.title')}</ThemedText>
+              <ThemedText style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>
+                Attendance logs and real-time alerts
+              </ThemedText>
+            </View>
+          </View>
 
-      <View style={{ flex: 1, gap: Spacing.three }}>
+          {showHelp && (
+            <View style={{
+              backgroundColor: colors.primaryLight,
+              borderWidth: 1,
+              borderColor: colors.border,
+              borderRadius: 12,
+              padding: Spacing.three,
+              marginBottom: Spacing.three,
+            }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <View style={{ flex: 1, paddingRight: Spacing.three }}>
+                  <ThemedText style={{ fontWeight: '700', color: colors.primary, fontSize: 13, marginBottom: 4 }}>
+                    ℹ️ Quick Guide / உதவிக்குறிப்பு
+                  </ThemedText>
+                  <ThemedText style={{ fontSize: 12, lineHeight: 18, color: colors.text }}>
+                    Welcome to the Attendance Panel. Teachers can select their assigned class, pick the weekly session date, and mark students as present, late, or absent. When rolls are saved, administrators review and approve absences to trigger automated push alert messages to parents.
+                  </ThemedText>
+                  <ThemedText style={{ fontSize: 12, lineHeight: 18, color: colors.textSecondary, marginTop: 4, fontStyle: 'italic' }}>
+                    வருகைப்பதிவேட்டிற்கு வரவேற்கிறோம். ஆசிரியர்கள் தங்கள் வகுப்பைத் தேர்ந்தெடுத்து, மாணவர்களின் வருகைப் பதிவை மேற்கொள்ளலாம். வருகைப் பதிவைச் சேமிக்கும் போது, பெற்றோருக்குத் தானியங்கி அறிவிப்புகள் அனுப்பப்படும்.
+                  </ThemedText>
+                </View>
+                <Pressable onPress={dismissHelp} style={{ padding: 4 }}>
+                  <X size={16} color={colors.textSecondary} />
+                </Pressable>
+              </View>
+            </View>
+          )}
+
+          <View style={{ flex: 1, gap: Spacing.three }}>
         {/* Admin Approval Section (Only for Admins) */}
         {user?.role === 'admin' && (
           <View style={[styles.pendingAlertsCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
@@ -1133,9 +1183,16 @@ export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentI
 
               return (
                 <View style={{ marginBottom: Spacing.three }}>
-                  <ThemedText style={[styles.formInputLabel, { marginBottom: 8 }]}>
-                    Session Date / வகுப்பு நாள் தேர்வு
-                  </ThemedText>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                    <ThemedText style={[styles.formInputLabel, { marginBottom: 0 }]}>
+                      Session Date / வகுப்பு நாள் தேர்வு
+                    </ThemedText>
+                    <HelperTooltip 
+                      size={12}
+                      content="Choose the correct session date. Shortcut chips let you quickly toggle between the previous session, today, or the upcoming week's session."
+                      contentTa="வகுப்பு நடக்கும் தேதியைத் தேர்ந்தெடுக்கவும். குறுக்குவழி பொத்தான்களைப் பயன்படுத்தி எளிதாக முந்தைய, இன்றைய அல்லது அடுத்த தேதியை தேர்வு செய்யலாம்."
+                    />
+                  </View>
 
                   <View style={{ gap: 10 }}>
                     <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -1272,9 +1329,16 @@ export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentI
             {selectedClassId && studentList.length > 0 ? (
               <View style={styles.studentListWrapper}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.two, flexWrap: 'wrap', gap: 10 }}>
-                  <ThemedText style={styles.listHeaderTitle}>
-                    {(selectedClassId === 'teacher_attendance' || selectedClassId === 'volunteer_attendance' || selectedClassId === 'staff_attendance') ? 'Active Staff Roll (Choose Status)' : 'Active Student Roll (Choose Status)'}
-                  </ThemedText>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <ThemedText style={styles.listHeaderTitle}>
+                      {(selectedClassId === 'teacher_attendance' || selectedClassId === 'volunteer_attendance' || selectedClassId === 'staff_attendance') ? 'Active Staff Roll (Choose Status)' : 'Active Student Roll (Choose Status)'}
+                    </ThemedText>
+                    <HelperTooltip 
+                      size={13}
+                      content="Tap 'Present' (Green), 'Absent' (Red), or 'Late' (Orange) for each student. When finished, scroll to the bottom and click 'Save Attendance Roll'."
+                      contentTa="மாணவர்களின் வருகை நிலையை அமைத்து, பக்கத்தின் கீழே உள்ள 'வருகைப் பதிவைச் சேமி' பொத்தானை அழுத்தவும்."
+                    />
+                  </View>
                   
                   <View style={{ flexDirection: 'row', gap: 8 }}>
                     <Pressable

@@ -8,7 +8,8 @@ import {
   Modal,
   ActivityIndicator,
   Platform,
-  Alert
+  Alert,
+  useWindowDimensions
 } from 'react-native';
 import {
   Award,
@@ -50,6 +51,8 @@ export const getRibbonInfo = (points: number, thresholds: { red: number; yellow:
 };
 
 export function PointsPortalTab({ user, colors, t, showToast, i18n }: TabProps) {
+  const { width: windowWidth } = useWindowDimensions();
+  const isLargeScreen = windowWidth >= 768;
   const [activeSubTab, setActiveSubTab] = useState<'students' | 'config'>('students');
   const [classes, setClasses] = useState<any[]>([]);
   const [selectedClassId, setSelectedClassId] = useState<string>('');
@@ -434,9 +437,19 @@ export function PointsPortalTab({ user, colors, t, showToast, i18n }: TabProps) 
       </View>
 
       {activeSubTab === 'students' ? (
-        <View style={styles.flexRowContainer}>
+        <View style={[styles.flexRowContainer, { flexDirection: isLargeScreen ? 'row' : 'column' }]}>
           {/* Left panel: student roster */}
-          <View style={[styles.leftRosterPanel, { borderRightColor: colors.border }]}>
+          {(!selectedStudent || isLargeScreen) && (
+            <View
+              style={[
+                styles.leftRosterPanel,
+                {
+                  borderRightColor: colors.border,
+                  width: isLargeScreen ? '35%' : '100%',
+                  borderRightWidth: isLargeScreen ? 1 : 0
+                }
+              ]}
+            >
             {/* Class Selector Chips */}
             <View style={{ marginBottom: 12 }}>
               <ThemedText style={{ fontSize: 11, fontWeight: 'bold', marginBottom: 6, color: colors.text + '99', textTransform: 'uppercase' }}>
@@ -529,11 +542,23 @@ export function PointsPortalTab({ user, colors, t, showToast, i18n }: TabProps) 
               )}
             </ScrollView>
           </View>
+          )}
 
           {/* Right panel: student detailed profile & logs */}
-          <View style={styles.rightDetailPanel}>
+          {(selectedStudent || isLargeScreen) && (
+            <View style={[styles.rightDetailPanel, { flex: 1 }]}>
             {selectedStudent ? (
               <View style={{ flex: 1 }}>
+                {!isLargeScreen && (
+                  <Pressable
+                    onPress={() => setSelectedStudent(null)}
+                    style={{ marginBottom: 12, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                  >
+                    <ThemedText style={{ fontSize: 14, fontWeight: '700', color: colors.primary }}>
+                      ← {isTa ? 'மாணவர் பட்டியலுக்குத் திரும்பு' : 'Back to Student List'}
+                    </ThemedText>
+                  </Pressable>
+                )}
                 {/* Header Profile card */}
                 <View style={[styles.detailProfileHeader, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                   <View style={{ flex: 1 }}>
@@ -673,6 +698,7 @@ export function PointsPortalTab({ user, colors, t, showToast, i18n }: TabProps) 
               </View>
             )}
           </View>
+          )}
         </View>
       ) : (
         /* Configuration Sub Tab */

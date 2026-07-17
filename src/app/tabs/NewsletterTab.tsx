@@ -26,8 +26,10 @@ import {
   X,
   FileText,
   Image as ImageIcon,
-  Video as VideoIcon
+  Video as VideoIcon,
+  HelpCircle
 } from 'lucide-react-native';
+import { HelperTooltip } from '@/components/HelperTooltip';
 import { ThemedText } from '@/components/themed-text';
 import { VideoPlayer } from '@/components/VideoPlayer';
 import { TabProps, getGlassStyle } from '@/app/sharedTypes';
@@ -55,6 +57,19 @@ export function NewsletterTab({
   clearInitialParams?: () => void;
 }) {
   const [articles, setArticles] = useState<any[]>([]);
+  const [showHelp, setShowHelp] = useState(() => {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      return window.localStorage.getItem('pallithozhan_help_newsletter') !== 'hidden';
+    }
+    return true;
+  });
+
+  const dismissHelp = () => {
+    setShowHelp(false);
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem('pallithozhan_help_newsletter', 'hidden');
+    }
+  };
   const [newsletters, setNewsletters] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [activeSubTab, setActiveSubTab] = useState<'newsletters' | 'articles' | 'submit' | 'pending' | 'upload'>('newsletters');
@@ -614,12 +629,41 @@ export function NewsletterTab({
         <ThemedText style={globalStyles.sectionTitle}>
           {i18n.language === 'ta' ? 'செய்திமடல்கள் & கட்டுரைகள்' : 'Newsletters & Articles'}
         </ThemedText>
-        <ThemedText style={[globalStyles.sectionSubtitle, { color: colors.textSecondary }]}>
+        <ThemedText style={[globalStyles.sectionSubtitle, { color: colors.textSecondary, marginBottom: Spacing.three }]}>
           {i18n.language === 'ta'
             ? 'பள்ளியின் செய்திமடல்களைக் காணவும், மாணவர்கள் மற்றும் பெற்றோர்களின் படைப்பு கட்டுரைகளைச் சமர்ப்பிக்கவும்'
             : 'Explore newsletters and read or submit creative literary articles by parents, students, and staff'}
         </ThemedText>
       </View>
+
+      {showHelp && (
+        <View style={{
+          backgroundColor: colors.primaryLight,
+          borderWidth: 1,
+          borderColor: colors.border,
+          borderRadius: 12,
+          padding: Spacing.three,
+          marginBottom: Spacing.three,
+        }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <View style={{ flex: 1, paddingRight: Spacing.three }}>
+              <ThemedText style={{ fontWeight: '700', color: colors.primary, fontSize: 13, marginBottom: 4 }}>
+                ℹ️ Quick Guide / உதவிக்குறிப்பு
+              </ThemedText>
+              <ThemedText style={{ fontSize: 12, lineHeight: 18, color: colors.text }}>
+                Welcome to the Newsletters & Articles Board. Here you can read weekly/monthly school newsletters, browse literary articles submitted by students, parents, and teachers, or submit new articles of your own.
+              </ThemedText>
+              <ThemedText style={{ fontSize: 12, lineHeight: 18, color: colors.textSecondary, marginTop: 4, fontStyle: 'italic' }}>
+                செய்திமடல்கள் மற்றும் கட்டுரைகள் பகுதிக்கு வரவேற்கிறோம். இங்கு நீங்கள் பள்ளி செய்திமடல்களைப் படிக்கலாம், மேலும் கட்டுரைகளைச் சமர்ப்பிக்கலாம்.
+              </ThemedText>
+            </View>
+            <Pressable onPress={dismissHelp} style={{ padding: 4 }}>
+              <X size={16} color={colors.textSecondary} />
+            </Pressable>
+          </View>
+        </View>
+      )}
+
 
       {/* Sub tabs Navigation */}
       <View style={[localStyles.subTabBar, { borderColor: colors.border }]}>

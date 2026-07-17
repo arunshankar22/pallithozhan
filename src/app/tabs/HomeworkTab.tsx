@@ -8,8 +8,10 @@ import {
   Platform,
   Image
 } from 'react-native';
-import { Plus, BookOpen, CheckCircle, Clock, Trash2, Edit, Mic, Square, Upload, Video, Image as ImageIcon, X } from 'lucide-react-native';
+
+import { Plus, BookOpen, CheckCircle, Clock, Trash2, Edit, Mic, Square, Upload, Video, Image as ImageIcon, X, HelpCircle } from 'lucide-react-native';
 import { ThemedText } from '@/components/themed-text';
+import { HelperTooltip } from '@/components/HelperTooltip';
 import { TabProps } from '@/app/sharedTypes';
 import { styles } from '@/app/styles';
 import { mockDb } from '@/services/mockBackend';
@@ -23,6 +25,19 @@ import { VideoPlayer } from '@/components/VideoPlayer';
 
 export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId }: TabProps) {
   const [homework, setHomework] = useState<any[]>([]);
+  const [showHelp, setShowHelp] = useState(() => {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      return window.localStorage.getItem('pallithozhan_help_homework') !== 'hidden';
+    }
+    return true;
+  });
+
+  const dismissHelp = () => {
+    setShowHelp(false);
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem('pallithozhan_help_homework', 'hidden');
+    }
+  };
   const [classes, setClasses] = useState<any[]>([]);
   const [classNames, setClassNames] = useState<Record<string, string>>({});
   const [users, setUsers] = useState<any[]>([]);
@@ -512,12 +527,48 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
         )}
       </View>
 
+      {showHelp && (
+        <View style={{
+          backgroundColor: colors.primaryLight,
+          borderWidth: 1,
+          borderColor: colors.border,
+          borderRadius: 12,
+          padding: Spacing.three,
+          marginBottom: Spacing.three,
+        }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <View style={{ flex: 1, paddingRight: Spacing.three }}>
+              <ThemedText style={{ fontWeight: '700', color: colors.primary, fontSize: 13, marginBottom: 4 }}>
+                ℹ️ Quick Guide / உதவிக்குறிப்பு
+              </ThemedText>
+              <ThemedText style={{ fontSize: 12, lineHeight: 18, color: colors.text }}>
+                Welcome to the Learn & Homework Portal. Teachers can assign weekly homework tasks, upload voice recordings, attach files, and view submissions. Parents and students can download worksheets, read assignments, and review teacher feedback.
+              </ThemedText>
+              <ThemedText style={{ fontSize: 12, lineHeight: 18, color: colors.textSecondary, marginTop: 4, fontStyle: 'italic' }}>
+                வீட்டுப்பாடம் மற்றும் கற்றல் பகுதிக்கு வரவேற்கிறோம். ஆசிரியர்கள் வாராந்திர வீட்டுப்பாடங்களை ஒதுக்கலாம். பெற்றோர்களும் மாணவர்களும் அவற்றைப் பதிவிறக்கம் செய்து படிக்கலாம்.
+              </ThemedText>
+            </View>
+            <Pressable onPress={dismissHelp} style={{ padding: 4 }}>
+              <X size={16} color={colors.textSecondary} />
+            </Pressable>
+          </View>
+        </View>
+      )}
+
       {/* Homework Creation Form */}
       {modalVisible && (
         <View style={[styles.formCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
-          <ThemedText style={styles.formTitle}>
-            {editingHwId ? 'Edit Homework (ஆட்டோ-தமிழ் வசதியுடன்)' : 'Post New Homework (ஆட்டோ-தமிழ் வசதியுடன்)'}
-          </ThemedText>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: Spacing.two }}>
+            <ThemedText style={[styles.formTitle, { marginBottom: 0 }]}>
+              {editingHwId ? 'Edit Homework (ஆட்டோ-தமிழ் வசதியுடன்)' : 'Post New Homework (ஆட்டோ-தமிழ் வசதியுடன்)'}
+            </ThemedText>
+            <HelperTooltip 
+              size={15}
+              content="Post new homework tasks for a specific class. You can type in English, and the built-in translator will automatically translate it to Tamil as you type!"
+              contentTa="புதிய வீட்டுப்பாடத்தைப் பதிவு செய்யும் போது ஆட்டோ-தமிழ் மொழிபெயர்ப்பு வசதியைப் பயன்படுத்தலாம்."
+            />
+          </View>
+
           
           {/* Class Selector */}
           <ThemedText style={styles.formInputLabel}>{t('homework.assignedTo')}</ThemedText>

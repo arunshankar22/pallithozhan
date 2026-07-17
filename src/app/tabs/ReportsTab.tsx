@@ -11,7 +11,8 @@ import {
   Image,
   StyleSheet,
   Linking,
-  useWindowDimensions
+  useWindowDimensions,
+  Switch
 } from 'react-native';
 import {
   Award,
@@ -48,6 +49,8 @@ import { auditLogService } from '@/services/auditLogService';
 import { useDebounce } from '@/hooks/useDebounce';
 import { autoTranslate, translateWithGemini } from '@/services/translator';
 import { DateTimePicker } from '@/components/DateTimePicker';
+import { db } from '@/services/firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 // Mapper to resolve colors, icons, and text for different award types
 const getAwardMeta = (type: string) => {
@@ -307,8 +310,16 @@ export function ReportsTab({
   const [reportTerm, setReportTerm] = useState(2);
   const [reportAttendance, setReportAttendance] = useState('');
   const [reportComments, setReportComments] = useState('');
+  const [reportCommentsTamil, setReportCommentsTamil] = useState('');
+  const [isCommentsTranslating, setIsCommentsTranslating] = useState(false);
   const [reportTeacherSig, setReportTeacherSig] = useState('');
   const [reportPrincipalSig, setReportPrincipalSig] = useState('');
+  const [teacherSigImage, setTeacherSigImage] = useState('');
+  const [principalSigImage, setPrincipalSigImage] = useState('');
+  const [reportAttachTeacherSig, setReportAttachTeacherSig] = useState(true);
+  const [reportAttachPrincipalSig, setReportAttachPrincipalSig] = useState(true);
+  const [reportAttachParentSig, setReportAttachParentSig] = useState(true);
+  const [globalShowParentSig, setGlobalShowParentSig] = useState(false);
   const [reportParentSigned, setReportParentSigned] = useState(false);
   const [reportParentSigDate, setReportParentSigDate] = useState('');
   const [reportLoading, setReportLoading] = useState(false);
@@ -653,6 +664,22 @@ export function ReportsTab({
         if (studentUsers.length > 0) {
           setFormStudentId(studentUsers[0].uid);
         }
+      }
+      
+      // 5. Fetch global report configuration
+      try {
+        const docRef = doc(db, 'configs', 'reportCard');
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          setGlobalShowParentSig(docSnap.data().showParentSig ?? false);
+        } else {
+          const localVal = localStorage.getItem('bm_report_global_show_parent_sig');
+          setGlobalShowParentSig(localVal === 'true');
+        }
+      } catch (err) {
+        console.warn('Failed to load global config from Firestore:', err);
+        const localVal = localStorage.getItem('bm_report_global_show_parent_sig');
+        setGlobalShowParentSig(localVal === 'true');
       }
     } catch (err) {
       console.error('Error loading data for achievements tab:', err);
@@ -1581,10 +1608,17 @@ export function ReportsTab({
         if (report) {
           setReportAttendance(report.attendance || '');
           setReportComments(report.teacherComments || '');
+          setReportCommentsTamil(report.teacherCommentsTamil || '');
           setReportTeacherSig(report.teacherSignature || '');
           setReportPrincipalSig(report.principalSignature || '');
           setReportParentSigned(report.parentSigned || false);
           setReportParentSigDate(report.parentSignatureDate || '');
+          
+          setTeacherSigImage(report.teacherSignatureImage || localStorage.getItem('bm_teacher_sig_' + (user?.uid || 'default')) || '');
+          setPrincipalSigImage(report.principalSignatureImage || localStorage.getItem('bm_principal_sig') || '');
+          setReportAttachTeacherSig(report.attachTeacherSig ?? true);
+          setReportAttachPrincipalSig(report.attachPrincipalSig ?? true);
+          setReportAttachParentSig(report.attachParentSig ?? true);
           
           setSkillSpeaking1(report.skills?.speaking?.bodyLanguage || '');
           setSkillSpeaking2(report.skills?.speaking?.vocabulary || '');
@@ -1612,10 +1646,17 @@ export function ReportsTab({
           // Reset form to defaults
           setReportAttendance('');
           setReportComments('');
+          setReportCommentsTamil('');
           setReportTeacherSig('');
           setReportPrincipalSig('');
           setReportParentSigned(false);
           setReportParentSigDate('');
+          
+          setTeacherSigImage(localStorage.getItem('bm_teacher_sig_' + (user?.uid || 'default')) || '');
+          setPrincipalSigImage(localStorage.getItem('bm_principal_sig') || '');
+          setReportAttachTeacherSig(true);
+          setReportAttachPrincipalSig(true);
+          setReportAttachParentSig(true);
           
           setSkillSpeaking1('');
           setSkillSpeaking2('');
@@ -1733,10 +1774,16 @@ export function ReportsTab({
           homeworkCompletion: attitudeHomework
         },
         teacherComments: reportComments,
+        teacherCommentsTamil: reportCommentsTamil,
         teacherSignature: reportTeacherSig || user?.fullName || '',
+        teacherSignatureImage: teacherSigImage || undefined,
         principalSignature: reportPrincipalSig || 'Balar Malar Principal',
+        principalSignatureImage: principalSigImage || undefined,
         parentSigned: reportParentSigned,
         parentSignatureDate: reportParentSigDate || undefined,
+        attachTeacherSig: reportAttachTeacherSig,
+        attachPrincipalSig: reportAttachPrincipalSig,
+        attachParentSig: reportAttachParentSig,
         updatedAt: new Date().toISOString()
       };
 
@@ -1778,7 +1825,7 @@ export function ReportsTab({
     try {
       const termReport = await mockDb.getProgressReport(reportStudentId, reportTerm, 2026);
       if (!termReport) {
-        showToast('No report card found for this term yet / இந்த தவணைக்கான அறிக்கை இன்னும் உருவாக்கப்படவில்லை', 'error');
+        showToast('No report card found for this term yet / இந்த பருவத்திற்கான அறிக்கை இன்னும் உருவாக்கப்படவில்லை', 'error');
         return;
       }
       
@@ -1811,8 +1858,74 @@ export function ReportsTab({
     }
   };
 
+  // Translation helper for comments
+  const handleTranslateComments = async (direction: 'en-to-ta' | 'ta-to-en') => {
+    setIsCommentsTranslating(true);
+    try {
+      if (direction === 'en-to-ta') {
+        if (reportComments.trim()) {
+          const res = await translateWithGemini(reportComments);
+          setReportCommentsTamil(res);
+        }
+      } else {
+        if (reportCommentsTamil.trim()) {
+          const res = await translateWithGemini(reportCommentsTamil);
+          setReportComments(res);
+        }
+      }
+      showToast(i18n.language === 'ta' ? 'மொழிபெயர்ப்பு வெற்றிகரமாக முடிந்தது' : 'Translation completed successfully', 'success');
+    } catch (err: any) {
+      showToast(i18n.language === 'ta' ? 'மொழிபெயர்ப்பு தோல்வியடைந்தது' : 'Translation failed: ' + (err.message || err), 'error');
+    } finally {
+      setIsCommentsTranslating(false);
+    }
+  };
+
+  // Upload signature helper
+  const handleSignatureUpload = (type: 'teacher' | 'principal') => {
+    if (Platform.OS !== 'web') {
+      showToast('Signature upload is only supported on Web version', 'warning');
+      return;
+    }
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = (e: any) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (event: any) => {
+          const base64 = event.target.result;
+          if (type === 'teacher') {
+            setTeacherSigImage(base64);
+            localStorage.setItem('bm_teacher_sig_' + (user?.uid || 'default'), base64);
+          } else {
+            setPrincipalSigImage(base64);
+            localStorage.setItem('bm_principal_sig', base64);
+          }
+          showToast(i18n.language === 'ta' ? 'கையொப்ப படம் பதிவேற்றப்பட்டது' : 'Signature image uploaded successfully', 'success');
+        };
+        reader.readAsDataURL(file);
+      }
+    };
+    input.click();
+  };
+
+  // Clear signature helper
+  const handleClearSignature = (type: 'teacher' | 'principal') => {
+    if (type === 'teacher') {
+      setTeacherSigImage('');
+      localStorage.removeItem('bm_teacher_sig_' + (user?.uid || 'default'));
+    } else {
+      setPrincipalSigImage('');
+      localStorage.removeItem('bm_principal_sig');
+    }
+    showToast(i18n.language === 'ta' ? 'கையொப்ப படம் நீக்கப்பட்டது' : 'Signature image cleared', 'success');
+  };
+
   // Trigger web print dialogue
   const handlePrintReportCard = () => {
+    const BALAR_MALAR_LOGO_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAAD0AAAA8CAYAAADVPrJMAAAQAElEQVR4AbSaB3xXRfLAv+/9ehop1ARCAEloIRBAQZpYABXUEw/svZx/69kP7xTPk7McenYPuwIqSpGOdKR3QgsQAmmQ3pNff+8/+0sinZPz7n1mtszuzM7szs7ue7+fzv/oMU1TMw88NMTc8/vnzF3DvzS3pa82t7bPNLdEF5mbbeUh3BJVYm5NOmDuSPvZzBg61dw79s/m3nuvMjNfi/wfqRUS+1812lSG7r3zcXPHgGVsbVFG5cerqPvx77hX3k5g92CCx1Iw61rKyDEhNN3NMQo64Ns3CM/6G6id/TK1X82n9rVj5s6LVpt7xv7J3DPBLn3/q/BfMdo88MAVZsYls9kaXUfttLfwbR2CWdVMNDUEwdTOjoZulfaAoDKusX+NDe/2AdTNnkj967XmzgGLzN13jg7J+i8kv8loc//Tg80dFy2j8vMFeNaNxqx3iU4+McCKoevoETrOftDsRmj5JFzwT+g8GZL+JSh5+/eg7d+h1TM6MbeCc4COJdoQfrugVWTJJPg1vFtHUD/tB3N76iYz64lhQv9N8B8ZbRa+EW7uGjmFqndW4Nt+KZqp5OhiKFha2YkWIxMnQfL30EUM7PxXSHwI/5o6gnvFjrhR+JbnYVa2h9bSt+1dOh3HQ7cPIGV6NYnv+oi5A6yJSqYyHhnDjn9/b8rfW2pmXDzLzHhObRH+k0c/XyZz/x9vpOCtw7iX34RmaMIfwNANHOkQ/7Io/U2ATi9Cy+shrJOBP4iZuZHg6hkyP5sJZGUS3DATAnV4Vy/A3L1CRPh84CEkx5kYTYur7XR8rp6uU6HDW+AaGAi1gRU1wZ4t1+GbnGMeuPMPwnzeoJ8Ph7ln3OtUvf8NRkmcDK6U1LGnWLngTStdP66lzdgAzpZWfDUe/7zPcL/7im7mZuH+YSbejVvQo6Mwikvw78wgkFtA8HCuTEKWUsEONgJL51D3wlOB4M+zZBKCYeLqAe+iwgDxE60kva3jSGsyXrZATSSV0z40d131pRJwPqj/ms6mucJqZgyZR92sp0PGhgKTRafF/4nbvhvwLauAen8EnjIRZ0J5id27bI3h37YPz9y56G1aicHNxFvb4bhsGGZAdD9WTGB/AXp8fACswl8d8O/Zp/u3HrJ6Fi61+777DM/n71v1cIsVZxg0vwpSPtZp+ZSO5tQxNV9IF/fS280d6WvNLf+y8Ssf/d/1M809dna++DOeDSNCgyhXtnbW6aAC0ePgaGk16yupe/1vUHhUtBeRDqeut26h23pegC29F867H8F57yPYrrkZvedAXONuwTVmFFF/exZLah/h8UFYuNV1y+1E/vkBnKNG4tuWgfen9XjXbiKwfiW4S8WzHDqJD4vx38q4ve3i8oR08u3uj/52hmlOt/ArHtHw7L3k3LWQ8eRyfBv6i3BraBDXQIPOH0DspVBThpmzB0wTo7qWQPYBEaaB1YbzqpG4Hvoj1kuuFppX0C+ocg/EtcQy6Eq0zqngdApdvAMJcC3jsQwYLngFEX95gbBbRmNp31aO96PUvvQCvh+n4Jv1EcGdRyXofQSRItvQA6KbLvukIzte2/VrDNdlxLPDvrGz8S6/SIQaYrBB1Oh6Ok+y4kqEvN2B+g/fwrN0KXp0NK5rrsSamo5EKFEmEr1HP7DbpC6rKOnJEJSqV1BNhDJYiiFooktbRDPxjJsaJq5DJ8yyaokNS/DM+AnP4oVQHYDk16HlvVaCFkRHK/5dKeya/LMslsY5nrMaLWfwP6iZM0qE6WKwTtR1Bh1fDMMmJ4UEqvppU63+zZkYx4qw9bsY66Vyd2jRRoZSiitDTjVIms4LlBw1YQaW/sOIfO5JWfUWEgNisQ+4ECLCMLP2YVRcHKD1/b6QjpocnZ7VF7Hv3q/ONdQZjTbz3r+eqrefRDck4kiXsCE+kp4FSxTBtfPxL5nrRIKRfVifQPiLL0PrBBlDVgelqBTPCrIiOKRV5ZKhqeQUlDbDegLNlLIY37EbERP+hmPYYDCC1L0yAc+8WZg+r5W2j9qJulbooqsm/Wum3GoenvSgMJ4RpNfJdPPo3OaUvP+2UAOYmhVbB52k5+3Yoq3m3nU+z4rVAe+ajbiuv95wPfiUFatVuv57Y82gneUHdvHTwc3U1NdhBHT8vlP5LBwoOcqnOyVwYRe5J4IYHubENnIcml3mPOOwxJA8LCk9AqFe7Z8GZ3q96KyLd/oofW2imT+lbajtlEQ/pQ5Vs16XoNBWGK2htrbjwdVeoo/P51m+3I7bY7X36u7TuqQKr0+ij0Co44mJJhVZsdBKWjhSXso9Kz/l6QPLGLHlW6IWTqLzgje5b8VUMV7xq/7CIobOP5LBvYdWyTC1QpAhJD0Oqq8b62VX47pttBx/gyCymRW8AexxARL/FIYW2TAJZmU0FTM+Pc57vHSSVDPvg6HUTLlDDFaBC5o/bBA7VEbyO8G0u+QCZLsoPWAfc7td6kKXPXRcVmNJx5TAUlRVTjAo4k0Hr25fxOdl+9lWXwRyvBN0k11fwjXtuqBbHcJnCgqYBpsqCyQW1pNRIn1DW0HoJ4HqG8B+7c0hFD18+E0r3jorkXJ5afmoKKDZxQZwz7/UPPzmtSexS0UXPA6Vc2VZUUzg7CIKDtUpPKyb4pYSKCDChf2aW6xYTeExTuYVCrKyPrl2/nX9LFovmsSL62eyPGsz/xKDOeXpEt6Ka5OHCFUTbADTCJLnc4OuMSVrHdmlOdKgPEayBjghFXfHxNyfYa//52t4pn4ibQErba7XcV0kc6FJXW49VdNfUoUT8RfFzbw3h+JednlohkxNJ/6+QDCn1PDM+4Hadz4guGWV8KnuKmApo6V6EohyZhiTti5iQsEG0Axeyd/EZVumiQINHscJT2Z9MfeumszBknyhhgtaMCVurg3USxneK9nFPZtmwZnmNtSjMZGYEszOw7toHeTsR66u0OrOhkYV1Hzb0syDL9/QQGhIlRUNpZrND0hBrbIPR0+IHGS1DLxc16PjsHZsS2DvPmkWwyQ9HSwcqyrjyx2LGZ+3GTSN0CMrhkXKAqH6iYnQvhAPSF75AW9tligcNNlWlCcuWf5Lr5VyC6tyV0v9uJpSOQH8aJ1S5QZ3hUT1PhgVJeAR/riB4LoM1HVZ9faskGucKjRgSJppTtCpXzYaNTOqY+x1YIvDPJRRrzcLx5rSGcfvbhSO01dMiCLczoSti7kzc5GUlduFqL8uMQM8kb0Kfe6r9Nssb1Vqopo4ZdWX5sqNTwJcE+n03JTzuwPBohI88+XSUiieo7kgbrToIjOrbPKsHWIWfhXexKuHCtncj1FpDc2Mtbmd2MHC4At45s8Jc8/7CS0iCpq1kK6G4IkgQrFTWlvJ5KrD0OQIaqXD43kkYQhvpYxhcveb+WfKDfyx3SV0jJJ3aNk92JwMj+vK+KThvNftRt7sMJwX2w7m/gRZpYj4hkFEzuHqMtHFIXVN8ExgIXAgU75feOTM9uGeM1v6uyG2P9glLqlFNCWp2vpkE3eD0fUbfycEpyCEi1s42/vIP2gN5skd1+3D2rO3NJ24gorNQVDO2qKqYlllGchfK30EqvzM6HAn5jXv8c6Qx3k8/Rbu63kDj6XfzJuDHuXQ1W+xZ8DLZPWfyLdpf+KVAX/goV7j+KO0T+h/H/8a8iTm6Pf4W+Ql4A7ydO463ts2U04EZbRCTnn82C+/EnUqaGEurBd0Aq8XrDGyRcUWsVcYDOo3jJE8BLppouHLkIuy1NXrWmQ/tZx2nGEeLTIM+2CJhDFtpDEoqMBOrUzE+pzdXL9scihKv1+UoRoasChAm4qG+TMMk327S9i1o4jSknpyj1SxZUM+tTl2eQu1MXv2Po5kV4ba1v2cy95dsicbpNDycACq/bJqQR7JWs5Ta6ZL2d7YemIWhKhYIp4dj+PSYeKwFRgHlD46NJPF0mT/aHK0BvZc0MSlc2RiCsGSyBBBt9mJSJHe/oB72ldO5+WXGo4xNwMyuKQSHdhacIDIxW9x8fovmKNcWu0ZccNQs0rUnlQo5alfbGfChMXMmL6DNyau4MtPN/HttO1M+WYH33+3i9zcCj75aAOTXl3Jc+MX8sorSzh2tNFj1HmuiRAFIv/N4t3kqkAl20mRTsYARLdC0y1456ygfso30iw6h3cGa7wVtdqmL8yc/nuLNKDjLRgpBV3QwN5d3Fvu0aUFVqOkDPeseTrVpdIko8v6f7drJX3XfQm+Kmg0TBpPA03TQrTuqa3p3TOehIRooqKc9EiNZ/jILqSlJVBb52Pn7kJatowgrVcC14/qSlqPNgTknEeeRhFSagRZsDvXTSO/QukT0r2xoSnzoSddgNYqGktSIvhlX9vjwJHa1MGgh62tqugECrupgsyGjkM2PuHg82Af0A/H0IuhRWtpNjAMjb8f2QSmX+rnAA2aFE7vF89zL1zKfQ9dxPMvXcbvxnZn+FWd6XNhAm63n2tHdeO2u/ow+JIOPP7sEJ758zDatW+GejRNBKnCCbiiNo9NhQeF4hA8FYIQ10KOroHoURFQVACa9HMmi86aBxBbi8ar7azLG3rHEEESHAmgWTGKC/Gt24RRXgEWJ6HHDLLTULyh2rmTUxT+acFBZk3fQ9aBcvJzq1k8/yAup43KSjdlZW4Wzctk9fIjp8vUTiHpGmN2z2NPYZY02ARPBQtGYRHBnHy8q+Tbx49ToVlH8VEajAgWX0TGbWE6wfKWv7DaYqUoVzufF0uHRLTwMKkrMNFtTt5olSqzZirC2VEU1TRJGnusWZXDO++t4ePPNjJd9vPnH2+kuKSK6ho3WYdKmfLFFg4fLmf2rAxUoGtkQxMDm8on5eJpr+5eCuJ5J9FDFR09JppgfiGICvYR10g/l04o7sj+CJZHSJSL1zGro0JE5LGIa0tmyqtfMCcXS5vG81JoCqJ0mTCJyKp8LtTUiI0dDmQWExvtondqG2JiwujWvQ3JyS0YNbobw4Z1pq7Oy57MIhLbRpOY1ODailXTdJWdEQv89ZimcYa2ALbefbAP7Ic9TSK3U9xcd6l+EunEvalpgZHfToz2NERuNRu6uIzpwzrkKrRnX8MyYIgwNJ3PQcZ2vxBc0UI7N+gnrFKPnm149Y2reeb5YaG9PebGHowZ141LLmvPyNEpXNQ/iccfGyJtA04SqmvaSfUTK0HZmKA87tQ+Afnu1h3H2FvRuovRYguaPSC8VkEw3BLdihPPMJ0ma1aVMP6ZLeQd9oT6NiRBosNjWdj9SmFWAzZQT0tF2eLiCrZtP8DqNRnyQlpLTkE++w4eYfeew+TkFFJT4yH7UAG7d+0jUU4VZ1Q9W3dmsnb9XjJ2ZVMu+9wfkMB0mvAGQqGhFsJoqJyaBgN4VfPxrzhNHXU0idJG6BrjrAnxqbPMaIjMpsxkvdyGdN0MNR1PPIzo2JehUe2Ok04tBQ2WLtnEkp/Ws3XtetYuWMia+XNZt3AB65evYu2a7TIZO5gyB2myqgAADs9JREFU5UeWLFjF6gXLWTtvIVt+WsT2lSvYuWEr27YcoCD3+EXlpCFke73UoT+axSHkU/WDn1dV8NKLezmW17hgpu/4jUZzedBbFIv10dWYmnIBCNZJrjNoUDSTP0ozEtoqwSL7BNAsJi+kiNvL4CeQjxftOlkFO9i5dCqrZn7O0plfsWz2VMm/ZtG3/2Lx12/LREzl8L7V/Lx8Ggt//FyC2OfMmvU5P3z3EV9/+hpffPAXDubsA4fluNymktXFiPZpUvMLngKyWH6/QUGRW45Y1SbuH6xTBbX2suIRNTgTNutYYtQnCqtqwV8eyvfWOQLTj0bopb5QNdR0PPExLCmdEdFJx0mqJAOqjDY2hj06mHc/fp5Pf/gHU+a9x7QFHzBl/nuhuqJfc/vFzBwBRfencOSxNH5+tBNrHu3Mqoc7sOTueKaOCDJ1sBeibCGRvyQy0Z9eMJSYiGghBQVPAU1jyNBYPpnch9Zt1ALr4K9U3/rssrA6elwe3ZJKdCytD//C6i0IyIYNfJjjtN5e4KTMq8ns/NLaWNAwDTdVQTV5jSQ5y19ufzGfpYxgdp8xPHjJdcS1a01cfHNiW8f9gs3jW+JqEUPLbu35a59hTLpwFGmx8vYWLpMbbgGVR0o5xgHNbI3CGzMx+Jseo7k77XIhNLqulE4Fi3iaZrdgsckqq0bvMRGoCoLW5ls07Xv5iGVrmSlV5Njy4M2Um0md9bpWAd9d4UHKfbrOaY+GN+jn0mZykbFHMUheA/cPuY8/DxjHXWnDubbLQBwhfdVKqDk7ERXNJMLm4Nm+V5PWKonnug0DR/Rpo5xKuCG2M+O6XgLyExZne8TbfjrmYEaek3UlcrwiC+PZj9gmBcBMmCypnF2O+B2qIOjEtwfqC43EMOz7vZbAoTqL0liaTgQDl9PBKwPH4b/6KVYOf4jkFm1FoHpRcEtHtQqm5GcGm81Ct9aJ2O0acZERXJiUylcd1Pv72XmwuHj7wuvRLOKInKOfJgsil5a5ZXb86jOTV76ieHcrRZSvG5RfcEhVdCwpOySilUklgIredft9MQ6dfmEBvVukWhlpOQ1kYM2L1WZFflOUVr/g+YCSKzKQOTXdDEroBM5YEBcOSRHFQ7nqIqfB861TiY+OF5IyWrKzgDeg8X2xnXrh7yXiqBcbA0d9stLIeW1owyaEBOhau7Hl8k1sC8iXQ02uOTWbnS2cAU96ZFD/MM+pryu2gbiNtJ8BROlzzfwZOE4nBUmKbsGRi+9m48C7eLX9IL5KHkmaqxXf9hhF5mWP8HjaZcJWL3huOFJrEdeFG1t4aWaXvlXbRHf5HGzK/ramNnl0qA+4+s2SLgp06pYFcOc7e8eY+AwCu6psVPksqu1/hpq8Oxe7y7FbbDzS81J6t+rA9qseZ1z3oaS0TKS5+lylvOIcGshykRwV4MXOdfSMFhfxV0DNcmSVDdTj6jdHZQp1lVCZ8BlabLV0gECZlYq1JDfTaO8wrI+Ju1T6ZKbOutohCb8xsVAvwbH36k8I//FlsmqOockEgFfkqq2jtoMUzwamaeytsnLb9iiOuXW6RMu9o2Ij+DINsUkX9JExaGITu64KWt8H/IQNXYyp1UsHKFffvKo9d7f3UXlhFRaxudz7v1ztAKnNE5EggVhLv5YdAGWsZP8ejIDs4cVFDiqDmhEwddm3csEok4XV5M1KubZj2EZt7NhfZk7/RWb4hf+UcljIaG+Gj9JlzqRIC3tkBttta8aSQtkk51ptacs77Ka00AdSPo5G6EpYWthgRE2F6KTagyb11QGO5nqoKPEQGxnBgq5j2DbgDpqrj3qir+gTkpWb7aa8WOSGCKckpqlvLLXrS6utDIoMMLS1fBAoWwfu5WoBRWnZF5GX3H8i1y9Ga0lPrsN52RJZ7YAYbqfkMwNvsRElR0yazWC97O08+bnoROam8vLFpWzbVMMP0/P5cdYxZn9fyJwZRSxZWMb0qceY+UMBRw7Xs2dnbah95neFbN5YxVuTDjL3x2Nk7Kjhx+kFxFa0Ry9qxcxZBfzwzTG2b6pm6aJSFs4rlDt1eWgCmsYM5TJ5eyrtnqWlNlJdQWNES7l3BOvqKfpSNYeJLWBL36V1GN9wF1FUQV3wODQb8xLoFjHahz9L59g0vXMzeDPJzUa3zsJCB/V+7Xj/xtLWLWV88eUhMg9Ws/9AFQsWH2X5ikK+n3GElauLyD5Sy769VZSVeNm+s5z1G4qZN7cAv9+kpNTDypVFzJ6fz+HsSsrL3WzfIX02ljBjRi4/ry5m975KysrU/m4csDFzyyfozeVWp2jku66VV+8dJ6VjM8Nwy37WQq7iI+wGdYVr5GjITjJaa3/vWiJv/VpmyI5uyN7+SHAtl7bRuSPOT55Hp9hjaeA8Ie3VO46bbkziuWe78tjjyTz9VFceeTSZF/7SgxvHJdE7LZZe6TEMuTyOEcPj6dunOTeMTeTqUfGkJDfjoouaM6BfczonRzJsRBxXjkzgrrs6MvyKNoy7KZEnnkhh9LVtQNNoetTn5XWldqYJJrkMekRboXoXlPyzVhZNvEL6ukau0FKeKm3iacpPMjpE7DL8PqwdjorhAakb5E+E+hyubmPSQtz8i1wH0w67UEeEtIfgiqtE6cHRdLjAGbrod+jgpFOyk7btbFw8sBm33tWW1J4RVJX6GX5VHNdc14ouXcJIaOvk+t+3ZsSVcdz3QHt6pIbjqQ0wbHgMPdIiGHJZLC6XhaQkJy1CLxCEnjo5TeYUuNhYYSU9LGgMb23aIykNkPeqIT91RIQ6adG19JgjL/+h2kmJflJNKpo21kfco+qfeFaZMR2/vI/kTKSdo4Jb2gcp8ussKLfxWEak9BaQfSUph7PcLP+pXL555TP5w8Msmlsqr4pFTPkqn5xsj+xpD+Of38WMbwv57JMcvvgsl0ULitixrYbpQsvO9rByeTkL55eweF4pGdtqWba4jNkzC8jKUldbGUXGqvLq/FjgZKXoEO8weKSjT2/t9Bjk/MOKZ5suOhNasJZPDBLHMIXrNNBPowhBa//QXKIe+weG+LgA9avhyGtGnK0+MLGrF4d4zrDYgFHh0Vhb7JBBgmTureW773PYtaeCnLx6Zs/NY9nKQjZuKWXXzmppr6F5rCO0X0tkb+fn11NS4pF9m8f8xQV4RO/9mdVs2VrGvIUFzJtXwE8/HSU7p5bKCp8aI1DqsfJ9noNPZMxEhxFIjzGNBHkx4si7OtU/GqEtqY6oiJu/0to/Jy8SYswZ4IxGq35alzeeJvK6BTJrDcKU0EN/tcboNUzq7vX9rl2dvqTIyQK5vCwrdMkHfQfXjYznnns6MXJEPA8+0JmHH0pm0ICW4sYuhlwSxwMPdmLcuER69owR925G127NSJNy/77NiYuzMfamdvTv34JHHk4mvXcs99zbiUf/7wI6pkT4tpa5rBMPuDzba61c3czP79sGrD2jJbpmv2lQ8TlisC66BnAOXqd1//weZcPZ8KxGKwat23ejcV26DjV7umGlZi4cfMoXHcyzo4WT4DQoU5d8iepzwxJoMyyRLj3CZU/GktY3iu6yL2+5qx29L4wiLMpCfKKT1PQo1D6+6Y62srdbM+62BP7vsQ60lq80Ckdf34rkrmGMHNVccokd7aJZVRdpf0niSILDdPaOCHqeSAkG2tkkPmW94KPiS10M9ojBYE/P1HouG6h0Pxee02jFqKUuGoyj76qQUF2+yLnX2sl6EHVVHdhKD4zv7ENeTvhziZ1nssL4JDuc7eUOxdqAsg9R2FBrSNUVT5UsKhGUzSepuLApCB45inZXNcgok5vgmFyncX2sj/6xBvdeYDq1mh1Wsh7xUTPfLgYLj+bE2jFT67UhNSTn3yT/1mjFr6WtuwTnwPlieMMggWwfh++DnHesifZS7ugA67vVM665jzVyg8urF7ES3t89EMacfBcZFXbccr77g1ooD33oFPsUTWG5HIPZ1RYWHXWxVD4CvJgZztf5DlYXu0iODBhrkt36jUkaA2MrPeR+GuDQXeDdGWg0OCBviWtJz+ymdP01KNr9mm6g9VwxivBr3xDDkceKFoTSD2H/PThKZtA/plqM1/hDop8EOTfLPDZWyi1uj7zuvZzt4h3xgo8lf+tgOPOOOnn7QHiI9rbQX9ofxqTsMD446uDNfCdVsmW6hgUJmhbiXA59YPP6gLN8gYx1v5MSidKmRD3NtId0cV3+iZa2ZZAm6y16/Sr41UYraVr3758h8u6RWFuUhAbUDQP/QSh4XimEteh7BkQW0Ke5hks+CT3RXibAAaNi/fgkLpTJcWeKoKNyyZlfaSXGZpLgMGhtN4i3m0zo6Oaljn5e7Rbgzk4Gw2ILoUjiSObDVnKfMPDK787qX4zIK7EW7ibq1n5a6gLZayL0POC8jFZyta4fLdbSC1rjumIqpq5sEBXk9ubdCUf/IsbfDIdeJqxiPgMjsrg9STygY5A/djZ4Ktng1kS4qrXG1DQ/1yZojEnUeCLZ5JmUAOkxHvqFHyG6Zglkvw6Zt0H+Mwae9Q1jKAVMeaGw953KvMejtS6fbVGk88XzNrppAC11/q00/0OC/Gi0PLTqqkGd6cEig8pvIfdJODDOR6YsRNbfjIjCjw1X6QzaexYaSf7ltKhfSau6xUZY2SzDcewzbEcmipEPKx7hfcSgQl4aArnK2AYdTU3Hnvoz+p12rde6W7UJE2Sm1aDnjw0Cz58vxKF1fLtI67X5MhzjInAOmIMWpr4MGnIrakCj1o5nM1TJJBRP0kPbIPdROPIHgyMPKON08v+kU/S6QeUUtaIGwUq5iSj3NdUYUrbV4ei3QI2h9do6ROs7ueEdVbX+h/ibjG4aU0v7uk7ruepa+lSFE37jXdjTV6BH1Ui7IYhMgi6ocp/kqhyQXNUVGlJWNJ2Gx44eXiYetJiIG5K1fvURWtraq9UYDc2/PW0a6LdLEgly3Jpa96+maL02XK71LY3WLvRZBDX6+XRi5GYSjE9Bj3kfLTxTDNuK3mwz1nZTcXS5HH1INP3G21R/rW9Fc/GgkVq3aep/kiL5vwv/DwAA//9uTU7MAAAABklEQVQDANdxghxFZk6vAAAAAElFTkSuQmCC';
     if (Platform.OS !== 'web') {
       showToast('Printing is only supported on Web version / அச்சிடுதல் கணினி பதிப்பில் மட்டுமே ஆதரவுடையது', 'warning');
       return;
@@ -1839,10 +1952,10 @@ export function ReportsTab({
       const studentClassStr = activeStudentObj?.className || 'Year 2';
       const academicYearStr = '2026';
       const termStr = reportTerm === 2
-        ? 'தவணை 2 (Term 2)'
+        ? 'பருவம் 2 (Term 2)'
         : reportTerm === 3
-        ? 'தவணை 3 (Term 3)'
-        : 'தவணை 4 (Term 4)';
+        ? 'பருவம் 3 (Term 3)'
+        : 'பருவம் 4 (Term 4)';
 
       // Helper for grade badges
       const getGradeHtml = (grade: string) => {
@@ -1923,9 +2036,12 @@ export function ReportsTab({
         ? 'Signed' + (reportParentSigDate ? ' (' + reportParentSigDate + ')' : '')
         : 'Pending / நிலுவையில் உள்ளது';
 
-      const commentsVal = reportComments
+      const commentsEnVal = reportComments
         ? reportComments.replace(/\n/g, '<br>')
-        : 'No comments provided / கருத்துக்கள் இல்லை';
+        : 'No comments provided';
+      const commentsTaVal = reportCommentsTamil
+        ? reportCommentsTamil.replace(/\n/g, '<br>')
+        : 'கருத்துக்கள் ஏதும் வழங்கப்படவில்லை';
       const attendanceVal = reportAttendance || 'N/A';
 
       printWindow.document.write(`
@@ -2227,11 +2343,28 @@ export function ReportsTab({
     border-top: 2px solid #8B0000;
     padding-top: 8px;
   }
-  .sig-box { text-align: center; }
-  .sig-line {
+  .sig-box {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .sig-line-container {
+    width: 100%;
+    height: 40px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
     border-bottom: 1px solid #333;
-    height: 28px;
     margin-bottom: 4px;
+    position: relative;
+  }
+  .sig-img {
+    max-height: 38px;
+    max-width: 110px;
+    object-fit: contain;
+    position: absolute;
+    bottom: 2px;
   }
   .sig-value {
     font-size: 9px;
@@ -2281,9 +2414,14 @@ export function ReportsTab({
 <div class="page">
 
   <!-- School Header -->
-  <div class="school-header">
-    <div class="school-ta">பாலர்மலர் தமிழ் பள்ளி பரமட்டா</div>
-    <div class="school-en">BALAR MALAR TAMIL SCHOOL PARRAMATTA</div>
+  <div class="school-header" style="display: flex; flex-direction: column; align-items: center;">
+    <div style="display: flex; align-items: center; justify-content: center; gap: 15px; margin-bottom: 5px; width: 100%;">
+      <img src="data:image/png;base64,${BALAR_MALAR_LOGO_BASE64}" style="height: 38px; width: auto; filter: drop-shadow(0px 1px 2px rgba(0,0,0,0.25));" alt="Balar Malar Logo" />
+      <div style="text-align: left;">
+        <div class="school-ta" style="margin-bottom: 0;">பாலர்மலர் தமிழ் பள்ளி பரமட்டா</div>
+        <div class="school-en" style="margin-bottom: 0; opacity: 0.95;">BALAR MALAR TAMIL SCHOOL PARRAMATTA</div>
+      </div>
+    </div>
     <div class="report-title">மாணவர் முன்னேற்ற அறிக்கை &nbsp;/&nbsp; STUDENT PROGRESS REPORT</div>
   </div>
 
@@ -2340,7 +2478,7 @@ export function ReportsTab({
       <span class="value">${academicYearStr}</span>
     </div>
     <div class="info-field">
-      <span class="label">தவணை — Term</span>
+      <span class="label">பருவம் — Term</span>
       <span class="value">${termStr}</span>
     </div>
   </div>
@@ -2362,7 +2500,7 @@ export function ReportsTab({
 
       <!-- Speaking -->
       <tr class="category">
-        <td colspan="2">உரையாடல் — Speaking / Conversation</td>
+        <td colspan="2">உரையாடல் — Speaking</td>
       </tr>
       <tr class="skill-row">
         <td>
@@ -2394,7 +2532,7 @@ export function ReportsTab({
 
       <!-- Listening -->
       <tr class="category">
-        <td colspan="2">கேட்டு கிரகித்தல் — Listening Comprehension</td>
+        <td colspan="2">கேட்டு கிரகித்தல் — Listening</td>
       </tr>
       <tr class="skill-row">
         <td>
@@ -2407,7 +2545,7 @@ export function ReportsTab({
       </tr>
       <tr class="skill-row">
         <td>
-          <span class="skill-ta">வாய்மொழி தொடர்பாடல்களை கவனமாக கேட்டு புரிந்துகொள்கிறார்</span>
+          <span class="skill-ta">வாய்மொழி உரையாடல்களை கவனமாக கேட்டு புரிந்துகொள்கிறார்</span>
           <span class="skill-en">Listens carefully and understands oral communication</span>
         </td>
         <td>
@@ -2559,34 +2697,51 @@ export function ReportsTab({
   </table>
 
   <!-- Notes & Attendance -->
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+  <div style="display:grid;grid-template-columns:1.5fr 0.5fr;gap:8px;margin-bottom:8px;">
     <div class="notes-box">
-      <div class="notes-label">குறிப்பு — Notes / Teacher's Comments</div>
-      <div class="notes-value">${commentsVal}</div>
+      <div class="notes-label">குறிப்பு — Teacher's Comments / குறிப்புகள்</div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 4px;">
+        <div style="border-right: 1px solid #eee; padding-right: 8px;">
+          <div style="font-size: 8px; font-weight: bold; color: #8B0000; margin-bottom: 2px; text-transform: uppercase;">English</div>
+          <div class="notes-value" style="font-size: 9.5px; line-height: 1.3;">${commentsEnVal}</div>
+        </div>
+        <div>
+          <div style="font-size: 8px; font-weight: bold; color: #8B0000; margin-bottom: 2px; text-transform: uppercase;">தமிழ்</div>
+          <div class="notes-value" style="font-size: 9.5px; line-height: 1.3; font-family: 'Noto Sans Tamil', sans-serif;">${commentsTaVal}</div>
+        </div>
+      </div>
     </div>
-    <div class="notes-box">
-      <div class="notes-label">வரவு — Attendance</div>
-      <div class="notes-value">${attendanceVal}</div>
+    <div class="notes-box" style="display: flex; flex-direction: column; justify-content: space-between;">
+      <div class="notes-label" style="margin-bottom: 0;">வரவு — Attendance</div>
+      <div class="notes-value" style="font-size: 14px; font-weight: bold; color: #8B0000; text-align: center; font-style: normal; margin-top: auto; margin-bottom: auto;">
+        ${attendanceVal}
+      </div>
     </div>
   </div>
 
   <!-- Signatures -->
-  <div class="signatures">
+  <div class="signatures" style="display: grid; grid-template-columns: ${globalShowParentSig ? '1fr 1fr 1fr' : '1fr 1fr'}; gap: 12px;">
     <div class="sig-box">
-      <div class="sig-line"></div>
+      <div class="sig-line-container">
+        ${reportAttachTeacherSig && teacherSigImage ? '<img class="sig-img" src="' + teacherSigImage + '" alt="Teacher Signature" />' : ''}
+      </div>
       <div class="sig-value">${teacherSigVal}</div>
       <div class="sig-label">வகுப்பாசிரியர் கையெப்பம்<br>Teacher's Signature</div>
     </div>
     <div class="sig-box">
-      <div class="sig-line"></div>
+      <div class="sig-line-container">
+        ${reportAttachPrincipalSig && principalSigImage ? '<img class="sig-img" src="' + principalSigImage + '" alt="Principal Signature" />' : ''}
+      </div>
       <div class="sig-value">${principalSigVal}</div>
       <div class="sig-label">அதிபர் கையெப்பம்<br>Principal's Signature</div>
     </div>
+    ${globalShowParentSig ? `
     <div class="sig-box">
-      <div class="sig-line"></div>
-      <div class="sig-value">${parentSigVal}</div>
+      <div class="sig-line-container"></div>
+      <div class="sig-value">${reportAttachParentSig ? parentSigVal : ''}</div>
       <div class="sig-label">பெற்றோர் கையெப்பம்<br>Parent's Signature</div>
     </div>
+    ` : ''}
   </div>
 
 </div>
@@ -2757,7 +2912,7 @@ export function ReportsTab({
       <View style={{ gap: Spacing.three }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: colors.border, paddingBottom: 10 }}>
           <ThemedText style={{ fontSize: 14, fontWeight: '800', color: colors.primary }}>
-            {selectedClassName} - {i18n.language === 'ta' ? `வகுப்பு சுருக்கம் (தவணை ${reportTerm})` : `Class Summary Table (Term ${reportTerm})`}
+            {selectedClassName} - {i18n.language === 'ta' ? `வகுப்பு சுருக்கம் (பருவம் ${reportTerm})` : `Class Summary Table (Term ${reportTerm})`}
           </ThemedText>
         </View>
 
@@ -3081,7 +3236,7 @@ export function ReportsTab({
             {/* Term Dropdown / Picker */}
             <View style={{ gap: 4 }}>
               <ThemedText style={{ fontSize: 11, fontWeight: '700', color: colors.textSecondary }}>
-                {i18n.language === 'ta' ? 'தவணை' : 'Term'}
+                {i18n.language === 'ta' ? 'பருவம்' : 'Term'}
               </ThemedText>
               
               {Platform.OS === 'web' ? (
@@ -3099,20 +3254,20 @@ export function ReportsTab({
                     width: '100%'
                   }}
                 >
-                  <option value="2">{i18n.language === 'ta' ? 'தவணை 2' : 'Term 2'}</option>
-                  <option value="3">{i18n.language === 'ta' ? 'தவணை 3' : 'Term 3'}</option>
-                  <option value="4">{i18n.language === 'ta' ? 'தவணை 4' : 'Term 4'}</option>
+                  <option value="2">{i18n.language === 'ta' ? 'பருவம் 2' : 'Term 2'}</option>
+                  <option value="3">{i18n.language === 'ta' ? 'பருவம் 3' : 'Term 3'}</option>
+                  <option value="4">{i18n.language === 'ta' ? 'பருவம் 4' : 'Term 4'}</option>
                 </select>
               ) : (
                 <Pressable
                   onPress={() => {
                     const opts = [
-                      { label: i18n.language === 'ta' ? 'தவணை 2' : 'Term 2', value: '2' },
-                      { label: i18n.language === 'ta' ? 'தவணை 3' : 'Term 3', value: '3' },
-                      { label: i18n.language === 'ta' ? 'தவணை 4' : 'Term 4', value: '4' }
+                      { label: i18n.language === 'ta' ? 'பருவம் 2' : 'Term 2', value: '2' },
+                      { label: i18n.language === 'ta' ? 'பருவம் 3' : 'Term 3', value: '3' },
+                      { label: i18n.language === 'ta' ? 'பருவம் 4' : 'Term 4', value: '4' }
                     ];
                     openCustomPicker(
-                      i18n.language === 'ta' ? 'தவணையைத் தேர்ந்தெடுக்கவும்' : 'Select Term',
+                      i18n.language === 'ta' ? 'பருவத்தைத் தேர்ந்தெடுக்கவும்' : 'Select Term',
                       opts,
                       (val) => setReportTerm(parseInt(val))
                     );
@@ -3136,6 +3291,41 @@ export function ReportsTab({
                 </Pressable>
               )}
             </View>
+
+            {/* Global Report Card Settings (Admins/Superadmins/Volunteers) */}
+            {['admin', 'superadmin', 'volunteer'].includes(user?.role || '') && (
+              <View style={{ gap: 6, marginTop: Spacing.two, borderTopWidth: 1, borderColor: colors.border + '50', paddingTop: Spacing.two }}>
+                <ThemedText style={{ fontSize: 11, fontWeight: '700', color: colors.textSecondary }}>
+                  ⚙️ {i18n.language === 'ta' ? 'அறிக்கை அமைப்புகள்' : 'Report Settings'}
+                </ThemedText>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
+                  <ThemedText style={{ fontSize: 12, color: colors.text }}>
+                    {i18n.language === 'ta' ? 'பெற்றோர் கையொப்பம் காட்டு' : 'Show Parent Signature'}
+                  </ThemedText>
+                  <Switch
+                    value={globalShowParentSig}
+                    onValueChange={async (val) => {
+                      setGlobalShowParentSig(val);
+                      localStorage.setItem('bm_report_global_show_parent_sig', val ? 'true' : 'false');
+                      try {
+                        const docRef = doc(db, 'configs', 'reportCard');
+                        await setDoc(docRef, { showParentSig: val }, { merge: true });
+                        showToast(
+                          val
+                            ? 'Parent signature block enabled globally'
+                            : 'Parent signature block hidden globally',
+                          'success'
+                        );
+                      } catch (err) {
+                        console.warn('Firestore failed to save global config, local storage saved:', err);
+                        showToast('Config saved locally / உள்ளூரில் சேமிக்கப்பட்டது', 'warning');
+                      }
+                    }}
+                    trackColor={{ false: '#767577', true: colors.primary }}
+                  />
+                </View>
+              </View>
+            )}
 
             {/* Print action (Web only) */}
             {Platform.OS === 'web' && reportStudentId && progressViewMode === 'single' ? (
@@ -3214,7 +3404,7 @@ export function ReportsTab({
                 {/* 3. Term Header Title */}
                 <View style={{ paddingVertical: 6, borderBottomWidth: 2, borderBottomColor: colors.primary, marginTop: Spacing.one }}>
                   <ThemedText style={{ fontSize: 13, fontWeight: '800', color: colors.primary }}>
-                    {reportTerm === 2 ? 'தவணை 2 (Term 2) - மாணவர் அறிக்கை (Student Report)' : reportTerm === 3 ? 'தவணை 3 (Term 3) - மாணவர் அறிக்கை (Student Report)' : 'தவணை 4 (Term 4) - மாணவர் அறிக்கை (Student Report)'}
+                    {reportTerm === 2 ? 'பருவம் 2 (Term 2) - மாணவர் அறிக்கை (Student Report)' : reportTerm === 3 ? 'பருவம் 3 (Term 3) - மாணவர் அறிக்கை (Student Report)' : 'பருவம் 4 (Term 4) - மாணவர் அறிக்கை (Student Report)'}
                   </ThemedText>
                 </View>
 
@@ -3266,7 +3456,7 @@ export function ReportsTab({
 
                 {/* Section A: Speaking */}
                 <View style={{ backgroundColor: colors.primaryLight + '30', paddingHorizontal: Spacing.two, paddingVertical: 6, borderLeftWidth: 1, borderRightWidth: 1, borderBottomWidth: 1, borderColor: colors.border }}>
-                  <ThemedText style={{ fontSize: 10, fontWeight: '800', color: colors.primary }}>உரையாடல் (Speaking / Conversation)</ThemedText>
+                  <ThemedText style={{ fontSize: 10, fontWeight: '800', color: colors.primary }}>உரையாடல் (Speaking)</ThemedText>
                 </View>
                 <View style={[localStyles.reportTable, { borderColor: colors.border, borderTopWidth: 0, borderBottomWidth: 0 }]} className="print-table">
                   <View style={[localStyles.reportTableRow, { borderBottomColor: colors.border, flexDirection: isReadOnly ? 'row' : 'column', alignItems: isReadOnly ? 'center' : 'stretch' }]} className="print-table-row">
@@ -3314,7 +3504,7 @@ export function ReportsTab({
 
                 {/* Section B: Listening */}
                 <View style={{ backgroundColor: colors.primaryLight + '30', paddingHorizontal: Spacing.two, paddingVertical: 6, borderLeftWidth: 1, borderRightWidth: 1, borderBottomWidth: 1, borderColor: colors.border }}>
-                  <ThemedText style={{ fontSize: 10, fontWeight: '800', color: colors.primary }}>கேட்டு கிரகித்தல் (Listening Comprehension)</ThemedText>
+                  <ThemedText style={{ fontSize: 10, fontWeight: '800', color: colors.primary }}>கேட்டு கிரகித்தல் (Listening)</ThemedText>
                 </View>
                 <View style={[localStyles.reportTable, { borderColor: colors.border, borderTopWidth: 0, borderBottomWidth: 0 }]} className="print-table">
                   <View style={[localStyles.reportTableRow, { borderBottomColor: colors.border, flexDirection: isReadOnly ? 'row' : 'column', alignItems: isReadOnly ? 'center' : 'stretch' }]} className="print-table-row">
@@ -3333,7 +3523,7 @@ export function ReportsTab({
 
                   <View style={[localStyles.reportTableRow, { borderBottomColor: colors.border, flexDirection: isReadOnly ? 'row' : 'column', alignItems: isReadOnly ? 'center' : 'stretch' }]} className="print-table-row">
                     <View style={isReadOnly ? localStyles.reportTableCellLeft : { width: '100%', marginBottom: 4 }} className="print-table-cell-left">
-                      <ThemedText style={{ fontSize: 11, color: colors.text }}>வாய்மொழி தொடர்பாடல்களை கவனமாக கேட்டு புரிந்துகொள்கிறார்</ThemedText>
+                      <ThemedText style={{ fontSize: 11, color: colors.text }}>வாய்மொழி உரையாடல்களை கவனமாக கேட்டு புரிந்துகொள்கிறார்</ThemedText>
                       <ThemedText style={{ fontSize: 9, color: colors.textSecondary }}>(Listens carefully and understands oral communication)</ThemedText>
                     </View>
                     <View style={isReadOnly ? [localStyles.reportTableCellRight, { flex: undefined, minWidth: 140, alignItems: 'flex-end', justifyContent: 'center' }] : { width: '100%', marginTop: 4 }} className="print-table-cell-right">
@@ -3581,33 +3771,110 @@ export function ReportsTab({
                 </ThemedText>
 
                 {/* 7. Comments & Notes Box */}
-                <View style={{ gap: 4, marginTop: Spacing.two }}>
-                  <ThemedText style={{ fontSize: 11, fontWeight: '700', color: colors.textSecondary }}>
-                    குறிப்பு (Notes / Teacher's Comments):
-                  </ThemedText>
-                  {!isReadOnly ? (
-                    <TextInput
-                      style={{
-                        borderWidth: 1,
-                        borderColor: colors.border,
-                        borderRadius: 8,
-                        padding: 10,
-                        fontSize: 12,
-                        minHeight: 60,
-                        color: colors.text,
-                        backgroundColor: colors.background,
-                        textAlignVertical: 'top'
-                      }}
-                      multiline
-                      value={reportComments}
-                      onChangeText={setReportComments}
-                      placeholder="Enter teacher comments..."
-                      placeholderTextColor={colors.textSecondary}
-                    />
-                  ) : (
-                    <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 12, backgroundColor: colors.background }}>
+                <View style={{ gap: 8, marginTop: Spacing.two }}>
+                  <View style={{ gap: 4 }}>
+                    <ThemedText style={{ fontSize: 11, fontWeight: '700', color: colors.textSecondary }}>
+                      குறிப்பு (Teacher's Comments - English):
+                    </ThemedText>
+                    {!isReadOnly ? (
+                      <TextInput
+                        style={{
+                          borderWidth: 1,
+                          borderColor: colors.border,
+                          borderRadius: 8,
+                          padding: 10,
+                          fontSize: 12,
+                          minHeight: 60,
+                          color: colors.text,
+                          backgroundColor: colors.background,
+                          textAlignVertical: 'top'
+                        }}
+                        multiline
+                        value={reportComments}
+                        onChangeText={setReportComments}
+                        placeholder="Enter teacher comments in English..."
+                        placeholderTextColor={colors.textSecondary}
+                      />
+                    ) : null}
+                  </View>
+
+                  {!isReadOnly && (
+                    <View style={{ flexDirection: 'row', gap: 10, alignSelf: 'flex-start', marginVertical: 4 }}>
+                      <Pressable
+                        onPress={() => handleTranslateComments('en-to-ta')}
+                        disabled={isCommentsTranslating || !reportComments}
+                        style={{
+                          backgroundColor: colors.primary,
+                          paddingHorizontal: 12,
+                          paddingVertical: 6,
+                          borderRadius: 6,
+                          opacity: (isCommentsTranslating || !reportComments) ? 0.6 : 1,
+                          flexDirection: 'row',
+                          alignItems: 'center'
+                        }}
+                      >
+                        {isCommentsTranslating && <ActivityIndicator size="small" color="#FFF" style={{ marginRight: 6 }} />}
+                        <ThemedText style={{ color: '#FFF', fontSize: 10, fontWeight: '700' }}>
+                          Translate to Tamil / தமிழில் மொழிபெயர்க்க
+                        </ThemedText>
+                      </Pressable>
+
+                      <Pressable
+                        onPress={() => handleTranslateComments('ta-to-en')}
+                        disabled={isCommentsTranslating || !reportCommentsTamil}
+                        style={{
+                          backgroundColor: colors.primary,
+                          paddingHorizontal: 12,
+                          paddingVertical: 6,
+                          borderRadius: 6,
+                          opacity: (isCommentsTranslating || !reportCommentsTamil) ? 0.6 : 1,
+                          flexDirection: 'row',
+                          alignItems: 'center'
+                        }}
+                      >
+                        {isCommentsTranslating && <ActivityIndicator size="small" color="#FFF" style={{ marginRight: 6 }} />}
+                        <ThemedText style={{ color: '#FFF', fontSize: 10, fontWeight: '700' }}>
+                          Translate to English / ஆங்கிலத்தில் மொழிபெயர்க்க
+                        </ThemedText>
+                      </Pressable>
+                    </View>
+                  )}
+
+                  <View style={{ gap: 4 }}>
+                    <ThemedText style={{ fontSize: 11, fontWeight: '700', color: colors.textSecondary }}>
+                      குறிப்பு (Teacher's Comments - Tamil):
+                    </ThemedText>
+                    {!isReadOnly ? (
+                      <TextInput
+                        style={{
+                          borderWidth: 1,
+                          borderColor: colors.border,
+                          borderRadius: 8,
+                          padding: 10,
+                          fontSize: 12,
+                          minHeight: 60,
+                          color: colors.text,
+                          backgroundColor: colors.background,
+                          textAlignVertical: 'top'
+                        }}
+                        multiline
+                        value={reportCommentsTamil}
+                        onChangeText={setReportCommentsTamil}
+                        placeholder="Enter teacher comments in Tamil..."
+                        placeholderTextColor={colors.textSecondary}
+                      />
+                    ) : null}
+                  </View>
+
+                  {isReadOnly && (
+                    <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 12, backgroundColor: colors.background, gap: 6 }}>
+                      <ThemedText style={{ fontSize: 10, fontWeight: '700', color: colors.textSecondary }}>English:</ThemedText>
+                      <ThemedText style={{ fontSize: 12, color: colors.text, lineHeight: 18, marginBottom: 4 }}>
+                        {reportComments || 'No English comments provided'}
+                      </ThemedText>
+                      <ThemedText style={{ fontSize: 10, fontWeight: '700', color: colors.textSecondary }}>தமிழ்:</ThemedText>
                       <ThemedText style={{ fontSize: 12, color: colors.text, lineHeight: 18 }}>
-                        {reportComments || (i18n.language === 'ta' ? 'கருத்துகள் எதுவும் இல்லை' : 'No comments provided')}
+                        {reportCommentsTamil || 'தமிழ் குறிப்புகள் ஏதும் இல்லை / No Tamil comments provided'}
                       </ThemedText>
                     </View>
                   )}
@@ -3647,74 +3914,164 @@ export function ReportsTab({
                   <View style={localStyles.signatureBlock}>
                     <ThemedText style={{ fontSize: 9, fontWeight: '700', color: colors.textSecondary }}>வகுப்பாசிரியர் கையொப்பம் (Teacher's Sign):</ThemedText>
                     {!isReadOnly ? (
-                      <TextInput
-                        style={{
-                          borderWidth: 1,
-                          borderColor: colors.border,
-                          borderRadius: 4,
-                          paddingHorizontal: 6,
-                          paddingVertical: 4,
-                          fontSize: 11,
-                          color: colors.text,
-                          backgroundColor: colors.background
-                        }}
-                        value={reportTeacherSig}
-                        onChangeText={setReportTeacherSig}
-                        placeholder="Teacher signature name"
-                        placeholderTextColor={colors.textSecondary}
-                        autoComplete="off"
-                      />
+                      <View style={{ gap: 6 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                          <Switch
+                            value={reportAttachTeacherSig}
+                            onValueChange={setReportAttachTeacherSig}
+                            trackColor={{ false: '#767577', true: colors.primary }}
+                            style={{ transform: Platform.OS === 'web' ? [] : [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
+                          />
+                          <ThemedText style={{ fontSize: 10, color: colors.text }}>Attach Sign Image</ThemedText>
+                        </View>
+                        <TextInput
+                          style={{
+                            borderWidth: 1,
+                            borderColor: colors.border,
+                            borderRadius: 4,
+                            paddingHorizontal: 6,
+                            paddingVertical: 4,
+                            fontSize: 11,
+                            color: colors.text,
+                            backgroundColor: colors.background
+                          }}
+                          value={reportTeacherSig}
+                          onChangeText={setReportTeacherSig}
+                          placeholder="Teacher signature name"
+                          placeholderTextColor={colors.textSecondary}
+                          autoComplete="off"
+                        />
+                        {teacherSigImage ? (
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <img src={teacherSigImage} style={{ height: 28, maxWidth: 120, objectFit: 'contain', border: '1px dashed #ccc', padding: 2 }} />
+                            <Pressable onPress={() => handleClearSignature('teacher')} style={{ backgroundColor: '#EF4444', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                              <ThemedText style={{ color: '#FFF', fontSize: 8, fontWeight: '700' }}>Clear</ThemedText>
+                            </Pressable>
+                          </View>
+                        ) : (
+                          <Pressable onPress={() => handleSignatureUpload('teacher')} style={{ alignSelf: 'flex-start', backgroundColor: colors.primary, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 }}>
+                            <ThemedText style={{ color: '#FFF', fontSize: 9, fontWeight: '700' }}>Upload Sign Image</ThemedText>
+                          </Pressable>
+                        )}
+                      </View>
                     ) : (
-                      <ThemedText style={{ fontSize: 12, fontStyle: 'italic', fontWeight: '700', color: colors.text }}>
-                        {reportTeacherSig || user?.fullName || 'Suba shree'}
-                      </ThemedText>
+                      <View style={{ gap: 4 }}>
+                        {reportAttachTeacherSig && teacherSigImage ? (
+                          <img src={teacherSigImage} style={{ height: 28, maxWidth: 120, objectFit: 'contain' }} />
+                        ) : (
+                          <ThemedText style={{ fontSize: 12, fontStyle: 'italic', fontWeight: '700', color: colors.text }}>
+                            {reportTeacherSig || user?.fullName || 'Suba shree'}
+                          </ThemedText>
+                        )}
+                      </View>
                     )}
                   </View>
 
                   <View style={localStyles.signatureBlock}>
                     <ThemedText style={{ fontSize: 9, fontWeight: '700', color: colors.textSecondary }}>அதிபர் கையொப்பம் (Principal's Sign):</ThemedText>
                     {!isReadOnly ? (
-                      <TextInput
-                        style={{
-                          borderWidth: 1,
-                          borderColor: colors.border,
-                          borderRadius: 4,
-                          paddingHorizontal: 6,
-                          paddingVertical: 4,
-                          fontSize: 11,
-                          color: colors.text,
-                          backgroundColor: colors.background
-                        }}
-                        value={reportPrincipalSig}
-                        onChangeText={setReportPrincipalSig}
-                        placeholder="Principal signature name"
-                        placeholderTextColor={colors.textSecondary}
-                        autoComplete="off"
-                      />
-                    ) : (
-                      <ThemedText style={{ fontSize: 12, fontStyle: 'italic', fontWeight: '700', color: colors.text }}>
-                        {reportPrincipalSig && reportPrincipalSig !== 'Balar Malar Principal' ? reportPrincipalSig : '___________________________'}
-                      </ThemedText>
-                    )}
-                  </View>
-
-                  <View style={localStyles.signatureBlock}>
-                    <ThemedText style={{ fontSize: 9, fontWeight: '700', color: colors.textSecondary }}>பெற்றோர் கையொப்பம் (Parent's Sign):</ThemedText>
-                    {reportParentSigned ? (
-                      <View style={{ gap: 2 }}>
-                        <ThemedText style={{ fontSize: 12, fontWeight: '700', color: '#10B981' }}>✓ Acknowledged & Signed</ThemedText>
-                        {!!reportParentSigDate && (
-                          <ThemedText style={{ fontSize: 8, color: colors.textSecondary }}>
-                            Date: {new Date(reportParentSigDate).toLocaleDateString()}
-                          </ThemedText>
+                      <View style={{ gap: 6 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                          <Switch
+                            value={reportAttachPrincipalSig}
+                            onValueChange={setReportAttachPrincipalSig}
+                            trackColor={{ false: '#767577', true: colors.primary }}
+                            style={{ transform: Platform.OS === 'web' ? [] : [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
+                          />
+                          <ThemedText style={{ fontSize: 10, color: colors.text }}>Attach Sign Image</ThemedText>
+                        </View>
+                        <TextInput
+                          style={{
+                            borderWidth: 1,
+                            borderColor: colors.border,
+                            borderRadius: 4,
+                            paddingHorizontal: 6,
+                            paddingVertical: 4,
+                            fontSize: 11,
+                            color: colors.text,
+                            backgroundColor: colors.background
+                          }}
+                          value={reportPrincipalSig}
+                          onChangeText={setReportPrincipalSig}
+                          placeholder="Principal signature name"
+                          placeholderTextColor={colors.textSecondary}
+                          autoComplete="off"
+                        />
+                        {principalSigImage ? (
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <img src={principalSigImage} style={{ height: 28, maxWidth: 120, objectFit: 'contain', border: '1px dashed #ccc', padding: 2 }} />
+                            <Pressable onPress={() => handleClearSignature('principal')} style={{ backgroundColor: '#EF4444', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                              <ThemedText style={{ color: '#FFF', fontSize: 8, fontWeight: '700' }}>Clear</ThemedText>
+                            </Pressable>
+                          </View>
+                        ) : (
+                          <Pressable onPress={() => handleSignatureUpload('principal')} style={{ alignSelf: 'flex-start', backgroundColor: colors.primary, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 }}>
+                            <ThemedText style={{ color: '#FFF', fontSize: 9, fontWeight: '700' }}>Upload Sign Image</ThemedText>
+                          </Pressable>
                         )}
                       </View>
                     ) : (
-                      <ThemedText style={{ fontSize: 11, color: colors.textSecondary, fontStyle: 'italic' }}>
-                        Pending signature / கையொப்பம் நிலுவையில் உள்ளது
-                      </ThemedText>
+                      <View style={{ gap: 4 }}>
+                        {reportAttachPrincipalSig && principalSigImage ? (
+                          <img src={principalSigImage} style={{ height: 28, maxWidth: 120, objectFit: 'contain' }} />
+                        ) : (
+                          <ThemedText style={{ fontSize: 12, fontStyle: 'italic', fontWeight: '700', color: colors.text }}>
+                            {reportPrincipalSig && reportPrincipalSig !== 'Balar Malar Principal' ? reportPrincipalSig : '___________________________'}
+                          </ThemedText>
+                        )}
+                      </View>
                     )}
                   </View>
+
+                  {globalShowParentSig && (
+                    <View style={localStyles.signatureBlock}>
+                      <ThemedText style={{ fontSize: 9, fontWeight: '700', color: colors.textSecondary }}>பெற்றோர் கையொப்பம் (Parent's Sign):</ThemedText>
+                      {!isReadOnly ? (
+                        <View style={{ gap: 6 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                            <Switch
+                              value={reportAttachParentSig}
+                              onValueChange={setReportAttachParentSig}
+                              trackColor={{ false: '#767577', true: colors.primary }}
+                              style={{ transform: Platform.OS === 'web' ? [] : [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
+                            />
+                            <ThemedText style={{ fontSize: 10, color: colors.text }}>Attach Sign</ThemedText>
+                          </View>
+                          {reportParentSigned ? (
+                            <View style={{ gap: 2 }}>
+                              <ThemedText style={{ fontSize: 12, fontWeight: '700', color: '#10B981' }}>✓ Acknowledged & Signed</ThemedText>
+                              {!!reportParentSigDate && (
+                                <ThemedText style={{ fontSize: 8, color: colors.textSecondary }}>
+                                  Date: {new Date(reportParentSigDate).toLocaleDateString()}
+                                </ThemedText>
+                              )}
+                            </View>
+                          ) : (
+                            <ThemedText style={{ fontSize: 11, color: colors.textSecondary, fontStyle: 'italic' }}>
+                              Pending signature / கையொப்பம் நிலுவையில் உள்ளது
+                            </ThemedText>
+                          )}
+                        </View>
+                      ) : (
+                        <View style={{ gap: 4 }}>
+                          {reportAttachParentSig && reportParentSigned ? (
+                            <View style={{ gap: 2 }}>
+                              <ThemedText style={{ fontSize: 12, fontWeight: '700', color: '#10B981' }}>✓ Acknowledged & Signed</ThemedText>
+                              {!!reportParentSigDate && (
+                                <ThemedText style={{ fontSize: 8, color: colors.textSecondary }}>
+                                  Date: {new Date(reportParentSigDate).toLocaleDateString()}
+                                </ThemedText>
+                              )}
+                            </View>
+                          ) : (
+                            <ThemedText style={{ fontSize: 11, color: colors.textSecondary, fontStyle: 'italic' }}>
+                              Pending signature / கையொப்பம் நிலுவையில் உள்ளது
+                            </ThemedText>
+                          )}
+                        </View>
+                      )}
+                    </View>
+                  )}
                 </View>
 
                 {/* 10. Submission Actions buttons */}

@@ -11,6 +11,7 @@ import { schoolDateService } from './schoolDateService';
 import { waitlistService } from './waitlistService';
 import { achievementService } from './achievementService';
 import { newsletterService } from './newsletterService';
+import { progressReportService } from './progressReportService';
 import { checkServerStatus } from './dbCommon';
 
 // Export Presets and status checks
@@ -115,6 +116,11 @@ export const mockDb = {
   getNewsletters: newsletterService.getNewsletters,
   createNewsletter: newsletterService.createNewsletter,
   deleteNewsletter: newsletterService.deleteNewsletter,
+
+  // --- PROGRESS REPORTS ---
+  getProgressReports: progressReportService.getProgressReports,
+  saveProgressReport: progressReportService.saveProgressReport,
+  getProgressReport: progressReportService.getProgressReport,
 
   // --- SEED CLOUD DATABASE ---
   seedCloudDatabase: async (firebaseConfig: any): Promise<void> => {

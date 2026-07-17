@@ -6,9 +6,11 @@ import {
   Platform,
   StyleSheet
 } from 'react-native';
-import { Plus, Clock, MapPin, Edit, Trash2, ChevronLeft, ChevronRight } from 'lucide-react-native';
+import { Plus, Clock, MapPin, Edit, Trash2, ChevronLeft, ChevronRight, HelpCircle, X } from 'lucide-react-native';
 import { ThemedText } from '@/components/themed-text';
+import { HelperTooltip } from '@/components/HelperTooltip';
 import { TabProps } from '@/app/sharedTypes';
+import { Spacing } from '@/constants/theme';
 import { styles } from '@/app/styles';
 import { mockDb } from '@/services/mockBackend';
 import { autoTranslate, translateWithGemini } from '@/services/translator';
@@ -90,6 +92,19 @@ const generateMonthGrid = (date: Date) => {
 
 export function CalendarTab({ user, colors, t, showToast, i18n, activeStudentId }: TabProps) {
   const [events, setEvents] = useState<any[]>([]);
+  const [showHelp, setShowHelp] = useState(() => {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      return window.localStorage.getItem('pallithozhan_help_calendar') !== 'hidden';
+    }
+    return true;
+  });
+
+  const dismissHelp = () => {
+    setShowHelp(false);
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem('pallithozhan_help_calendar', 'hidden');
+    }
+  };
   const [classes, setClasses] = useState<any[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
@@ -361,6 +376,34 @@ export function CalendarTab({ user, colors, t, showToast, i18n, activeStudentId 
           </Pressable>
         )}
       </View>
+
+      {showHelp && (
+        <View style={{
+          backgroundColor: colors.primaryLight,
+          borderWidth: 1,
+          borderColor: colors.border,
+          borderRadius: 12,
+          padding: Spacing.three,
+          marginBottom: Spacing.three,
+        }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <View style={{ flex: 1, paddingRight: Spacing.three }}>
+              <ThemedText style={{ fontWeight: '700', color: colors.primary, fontSize: 13, marginBottom: 4 }}>
+                ℹ️ Quick Guide / உதவிக்குறிப்பு
+              </ThemedText>
+              <ThemedText style={{ fontSize: 12, lineHeight: 18, color: colors.text }}>
+                Welcome to the Calendar & Events Portal. View monthly school schedules, branch closures, special assemblies, and term dates. Teachers can schedule new events or school milestones.
+              </ThemedText>
+              <ThemedText style={{ fontSize: 12, lineHeight: 18, color: colors.textSecondary, marginTop: 4, fontStyle: 'italic' }}>
+                நாள்காட்டி மற்றும் நிகழ்வுகள் பகுதிக்கு வரவேற்கிறோம். பள்ளியின் மாதாந்திர நிகழ்வுகள், விடுமுறை நாட்கள் மற்றும் முக்கிய அறிவிப்புகளை இங்கு காணலாம்.
+              </ThemedText>
+            </View>
+            <Pressable onPress={dismissHelp} style={{ padding: 4 }}>
+              <X size={16} color={colors.textSecondary} />
+            </Pressable>
+          </View>
+        </View>
+      )}
 
       {/* Event Form Modal */}
       {modalVisible && (

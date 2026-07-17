@@ -9,8 +9,10 @@ import {
   Dimensions,
   Platform
 } from 'react-native';
-import { Edit, Trash2, UserPlus, Plus, X, CheckCircle, UserCheck } from 'lucide-react-native';
+
+import { Edit, Trash2, UserPlus, Plus, X, CheckCircle, UserCheck, HelpCircle } from 'lucide-react-native';
 import { ThemedText } from '@/components/themed-text';
+import { HelperTooltip } from '@/components/HelperTooltip';
 import { TabProps } from '@/app/sharedTypes';
 import { styles } from '@/app/styles';
 import { mockDb } from '@/services/mockBackend';
@@ -26,6 +28,20 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
   const { width: windowWidth } = Dimensions.get('window');
   const isLargeScreen = windowWidth >= 768;
   const [subTab, setSubTab] = useState<'users' | 'classes' | 'calendar' | 'import_export' | 'waitlist'>('users');
+  const [headerCollapsed, setHeaderCollapsed] = useState(false);
+  const [showHelp, setShowHelp] = useState(() => {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      return window.localStorage.getItem('pallithozhan_help_management') !== 'hidden';
+    }
+    return true;
+  });
+
+  const dismissHelp = () => {
+    setShowHelp(false);
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem('pallithozhan_help_management', 'hidden');
+    }
+  };
   const [users, setUsers] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
   const [waitlist, setWaitlist] = useState<any[]>([]);
@@ -1112,79 +1128,124 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
 
   return (
     <View style={[styles.tabContentWrapper, { flex: 1, padding: isLargeScreen ? Spacing.four : Spacing.three }]}>
-      <ThemedText style={styles.sectionTitle}>Portal Management / நிர்வாகக் குழு</ThemedText>
-      <ThemedText style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>
-        Manage registered roles, assign classes, and orchestrate parent-student linkages
-      </ThemedText>
-
-      {/* Sub-tabs Selection */}
-      <View style={{ flexDirection: 'row', gap: Spacing.two, marginBottom: Spacing.two, flexWrap: 'wrap' }}>
-        <Pressable
-          onPress={() => setSubTab('users')}
-          style={[
-            { paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20, borderWidth: 1 },
-            subTab === 'users' 
-              ? { backgroundColor: colors.primary, borderColor: colors.primary } 
-              : { backgroundColor: 'transparent', borderColor: colors.border }
-          ]}
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: headerCollapsed ? 8 : 4 }}>
+        <ThemedText style={[styles.sectionTitle, { marginBottom: 0 }]}>Portal Management / நிர்வாகக் குழு</ThemedText>
+        <Pressable 
+          onPress={() => setHeaderCollapsed(!headerCollapsed)} 
+          style={{ paddingVertical: 4, paddingHorizontal: 8, borderRadius: 6, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background }}
         >
-          <ThemedText style={{ color: subTab === 'users' ? '#FFF' : colors.text, fontWeight: '700', fontSize: 13 }}>
-            👥 Users Directory
-          </ThemedText>
-        </Pressable>
-        <Pressable
-          onPress={() => setSubTab('classes')}
-          style={[
-            { paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20, borderWidth: 1 },
-            subTab === 'classes' 
-              ? { backgroundColor: colors.primary, borderColor: colors.primary } 
-              : { backgroundColor: 'transparent', borderColor: colors.border }
-          ]}
-        >
-          <ThemedText style={{ color: subTab === 'classes' ? '#FFF' : colors.text, fontWeight: '700', fontSize: 13 }}>
-            🏫 Classes Assignment
-          </ThemedText>
-        </Pressable>
-        <Pressable
-          onPress={() => setSubTab('calendar')}
-          style={[
-            { paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20, borderWidth: 1 },
-            subTab === 'calendar' 
-              ? { backgroundColor: colors.primary, borderColor: colors.primary } 
-              : { backgroundColor: 'transparent', borderColor: colors.border }
-          ]}
-        >
-          <ThemedText style={{ color: subTab === 'calendar' ? '#FFF' : colors.text, fontWeight: '700', fontSize: 13 }}>
-            📅 School Calendar
-          </ThemedText>
-        </Pressable>
-        <Pressable
-          onPress={() => setSubTab('import_export')}
-          style={[
-            { paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20, borderWidth: 1 },
-            subTab === 'import_export' 
-              ? { backgroundColor: colors.primary, borderColor: colors.primary } 
-              : { backgroundColor: 'transparent', borderColor: colors.border }
-          ]}
-        >
-          <ThemedText style={{ color: subTab === 'import_export' ? '#FFF' : colors.text, fontWeight: '700', fontSize: 13 }}>
-            📤 Import / Export
-          </ThemedText>
-        </Pressable>
-        <Pressable
-          onPress={() => setSubTab('waitlist')}
-          style={[
-            { paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20, borderWidth: 1 },
-            subTab === 'waitlist' 
-              ? { backgroundColor: colors.primary, borderColor: colors.primary } 
-              : { backgroundColor: 'transparent', borderColor: colors.border }
-          ]}
-        >
-          <ThemedText style={{ color: subTab === 'waitlist' ? '#FFF' : colors.text, fontWeight: '700', fontSize: 13 }}>
-            📝 Waitlist Directory
+          <ThemedText style={{ fontSize: 10, fontWeight: '700', color: colors.primary }}>
+            {headerCollapsed 
+              ? (i18n.language === 'ta' ? 'விரிவாக்கு' : 'Expand') 
+              : (i18n.language === 'ta' ? 'சுருக்கு' : 'Minimize')}
           </ThemedText>
         </Pressable>
       </View>
+
+      {!headerCollapsed && (
+        <>
+          <ThemedText style={[styles.sectionSubtitle, { color: colors.textSecondary, marginBottom: Spacing.three }]}>
+            Manage registered roles, assign classes, and orchestrate parent-student linkages
+          </ThemedText>
+
+          {showHelp && (
+            <View style={{
+              backgroundColor: colors.primaryLight,
+              borderWidth: 1,
+              borderColor: colors.border,
+              borderRadius: 12,
+              padding: Spacing.three,
+              marginBottom: Spacing.three,
+            }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <View style={{ flex: 1, paddingRight: Spacing.three }}>
+                  <ThemedText style={{ fontWeight: '700', color: colors.primary, fontSize: 13, marginBottom: 4 }}>
+                    ℹ️ Quick Guide / உதவிக்குறிப்பு
+                  </ThemedText>
+                  <ThemedText style={{ fontSize: 12, lineHeight: 18, color: colors.text }}>
+                    Welcome to the Portal Management Panel. Here you can search and manage users (teachers, parents, volunteers), assign students and teachers to class structures, manage calendar settings, view import logs, and handle the waitlist.
+                  </ThemedText>
+                  <ThemedText style={{ fontSize: 12, lineHeight: 18, color: colors.textSecondary, marginTop: 4, fontStyle: 'italic' }}>
+                    நிர்வாகக் குழுவிற்கு வரவேற்கிறோம். இங்கு நீங்கள் பயனர்களை நிர்வகிக்கலாம், வகுப்புகளை ஒதுக்கலாம், நாட்காட்டியை மாற்றியமைக்கலாம், மற்றும் காத்திருப்புப் பட்டியலைக் கையாளலாம்.
+                  </ThemedText>
+                </View>
+                <Pressable onPress={dismissHelp} style={{ padding: 4 }}>
+                  <X size={16} color={colors.textSecondary} />
+                </Pressable>
+              </View>
+            </View>
+          )}
+
+          {/* Sub-tabs Selection */}
+          <View style={{ flexDirection: 'row', gap: Spacing.two, marginBottom: Spacing.two, flexWrap: 'wrap' }}>
+            <Pressable
+              onPress={() => setSubTab('users')}
+              style={[
+                { paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20, borderWidth: 1 },
+                subTab === 'users' 
+                  ? { backgroundColor: colors.primary, borderColor: colors.primary } 
+                  : { backgroundColor: 'transparent', borderColor: colors.border }
+              ]}
+            >
+              <ThemedText style={{ color: subTab === 'users' ? '#FFF' : colors.text, fontWeight: '700', fontSize: 13 }}>
+                👥 Users Directory
+              </ThemedText>
+            </Pressable>
+            <Pressable
+              onPress={() => setSubTab('classes')}
+              style={[
+                { paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20, borderWidth: 1 },
+                subTab === 'classes' 
+                  ? { backgroundColor: colors.primary, borderColor: colors.primary } 
+                  : { backgroundColor: 'transparent', borderColor: colors.border }
+              ]}
+            >
+              <ThemedText style={{ color: subTab === 'classes' ? '#FFF' : colors.text, fontWeight: '700', fontSize: 13 }}>
+                🏫 Classes Assignment
+              </ThemedText>
+            </Pressable>
+            <Pressable
+              onPress={() => setSubTab('calendar')}
+              style={[
+                { paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20, borderWidth: 1 },
+                subTab === 'calendar' 
+                  ? { backgroundColor: colors.primary, borderColor: colors.primary } 
+                  : { backgroundColor: 'transparent', borderColor: colors.border }
+              ]}
+            >
+              <ThemedText style={{ color: subTab === 'calendar' ? '#FFF' : colors.text, fontWeight: '700', fontSize: 13 }}>
+                📅 School Calendar
+              </ThemedText>
+            </Pressable>
+            <Pressable
+              onPress={() => setSubTab('import_export')}
+              style={[
+                { paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20, borderWidth: 1 },
+                subTab === 'import_export' 
+                  ? { backgroundColor: colors.primary, borderColor: colors.primary } 
+                  : { backgroundColor: 'transparent', borderColor: colors.border }
+              ]}
+            >
+              <ThemedText style={{ color: subTab === 'import_export' ? '#FFF' : colors.text, fontWeight: '700', fontSize: 13 }}>
+                📤 Import / Export
+              </ThemedText>
+            </Pressable>
+            <Pressable
+              onPress={() => setSubTab('waitlist')}
+              style={[
+                { paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20, borderWidth: 1 },
+                subTab === 'waitlist' 
+                  ? { backgroundColor: colors.primary, borderColor: colors.primary } 
+                  : { backgroundColor: 'transparent', borderColor: colors.border }
+              ]}
+            >
+              <ThemedText style={{ color: subTab === 'waitlist' ? '#FFF' : colors.text, fontWeight: '700', fontSize: 13 }}>
+                📝 Waitlist Directory
+              </ThemedText>
+            </Pressable>
+          </View>
+        </>
+      )}
 
       {loading ? (
         <ActivityIndicator size="large" color={colors.primary} style={{ marginVertical: Spacing.three }} />
@@ -1417,13 +1478,23 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
                         { label: 'Details & Custom Fields', width: 300 },
                         { label: 'Effective From', width: 160 },
                         { label: 'Effective To', width: 120 }
-                      ]).map((col, idx) => (
-                        <View key={idx} style={{ width: col.width, paddingHorizontal: 8 }}>
-                          <ThemedText style={{ fontSize: 11, fontWeight: '800', color: colors.textSecondary }}>
-                            {col.label}
-                          </ThemedText>
-                        </View>
-                      ))}
+                      ]).map((col, idx) => {
+                        const showWwcTooltip = col.label === 'WWC Number' || col.label === 'WWC Verified';
+                        return (
+                          <View key={idx} style={{ width: col.width, paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                            <ThemedText style={{ fontSize: 11, fontWeight: '800', color: colors.textSecondary }}>
+                              {col.label}
+                            </ThemedText>
+                            {showWwcTooltip && (
+                              <HelperTooltip 
+                                size={11}
+                                content="Working With Children Check (WWC) is a NSW government requirement. Volunteers/Teachers must have a verified status to participate in school activities."
+                                contentTa="குழந்தைகள் பணிப் பாதுகாப்பு சரிபார்ப்பு (WWC) என்பது NSW அரசாங்கத்தின் ஒரு கட்டாயத் தேவையாகும்."
+                              />
+                            )}
+                          </View>
+                        );
+                      })}
                     </View>
 
                     {/* Body Rows */}
@@ -1983,7 +2054,14 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
             
             {/* LEFT SECTION: IMPORT BOARD */}
             <View style={[{ padding: 20, borderRadius: 16, borderWidth: 1, backgroundColor: colors.cardBg, borderColor: colors.border, flex: 1, gap: 12 }]}>
-              <ThemedText style={{ fontSize: 15, fontWeight: '700', color: colors.primary }}>📂 Bulk Import Data / தொகுதி இறக்குமதி</ThemedText>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <ThemedText style={{ fontSize: 15, fontWeight: '700', color: colors.primary }}>📂 Bulk Import Data / தொகுதி இறக்குமதி</ThemedText>
+                <HelperTooltip 
+                  size={15}
+                  content="Upload or paste TSV/CSV files from Excel to bulk-import student records, teachers, volunteers, or waitlist logs. Missing student emails will automatically fall back to [student_id]@balarmalar.nsw.edu.au."
+                  contentTa="விரிதாள் கோப்புகள் மூலம் மாணவர் மற்றும் ஆசிரியர் விவரங்களை தொகுதி இறக்குமதி செய்யலாம்."
+                />
+              </View>
               
               {/* Role Select Pills */}
               <View style={{ flexDirection: 'row', gap: 6 }}>
@@ -2346,6 +2424,14 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
       ) : (
         /* WAITLIST SUB-TAB */
         <View style={{ flex: 1 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8, marginTop: 4 }}>
+            <ThemedText style={{ fontSize: 14, fontWeight: '700', color: colors.text }}>📝 Waitlist Registrations</ThemedText>
+            <HelperTooltip 
+              size={14}
+              content="Review waitlisted students. You can edit details, update status, or click 'Admit' to enroll the student directly into classes and migrate their records to the active student roster."
+              contentTa="காத்திருப்போர் பட்டியலை நிர்வகிக்கலாம். தகுதியான மாணவர்களை நேரடியாக வகுப்புகளில் சேர்க்கலாம்."
+            />
+          </View>
           {/* Search and Action Bar */}
           <View style={{ flexDirection: 'row', gap: Spacing.two, marginBottom: Spacing.two, flexWrap: 'wrap', alignItems: 'center' }}>
             <TextInput

@@ -44,7 +44,8 @@ import {
   Trash2,
   Award,
   X,
-  FileText
+  FileText,
+  RefreshCw
 } from 'lucide-react-native';
 
 
@@ -136,8 +137,7 @@ const cleanTopic = (topicStr: string) => {
 export default function HomeScreen() {
   const { t, i18n } = useTranslation();
   const { user, logout, updateLanguage, updateAuthPassword, switchRole } = useAuth();
-  const canSwitchRole = (user?.originalRole === 'teacher' || user?.originalRole === 'volunteer' || user?.originalRole === 'admin') && 
-                       !!(user?.associatedStudents && user?.associatedStudents.length > 0);
+  const canSwitchRole = (user?.originalRole === 'superadmin' || user?.originalRole === 'admin' || user?.originalRole === 'teacher' || user?.originalRole === 'volunteer');
   const alternateRole = user?.role === 'parent' ? user?.originalRole : 'parent';
   const scheme = useColorScheme();
   const theme = scheme === 'dark' ? 'dark' : 'light';
@@ -734,11 +734,15 @@ export default function HomeScreen() {
       const loadParentProfiles = async () => {
         try {
           const profiles = [];
-          if (user.associatedStudents) {
+          if (user.associatedStudents && user.associatedStudents.length > 0) {
             for (const sId of user.associatedStudents) {
               const p = await mockDb.getUser(sId);
               if (p) profiles.push(p);
             }
+          } else {
+            // Fallback for staff switching to parent view context
+            const p = await mockDb.getUser('student_1');
+            if (p) profiles.push(p);
           }
           setStudentProfiles(profiles);
           if (profiles.length > 0) {
@@ -841,22 +845,23 @@ export default function HomeScreen() {
 
     if (role === 'superadmin') {
       items.push({ key: 'superadmin', label: 'Super Admin', labelTa: 'முதன்மை நிர்வாகி', icon: Shield });
-      items.push({ key: 'messages', label: i18n.language === 'ta' ? 'செய்திகள்' : 'Messages', labelTa: 'செய்திகள்', icon: MessageSquare });
+      items.push({ key: 'reports', label: t('nav.reports'), labelTa: 'சாதனைகள்', icon: Award });
     } else if (role === 'admin') {
       items.push({ key: 'management', label: 'Admin Panel', labelTa: 'நிர்வாகம்', icon: Users });
-      items.push({ key: 'messages', label: i18n.language === 'ta' ? 'செய்திகள்' : 'Messages', labelTa: 'செய்திகள்', icon: MessageSquare });
+      items.push({ key: 'reports', label: t('nav.reports'), labelTa: 'சாதனைகள்', icon: Award });
     } else if (role === 'teacher') {
       items.push({ key: 'attendance', label: 'Take Attendance', labelTa: 'வருகைப்பதிவு', icon: CheckSquare });
       items.push({ key: 'homework', label: t('nav.homework') || 'Learn', labelTa: 'கற்றல்', icon: BookOpen });
+      items.push({ key: 'reports', label: t('nav.reports'), labelTa: 'சாதனைகள்', icon: Award });
     } else if (role === 'volunteer') {
       items.push({ key: 'attendance', label: 'Take Attendance', labelTa: 'வருகைப்பதிவு', icon: CheckSquare });
-      items.push({ key: 'messages', label: i18n.language === 'ta' ? 'செய்திகள்' : 'Messages', labelTa: 'செய்திகள்', icon: MessageSquare });
+      items.push({ key: 'reports', label: t('nav.reports'), labelTa: 'சாதனைகள்', icon: Award });
     } else if (role === 'parent') {
       items.push({ key: 'homework', label: t('nav.homework') || 'Learn', labelTa: 'கற்றல்', icon: BookOpen });
       items.push({ key: 'students', label: 'My Children', labelTa: 'என் குழந்தைகள்', icon: Users });
+      items.push({ key: 'reports', label: t('nav.reports'), labelTa: 'சாதனைகள்', icon: Award });
     } else if (role === 'student') {
       items.push({ key: 'homework', label: t('nav.homework') || 'Learn', labelTa: 'கற்றல்', icon: BookOpen });
-      items.push({ key: 'messages', label: i18n.language === 'ta' ? 'செய்திகள்' : 'Messages', labelTa: 'செய்திகள்', icon: MessageSquare });
     } else {
       items.push({ key: 'messages', label: i18n.language === 'ta' ? 'செய்திகள்' : 'Messages', labelTa: 'செய்திகள்', icon: MessageSquare });
     }
@@ -921,7 +926,7 @@ export default function HomeScreen() {
       });
       actions.push({
         key: 'reports',
-        label: i18n.language === 'ta' ? 'மாணவர் சாதனைகள்' : 'Students achievements',
+        label: t('nav.reports'),
         icon: Award,
         color: '#FEF3C7',
         iconColor: '#D97706',
@@ -972,7 +977,7 @@ export default function HomeScreen() {
       });
       actions.push({
         key: 'reports',
-        label: i18n.language === 'ta' ? 'மாணவர் சாதனைகள்' : 'Students achievements',
+        label: t('nav.reports'),
         icon: Award,
         color: '#FEF3C7',
         iconColor: '#D97706',
@@ -2469,13 +2474,23 @@ export default function HomeScreen() {
                   )}
                 </Pressable>
               )}
-              <Pressable 
-                onPress={() => setActiveTab('profile')} 
-                style={styles.headerIconButton}
-                hitSlop={{ top: 12, bottom: 12, left: 10, right: 10 }}
-              >
-                <UserIcon size={18} color={activeTab === 'profile' ? colors.primary : colors.text} />
-              </Pressable>
+              {canSwitchRole && alternateRole && (
+                <Pressable 
+                  onPress={() => {
+                    switchRole(alternateRole);
+                    showToast(
+                      i18n.language === 'ta'
+                        ? `காட்சிப் பொறுப்பு ${alternateRole.toUpperCase()} ஆக மாற்றப்பட்டது!`
+                        : `Switched view context to ${alternateRole.toUpperCase()}!`,
+                      'success'
+                    );
+                  }} 
+                  style={styles.headerIconButton}
+                  hitSlop={{ top: 12, bottom: 12, left: 10, right: 10 }}
+                >
+                  <RefreshCw size={18} color={colors.primary} />
+                </Pressable>
+              )}
               <Pressable 
                 onPress={toggleLanguage} 
                 style={styles.headerIconButton}
