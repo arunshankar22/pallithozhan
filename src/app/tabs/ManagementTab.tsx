@@ -1129,7 +1129,11 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
   return (
     <View style={[styles.tabContentWrapper, { flex: 1, padding: isLargeScreen ? Spacing.four : Spacing.three }]}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: headerCollapsed ? 8 : 4 }}>
-        <ThemedText style={[styles.sectionTitle, { marginBottom: 0 }]}>Portal Management / நிர்வாகக் குழு</ThemedText>
+        <View style={{ flex: 1, marginRight: 8 }}>
+          <ThemedText style={[styles.sectionTitle, { marginBottom: 0, flexShrink: 1 }]}>
+            Portal Management / நிர்வாகக் குழு
+          </ThemedText>
+        </View>
         <Pressable 
           onPress={() => setHeaderCollapsed(!headerCollapsed)} 
           style={{ paddingVertical: 4, paddingHorizontal: 8, borderRadius: 6, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background }}

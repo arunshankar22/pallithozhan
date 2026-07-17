@@ -2569,7 +2569,10 @@ export default function HomeScreen() {
           );
 
           return ['attendance', 'management', 'messages'].includes(activeTab) ? (
-            <View style={{ flex: 1, paddingHorizontal: isLargeScreen ? Spacing.five : Spacing.three, paddingTop: Spacing.three }}>
+            <View style={[
+              { flex: 1, paddingHorizontal: isLargeScreen ? Spacing.five : Spacing.three, paddingTop: Spacing.three },
+              !isLargeScreen && { paddingBottom: 80 + Math.max(0, (insets.bottom || 0) - 10) }
+            ]}>
               {renderHeaderOptions()}
               {renderContent()}
             </View>
