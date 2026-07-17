@@ -3442,15 +3442,18 @@ export function ReportsTab({
                   திறன் அடைவுகள் - மதிப்பீடு (Skill Achievements - Evaluation):
                 </ThemedText>
                 
-                {/* Main Table Headers */}
                 <View style={[localStyles.reportTable, { borderColor: colors.border, borderBottomWidth: 0 }]} className="print-table">
                   <View style={[localStyles.reportTableHeader, { backgroundColor: colors.background, borderBottomColor: colors.border }]} className="print-table-row">
-                    <ThemedText style={[localStyles.reportTableCellLeft, { fontWeight: '800', color: colors.textSecondary }]} className="print-table-cell-left">
-                      பாடத்திட்டத்திறன்கள் (Skills / Learning Outcomes)
-                    </ThemedText>
-                    <ThemedText style={[localStyles.reportTableCellRight, { fontWeight: '800', color: colors.textSecondary, flex: undefined, minWidth: 140, textAlign: 'right' }]} className="print-table-cell-right">
-                      புள்ளிகள் விகிதம் (Grade)
-                    </ThemedText>
+                    <View style={localStyles.reportTableCellLeft} className="print-table-cell-left">
+                      <ThemedText style={{ fontWeight: '800', color: colors.textSecondary, fontSize: 11 }}>
+                        பாடத்திட்டத்திறன்கள் (Skills / Learning Outcomes)
+                      </ThemedText>
+                    </View>
+                    <View style={[localStyles.reportTableCellRight, { flex: undefined, minWidth: 140, alignItems: 'flex-end', justifyContent: 'center' }]} className="print-table-cell-right">
+                      <ThemedText style={{ fontWeight: '800', color: colors.textSecondary, textAlign: 'right', fontSize: 11 }}>
+                        புள்ளிகள் விகிதம் (Grade)
+                      </ThemedText>
+                    </View>
                   </View>
                 </View>
 
@@ -3653,9 +3656,11 @@ export function ReportsTab({
 
                 <View style={[localStyles.reportTable, { borderColor: colors.border, paddingHorizontal: Spacing.two }]} className="print-table">
                   <View style={[localStyles.reportTableHeader, { backgroundColor: colors.background, borderBottomColor: colors.border, marginHorizontal: -Spacing.two, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]} className="print-table-row">
-                    <ThemedText style={[localStyles.reportTableCellLeft, { fontWeight: '800', color: colors.textSecondary, paddingLeft: Spacing.two }]} className="print-table-cell-left">
-                      செயல்பாடு (Activity / Criteria)
-                    </ThemedText>
+                    <View style={[localStyles.reportTableCellLeft, { paddingLeft: Spacing.two }]} className="print-table-cell-left">
+                      <ThemedText style={{ fontWeight: '800', color: colors.textSecondary, fontSize: 11 }}>
+                        செயல்பாடு (Activity / Criteria)
+                      </ThemedText>
+                    </View>
                     {!isReadOnly ? (
                       <View style={{ flexDirection: 'row', gap: 6, width: 108 }} className="print-table-cell-right">
                         <ThemedText style={{ fontSize: 10, fontWeight: '800', width: 32, textAlign: 'center', color: colors.textSecondary }}>A</ThemedText>
@@ -3663,9 +3668,11 @@ export function ReportsTab({
                         <ThemedText style={{ fontSize: 10, fontWeight: '800', width: 32, textAlign: 'center', color: colors.textSecondary }}>S</ThemedText>
                       </View>
                     ) : (
-                      <ThemedText style={[localStyles.reportTableCellRight, { fontWeight: '800', color: colors.textSecondary, flex: undefined, minWidth: 140, textAlign: 'right' }]} className="print-table-cell-right">
-                        மதிப்பீடு (Evaluation)
-                      </ThemedText>
+                      <View style={[localStyles.reportTableCellRight, { flex: undefined, minWidth: 140, alignItems: 'flex-end', justifyContent: 'center' }]} className="print-table-cell-right">
+                        <ThemedText style={{ fontWeight: '800', color: colors.textSecondary, textAlign: 'right', fontSize: 11 }}>
+                          மதிப்பீடு (Evaluation)
+                        </ThemedText>
+                      </View>
                     )}
                   </View>
 
