@@ -52,6 +52,33 @@ import { DateTimePicker } from '@/components/DateTimePicker';
 import { db } from '@/services/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 
+const safeLocalStorage = {
+  getItem: (key: string): string | null => {
+    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+      try {
+        return localStorage.getItem(key);
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  },
+  setItem: (key: string, value: string): void => {
+    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+      try {
+        localStorage.setItem(key, value);
+      } catch (e) {}
+    }
+  },
+  removeItem: (key: string): void => {
+    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+      try {
+        localStorage.removeItem(key);
+      } catch (e) {}
+    }
+  }
+};
+
 // Mapper to resolve colors, icons, and text for different award types
 const getAwardMeta = (type: string) => {
   const t = type?.toLowerCase() || '';
@@ -673,12 +700,12 @@ export function ReportsTab({
         if (docSnap.exists()) {
           setGlobalShowParentSig(docSnap.data().showParentSig ?? false);
         } else {
-          const localVal = localStorage.getItem('bm_report_global_show_parent_sig');
+          const localVal = safeLocalStorage.getItem('bm_report_global_show_parent_sig');
           setGlobalShowParentSig(localVal === 'true');
         }
       } catch (err) {
         console.warn('Failed to load global config from Firestore:', err);
-        const localVal = localStorage.getItem('bm_report_global_show_parent_sig');
+        const localVal = safeLocalStorage.getItem('bm_report_global_show_parent_sig');
         setGlobalShowParentSig(localVal === 'true');
       }
     } catch (err) {
@@ -1614,8 +1641,8 @@ export function ReportsTab({
           setReportParentSigned(report.parentSigned || false);
           setReportParentSigDate(report.parentSignatureDate || '');
           
-          setTeacherSigImage(report.teacherSignatureImage || localStorage.getItem('bm_teacher_sig_' + (user?.uid || 'default')) || '');
-          setPrincipalSigImage(report.principalSignatureImage || localStorage.getItem('bm_principal_sig') || '');
+          setTeacherSigImage(report.teacherSignatureImage || safeLocalStorage.getItem('bm_teacher_sig_' + (user?.uid || 'default')) || '');
+          setPrincipalSigImage(report.principalSignatureImage || safeLocalStorage.getItem('bm_principal_sig') || '');
           setReportAttachTeacherSig(report.attachTeacherSig ?? true);
           setReportAttachPrincipalSig(report.attachPrincipalSig ?? true);
           setReportAttachParentSig(report.attachParentSig ?? true);
@@ -1652,8 +1679,8 @@ export function ReportsTab({
           setReportParentSigned(false);
           setReportParentSigDate('');
           
-          setTeacherSigImage(localStorage.getItem('bm_teacher_sig_' + (user?.uid || 'default')) || '');
-          setPrincipalSigImage(localStorage.getItem('bm_principal_sig') || '');
+          setTeacherSigImage(safeLocalStorage.getItem('bm_teacher_sig_' + (user?.uid || 'default')) || '');
+          setPrincipalSigImage(safeLocalStorage.getItem('bm_principal_sig') || '');
           setReportAttachTeacherSig(true);
           setReportAttachPrincipalSig(true);
           setReportAttachParentSig(true);
@@ -1898,10 +1925,10 @@ export function ReportsTab({
           const base64 = event.target.result;
           if (type === 'teacher') {
             setTeacherSigImage(base64);
-            localStorage.setItem('bm_teacher_sig_' + (user?.uid || 'default'), base64);
+            safeLocalStorage.setItem('bm_teacher_sig_' + (user?.uid || 'default'), base64);
           } else {
             setPrincipalSigImage(base64);
-            localStorage.setItem('bm_principal_sig', base64);
+            safeLocalStorage.setItem('bm_principal_sig', base64);
           }
           showToast(i18n.language === 'ta' ? 'கையொப்ப படம் பதிவேற்றப்பட்டது' : 'Signature image uploaded successfully', 'success');
         };
@@ -1915,10 +1942,10 @@ export function ReportsTab({
   const handleClearSignature = (type: 'teacher' | 'principal') => {
     if (type === 'teacher') {
       setTeacherSigImage('');
-      localStorage.removeItem('bm_teacher_sig_' + (user?.uid || 'default'));
+      safeLocalStorage.removeItem('bm_teacher_sig_' + (user?.uid || 'default'));
     } else {
       setPrincipalSigImage('');
-      localStorage.removeItem('bm_principal_sig');
+      safeLocalStorage.removeItem('bm_principal_sig');
     }
     showToast(i18n.language === 'ta' ? 'கையொப்ப படம் நீக்கப்பட்டது' : 'Signature image cleared', 'success');
   };
@@ -3306,7 +3333,7 @@ export function ReportsTab({
                     value={globalShowParentSig}
                     onValueChange={async (val) => {
                       setGlobalShowParentSig(val);
-                      localStorage.setItem('bm_report_global_show_parent_sig', val ? 'true' : 'false');
+                      safeLocalStorage.setItem('bm_report_global_show_parent_sig', val ? 'true' : 'false');
                       try {
                         const docRef = doc(db, 'configs', 'reportCard');
                         await setDoc(docRef, { showParentSig: val }, { merge: true });
@@ -3950,7 +3977,9 @@ export function ReportsTab({
                         />
                         {teacherSigImage ? (
                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                            <img src={teacherSigImage} style={{ height: 28, maxWidth: 120, objectFit: 'contain', border: '1px dashed #ccc', padding: 2 }} />
+                            <View style={{ height: 32, width: 124, borderWidth: 1, borderColor: '#ccc', borderStyle: 'dashed', padding: 2, justifyContent: 'center', alignItems: 'center' }}>
+                              <Image source={{ uri: teacherSigImage }} style={{ height: 28, width: 120, resizeMode: 'contain' }} />
+                            </View>
                             <Pressable onPress={() => handleClearSignature('teacher')} style={{ backgroundColor: '#EF4444', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
                               <ThemedText style={{ color: '#FFF', fontSize: 8, fontWeight: '700' }}>Clear</ThemedText>
                             </Pressable>
@@ -3964,7 +3993,7 @@ export function ReportsTab({
                     ) : (
                       <View style={{ gap: 4 }}>
                         {reportAttachTeacherSig && teacherSigImage ? (
-                          <img src={teacherSigImage} style={{ height: 28, maxWidth: 120, objectFit: 'contain' }} />
+                          <Image source={{ uri: teacherSigImage }} style={{ height: 28, width: 120, resizeMode: 'contain' }} />
                         ) : (
                           <ThemedText style={{ fontSize: 12, fontStyle: 'italic', fontWeight: '700', color: colors.text }}>
                             {reportTeacherSig || user?.fullName || 'Suba shree'}
@@ -4006,7 +4035,9 @@ export function ReportsTab({
                         />
                         {principalSigImage ? (
                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                            <img src={principalSigImage} style={{ height: 28, maxWidth: 120, objectFit: 'contain', border: '1px dashed #ccc', padding: 2 }} />
+                            <View style={{ height: 32, width: 124, borderWidth: 1, borderColor: '#ccc', borderStyle: 'dashed', padding: 2, justifyContent: 'center', alignItems: 'center' }}>
+                              <Image source={{ uri: principalSigImage }} style={{ height: 28, width: 120, resizeMode: 'contain' }} />
+                            </View>
                             <Pressable onPress={() => handleClearSignature('principal')} style={{ backgroundColor: '#EF4444', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
                               <ThemedText style={{ color: '#FFF', fontSize: 8, fontWeight: '700' }}>Clear</ThemedText>
                             </Pressable>
@@ -4020,7 +4051,7 @@ export function ReportsTab({
                     ) : (
                       <View style={{ gap: 4 }}>
                         {reportAttachPrincipalSig && principalSigImage ? (
-                          <img src={principalSigImage} style={{ height: 28, maxWidth: 120, objectFit: 'contain' }} />
+                          <Image source={{ uri: principalSigImage }} style={{ height: 28, width: 120, resizeMode: 'contain' }} />
                         ) : (
                           <ThemedText style={{ fontSize: 12, fontStyle: 'italic', fontWeight: '700', color: colors.text }}>
                             {reportPrincipalSig && reportPrincipalSig !== 'Balar Malar Principal' ? reportPrincipalSig : '___________________________'}
