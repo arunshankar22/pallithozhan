@@ -264,14 +264,14 @@ export function ThirukkuralPracticeGuide({ colors, i18n, showToast }: Thirukkura
     <View style={[styles.kuralContainer, { borderColor: colors.border }]}>
       {/* Header and overall progress indicator */}
       <View style={styles.kuralHeaderRow}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.two }}>
-          <BookOpen size={16} color={colors.primary} />
-          <ThemedText style={{ fontSize: 13, fontWeight: '800', color: colors.text }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.two, flex: 1, marginRight: 8 }}>
+          <BookOpen size={16} color={colors.primary} style={{ flexShrink: 0 }} />
+          <ThemedText style={{ fontSize: 12, fontWeight: '800', color: colors.text, flex: 1 }}>
             Thirukkural Guide / திருக்குறள் வழிகாட்டி (1 - 5)
           </ThemedText>
         </View>
 
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 0 }}>
           <Award size={14} color={progressPercent === 100 ? colors.secondary : colors.textSecondary} />
           <ThemedText style={{ fontSize: 11, fontWeight: '700', color: progressPercent === 100 ? colors.secondary : colors.textSecondary }}>
             {progressPercent}% Done

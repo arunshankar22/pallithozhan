@@ -7,7 +7,7 @@ import {
   Modal,
   ActivityIndicator,
   Platform,
-  Dimensions,
+  useWindowDimensions,
   Image,
   Alert,
   Linking
@@ -50,7 +50,7 @@ import { Spacing } from '@/constants/theme';
 import { getLocalStorageItem, setLocalStorageItem } from '@/services/dbCommon';
 import * as ImagePicker from 'expo-image-picker';
 
-const { width: windowWidth } = Dimensions.get('window');
+// windowWidth is fetched reactively inside NewsfeedTab using useWindowDimensions()
 
 const HERO_SLIDES = [
   {
@@ -89,6 +89,7 @@ export function NewsfeedTab({
   dashboardEditPost?: any;
   clearDashboardEditPost?: () => void;
 }) {
+  const { width: windowWidth } = useWindowDimensions();
   const [posts, setPosts] = useState<any[]>([]);
   const [showHelp, setShowHelp] = useState(() => {
     if (typeof window !== 'undefined' && window.localStorage) {

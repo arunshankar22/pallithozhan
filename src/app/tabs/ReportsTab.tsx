@@ -3833,7 +3833,7 @@ export function ReportsTab({
                   </View>
 
                   {!isReadOnly && (
-                    <View style={{ flexDirection: 'row', gap: 10, alignSelf: 'flex-start', marginVertical: 4 }}>
+                    <View style={{ flexDirection: isLargeScreen ? 'row' : 'column', gap: 8, alignSelf: isLargeScreen ? 'flex-start' : 'stretch', marginVertical: 6 }}>
                       <Pressable
                         onPress={() => handleTranslateComments('en-to-ta')}
                         disabled={isCommentsTranslating || !reportComments}

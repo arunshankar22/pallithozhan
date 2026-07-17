@@ -6,7 +6,7 @@ import {
   ScrollView,
   Modal,
   ActivityIndicator,
-  Dimensions,
+  useWindowDimensions,
   Platform
 } from 'react-native';
 
@@ -25,7 +25,7 @@ import { DateTimePicker } from '@/components/DateTimePicker';
 import * as XLSX from 'xlsx';
 
 export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabProps) {
-  const { width: windowWidth } = Dimensions.get('window');
+  const { width: windowWidth } = useWindowDimensions();
   const isLargeScreen = windowWidth >= 768;
   const [subTab, setSubTab] = useState<'users' | 'classes' | 'calendar' | 'import_export' | 'waitlist'>('users');
   const [headerCollapsed, setHeaderCollapsed] = useState(false);

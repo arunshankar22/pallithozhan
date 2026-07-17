@@ -5,7 +5,7 @@ import {
   Pressable,
   ActivityIndicator,
   Platform,
-  Dimensions
+  useWindowDimensions
 } from 'react-native';
 
 import { AlertTriangle, CheckCircle, Clock, X, HelpCircle } from 'lucide-react-native';
@@ -21,7 +21,7 @@ import * as XLSX from 'xlsx';
 
 
 export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentId, insets }: TabProps) {
-  const { width: windowWidth } = Dimensions.get('window');
+  const { width: windowWidth } = useWindowDimensions();
   const isLargeScreen = windowWidth >= 768;
   const [classes, setClasses] = useState<any[]>([]);
   const [showHelp, setShowHelp] = useState(() => {

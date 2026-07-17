@@ -5,6 +5,7 @@ import {
   ScrollView,
   Pressable,
   useColorScheme,
+  useWindowDimensions,
   Dimensions,
   Platform,
   Image,
@@ -66,7 +67,7 @@ import { auditLogService } from '@/services/auditLogService';
 import { chatNotificationService } from '@/services/chatNotificationService';
 import WaitlistScreen from './waitlist';
 
-const { width: windowWidth } = Dimensions.get('window');
+// Window dimensions are fetched reactively inside components using useWindowDimensions()
 
 const BRANCHES_DATA = [
   {
@@ -136,6 +137,7 @@ const cleanTopic = (topicStr: string) => {
 
 export default function HomeScreen() {
   const { t, i18n } = useTranslation();
+  const { width: windowWidth } = useWindowDimensions();
   const { user, logout, updateLanguage, updateAuthPassword, switchRole } = useAuth();
   const canSwitchRole = (user?.originalRole === 'superadmin' || user?.originalRole === 'admin' || user?.originalRole === 'teacher' || user?.originalRole === 'volunteer');
   const alternateRole = user?.role === 'parent' ? user?.originalRole : 'parent';
@@ -1030,7 +1032,7 @@ export default function HomeScreen() {
     return actions.filter(action => !action.key || !mainKeys.includes(action.key));
   };
 
-  const [isLargeScreen, setIsLargeScreen] = useState(windowWidth >= 768);
+  const isLargeScreen = windowWidth >= 768;
 
   // Premium Toast Notification state
   const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'success' | 'error' | 'warning' }>({
@@ -1072,13 +1074,7 @@ export default function HomeScreen() {
     }
   };
 
-  useEffect(() => {
-    const handleResize = () => {
-      setIsLargeScreen(Dimensions.get('window').width >= 768);
-    };
-    const subscription = Dimensions.addEventListener('change', handleResize);
-    return () => subscription.remove();
-  }, []);
+  // Screen resize and orientation change listener removed as it is handled reactively by useWindowDimensions hook
 
   const toggleLanguage = () => {
     const nextLang = i18n.language === 'ta' ? 'en' : 'ta';
@@ -2195,7 +2191,7 @@ export default function HomeScreen() {
   }, [user]);
 
   // Sidebar Logo using the official brand blossomed-flower logo and showing active branch next to parramatta in english and tamil
-  const BalarMalarBranchLogo = ({ size = 26 }: { size?: number }) => {
+  const BalarMalarBranchLogo = ({ size = 26, showBranch = true }: { size?: number; showBranch?: boolean }) => {
     const activeBranch = typeof window !== 'undefined' && typeof window.localStorage !== 'undefined' ? window.localStorage.getItem('pallithozhan_active_branch') || 'parramatta' : 'parramatta';
     const branchNames: Record<string, { en: string, ta: string }> = {
       parramatta: { en: 'Parramatta Branch', ta: 'பரமட்டா கிளை' },
@@ -2208,7 +2204,7 @@ export default function HomeScreen() {
     const displayHeight = size;
 
     return (
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         {/* Main BalarMalar text logo */}
         <Image 
           source={scheme === 'dark' 
@@ -2221,18 +2217,22 @@ export default function HomeScreen() {
           }} 
         />
         
-        {/* Divider line */}
-        <View style={{ width: 1, height: 18, backgroundColor: colors.border, marginHorizontal: 2 }} />
+        {showBranch && (
+          <>
+            {/* Divider line */}
+            <View style={{ width: 1, height: 18, backgroundColor: colors.border, marginHorizontal: 2 }} />
 
-        {/* Branch Info (Logo removed as requested) */}
-        <View style={{ justifyContent: 'center' }}>
-          <ThemedText style={{ color: colors.secondary, fontSize: 6, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5, lineHeight: 7 }}>
-            {currentBranch.en}
-          </ThemedText>
-          <ThemedText style={{ color: colors.textSecondary, fontSize: 6, fontWeight: '600', lineHeight: 7 }}>
-            {currentBranch.ta}
-          </ThemedText>
-        </View>
+            {/* Branch Info (Logo removed as requested) */}
+            <View style={{ justifyContent: 'center' }}>
+              <ThemedText style={{ color: colors.secondary, fontSize: 6, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5, lineHeight: 7 }}>
+                {currentBranch.en}
+              </ThemedText>
+              <ThemedText style={{ color: colors.textSecondary, fontSize: 6, fontWeight: '600', lineHeight: 7 }}>
+                {currentBranch.ta}
+              </ThemedText>
+            </View>
+          </>
+        )}
       </View>
     );
   };
@@ -2443,7 +2443,7 @@ export default function HomeScreen() {
               paddingTop: Spacing.three + topOffset
             }
           ]}>
-            <BalarMalarBranchLogo size={26} />
+            <BalarMalarBranchLogo size={26} showBranch={isLargeScreen} />
             <View style={styles.headerRightActions}>
               {user?.role && (
                 <Pressable 
