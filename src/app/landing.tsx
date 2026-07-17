@@ -328,47 +328,51 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
             </ThemedText>
           </Pressable>
 
-          <Pressable
-            onPress={() => { setAuthMode('register'); setPortalVisible(true); }}
-            style={({ pressed }) => [
-              styles.portalButton,
-              { 
-                backgroundColor: '#EA5330', 
-                opacity: pressed ? 0.9 : 1,
-                borderRadius: 20,
-                paddingHorizontal: 16,
-                paddingVertical: 6,
-                shadowColor: '#EA5330',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.15,
-                shadowRadius: 4,
-                elevation: 2,
-              }
-            ]}
-          >
-            <ThemedText style={[styles.portalButtonText, { color: '#FFF', fontWeight: '800' }]}>
-              {isLargeScreen ? (i18n.language === 'ta' ? 'பதிவு செய்க 2026' : 'Enroll 2026') : (i18n.language === 'ta' ? 'பதிவு' : 'Enroll')}
-            </ThemedText>
-          </Pressable>
+          {isLargeScreen && (
+            <Pressable
+              onPress={() => { setAuthMode('register'); setPortalVisible(true); }}
+              style={({ pressed }) => [
+                styles.portalButton,
+                { 
+                  backgroundColor: '#EA5330', 
+                  opacity: pressed ? 0.9 : 1,
+                  borderRadius: 20,
+                  paddingHorizontal: 16,
+                  paddingVertical: 6,
+                  shadowColor: '#EA5330',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.15,
+                  shadowRadius: 4,
+                  elevation: 2,
+                }
+              ]}
+            >
+              <ThemedText style={[styles.portalButtonText, { color: '#FFF', fontWeight: '800' }]}>
+                {i18n.language === 'ta' ? 'பதிவு செய்க 2026' : 'Enroll 2026'}
+              </ThemedText>
+            </Pressable>
+          )}
 
-          <Pressable
-            onPress={() => { setAuthMode('waitlist'); setPortalVisible(true); }}
-            style={({ pressed }) => [
-              styles.langBadge,
-              { 
-                backgroundColor: 'transparent',
-                borderColor: colors.border,
-                opacity: pressed ? 0.8 : 1,
-                borderRadius: 20,
-                paddingHorizontal: 14,
-                paddingVertical: 6,
-              }
-            ]}
-          >
-            <ThemedText style={[styles.langText, { marginLeft: 0, color: colors.textSecondary }]}>
-              {isLargeScreen ? (i18n.language === 'ta' ? 'காத்திருப்புப் பட்டியல்' : 'Waitlist') : (i18n.language === 'ta' ? 'காத்திருப்பு' : 'Waitlist')}
-            </ThemedText>
-          </Pressable>
+          {isLargeScreen && (
+            <Pressable
+              onPress={() => { setAuthMode('waitlist'); setPortalVisible(true); }}
+              style={({ pressed }) => [
+                styles.langBadge,
+                { 
+                  backgroundColor: 'transparent',
+                  borderColor: colors.border,
+                  opacity: pressed ? 0.8 : 1,
+                  borderRadius: 20,
+                  paddingHorizontal: 14,
+                  paddingVertical: 6,
+                }
+              ]}
+            >
+              <ThemedText style={[styles.langText, { marginLeft: 0, color: colors.textSecondary }]}>
+                {i18n.language === 'ta' ? 'காத்திருப்புப் பட்டியல்' : 'Waitlist'}
+              </ThemedText>
+            </Pressable>
+          )}
 
           <Pressable
             onPress={() => { setAuthMode('login'); setPortalVisible(true); }}
