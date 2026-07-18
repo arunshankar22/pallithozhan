@@ -2443,7 +2443,7 @@ export default function HomeScreen() {
               paddingTop: Spacing.three + topOffset
             }
           ]}>
-            <BalarMalarBranchLogo size={26} showBranch={isLargeScreen} />
+            <BalarMalarBranchLogo size={26} showBranch={true} />
             <View style={styles.headerRightActions}>
               {user?.role && (
                 <Pressable 
@@ -2568,10 +2568,14 @@ export default function HomeScreen() {
             </>
           );
 
+          const bottomInset = insets.bottom || 0;
+          const tabBarPaddingBottom = bottomInset > 0 ? bottomInset : Spacing.two;
+          const tabBarHeight = 72 + tabBarPaddingBottom;
+
           return ['attendance', 'management', 'messages'].includes(activeTab) ? (
             <View style={[
               { flex: 1, paddingHorizontal: isLargeScreen ? Spacing.five : Spacing.three, paddingTop: Spacing.three },
-              !isLargeScreen && { paddingBottom: 80 + Math.max(0, (insets.bottom || 0) - 10) }
+              !isLargeScreen && { paddingBottom: tabBarHeight }
             ]}>
               {renderHeaderOptions()}
               {renderContent()}
@@ -2581,7 +2585,7 @@ export default function HomeScreen() {
               style={{ flex: 1 }}
               contentContainerStyle={isLargeScreen ? styles.scrollContent : [
                 styles.mobileScrollContent, 
-                { paddingBottom: 80 + (insets.bottom || 0) + 20 }
+                { paddingBottom: tabBarHeight + 16 }
               ]}
             >
               {renderHeaderOptions()}
@@ -2599,8 +2603,8 @@ export default function HomeScreen() {
           { 
             borderTopWidth: 1, 
             borderColor: colors.border,
-            height: 80 + Math.max(0, (insets.bottom || 0) - 10),
-            paddingBottom: Spacing.two + (insets.bottom || 0)
+            height: 72 + (insets.bottom || Spacing.two),
+            paddingBottom: insets.bottom || Spacing.two
           }
         ]}>
           {mainNavItems.map((item: any) => {
