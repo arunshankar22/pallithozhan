@@ -1857,11 +1857,11 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
                     <View style={{ flexDirection: 'row', gap: Spacing.four, borderTopWidth: 1, borderColor: colors.border, paddingTop: 12 }}>
                       <View style={{ flex: 1, borderRightWidth: 1, borderColor: colors.border, paddingRight: 8 }}>
                         <ThemedText style={{ fontSize: 12, fontWeight: '700', color: colors.secondary, marginBottom: 4 }}>
-                          Students ({c.associatedStudentIds?.length || 0})
+                          Students ({c.studentIds?.length || 0})
                         </ThemedText>
                         <ThemedText style={{ fontSize: 11, color: colors.text }}>
-                          {c.associatedStudentIds && c.associatedStudentIds.length > 0
-                            ? c.associatedStudentIds.map((sId: string) => users.find(x => x.uid === sId)?.fullName || sId).join(', ')
+                          {c.studentIds && c.studentIds.length > 0
+                            ? c.studentIds.map((sId: string) => users.find(x => x.uid === sId)?.fullName || sId).join(', ')
                             : 'None'
                           }
                         </ThemedText>
@@ -2310,7 +2310,7 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
                 {/* Format Select */}
                 <View style={{ gap: 6 }}>
                   <ThemedText style={{ fontSize: 11, fontWeight: '600' }}>Export Format:</ThemedText>
-                  <View style={{ flexDirection: 'row', gap: 10 }}>
+                  <View style={{ flexDirection: isLargeScreen ? 'row' : 'column', gap: isLargeScreen ? 12 : 8, flexWrap: 'wrap' }}>
                     {[
                       { key: 'xlsx', label: 'Excel Spreadsheet (.xlsx)' },
                       { key: 'csv', label: 'Tab-Separated Values (.csv / .tsv)' }
@@ -2602,9 +2602,20 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
                               </ThemedText>
                             </View>
                           </View>
-                          <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>
-                            Student ID: {w.student_id || 'Waitlisted'}  |  📧 Student Email: {w.student_email || 'Not provided'}  |  🎂 DOB: {w.DATE_OF_BIRTH || w.dob || 'Not provided'}  |  ⚧️ {w.gender || '-'}
-                          </ThemedText>
+                          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4, marginBottom: 6 }}>
+                            {[
+                              { label: 'Student ID', value: w.student_id || 'Waitlisted' },
+                              { label: '📧 Email', value: w.student_email || 'Not provided' },
+                              { label: '🎂 DOB', value: w.DATE_OF_BIRTH || w.dob || 'Not provided' },
+                              { label: '⚧️ Gender', value: w.gender || '-' }
+                            ].map((detail, idx) => (
+                              <View key={idx} style={{ backgroundColor: colors.background, paddingVertical: 3, paddingHorizontal: 8, borderRadius: 6, borderWidth: 1, borderColor: colors.border }}>
+                                <ThemedText style={{ fontSize: 10, color: colors.textSecondary }}>
+                                  {detail.label}: <ThemedText style={{ fontWeight: '700', fontSize: 10, color: colors.text }}>{detail.value}</ThemedText>
+                                </ThemedText>
+                              </View>
+                            ))}
+                          </View>
                         </View>
 
                         {/* Action buttons */}
