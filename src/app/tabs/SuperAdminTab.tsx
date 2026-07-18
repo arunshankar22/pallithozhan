@@ -339,7 +339,7 @@ export function SuperAdminTab({ user, colors, t, showToast, i18n }: TabProps) {
           </View>
 
           {/* Users Directory Table with Horizontal Scrolling */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={true} style={{ flex: 1 }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={true} style={{ flex: 1 }} nestedScrollEnabled={true} directionalLockEnabled={true}>
             <View style={stylesTab.tableWrapper}>
               {/* Table Header Row */}
               <View style={[stylesTab.tableRow, stylesTab.tableHeaderRow, { backgroundColor: colors.backgroundSelected, borderBottomColor: colors.border }]}>
@@ -445,7 +445,7 @@ export function SuperAdminTab({ user, colors, t, showToast, i18n }: TabProps) {
           </View>
 
           {/* Audit Logs Table with Horizontal Scrolling */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={true} style={{ flex: 1 }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={true} style={{ flex: 1 }} nestedScrollEnabled={true} directionalLockEnabled={true}>
             <View style={[stylesTab.tableWrapper, { minWidth: 950 }]}>
               {/* Table Header Row */}
               <View style={[stylesTab.tableRow, stylesTab.tableHeaderRow, { backgroundColor: colors.backgroundSelected, borderBottomColor: colors.border }]}>

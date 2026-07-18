@@ -1432,7 +1432,7 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
           ) : (
             <View style={{ flex: 1, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.cardBg, overflow: 'hidden' }}>
               <FlatScrollContainer style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: isLargeScreen ? Spacing.four : 0 }}>
-                <ScrollView horizontal showsHorizontalScrollIndicator={true}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={true} nestedScrollEnabled={true} directionalLockEnabled={true}>
                   <View style={{ flexDirection: 'column' }}>
                     {/* Header Row */}
                     <View style={{ flexDirection: 'row', backgroundColor: colors.background, borderBottomWidth: 2, borderBottomColor: colors.border, paddingVertical: 10, alignItems: 'center' }}>
@@ -2738,7 +2738,7 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
             const waitlistTableContent = (
               <View style={{ flex: 1, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.cardBg, overflow: 'hidden' }}>
                 <FlatScrollContainer style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: isLargeScreen ? Spacing.four : 0 }}>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={true}>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={true} nestedScrollEnabled={true} directionalLockEnabled={true}>
                     <View style={{ flexDirection: 'column' }}>
                       {/* Header Row */}
                       <View style={{ flexDirection: 'row', backgroundColor: colors.background, borderBottomWidth: 2, borderBottomColor: colors.border, paddingVertical: 10, alignItems: 'center' }}>

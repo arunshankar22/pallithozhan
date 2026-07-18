@@ -2954,7 +2954,7 @@ export function ReportsTab({
             </ThemedText>
           </View>
         ) : (
-          <ScrollView horizontal style={{ width: '100%' }}>
+          <ScrollView horizontal style={{ width: '100%' }} nestedScrollEnabled={true} directionalLockEnabled={true}>
             <View style={[localStyles.reportTable, { borderColor: colors.border, minWidth: 900 }]}>
               {/* Header row */}
               <View style={[localStyles.reportTableHeader, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
