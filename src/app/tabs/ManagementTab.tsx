@@ -1379,8 +1379,8 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
                       {/* Main Details */}
                       <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                         <View style={{ gap: 4, flex: 1, marginRight: 8 }}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                            <ThemedText style={{ fontSize: 15, fontWeight: '700' }}>{u.fullName}</ThemedText>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                            <ThemedText style={{ fontSize: 15, fontWeight: '700', flexShrink: 1 }}>{u.fullName}</ThemedText>
                             <View style={{ backgroundColor: u.role === 'teacher' ? colors.primaryLight : u.role === 'volunteer' ? colors.secondaryLight : colors.background, paddingVertical: 2, paddingHorizontal: 6, borderRadius: 4 }}>
                               <ThemedText style={{ fontSize: 9, fontWeight: '700', color: u.role === 'teacher' ? colors.primary : u.role === 'volunteer' ? colors.secondary : colors.textSecondary }}>
                                 {u.role.toUpperCase()}
@@ -2351,11 +2351,11 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
                 <ThemedText style={{ fontSize: 13, fontWeight: '700', color: colors.secondary }}>📥 Import Bulk Attendance</ThemedText>
                 
                 <View style={{ gap: 6 }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <View style={{ flexDirection: isLargeScreen ? 'row' : 'column', justifyContent: 'space-between', alignItems: isLargeScreen ? 'center' : 'flex-start', gap: 8, marginBottom: 4 }}>
                     <ThemedText style={{ fontSize: 11, fontWeight: '600' }}>Upload sheet file or paste cells:</ThemedText>
                     <Pressable
                       onPress={triggerBulkFileUpload}
-                      style={{ backgroundColor: colors.secondaryLight, borderWidth: 1, borderColor: colors.secondary, paddingVertical: 4, paddingHorizontal: 10, borderRadius: 6 }}
+                      style={{ backgroundColor: colors.secondaryLight, borderWidth: 1, borderColor: colors.secondary, paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8, marginTop: isLargeScreen ? 0 : 4 }}
                     >
                       <ThemedText style={{ fontSize: 10, fontWeight: '700', color: colors.secondary }}>📁 Choose File (.csv, .xlsx)</ThemedText>
                     </Pressable>
@@ -2587,8 +2587,8 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
                       {/* Top row: Name & badge, purpose/request */}
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
                         <View style={{ gap: 2 }}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                            <ThemedText style={{ fontSize: 16, fontWeight: '700' }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                            <ThemedText style={{ fontSize: 16, fontWeight: '700', flexShrink: 1 }}>
                               {w.given_name} {w.family_name}
                             </ThemedText>
                             {w.full_name_tamil ? (

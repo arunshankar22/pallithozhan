@@ -164,10 +164,10 @@ export const styles = StyleSheet.create({
   headerRightActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.two,
+    gap: 8,
   },
   headerIconButton: {
-    padding: 12,
+    padding: 6,
   },
   mobileScrollContent: {
     padding: Spacing.three,
