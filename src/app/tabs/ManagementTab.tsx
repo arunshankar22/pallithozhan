@@ -27,6 +27,21 @@ import * as XLSX from 'xlsx';
 export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabProps) {
   const { width: windowWidth } = useWindowDimensions();
   const isLargeScreen = windowWidth >= 768;
+
+  const FlatScrollContainer = ({ children, style, contentContainerStyle }: { children: React.ReactNode, style?: any, contentContainerStyle?: any }) => {
+    if (isLargeScreen) {
+      return (
+        <ScrollView style={style} contentContainerStyle={contentContainerStyle}>
+          {children}
+        </ScrollView>
+      );
+    }
+    return (
+      <View style={[style, contentContainerStyle, { flex: undefined }]}>
+        {children}
+      </View>
+    );
+  };
   const [subTab, setSubTab] = useState<'users' | 'classes' | 'calendar' | 'import_export' | 'waitlist'>('users');
   const [headerCollapsed, setHeaderCollapsed] = useState(false);
   const [showHelp, setShowHelp] = useState(() => {
@@ -1128,22 +1143,10 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
 
   return (
     <View style={[styles.tabContentWrapper, { flex: 1, padding: isLargeScreen ? Spacing.four : Spacing.three }]}>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: headerCollapsed ? 8 : 4 }}>
-        <View style={{ flex: 1, marginRight: 8 }}>
-          <ThemedText style={[styles.sectionTitle, { marginBottom: 0, flexShrink: 1 }]}>
-            Portal Management / நிர்வாகக் குழு
-          </ThemedText>
-        </View>
-        <Pressable 
-          onPress={() => setHeaderCollapsed(!headerCollapsed)} 
-          style={{ paddingVertical: 4, paddingHorizontal: 8, borderRadius: 6, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background }}
-        >
-          <ThemedText style={{ fontSize: 10, fontWeight: '700', color: colors.primary }}>
-            {headerCollapsed 
-              ? (i18n.language === 'ta' ? 'விரிவாக்கு' : 'Expand') 
-              : (i18n.language === 'ta' ? 'சுருக்கு' : 'Minimize')}
-          </ThemedText>
-        </Pressable>
+      <View style={{ marginBottom: 4 }}>
+        <ThemedText style={styles.sectionTitle}>
+          Portal Management / நிர்வாகக் குழு
+        </ThemedText>
       </View>
 
       {!headerCollapsed && (
@@ -1350,7 +1353,7 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
               No users found matching current filters.
             </ThemedText>
           ) : userViewMode === 'card' ? (
-            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: isLargeScreen ? Spacing.four : 80 + (insets?.bottom || 0) + 20 }}>
+            <FlatScrollContainer style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: isLargeScreen ? Spacing.four : 0 }}>
               <View style={{ gap: Spacing.two }}>
                 {filteredUsers.map((u) => {
                   const isChecked = !!selectedUserUids[u.uid];
@@ -1384,10 +1387,23 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
                               </ThemedText>
                             </View>
                           </View>
-                          <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>✉️ {u.email}  |  📞 {u.phone || 'No phone'}</ThemedText>
-                          {u.associatedStudents && u.associatedStudents.length > 0 && (
-                            <ThemedText style={{ fontSize: 11, color: colors.secondary, fontWeight: '600' }}>
-                              🔗 Children: {u.associatedStudents.map((sId: string) => users.find(x => x.uid === sId)?.fullName || sId).join(', ')}
+                          
+                          <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>{u.email}</ThemedText>
+                          
+                          {/* Role-specific details */}
+                          {u.role === 'student' && (
+                            <ThemedText style={{ fontSize: 11, color: colors.textSecondary }}>
+                              Class: {u.className || 'None'}  |  Mainstream: {u.mainstreamSchoolName || '-'}
+                            </ThemedText>
+                          )}
+                          {(u.role === 'teacher' || u.role === 'volunteer') && (
+                            <ThemedText style={{ fontSize: 11, color: colors.textSecondary }}>
+                              Stage: {u.stage || 'None'}  |  WWC: {u.wwcNumber || '-'}
+                            </ThemedText>
+                          )}
+                          {u.role === 'parent' && (
+                            <ThemedText style={{ fontSize: 11, color: colors.textSecondary }}>
+                              Linked Children: {u.associatedStudents?.length || 0}
                             </ThemedText>
                           )}
                           {(u.effectiveFrom || u.prevBmSchoolClass || u.studentCreated) && (
@@ -1412,10 +1428,10 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
                   );
                 })}
               </View>
-            </ScrollView>
+            </FlatScrollContainer>
           ) : (
             <View style={{ flex: 1, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.cardBg, overflow: 'hidden' }}>
-              <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: isLargeScreen ? Spacing.four : 80 + (insets?.bottom || 0) + 20 }}>
+              <FlatScrollContainer style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: isLargeScreen ? Spacing.four : 0 }}>
                 <ScrollView horizontal showsHorizontalScrollIndicator={true}>
                   <View style={{ flexDirection: 'column' }}>
                     {/* Header Row */}
@@ -1785,7 +1801,7 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
                     })}
                   </View>
                 </ScrollView>
-              </ScrollView>
+              </FlatScrollContainer>
             </View>
           )}
         </View>
@@ -1806,7 +1822,7 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
             </Pressable>
           </View>
 
-          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: isLargeScreen ? Spacing.four : 80 + (insets?.bottom || 0) + 20 }}>
+          <FlatScrollContainer style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: isLargeScreen ? Spacing.four : 0 }}>
             <View style={{ gap: Spacing.two }}>
               {classes.map((c) => {
                 const teacherNames = c.teacherIds && c.teacherIds.length > 0
@@ -1817,30 +1833,35 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                       <View style={{ flex: 1, marginRight: 12 }}>
                         <ThemedText style={{ fontSize: 16, fontWeight: '700', color: colors.primary }}>{c.className}</ThemedText>
-                        <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>
-                          👨‍🏫 Teachers: <ThemedText style={{ fontWeight: '700', color: colors.text }}>{teacherNames}</ThemedText>
-                        </ThemedText>
+                        <ThemedText style={{ fontSize: 10, color: colors.textSecondary }}>Classroom structure details & active roster</ThemedText>
                       </View>
-                      
                       <View style={{ flexDirection: 'row', gap: 8 }}>
-                        <Pressable onPress={() => openEditClass(c)} style={{ padding: 8, borderRadius: 8, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border }}>
-                          <Edit size={16} color={colors.textSecondary} />
+                        <Pressable onPress={() => openEditClass(c)} style={{ padding: 6, borderRadius: 6, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border }}>
+                          <Edit size={14} color={colors.textSecondary} />
                         </Pressable>
-                        <Pressable onPress={() => handleDeleteClass(c.classId)} style={{ padding: 8, borderRadius: 8, backgroundColor: colors.primaryLight || '#FFE5E5', borderWidth: 1, borderColor: colors.danger || '#FF4D4D' }}>
-                          <Trash2 size={16} color={colors.danger || '#FF4D4D'} />
+                        <Pressable onPress={() => handleDeleteClass(c.classId)} style={{ padding: 6, borderRadius: 6, backgroundColor: colors.primaryLight || '#FFE5E5', borderWidth: 1, borderColor: colors.danger || '#FF4D4D' }}>
+                          <Trash2 size={14} color={colors.danger || '#FF4D4D'} />
                         </Pressable>
                       </View>
                     </View>
 
-                    {/* Enrolled details */}
-                    <View style={{ flexDirection: 'row', gap: 20, borderTopWidth: 1, borderColor: colors.border, paddingTop: 10 }}>
-                      <View style={{ flex: 1 }}>
+                    <View style={{ gap: 4, marginBottom: 12 }}>
+                      <ThemedText style={{ fontSize: 13, fontWeight: '700' }}>
+                        Teachers: <ThemedText style={{ fontWeight: '500', color: colors.textSecondary }}>{teacherNames}</ThemedText>
+                      </ThemedText>
+                      <ThemedText style={{ fontSize: 13, fontWeight: '700' }}>
+                        BM School Grade Level: <ThemedText style={{ fontWeight: '500', color: colors.textSecondary }}>{c.bmSchoolClass || 'Not defined'}</ThemedText>
+                      </ThemedText>
+                    </View>
+
+                    <View style={{ flexDirection: 'row', gap: Spacing.four, borderTopWidth: 1, borderColor: colors.border, paddingTop: 12 }}>
+                      <View style={{ flex: 1, borderRightWidth: 1, borderColor: colors.border, paddingRight: 8 }}>
                         <ThemedText style={{ fontSize: 12, fontWeight: '700', color: colors.secondary, marginBottom: 4 }}>
-                          Students ({c.studentIds?.length || 0})
+                          Students ({c.associatedStudentIds?.length || 0})
                         </ThemedText>
                         <ThemedText style={{ fontSize: 11, color: colors.text }}>
-                          {c.studentIds && c.studentIds.length > 0
-                            ? c.studentIds.map((sId: string) => users.find(x => x.uid === sId)?.fullName || sId).join(', ')
+                          {c.associatedStudentIds && c.associatedStudentIds.length > 0
+                            ? c.associatedStudentIds.map((sId: string) => users.find(x => x.uid === sId)?.fullName || sId).join(', ')
                             : 'None'
                           }
                         </ThemedText>
@@ -1862,7 +1883,7 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
                 );
               })}
             </View>
-          </ScrollView>
+          </FlatScrollContainer>
         </View>
       ) : subTab === 'calendar' ? (
         /* CALENDAR SUB-TAB */
@@ -2039,17 +2060,13 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
             </View>
           );
 
-          return isLargeScreen ? (
+          return (
             <View style={{ flex: 1 }}>{calendarContent}</View>
-          ) : (
-            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 80 + (insets?.bottom || 0) + 20 }}>
-              {calendarContent}
-            </ScrollView>
           );
         })()
       ) : subTab === 'import_export' ? (
         /* IMPORT_EXPORT SUB-TAB */
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ gap: Spacing.three, paddingBottom: isLargeScreen ? Spacing.three : 80 + (insets?.bottom || 0) + 20 }}>
+        <FlatScrollContainer style={{ flex: 1 }} contentContainerStyle={{ gap: Spacing.three, paddingBottom: isLargeScreen ? Spacing.three : 0 }}>
           <View style={{ flexDirection: 'row', gap: Spacing.two, borderBottomWidth: 1, borderColor: colors.border, paddingBottom: 10 }}>
             <ThemedText style={{ fontSize: 16, fontWeight: '800', color: colors.primary }}>📤 Spreadsheet Bulk Utilities / விரிதாள் தரவு மேலாண்மை</ThemedText>
           </View>
@@ -2424,7 +2441,7 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
               </View>
             </View>
           </View>
-        </ScrollView>
+        </FlatScrollContainer>
       ) : (
         /* WAITLIST SUB-TAB */
         <View style={{ flex: 1 }}>
@@ -2709,7 +2726,7 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
 
             const waitlistTableContent = (
               <View style={{ flex: 1, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.cardBg, overflow: 'hidden' }}>
-                <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: isLargeScreen ? Spacing.four : 80 + (insets?.bottom || 0) + 20 }}>
+                <FlatScrollContainer style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: isLargeScreen ? Spacing.four : 0 }}>
                   <ScrollView horizontal showsHorizontalScrollIndicator={true}>
                     <View style={{ flexDirection: 'column' }}>
                       {/* Header Row */}
@@ -2872,7 +2889,7 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
                       })}
                     </View>
                   </ScrollView>
-                </ScrollView>
+                </FlatScrollContainer>
               </View>
             );
 
@@ -2882,9 +2899,7 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
                   {waitlistListContent}
                 </ScrollView>
               ) : (
-                <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 80 + (insets?.bottom || 0) + 20 }}>
-                  {waitlistListContent}
-                </ScrollView>
+                waitlistListContent
               )
             ) : (
               waitlistTableContent
