@@ -91,6 +91,7 @@ export function NewsfeedTab({
 }) {
   const { width: windowWidth } = useWindowDimensions();
   const [posts, setPosts] = useState<any[]>([]);
+  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
   const [showHelp, setShowHelp] = useState(() => {
     if (typeof window !== 'undefined' && window.localStorage) {
       return window.localStorage.getItem('pallithozhan_help_newsfeed') !== 'hidden';
@@ -677,22 +678,29 @@ export function NewsfeedTab({
   const currentFolderItems = getCurrentFolderItems(drivePathStack);
 
   // Audience filtering: Parents and Students seeGeneral posts OR those tagged to their class or UID
-  const audienceFilteredPosts = posts.filter(post => {
-    if (['admin', 'teacher', 'volunteer'].includes(user?.role || '')) {
-      return true; // Staff sees all broadcasts
-    }
-    const hasTags = (post.taggedClassIds && post.taggedClassIds.length > 0) || 
-                    (post.taggedStudentIds && post.taggedStudentIds.length > 0);
-    if (!hasTags) return true; // General post
+  // Sorted dynamically based on the active sortOrder state
+  const audienceFilteredPosts = posts
+    .filter(post => {
+      if (['admin', 'teacher', 'volunteer'].includes(user?.role || '')) {
+        return true; // Staff sees all broadcasts
+      }
+      const hasTags = (post.taggedClassIds && post.taggedClassIds.length > 0) || 
+                      (post.taggedStudentIds && post.taggedStudentIds.length > 0);
+      if (!hasTags) return true; // General post
 
-    const targetStudentId = activeStudentId || (user?.role === 'parent' ? (user.associatedStudents?.[0] || 'student_1') : (user?.uid || 'student_1'));
-    const studentClass = allClasses.find(c => c.studentIds && c.studentIds.includes(targetStudentId));
-    
-    const matchClass = studentClass && post.taggedClassIds?.includes(studentClass.classId);
-    const matchStudent = post.taggedStudentIds?.includes(targetStudentId);
+      const targetStudentId = activeStudentId || (user?.role === 'parent' ? (user.associatedStudents?.[0] || 'student_1') : (user?.uid || 'student_1'));
+      const studentClass = allClasses.find(c => c.studentIds && c.studentIds.includes(targetStudentId));
+      
+      const matchClass = studentClass && post.taggedClassIds?.includes(studentClass.classId);
+      const matchStudent = post.taggedStudentIds?.includes(targetStudentId);
 
-    return matchClass || matchStudent;
-  });
+      return matchClass || matchStudent;
+    })
+    .sort((a, b) => {
+      const timeA = new Date(a.createdAt || 0).getTime();
+      const timeB = new Date(b.createdAt || 0).getTime();
+      return sortOrder === 'newest' ? timeB - timeA : timeA - timeB;
+    });
 
   return (
     <View style={styles.tabContentWrapper}>
@@ -1181,6 +1189,45 @@ export function NewsfeedTab({
 
       {/* Broadcast news lists */}
       <View style={{ flex: 1 }}>
+        <View style={{ 
+          flexDirection: 'row', 
+          justifyContent: 'space-between', 
+          alignItems: 'center', 
+          marginBottom: Spacing.two,
+          paddingHorizontal: Spacing.one
+        }}>
+          <ThemedText style={{ fontSize: 13, fontWeight: '700', color: colors.text }}>
+            {i18n.language === 'ta' ? `அறிவிப்புகள் (${audienceFilteredPosts.length})` : `Announcements (${audienceFilteredPosts.length})`}
+          </ThemedText>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <ThemedText style={{ fontSize: 11, color: colors.textSecondary }}>
+              {i18n.language === 'ta' ? 'வரிசைப்படுத்து:' : 'Sort by:'}
+            </ThemedText>
+            <Pressable
+              onPress={() => setSortOrder(prev => prev === 'newest' ? 'oldest' : 'newest')}
+              style={({ pressed }) => [
+                {
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingHorizontal: 8,
+                  paddingVertical: 4,
+                  borderRadius: 6,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  backgroundColor: colors.cardBg,
+                  opacity: pressed ? 0.8 : 1
+                }
+              ]}
+            >
+              <ThemedText style={{ fontSize: 11, fontWeight: '600', color: colors.primary }}>
+                {sortOrder === 'newest' 
+                  ? (i18n.language === 'ta' ? 'புதியது முதலில்' : 'Newest First') 
+                  : (i18n.language === 'ta' ? 'பழையது முதலில்' : 'Oldest First')}
+              </ThemedText>
+            </Pressable>
+          </View>
+        </View>
+
         <View style={styles.postsList}>
           {audienceFilteredPosts.map((post) => {
             const title = i18n.language === 'ta' ? post.title.ta : post.title.en;
