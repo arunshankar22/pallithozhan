@@ -2204,15 +2204,12 @@ export function ReportsTab({
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Student Progress Report — Balar Malar Parramatta</title>
 <style>
-  /* ── Google Fonts for Tamil ── */
-  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Tamil:wght@400;600;700&family=Noto+Sans:wght@400;600;700&display=swap');
-
   /* ── Reset ── */
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   /* ── Page setup ── */
   body {
-    font-family: 'Noto Sans', 'Noto Sans Tamil', Arial, sans-serif;
+    font-family: 'Tamil MN', 'Latha', 'Arial Unicode MS', 'Noto Sans Tamil', Arial, sans-serif;
     font-size: 11px;
     color: #1a1a1a;
     background: #f5f5f5;
@@ -2898,21 +2895,11 @@ export function ReportsTab({
 
 </div>
 <script>
-  window.addEventListener('DOMContentLoaded', () => {
-    if (document.fonts) {
-      document.fonts.ready.then(() => {
-        setTimeout(() => {
-          window.print();
-        }, 500);
-      });
-    } else {
-      window.onload = () => {
-        setTimeout(() => {
-          window.print();
-        }, 500);
-      };
-    }
-  });
+  window.onload = () => {
+    setTimeout(() => {
+      window.print();
+    }, 200);
+  };
 </script>
 </body>
 </html>
