@@ -114,34 +114,40 @@ export const userService = {
   },
 
   getUsers: async (): Promise<any[]> => {
-    if (!db) throw new Error('Firestore database is not initialized');
-    const querySnapshot = await getDocs(collection(db, 'users'));
-    const usersList: any[] = [];
-    querySnapshot.forEach((docSnap) => {
-      usersList.push({ uid: docSnap.id, ...docSnap.data() });
-    });
-    
-    // Self-healing seeding: Ensure all DEFAULT_USERS exist in the database
-    for (const u of DEFAULT_USERS) {
-      const exists = usersList.some((user) => user.email && user.email.toLowerCase() === u.email.toLowerCase());
-      if (!exists) {
-        console.log(`[userService] Seeding missing default user: ${u.email}`);
-        await userService.createUser(u);
-        usersList.push(u);
+    try {
+      if (!db) return DEFAULT_USERS;
+      const querySnapshot = await getDocs(collection(db, 'users'));
+      const usersList: any[] = [];
+      querySnapshot.forEach((docSnap) => {
+        usersList.push({ uid: docSnap.id, ...docSnap.data() });
+      });
+      for (const u of DEFAULT_USERS) {
+        const exists = usersList.some((user) => user.email && user.email.toLowerCase() === u.email.toLowerCase());
+        if (!exists) {
+          usersList.push(u);
+        }
       }
+      return usersList.length > 0 ? usersList : DEFAULT_USERS;
+    } catch (e) {
+      console.warn('[userService] Falling back to DEFAULT_USERS:', e);
+      return DEFAULT_USERS;
     }
-    return usersList;
   },
 
   getUser: async (uid: string): Promise<any | null> => {
-    if (!db) throw new Error('Firestore database is not initialized');
-    const docRef = doc(db, 'users', uid);
-    const docSnap = await getDoc(docRef);
-    if (docSnap.exists()) {
-      return { uid: docSnap.id, ...docSnap.data() };
+    try {
+      if (!db) return DEFAULT_USERS.find(u => u.uid === uid) || null;
+      const docRef = doc(db, 'users', uid);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        return { uid: docSnap.id, ...docSnap.data() };
+      }
+      return DEFAULT_USERS.find(u => u.uid === uid) || null;
+    } catch (e) {
+      return DEFAULT_USERS.find(u => u.uid === uid) || null;
     }
-    return null;
   },
+
 
   createUser: async (user: any): Promise<any> => {
     if (!db) throw new Error('Firestore database is not initialized');

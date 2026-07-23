@@ -21,21 +21,18 @@ export const attendanceService = {
   },
 
   getAttendance: async (): Promise<any[]> => {
-    if (!db) throw new Error('Firestore database is not initialized');
-    const querySnapshot = await getDocs(collection(db, 'attendance'));
-    const attList: any[] = [];
-    querySnapshot.forEach((docSnap) => {
-      attList.push({ recordId: docSnap.id, ...docSnap.data() });
-    });
-    
-    if (attList.length === 0) {
-      for (const a of DEFAULT_ATTENDANCE) {
-        const { recordId, ...details } = a;
-        await setDoc(doc(db, 'attendance', recordId), details);
-        attList.push(a);
-      }
+    try {
+      if (!db) return DEFAULT_ATTENDANCE;
+      const querySnapshot = await getDocs(collection(db, 'attendance'));
+      const attList: any[] = [];
+      querySnapshot.forEach((docSnap) => {
+        attList.push({ recordId: docSnap.id, ...docSnap.data() });
+      });
+      return attList.length > 0 ? attList : DEFAULT_ATTENDANCE;
+    } catch (e) {
+      console.warn('[attendanceService] Falling back to DEFAULT_ATTENDANCE:', e);
+      return DEFAULT_ATTENDANCE;
     }
-    return attList;
   },
 
   getAttendanceRecord: async (classId: string, date: string): Promise<any | null> => {

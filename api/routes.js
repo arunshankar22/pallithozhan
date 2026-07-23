@@ -785,6 +785,112 @@ async function handleApiRoutes(req, res, pathname, method, dbData, writeDb, urlO
     return true;
   }
 
+  // POST /api/support/submit (Save support ticket and dispatch email notifications)
+  if (pathname === '/api/support/submit' && method === 'POST') {
+    try {
+      const body = await parseBody(req);
+      const ticket = {
+        name: body.name || '',
+        email: body.email || '',
+        subject: body.subject || '',
+        message: body.message || ''
+      };
+      
+      console.log('[Backend API] Received support ticket submission:', ticket);
+      
+      // Save to local JSON database for mock persistence
+      if (!dbData.support_tickets) {
+        dbData.support_tickets = [];
+      }
+      const newTicket = {
+        id: `ticket_${Date.now()}`,
+        ...ticket,
+        status: 'new',
+        createdAt: new Date().toISOString()
+      };
+      dbData.support_tickets.push(newTicket);
+      writeDb(dbData);
+
+      // Attempt to send email via Resend if RESEND_API_KEY is available
+      if (process.env.RESEND_API_KEY) {
+        const senderEmail = process.env.SENDER_EMAIL || 'noreply@3stech.com.au';
+        const adminRecipient = process.env.SUPPORT_EMAIL || 'arun.zorro@gmail.com';
+
+        // 1. Admin notification email
+        const adminResponse = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${process.env.RESEND_API_KEY}`
+          },
+          body: JSON.stringify({
+            from: `pallithozhan app from Balar Malar Tamil School - Parramatta <${senderEmail}>`,
+            to: adminRecipient,
+            subject: `[PalliThozhan Support] ${ticket.subject}`,
+            html: `
+              <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; line-height: 1.6;">
+                <h2 style="color: #1E352F; border-bottom: 2px solid #FAF6EB; padding-bottom: 10px;">New Support Ticket Received</h2>
+                <p><strong>From:</strong> ${ticket.name} (<a href="mailto:${ticket.email}">${ticket.email}</a>)</p>
+                <p><strong>Subject:</strong> ${ticket.subject}</p>
+                <p><strong>Message:</strong></p>
+                <div style="background-color: #FAF8F4; padding: 15px; border-left: 4px solid #EA5330; border-radius: 4px; white-space: pre-wrap;">
+                  ${ticket.message}
+                </div>
+                <hr style="border: 0; border-top: 1px solid #E6E4DF; margin-top: 20px;" />
+                <p style="font-size: 11px; color: #999;">Sent automatically by PalliThozhan Portal.</p>
+              </div>
+            `
+          })
+        });
+
+        if (!adminResponse.ok) {
+          console.warn('[Backend API] Failed to send admin support notification via Resend:', await adminResponse.text());
+        }
+
+        // 2. User confirmation email
+        const userResponse = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${process.env.RESEND_API_KEY}`
+          },
+          body: JSON.stringify({
+            from: `pallithozhan app from Balar Malar Tamil School - Parramatta <${senderEmail}>`,
+            to: ticket.email,
+            subject: `We received your inquiry: ${ticket.subject}`,
+            html: `
+              <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; line-height: 1.6;">
+                <h2 style="color: #1E352F; border-bottom: 2px solid #FAF6EB; padding-bottom: 10px;">Ticket Received</h2>
+                <p>Dear ${ticket.name},</p>
+                <p>Thank you for contacting Balar Malar Tamil School Support. We have received your message and our Parramatta campus team will get back to you shortly.</p>
+                <p><strong>Copy of your message:</strong></p>
+                <div style="background-color: #FAF8F4; padding: 15px; border-left: 4px solid #EA5330; border-radius: 4px; white-space: pre-wrap;">
+                  ${ticket.message}
+                </div>
+                <p>Warm regards,<br/><strong>Balar Malar Parramatta Campus Team</strong></p>
+                <hr style="border: 0; border-top: 1px solid #E6E4DF; margin-top: 20px;" />
+                <p style="font-size: 11px; color: #999;">Please do not reply directly to this automated email. For urgent assistance, contact: parramatta@balarmalar.nsw.edu.au</p>
+              </div>
+            `
+          })
+        });
+
+        if (!userResponse.ok) {
+          console.warn('[Backend API] Failed to send user support confirmation via Resend:', await userResponse.text());
+        }
+        console.log('[Backend API] Successfully dispatched support emails via Resend.');
+      } else {
+        console.warn('[Backend API] RESEND_API_KEY not configured on server. Skipping email dispatch.');
+      }
+
+      sendJson(res, 200, { success: true, message: 'Ticket submitted and persistent.' });
+    } catch (err) {
+      console.error('[Backend API] Error in /api/support/submit:', err);
+      sendJson(res, 500, { error: 'Failed to submit support ticket.', message: err.message });
+    }
+    return true;
+  }
+
   return false;
 }
 

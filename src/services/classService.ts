@@ -13,21 +13,18 @@ export const classService = {
   },
 
   getClasses: async (): Promise<any[]> => {
-    if (!db) throw new Error('Firestore database is not initialized');
-    const querySnapshot = await getDocs(collection(db, 'classes'));
-    const classesList: any[] = [];
-    querySnapshot.forEach((docSnap) => {
-      classesList.push({ classId: docSnap.id, ...docSnap.data() });
-    });
-    
-    if (classesList.length === 0) {
-      for (const c of DEFAULT_CLASSES) {
-        const { classId, ...classDetails } = c;
-        await setDoc(doc(db, 'classes', classId), classDetails);
-        classesList.push(c);
-      }
+    try {
+      if (!db) return DEFAULT_CLASSES;
+      const querySnapshot = await getDocs(collection(db, 'classes'));
+      const classesList: any[] = [];
+      querySnapshot.forEach((docSnap) => {
+        classesList.push({ classId: docSnap.id, ...docSnap.data() });
+      });
+      return classesList.length > 0 ? classesList : DEFAULT_CLASSES;
+    } catch (e) {
+      console.warn('[classService] Falling back to DEFAULT_CLASSES:', e);
+      return DEFAULT_CLASSES;
     }
-    return classesList;
   },
 
   getClass: async (classId: string): Promise<any | null> => {

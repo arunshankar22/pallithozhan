@@ -68,53 +68,62 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const initAuth = async () => {
       setIsLoading(true);
-      if (isDemoMode) {
-        // Look for existing session in localStorage
-        const storedUid = typeof window !== 'undefined' && typeof window.localStorage !== 'undefined' ? window.localStorage.getItem('pallithozhan_session_uid') : null;
-        if (storedUid) {
-          const profile = await mockDb.getUser(storedUid);
+      const urlMockUser = typeof window !== 'undefined' && window.location ? new URLSearchParams(window.location.search).get('mockUser') : null;
+      if (urlMockUser || isDemoMode) {
+        const targetUid = urlMockUser || (typeof window !== 'undefined' && typeof window.localStorage !== 'undefined' ? window.localStorage.getItem('pallithozhan_session_uid') : null);
+        if (targetUid) {
+          const profile = await mockDb.getUser(targetUid);
           if (profile) {
             setUser(resolveUserProfile(profile));
             i18n.changeLanguage(profile.languagePreference);
+            setIsLoading(false);
+            return;
           }
         }
-      } else {
-        // Enforce Firebase production sync
-        fbAuth.onAuthStateChanged(async (fbUser: any) => {
-          try {
-            if (fbUser) {
-              // Fetch profile from Firestore mock/production
-              const profile = await mockDb.getUser(fbUser.uid);
-              if (profile) {
-                if (profile.role === 'student' && !profile.studentCode) {
-                  try {
-                    const { achievementService } = require('./achievementService');
-                    const achs = await achievementService.getAchievements();
-                    const match = achs.find((a: any) => a.studentName && a.studentName.toLowerCase().trim() === profile.fullName.toLowerCase().trim());
-                    if (match && match.studentId && match.studentId !== profile.uid) {
-                      console.log(`[Self-Healing] Mapping student UID ${profile.uid} to roll number ${match.studentId}`);
-                      await mockDb.updateUser(profile.uid, { studentCode: match.studentId });
-                      profile.studentCode = match.studentId;
+      }
+      if (!isDemoMode && !urlMockUser) {
+        // Enforce Firebase production sync if initialized
+        if (fbAuth) {
+          fbAuth.onAuthStateChanged(async (fbUser: any) => {
+            try {
+              if (fbUser) {
+                // Fetch profile from Firestore mock/production
+                const profile = await mockDb.getUser(fbUser.uid);
+                if (profile) {
+                  if (profile.role === 'student' && !profile.studentCode) {
+                    try {
+                      const { achievementService } = require('./achievementService');
+                      const achs = await achievementService.getAchievements();
+                      const match = achs.find((a: any) => a.studentName && a.studentName.toLowerCase().trim() === profile.fullName.toLowerCase().trim());
+                      if (match && match.studentId && match.studentId !== profile.uid) {
+                        console.log(`[Self-Healing] Mapping student UID ${profile.uid} to roll number ${match.studentId}`);
+                        await mockDb.updateUser(profile.uid, { studentCode: match.studentId });
+                        profile.studentCode = match.studentId;
+                      }
+                    } catch (e) {
+                      console.warn('[Self-Healing] Failed to map student code:', e);
                     }
-                  } catch (e) {
-                    console.warn('[Self-Healing] Failed to map student code:', e);
                   }
+                  setUser(resolveUserProfile(profile));
+                  i18n.changeLanguage(profile.languagePreference);
+                } else {
+                  setUser(null);
                 }
-                setUser(resolveUserProfile(profile));
-                i18n.changeLanguage(profile.languagePreference);
               } else {
                 setUser(null);
               }
-            } else {
+            } catch (err) {
+              console.warn('Failed to load user profile from Firestore on auth sync:', err);
+              // Gracefully clear the invalid/outdated session to fall back to login screen
+              fbAuth.signOut().catch(() => {});
               setUser(null);
             }
-          } catch (err) {
-            console.warn('Failed to load user profile from Firestore on auth sync:', err);
-            // Gracefully clear the invalid/outdated session to fall back to login screen
-            fbAuth.signOut().catch(() => {});
-            setUser(null);
-          }
-        });
+          });
+        } else {
+          console.warn("[Auth Init] Firebase Auth is not initialized. Defaulting to unauthenticated state.");
+          setUser(null);
+          setIsLoading(false);
+        }
       }
       setIsLoading(false);
     };

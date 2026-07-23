@@ -1565,6 +1565,131 @@ export function ReportsTab({
     }
   };
 
+  const handleExportProgressReports = (format: 'csv' | 'excel') => {
+    if (!classReports || classReports.length === 0) {
+      showToast(
+        i18n.language === 'ta' ? 'ஏற்றுமதி செய்ய அறிக்கைகள் இல்லை.' : 'No progress reports available to export.',
+        'warning'
+      );
+      return;
+    }
+
+    const headers = [
+      'Student ID', 'Student Name', 'Level', 'Class/Year', 'Academic Year', 'Term',
+      'Speaking - Body Language', 'Speaking - Vocabulary', 'Speaking - Conversation',
+      'Listening - Visual Comprehension', 'Listening - Oral Understanding', 'Listening - Response Accuracy',
+      'Reading - Fluency', 'Reading - Vocabulary Comprehension', 'Reading - Grammar Conventions',
+      'Writing - Word Accuracy', 'Writing - Sentence Arrangement', 'Writing - Grammar Accuracy',
+      'Attitude - Punctuality', 'Attitude - Enthusiasm', 'Attitude - Peer Interaction',
+      'Attitude - Kind Language', 'Attitude - Expressing Confidence', 'Attitude - Homework Completion',
+      'Teacher Comments', 'Teacher Comments (Tamil)', 'Attendance', 'Parent Signed', 'Parent Signature Date'
+    ];
+
+    const rows = classReports.map(rep => {
+      const student = students.find((s: any) => s.uid === rep.studentId) || 
+                      parentStudents.find((s: any) => s.uid === rep.studentId);
+      const studentName = student ? student.fullName : (rep.studentName || 'Unknown');
+
+      // Resolve class name using classId from either the report or student profile
+      const cls = classes.find((c: any) => c.classId === rep.classId) || 
+                  classes.find((c: any) => c.classId === student?.classId);
+      const classYear = cls?.className || student?.className || rep.classId || '';
+
+      // Resolve level: check if explicitly on student, extract from classYear, or fallback to '2'
+      let level = student?.level || '';
+      if (!level && classYear) {
+        const match = classYear.match(/(?:Standard|Year|நிலை|ஆண்டு)\s*(\d+)/i);
+        if (match) {
+          level = match[1];
+        }
+      }
+      if (!level) level = '2'; // Fallback default
+
+      return [
+        rep.studentId || '',
+        studentName,
+        level,
+        classYear,
+        rep.academicYear || '',
+        rep.term || '',
+        rep.skills?.speaking?.bodyLanguage || '',
+        rep.skills?.speaking?.vocabulary || '',
+        rep.skills?.speaking?.conversation || '',
+        rep.skills?.listening?.visualComprehension || '',
+        rep.skills?.listening?.oralUnderstanding || '',
+        rep.skills?.listening?.responseAccuracy || '',
+        rep.skills?.reading?.fluency || '',
+        rep.skills?.reading?.vocabularyComprehension || '',
+        rep.skills?.reading?.grammarConventions || '',
+        rep.skills?.writing?.wordAccuracy || '',
+        rep.skills?.writing?.sentenceArrangement || '',
+        rep.skills?.writing?.grammarAccuracy || '',
+        rep.attitudes?.punctuality || '',
+        rep.attitudes?.enthusiasm || '',
+        rep.attitudes?.peerInteraction || '',
+        rep.attitudes?.kindLanguage || '',
+        rep.attitudes?.expressingConfidence || '',
+        rep.attitudes?.homeworkCompletion || '',
+        rep.teacherComments || '',
+        rep.teacherCommentsTamil || '',
+        rep.attendance ? `${rep.attendance}%` : '',
+        rep.parentSigned ? 'YES' : 'NO',
+        rep.parentSignatureDate || ''
+      ];
+    });
+
+    if (format === 'csv') {
+      let csvContent = '\uFEFF'; // Add BOM for Excel UTF-8 encoding support
+      csvContent += headers.map(h => `"${h.replace(/"/g, '""')}"`).join(',') + '\n';
+      rows.forEach(row => {
+        csvContent += row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',') + '\n';
+      });
+
+      if (Platform.OS === 'web') {
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', `Student_Progress_Reports_Term_${reportTerm}_${Date.now()}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        showToast(
+          i18n.language === 'ta' ? `CSV கோப்பாக ஏற்றுமதி செய்யப்பட்டது` : `CSV Exported: ${classReports.length} report(s)`,
+          'success'
+        );
+      } else {
+        showToast(`CSV Exported: ${classReports.length} report(s)`, 'success');
+      }
+    } else {
+      let excelContent = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">';
+      excelContent += '<head><meta charset="UTF-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Progress Reports</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head><body>';
+      excelContent += '<table border="1">';
+      excelContent += '<tr>' + headers.map(h => `<th style="background-color: #D97706; color: white; padding: 6px; font-weight: bold;">${h}</th>`).join('') + '</tr>';
+      rows.forEach(row => {
+        excelContent += '<tr>' + row.map(cell => `<td style="padding: 6px; border: 1px solid #ddd;">${cell}</td>`).join('') + '</tr>';
+      });
+      excelContent += '</table></body></html>';
+
+      if (Platform.OS === 'web') {
+        const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), excelContent], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', `Student_Progress_Reports_Term_${reportTerm}_${Date.now()}.xls`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        showToast(
+          i18n.language === 'ta' ? `Excel கோப்பாக ஏற்றுமதி செய்யப்பட்டது` : `Excel Exported: ${classReports.length} report(s)`,
+          'success'
+        );
+      } else {
+        showToast(`Excel Exported: ${classReports.length} report(s)`, 'success');
+      }
+    }
+  };
+
   // Helper to filter student list in Record form if Class selected
   const filteredFormStudents = formClassId
     ? students.filter(s => {
@@ -2937,10 +3062,56 @@ export function ReportsTab({
 
     return (
       <View style={{ gap: Spacing.three }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: colors.border, paddingBottom: 10 }}>
-          <ThemedText style={{ fontSize: 14, fontWeight: '800', color: colors.primary }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: colors.border, paddingBottom: 10, flexWrap: 'wrap', gap: 12 }}>
+          <ThemedText style={{ fontSize: 14, fontWeight: '800', color: colors.primary, flex: 1, minWidth: 200 }}>
             {selectedClassName} - {i18n.language === 'ta' ? `வகுப்பு சுருக்கம் (பருவம் ${reportTerm})` : `Class Summary Table (Term ${reportTerm})`}
           </ThemedText>
+
+          {/* Export buttons for Admins & Volunteers */}
+          {(user?.role === 'admin' || user?.role === 'superadmin' || user?.role === 'volunteer') && (
+            <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+              <Pressable
+                onPress={() => handleExportProgressReports('csv')}
+                style={({ pressed }) => [
+                  {
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    height: 32,
+                    borderRadius: 6,
+                    paddingHorizontal: 12,
+                    backgroundColor: colors.secondary,
+                    opacity: pressed ? 0.8 : 1
+                  }
+                ]}
+              >
+                <Download size={12} color="#FFF" style={{ marginRight: 6 }} />
+                <ThemedText style={{ color: '#FFF', fontSize: 11, fontWeight: '700' }}>
+                  {i18n.language === 'ta' ? 'CSV ஏற்றுமதி' : 'Export Reports CSV'}
+                </ThemedText>
+              </Pressable>
+              <Pressable
+                onPress={() => handleExportProgressReports('excel')}
+                style={({ pressed }) => [
+                  {
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    height: 32,
+                    borderRadius: 6,
+                    paddingHorizontal: 12,
+                    backgroundColor: '#217346',
+                    opacity: pressed ? 0.8 : 1
+                  }
+                ]}
+              >
+                <Download size={12} color="#FFF" style={{ marginRight: 6 }} />
+                <ThemedText style={{ color: '#FFF', fontSize: 11, fontWeight: '700' }}>
+                  {i18n.language === 'ta' ? 'Excel ஏற்றுமதி' : 'Export Reports Excel'}
+                </ThemedText>
+              </Pressable>
+            </View>
+          )}
         </View>
 
         {classReportsLoading ? (

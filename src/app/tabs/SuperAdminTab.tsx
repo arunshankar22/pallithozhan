@@ -22,7 +22,8 @@ import {
   User as UserIcon,
   ChevronRight,
   Database,
-  RefreshCw
+  RefreshCw,
+  Settings
 } from 'lucide-react-native';
 import { ThemedText } from '@/components/themed-text';
 import { TabProps } from '@/app/sharedTypes';
@@ -79,11 +80,15 @@ const getActionIcon = (action: string) => {
 };
 
 export function SuperAdminTab({ user, colors, t, showToast, i18n }: TabProps) {
-  const [activeSubTab, setActiveSubTab] = useState<'users' | 'logs'>('users');
+  const [activeSubTab, setActiveSubTab] = useState<'users' | 'logs' | 'settings'>('users');
   const [usersList, setUsersList] = useState<any[]>([]);
   const [logsList, setLogsList] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Support config state
+  const [supportEmailInput, setSupportEmailInput] = useState('arun.zorro@gmail.com');
+  const [savingSettings, setSavingSettings] = useState(false);
 
   // Search & Filter state
   const [userSearch, setUserSearch] = useState('');
@@ -109,11 +114,62 @@ export function SuperAdminTab({ user, colors, t, showToast, i18n }: TabProps) {
       const fetchedLogs = await auditLogService.getAuditLogs();
       setUsersList(fetchedUsers);
       setLogsList(fetchedLogs);
+
+      // Load support email config from Firestore
+      try {
+        const { db } = require('@/services/firebase');
+        const { doc, getDoc } = require('firebase/firestore');
+        if (db) {
+          const configSnap = await getDoc(doc(db, 'system_config', 'support'));
+          if (configSnap.exists()) {
+            setSupportEmailInput(configSnap.data().supportEmail || 'arun.zorro@gmail.com');
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to load support config from Firestore', err);
+      }
     } catch (e) {
       showToast(i18n.language === 'ta' ? 'தரவை ஏற்ற முடியவில்லை' : 'Failed to load portal data', 'error');
     } finally {
       setLoading(false);
       setRefreshing(false);
+    }
+  };
+
+  const handleSaveSettings = async () => {
+    if (!supportEmailInput) return;
+    setSavingSettings(true);
+    try {
+      const { db } = require('@/services/firebase');
+      const { doc, setDoc } = require('firebase/firestore');
+      if (!db) throw new Error('Firestore not initialized');
+      
+      await setDoc(doc(db, 'system_config', 'support'), {
+        supportEmail: supportEmailInput,
+        updatedAt: new Date().toISOString(),
+        updatedBy: user?.email || 'superadmin'
+      }, { merge: true });
+
+      // Log audit log
+      await auditLogService.logAction(
+        'update_system_config',
+        user?.uid || 'unknown',
+        user?.fullName || 'Super Admin',
+        user?.role || 'superadmin',
+        `Updated support config email to: ${supportEmailInput}`
+      );
+
+      showToast(
+        i18n.language === 'ta' ? 'அமைப்புகள் சேமிக்கப்பட்டன!' : 'Support configuration saved successfully!',
+        'success'
+      );
+    } catch (err) {
+      showToast(
+        i18n.language === 'ta' ? 'சேமிப்பதில் பிழை ஏற்பட்டது.' : 'Failed to save settings.',
+        'error'
+      );
+    } finally {
+      setSavingSettings(false);
     }
   };
 
@@ -287,6 +343,22 @@ export function SuperAdminTab({ user, colors, t, showToast, i18n }: TabProps) {
             {isTa ? 'கணினி பதிவுகள் (Audit Logs)' : 'Audit Logs'}
           </ThemedText>
         </Pressable>
+
+        <Pressable
+          style={[
+            stylesTab.tabButton,
+            activeSubTab === 'settings' && [stylesTab.tabActiveButton, { borderColor: colors.primary }]
+          ]}
+          onPress={() => setActiveSubTab('settings')}
+        >
+          <Settings size={16} color={activeSubTab === 'settings' ? colors.primary : colors.textSecondary} />
+          <ThemedText style={[
+            stylesTab.tabText,
+            activeSubTab === 'settings' ? { color: colors.primary, fontWeight: '700' } : { color: colors.textSecondary }
+          ]}>
+            {isTa ? 'அமைப்புகள்' : 'Settings'}
+          </ThemedText>
+        </Pressable>
       </View>
 
       {loading ? (
@@ -402,7 +474,7 @@ export function SuperAdminTab({ user, colors, t, showToast, i18n }: TabProps) {
             </View>
           </ScrollView>
         </View>
-      ) : (
+      ) : activeSubTab === 'logs' ? (
         // --- SORTABLE AUDIT LOGS TABLE VIEW ---
         <View style={{ flex: 1 }}>
           {/* Audit Logs Filters */}
@@ -525,6 +597,61 @@ export function SuperAdminTab({ user, colors, t, showToast, i18n }: TabProps) {
             </View>
           </ScrollView>
         </View>
+      ) : (
+        // --- SETTINGS VIEW ---
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16 }}>
+          <View style={[stylesTab.card, { backgroundColor: colors.backgroundElement, borderColor: colors.border, gap: 12 }]}>
+            <ThemedText style={[stylesTab.cardTitle, { color: colors.primary, fontSize: 16, fontWeight: '800' }]}>
+              {isTa ? 'உதவி மைய அமைப்புகள்' : 'Help & Support Configurations'}
+            </ThemedText>
+            <ThemedText style={{ color: colors.textSecondary, fontSize: 12, lineHeight: 16 }}>
+              {isTa 
+                ? 'பயனர்கள் உதவி மையப் பக்கத்திலிருந்து அனுப்பும் செய்திகளைப் பெறும் மின்னஞ்சல் முகவரி.' 
+                : 'Configure the email address that receives support tickets and inquiries submitted from the Help & Support Center page.'}
+            </ThemedText>
+
+            <View style={{ gap: 8, marginTop: 12 }}>
+              <ThemedText style={{ fontSize: 12, fontWeight: '700', color: colors.text }}>
+                {isTa ? 'பெறுநரின் மின்னஞ்சல் முகவரி *' : 'Support Recipient Email *'}
+              </ThemedText>
+              <TextInput
+                value={supportEmailInput}
+                onChangeText={setSupportEmailInput}
+                placeholder="arun.zorro@gmail.com"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                style={[
+                  stylesTab.textInput, 
+                  { 
+                    color: colors.text,
+                    backgroundColor: colors.background,
+                    borderColor: colors.border
+                  }
+                ]}
+              />
+            </View>
+
+            <Pressable
+              onPress={handleSaveSettings}
+              disabled={savingSettings || !supportEmailInput}
+              style={({ pressed }) => [
+                stylesTab.saveBtn,
+                {
+                  backgroundColor: colors.primary,
+                  opacity: (savingSettings || !supportEmailInput) ? 0.6 : (pressed ? 0.9 : 1)
+                }
+              ]}
+            >
+              {savingSettings ? (
+                <ActivityIndicator size="small" color="#FFF" />
+              ) : (
+                <ThemedText style={{ color: '#FFF', fontWeight: '800', fontSize: 13 }}>
+                  {isTa ? 'அமைப்புகளைச் சேமி' : 'Save Configurations'}
+                </ThemedText>
+              )}
+            </Pressable>
+          </View>
+        </ScrollView>
       )}
 
       {/* Audit Log Inspect Modal */}
@@ -847,5 +974,33 @@ const stylesTab = StyleSheet.create({
     fontSize: 10,
     fontFamily: Platform.select({ ios: 'Courier New', android: 'monospace', default: 'monospace' }),
     lineHeight: 14
+  },
+  card: {
+    padding: 20,
+    borderRadius: 16,
+    borderWidth: 1,
+    gap: 12
+  },
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: '800'
+  },
+  cardDesc: {
+    fontSize: 12,
+    lineHeight: 16
+  },
+  textInput: {
+    height: 44,
+    borderRadius: 8,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    fontSize: 13
+  },
+  saveBtn: {
+    height: 44,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 12
   }
 });

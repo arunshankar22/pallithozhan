@@ -28,21 +28,18 @@ export const eventService = {
   },
 
   getEvents: async (): Promise<any[]> => {
-    if (!db) throw new Error('Firestore database is not initialized');
-    const querySnapshot = await getDocs(collection(db, 'events'));
-    const eventsList: any[] = [];
-    querySnapshot.forEach((docSnap) => {
-      eventsList.push({ eventId: docSnap.id, ...docSnap.data() });
-    });
-    
-    if (eventsList.length === 0) {
-      for (const e of DEFAULT_EVENTS) {
-        const { eventId, ...details } = e;
-        await setDoc(doc(db, 'events', eventId), details);
-        eventsList.push(e);
-      }
+    try {
+      if (!db) return DEFAULT_EVENTS;
+      const querySnapshot = await getDocs(collection(db, 'events'));
+      const eventsList: any[] = [];
+      querySnapshot.forEach((docSnap) => {
+        eventsList.push({ eventId: docSnap.id, ...docSnap.data() });
+      });
+      return eventsList.length > 0 ? eventsList : DEFAULT_EVENTS;
+    } catch (e) {
+      console.warn('[eventService] Falling back to DEFAULT_EVENTS:', e);
+      return DEFAULT_EVENTS;
     }
-    return eventsList;
   },
 
   createEvent: async (event: any): Promise<any> => {

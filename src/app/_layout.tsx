@@ -13,6 +13,7 @@ import HomeScreen from './index';
 import LandingScreen from './landing';
 import PrivacyScreen from './privacy';
 import TermsScreen from './terms';
+import SupportScreen from './support';
 
 function AppContent() {
   const { user, isLoading } = useAuth();
@@ -33,6 +34,14 @@ function AppContent() {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
         <TermsScreen />
+      </SafeAreaView>
+    );
+  }
+
+  if (pathname === '/support') {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+        <SupportScreen />
       </SafeAreaView>
     );
   }

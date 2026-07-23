@@ -114,21 +114,18 @@ export const newsfeedService = {
   },
 
   getNewsfeed: async (): Promise<any[]> => {
-    if (!db) throw new Error('Firestore database is not initialized');
-    const querySnapshot = await getDocs(collection(db, 'newsfeed'));
-    const feedList: any[] = [];
-    querySnapshot.forEach((docSnap) => {
-      feedList.push({ postId: docSnap.id, ...docSnap.data() });
-    });
-    
-    if (feedList.length === 0) {
-      for (const p of DEFAULT_NEWSFEED) {
-        const { postId, ...details } = p;
-        await setDoc(doc(db, 'newsfeed', postId), details);
-        feedList.push(p);
-      }
+    try {
+      if (!db) return DEFAULT_NEWSFEED;
+      const querySnapshot = await getDocs(collection(db, 'newsfeed'));
+      const feedList: any[] = [];
+      querySnapshot.forEach((docSnap) => {
+        feedList.push({ postId: docSnap.id, ...docSnap.data() });
+      });
+      return feedList.length > 0 ? feedList : DEFAULT_NEWSFEED;
+    } catch (e) {
+      console.warn('[newsfeedService] Falling back to DEFAULT_NEWSFEED:', e);
+      return DEFAULT_NEWSFEED;
     }
-    return feedList.sort((a: any, b: any) => b.createdAt.localeCompare(a.createdAt));
   },
 
   createNewsfeedPost: async (post: any): Promise<any> => {

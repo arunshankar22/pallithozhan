@@ -56,5 +56,5 @@ try {
   console.error("Failed to initialize production Firebase:", error);
 }
 
-export const isDemoMode = false; // Always connect to actual Firestore, not local mock DB
+export const isDemoMode = false;
 export { auth, db, storage };

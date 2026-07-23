@@ -102,21 +102,19 @@ export const homeworkService = {
   },
 
   getHomework: async (classId?: string): Promise<any[]> => {
-    if (!db) throw new Error('Firestore database is not initialized');
-    const querySnapshot = await getDocs(collection(db, 'homework'));
-    const hwList: any[] = [];
-    querySnapshot.forEach((docSnap) => {
-      hwList.push({ homeworkId: docSnap.id, ...docSnap.data() });
-    });
-    
-    if (hwList.length === 0) {
-      for (const h of DEFAULT_HOMEWORK) {
-        const { homeworkId, ...details } = h;
-        await setDoc(doc(db, 'homework', homeworkId), details);
-        hwList.push(h);
-      }
+    try {
+      if (!db) return DEFAULT_HOMEWORK;
+      const querySnapshot = await getDocs(collection(db, 'homework'));
+      const hwList: any[] = [];
+      querySnapshot.forEach((docSnap) => {
+        hwList.push({ homeworkId: docSnap.id, ...docSnap.data() });
+      });
+      const list = hwList.length > 0 ? hwList : DEFAULT_HOMEWORK;
+      return classId ? list.filter((h: any) => h.classId === classId) : list;
+    } catch (e) {
+      console.warn('[homeworkService] Falling back to DEFAULT_HOMEWORK:', e);
+      return classId ? DEFAULT_HOMEWORK.filter((h: any) => h.classId === classId) : DEFAULT_HOMEWORK;
     }
-    return classId ? hwList.filter((h: any) => h.classId === classId) : hwList;
   },
 
   createHomework: async (homework: any): Promise<any> => {

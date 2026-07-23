@@ -976,6 +976,11 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
               © 2026 Balar Malar Tamil School (NSW) Inc. All Rights Reserved.
             </ThemedText>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+              <Pressable onPress={() => router.replace('/support')}>
+                <ThemedText style={[styles.footerCopyrightText, { textDecorationLine: 'underline' }]}>
+                  {i18n.language === 'ta' ? 'உதவி & ஆதரவு' : 'Help & Support'}
+                </ThemedText>
+              </Pressable>
               <Pressable onPress={() => router.replace('/privacy')}>
                 <ThemedText style={[styles.footerCopyrightText, { textDecorationLine: 'underline' }]}>
                   {i18n.language === 'ta' ? 'தனியுரிமைக் கொள்கை' : 'Privacy Policy'}
