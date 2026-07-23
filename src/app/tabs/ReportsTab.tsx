@@ -2898,12 +2898,24 @@ export function ReportsTab({
 
 </div>
 <script>
-  window.addEventListener('load', () => {
-    setTimeout(() => {
-      window.print();
-      window.close();
-    }, 800);
+  window.addEventListener('DOMContentLoaded', () => {
+    if (document.fonts) {
+      document.fonts.ready.then(() => {
+        setTimeout(() => {
+          window.print();
+        }, 500);
+      });
+    } else {
+      window.onload = () => {
+        setTimeout(() => {
+          window.print();
+        }, 500);
+      };
+    }
   });
+  window.onafterprint = () => {
+    window.close();
+  };
 </script>
 </body>
 </html>
