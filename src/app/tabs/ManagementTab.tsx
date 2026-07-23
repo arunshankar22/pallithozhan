@@ -24,24 +24,35 @@ import { UserBulkBar } from '@/components/UserBulkBar';
 import { DateTimePicker } from '@/components/DateTimePicker';
 import * as XLSX from 'xlsx';
 
-export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabProps) {
+const FlatScrollContainer = ({ 
+  children, 
+  style, 
+  contentContainerStyle 
+}: { 
+  children: React.ReactNode, 
+  style?: any, 
+  contentContainerStyle?: any 
+}) => {
   const { width: windowWidth } = useWindowDimensions();
   const isLargeScreen = windowWidth >= 768;
 
-  const FlatScrollContainer = ({ children, style, contentContainerStyle }: { children: React.ReactNode, style?: any, contentContainerStyle?: any }) => {
-    if (isLargeScreen) {
-      return (
-        <ScrollView style={style} contentContainerStyle={contentContainerStyle}>
-          {children}
-        </ScrollView>
-      );
-    }
+  if (isLargeScreen) {
     return (
-      <View style={[style, contentContainerStyle, { flex: undefined }]}>
+      <ScrollView style={style} contentContainerStyle={contentContainerStyle}>
         {children}
-      </View>
+      </ScrollView>
     );
-  };
+  }
+  return (
+    <View style={[style, contentContainerStyle, { flex: undefined }]}>
+      {children}
+    </View>
+  );
+};
+
+export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabProps) {
+  const { width: windowWidth } = useWindowDimensions();
+  const isLargeScreen = windowWidth >= 768;
   const [subTab, setSubTab] = useState<'users' | 'classes' | 'calendar' | 'import_export' | 'waitlist'>('users');
   const [headerCollapsed, setHeaderCollapsed] = useState(false);
   const [showHelp, setShowHelp] = useState(() => {
