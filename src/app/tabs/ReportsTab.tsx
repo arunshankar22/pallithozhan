@@ -2087,13 +2087,40 @@ export function ReportsTab({
 
     // Wait for state change to render clean read-only components
     setTimeout(() => {
-      // Open print window
-      const printWindow = window.open('', '_blank', 'width=900,height=1000');
+      // Create a hidden print iframe to keep the secure site context for Chrome PDF printing
+      const iframeId = 'progress-report-print-frame';
+      let iframe = document.getElementById(iframeId) as HTMLIFrameElement | null;
+      if (iframe) {
+        try {
+          document.body.removeChild(iframe);
+        } catch (e) {}
+      }
+      iframe = document.createElement('iframe') as HTMLIFrameElement;
+      iframe.id = iframeId;
+      iframe.style.position = 'fixed';
+      iframe.style.right = '0';
+      iframe.style.bottom = '0';
+      iframe.style.width = '0';
+      iframe.style.height = '0';
+      iframe.style.border = '0';
+      document.body.appendChild(iframe);
+
+      const printWindow = iframe.contentWindow;
       if (!printWindow) {
-        showToast('Please allow popups for printing / அச்சிட பாப்-அப்களை அனுமதிக்கவும்', 'error');
+        showToast('Printing failed: could not access print frame', 'error');
         setIsPrinting(false);
         return;
       }
+
+      // Cleanup frame and reset state when the print dialog is dismissed
+      printWindow.onafterprint = () => {
+        try {
+          if (iframe && iframe.parentNode) {
+            document.body.removeChild(iframe);
+          }
+        } catch (e) {}
+        setIsPrinting(false);
+      };
 
       // Gather student and class info
       const activeStudentObj = students.find((s: any) => s.uid === reportStudentId) || parentStudents.find((s: any) => s.uid === reportStudentId);
