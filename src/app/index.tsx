@@ -700,7 +700,8 @@ export default function HomeScreen() {
     const fetchNews = async () => {
       try {
         const allNews = await mockDb.getNewsfeed();
-        setNewsPosts(allNews);
+        const sortedNews = [...allNews].sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+        setNewsPosts(sortedNews);
       } catch (err) {
         console.warn('Failed to load news posts for dashboard:', err);
       }
@@ -1088,7 +1089,8 @@ export default function HomeScreen() {
         await mockDb.deleteNewsfeedPost(postId);
         showToast('Announcement removed.', 'success');
         const allNews = await mockDb.getNewsfeed();
-        setNewsPosts(allNews);
+        const sortedNews = [...allNews].sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+        setNewsPosts(sortedNews);
       } catch (e) {
         showToast('Failed to delete announcement.', 'error');
       }
