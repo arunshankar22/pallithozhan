@@ -2913,9 +2913,6 @@ export function ReportsTab({
       };
     }
   });
-  window.onafterprint = () => {
-    window.close();
-  };
 </script>
 </body>
 </html>
