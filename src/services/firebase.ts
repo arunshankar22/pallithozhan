@@ -3,11 +3,12 @@ import { getAuth } from 'firebase/auth';
 import { initializeFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
-// Resolve the Firestore database ID & Storage Bucket
+// Resolve the Firebase Auth Domain, Firestore database ID & Storage Bucket
 // Local development and Vercel preview connect to staging resources
 // Vercel Production and EAS Production builds connect to production resources
 let defaultDbId = 'pallithozhandb';
 let defaultStorageBucket = 'pallithozhan.firebasestorage.app';
+let defaultAuthDomain = 'pallithozhan.firebaseapp.com';
 
 if (typeof window !== 'undefined' && window.location) {
   const hostname = window.location.hostname;
@@ -21,6 +22,7 @@ if (typeof window !== 'undefined' && window.location) {
   ) {
     defaultDbId = 'pallithozhan-prod-db';
     defaultStorageBucket = 'gs://pallithozhan-prod';
+    defaultAuthDomain = 'auth.pallithozhan.3stech.com.au';
   }
 }
 
@@ -30,7 +32,7 @@ export const storageBucketId = rawStorageBucket.startsWith('gs://') ? rawStorage
 
 export const firebaseConfig = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY || "",
-  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN || "auth.pallithozhan.3stech.com.au",
+  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN || defaultAuthDomain,
   projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID || "",
   storageBucket: storageBucketId,
   messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "",
