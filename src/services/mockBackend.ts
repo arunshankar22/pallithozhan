@@ -77,6 +77,7 @@ export const mockDb = {
   getPendingApprovals: attendanceService.getPendingApprovals,
   getApprovals: attendanceService.getApprovals,
   approveAbsence: attendanceService.approveAbsence,
+  rejectAbsence: attendanceService.rejectAbsence,
   getPushedAlerts: attendanceService.getPushedAlerts,
   getStudentAttendance: attendanceService.getStudentAttendance,
   exportBulkAttendanceData: attendanceService.exportBulkAttendanceData,

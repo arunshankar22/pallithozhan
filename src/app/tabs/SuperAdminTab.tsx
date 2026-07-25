@@ -152,10 +152,11 @@ export function SuperAdminTab({ user, colors, t, showToast, i18n }: TabProps) {
 
       // Log audit log
       await auditLogService.logAction(
-        'update_system_config',
         user?.uid || 'unknown',
         user?.fullName || 'Super Admin',
+        user?.email || 'superadmin@balarmalar.edu.au',
         user?.role || 'superadmin',
+        'update_system_config',
         `Updated support config email to: ${supportEmailInput}`
       );
 

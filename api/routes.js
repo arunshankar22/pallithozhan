@@ -326,6 +326,9 @@ async function handleApiRoutes(req, res, pathname, method, dbData, writeDb, urlO
     // Sync with pending approvals
     dbData.pending_approvals = dbData.pending_approvals.filter(a => !(a.classId === body.classId && a.date === body.date && a.status === 'pending'));
 
+    const classObj = dbData.classes ? dbData.classes.find(c => c.classId === body.classId) : null;
+    const className = classObj ? classObj.className : 'Unknown';
+
     Object.keys(body.rolls).forEach(uId => {
       if (body.rolls[uId] === 'absent') {
         const studentObj = dbData.users.find(u => u.uid === uId);
@@ -333,6 +336,7 @@ async function handleApiRoutes(req, res, pathname, method, dbData, writeDb, urlO
           dbData.pending_approvals.push({
             approvalId: `app_${Date.now()}_${uId}`,
             classId: body.classId,
+            className: className,
             date: body.date,
             markedBy: body.markedBy,
             markedByName: body.markedByName || 'Teacher',
@@ -387,6 +391,33 @@ async function handleApiRoutes(req, res, pathname, method, dbData, writeDb, urlO
         body: `${app.studentName} was marked absent today in ${app.markedByName}'s class. Absence has been authorized by Administration.`,
         createdAt: new Date().toISOString()
       });
+
+      writeDb(dbData);
+      sendJson(res, 200, app);
+    } else {
+      sendJson(res, 404, { error: 'Pending approval record not found.' });
+    }
+    return true;
+  }
+
+  // POST /api/attendance/reject
+  if (pathname === '/api/attendance/reject' && method === 'POST') {
+    const body = await parseBody(req);
+    const { approvalId } = body;
+    const appIndex = dbData.pending_approvals.findIndex(a => a.approvalId === approvalId);
+    
+    if (appIndex > -1) {
+      dbData.pending_approvals[appIndex].status = 'rejected';
+      const app = dbData.pending_approvals[appIndex];
+
+      // Update the student's roll status to 'present' in the attendance record
+      const attIndex = dbData.attendance.findIndex(a => a.classId === app.classId && a.date === app.date);
+      if (attIndex > -1) {
+        const att = dbData.attendance[attIndex];
+        if (att.rolls && att.rolls[app.studentId]) {
+          att.rolls[app.studentId] = 'present';
+        }
+      }
 
       writeDb(dbData);
       sendJson(res, 200, app);

@@ -285,18 +285,20 @@ export default function HomeScreen() {
         : pendingAbsences.filter((a: any) => userClassIds.includes(a.classId));
       
       filteredAbsences.forEach((item: any) => {
+        const classObj = allClassList.find((c: any) => c.classId === item.classId);
+        const resolvedClassName = item.className || classObj?.className || 'Unknown';
         combinedPending.push({
           approvalId: item.approvalId,
           id: item.approvalId,
           type: 'absence',
           titleEn: `Absence Approval (${item.studentName || 'Student'})`,
           titleTa: `வருகை ஒப்புதல் (${item.studentName || 'மாணவர்'})`,
-          subtitleEn: `${item.className || 'Unknown'} • Teacher: ${item.markedByName || 'Teacher'} • ${item.date}`,
-          subtitleTa: `${item.className || 'Unknown'} • பதிவு செய்தவர்: ${item.markedByName || 'Teacher'} • ${item.date}`,
+          subtitleEn: `${resolvedClassName} • Teacher: ${item.markedByName || 'Teacher'} • ${item.date}`,
+          subtitleTa: `${resolvedClassName} • பதிவு செய்தவர்: ${item.markedByName || 'Teacher'} • ${item.date}`,
           date: item.date,
           studentName: item.studentName,
           markedByName: item.markedByName,
-          className: item.className,
+          className: resolvedClassName,
           rawItem: item
         });
       });
@@ -643,6 +645,46 @@ export default function HomeScreen() {
       }
     } catch (e) {
       showToast('Approval error.', 'error');
+    }
+  };
+
+  const handleRejectPending = async (id: string, type: 'absence' | 'achievement' | 'article') => {
+    try {
+      let res;
+      if (type === 'absence') {
+        res = await mockDb.rejectAbsence(id);
+      } else if (type === 'achievement') {
+        res = await mockDb.deleteAchievement(id);
+      } else if (type === 'article') {
+        res = await mockDb.rejectArticle(id);
+      }
+
+      if (res) {
+        showToast(
+          i18n.language === 'ta'
+            ? 'ஒப்புதல் நிராகரிக்கப்பட்டது!'
+            : 'Approval rejected successfully!',
+          'success'
+        );
+        
+        // Log action in audit log
+        if (user && type === 'absence') {
+          auditLogService.logAction(
+            user.uid,
+            user.fullName,
+            user.email,
+            user.role,
+            'Reject Absence',
+            `Rejected absence approval alert for student/record ID: ${id}`
+          ).catch(e => console.error(e));
+        }
+
+        await reloadDashboardData();
+      } else {
+        showToast('Rejection failed.', 'error');
+      }
+    } catch (e) {
+      showToast('Rejection error.', 'error');
     }
   };
 
@@ -1462,11 +1504,11 @@ export default function HomeScreen() {
                       </View>
                     </View>
                     
-                    <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
+                    <View style={{ flexDirection: 'row', gap: 6, marginTop: 4 }}>
                       <Pressable
                         onPress={() => handleApprovePending(item.id, item.type)}
                         style={{
-                          flex: 1,
+                          flex: 1.2,
                           backgroundColor: colors.primary,
                           borderRadius: 8,
                           paddingVertical: 8,
@@ -1475,6 +1517,20 @@ export default function HomeScreen() {
                       >
                         <ThemedText style={{ color: '#FFF', fontSize: 11, fontWeight: '700' }}>
                           {item.rawItem.status === 'pending_deletion' ? 'Confirm Delete' : (i18n.language === 'ta' ? 'அங்கீகரி' : 'Approve')}
+                        </ThemedText>
+                      </Pressable>
+                      <Pressable
+                        onPress={() => handleRejectPending(item.id, item.type)}
+                        style={{
+                          flex: 1.2,
+                          backgroundColor: '#EF4444',
+                          borderRadius: 8,
+                          paddingVertical: 8,
+                          alignItems: 'center'
+                        }}
+                      >
+                        <ThemedText style={{ color: '#FFF', fontSize: 11, fontWeight: '700' }}>
+                          {i18n.language === 'ta' ? 'நிராகரி' : 'Reject'}
                         </ThemedText>
                       </Pressable>
                       <Pressable
@@ -1491,7 +1547,7 @@ export default function HomeScreen() {
                           }
                         }}
                         style={{
-                          flex: 1,
+                          flex: 1.6,
                           borderWidth: 1,
                           borderColor: colors.border,
                           borderRadius: 8,
@@ -1501,7 +1557,7 @@ export default function HomeScreen() {
                         }}
                       >
                         <ThemedText style={{ color: colors.text, fontSize: 11, fontWeight: '600' }}>
-                          {i18n.language === 'ta' ? 'விவரங்களை காண்க' : 'Review details'}
+                          {i18n.language === 'ta' ? 'காண்க' : 'Review'}
                         </ThemedText>
                       </Pressable>
                     </View>

@@ -32,6 +32,8 @@ export interface UserProfile {
   profilePicture?: string;
   parentVolunteer?: boolean;
   studentCode?: string;
+  signatureImage?: string;
+  designation?: string;
 }
 
 interface AuthContextType {
@@ -40,7 +42,7 @@ interface AuthContextType {
   register: (profile: Omit<UserProfile, 'uid' | 'schoolId'>, password?: string) => Promise<UserProfile>;
   logout: () => Promise<void>;
   updateLanguage: (lang: string) => void;
-  updateProfile: (fullName: string, phone: string, profilePicture?: string) => Promise<void>;
+  updateProfile: (fullName: string, phone: string, profilePicture?: string, signatureImage?: string) => Promise<void>;
   updateAuthPassword: (newPassword: string) => Promise<void>;
   switchRole: (role: 'superadmin' | 'admin' | 'teacher' | 'volunteer' | 'parent' | 'student') => void;
   resetPassword: (email: string) => Promise<void>;
@@ -325,11 +327,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const updateProfile = async (fullName: string, phone: string, profilePicture?: string): Promise<void> => {
+  const updateProfile = async (fullName: string, phone: string, profilePicture?: string, signatureImage?: string): Promise<void> => {
     if (user) {
       const updatedData: any = { fullName, phone };
       if (profilePicture !== undefined) {
         updatedData.profilePicture = profilePicture;
+      }
+      if (signatureImage !== undefined) {
+        updatedData.signatureImage = signatureImage;
       }
       const updated = { ...user, ...updatedData };
       setUser(updated);

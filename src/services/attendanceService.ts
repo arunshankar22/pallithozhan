@@ -2,6 +2,7 @@
 import { db } from './firebase';
 import { collection, doc, getDoc, getDocs, setDoc, query, where } from 'firebase/firestore';
 import { userService } from './userService';
+import { classService } from './classService';
 
 const DEFAULT_ATTENDANCE = [
   {
@@ -103,6 +104,14 @@ export const attendanceService = {
       console.warn('Failed to award attendance points automatically:', ptsErr);
     }
 
+    let className = 'Unknown';
+    try {
+      const cls = await classService.getClass(record.classId);
+      if (cls) className = cls.className;
+    } catch (e) {
+      console.warn('Failed to fetch class details for pending approvals:', e);
+    }
+
     for (const uId of Object.keys(record.rolls)) {
       if (record.rolls[uId] === 'absent') {
         const studentObj = await userService.getUser(uId);
@@ -118,6 +127,7 @@ export const attendanceService = {
 
           await setDoc(doc(db, 'pending_approvals', appDocId), {
             classId: record.classId,
+            className: className,
             date: record.date,
             markedBy: cleanRecord.markedBy,
             markedByName: cleanRecord.markedByName,
@@ -188,6 +198,31 @@ export const attendanceService = {
       }
 
       return { approvalId, ...appData, status: 'approved' };
+    }
+    return null;
+  },
+
+  rejectAbsence: async (approvalId: string): Promise<any | null> => {
+    if (!db) throw new Error('Firestore database is not initialized');
+    const appRef = doc(db, 'pending_approvals', approvalId);
+    const appSnap = await getDoc(appRef);
+    
+    if (appSnap.exists()) {
+      const appData = appSnap.data();
+      await setDoc(appRef, { status: 'rejected' }, { merge: true });
+
+      const attDocId = `${appData.classId}_${appData.date}`;
+      const attRef = doc(db, 'attendance', attDocId);
+      const attSnap = await getDoc(attRef);
+      if (attSnap.exists()) {
+        const attData = attSnap.data();
+        if (attData.rolls && attData.rolls[appData.studentId]) {
+          const updatedRolls = { ...attData.rolls, [appData.studentId]: 'present' };
+          await setDoc(attRef, { rolls: updatedRolls }, { merge: true });
+        }
+      }
+
+      return { approvalId, ...appData, status: 'rejected' };
     }
     return null;
   },
@@ -693,6 +728,9 @@ export const attendanceService = {
 
           await setDoc(doc(db, 'attendance', docId), cleanRecord);
 
+          const classObj = classesList.find(c => c.classId === saveRecord.classId);
+          const className = classObj ? classObj.className : 'Unknown';
+
           for (const uId of Object.keys(saveRecord.rolls)) {
             if (saveRecord.rolls[uId] === 'absent') {
               const studentObj = allUsers.find(u => u.uid === uId);
@@ -703,6 +741,7 @@ export const attendanceService = {
 
                 await setDoc(doc(db, 'pending_approvals', appDocId), {
                   classId: saveRecord.classId,
+                  className: className,
                   date: saveRecord.date,
                   markedBy: cleanRecord.markedBy,
                   markedByName: cleanRecord.markedByName,

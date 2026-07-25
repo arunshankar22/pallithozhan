@@ -336,6 +336,8 @@ export function ReportsTab({
   const [reportStudentId, setReportStudentId] = useState('');
   const [reportTerm, setReportTerm] = useState(2);
   const [reportAttendance, setReportAttendance] = useState('');
+  const [allUsers, setAllUsers] = useState<any[]>([]);
+  const [reportTeacherId, setReportTeacherId] = useState('');
   const [reportComments, setReportComments] = useState('');
   const [reportCommentsTamil, setReportCommentsTamil] = useState('');
   const [isCommentsTranslating, setIsCommentsTranslating] = useState(false);
@@ -667,6 +669,7 @@ export function ReportsTab({
 
       // 3. Fetch users list to get students info
       const usersList = await mockDb.getUsers();
+      setAllUsers(usersList);
       const studentUsers = usersList.filter((u: any) => u.role === 'student');
       setStudents(studentUsers);
 
@@ -1757,17 +1760,73 @@ export function ReportsTab({
       setReportLoading(true);
       try {
         const report = await mockDb.getProgressReport(reportStudentId, reportTerm, 2026);
+
+        // 1. Calculate the attendance rate dynamically
+        let calculatedAttendance = '';
+        try {
+          const attendanceRecords = await mockDb.getStudentAttendance(reportStudentId);
+          const allSchoolDates = await mockDb.getSchoolDates();
+          const termDates = allSchoolDates.filter((sd: any) => sd.term === reportTerm && !sd.isHoliday);
+          const termDateStrings = termDates.map((sd: any) => sd.date);
+          
+          const studentTermAttendance = attendanceRecords.filter((r: any) => termDateStrings.includes(r.date));
+          const totalSessions = studentTermAttendance.length;
+          const presentSessions = studentTermAttendance.filter((r: any) => r.status === 'present').length;
+          
+          if (totalSessions > 0) {
+            calculatedAttendance = `${Math.round((presentSessions / totalSessions) * 100)}%`;
+          } else {
+            calculatedAttendance = '100%';
+          }
+        } catch (calcErr) {
+          console.warn('Failed to calculate attendance for report:', calcErr);
+          calculatedAttendance = '100%';
+        }
+
+        // 2. Resolve class teacher and signatures
+        const studentClass = classes.find((c: any) => c.studentIds?.includes(reportStudentId));
+        const classTeacherId = studentClass?.teacherId || studentClass?.teacherIds?.[0] || '';
+        setReportTeacherId(classTeacherId);
+
+        const currentUsersList = allUsers.length > 0 ? allUsers : await mockDb.getUsers();
+        const teacherUser = currentUsersList.find((u: any) => u.uid === classTeacherId);
+        
+        // Robust Principal resolution (Designation -> Name -> Role Fallback)
+        const principalUser = currentUsersList.find((u: any) => u.designation?.toLowerCase() === 'principal') ||
+                              currentUsersList.find((u: any) => u.fullName?.toLowerCase().includes('sanjeev') || u.fullName?.toLowerCase().includes('shanmugam')) ||
+                              currentUsersList.find((u: any) => u.role === 'admin' || u.role === 'superadmin');
+
+        const isActualPrincipal = principalUser?.designation?.toLowerCase() === 'principal' ||
+                                  principalUser?.fullName?.toLowerCase().includes('sanjeev') ||
+                                  principalUser?.fullName?.toLowerCase().includes('shanmugam');
+
+        const defaultTeacherSigImg = teacherUser?.signatureImage || safeLocalStorage.getItem('bm_teacher_sig_' + (classTeacherId || 'default')) || '';
+        const resolvedPrincipalName = (isActualPrincipal ? principalUser?.fullName : '') || 'Sanjeev Prabhu Shanmugam';
+        const defaultPrincipalSigImg = isActualPrincipal 
+          ? (principalUser?.signatureImage || safeLocalStorage.getItem('bm_principal_sig') || '')
+          : (safeLocalStorage.getItem('bm_principal_sig') || '');
+
         if (report) {
-          setReportAttendance(report.attendance || '');
+          setReportAttendance(report.attendance || calculatedAttendance);
           setReportComments(report.teacherComments || '');
           setReportCommentsTamil(report.teacherCommentsTamil || '');
-          setReportTeacherSig(report.teacherSignature || '');
-          setReportPrincipalSig(report.principalSignature || '');
+          setReportTeacherSig(report.teacherSignature || teacherUser?.fullName || '');
+
+          // Override wrong principal signature name if it contains "arun shankar"
+          let initialPrincipalSig = report.principalSignature || resolvedPrincipalName;
+          if (initialPrincipalSig.toLowerCase().includes('arun shankar')) {
+            initialPrincipalSig = resolvedPrincipalName;
+          }
+          setReportPrincipalSig(initialPrincipalSig);
+
           setReportParentSigned(report.parentSigned || false);
           setReportParentSigDate(report.parentSignatureDate || '');
           
-          setTeacherSigImage(report.teacherSignatureImage || safeLocalStorage.getItem('bm_teacher_sig_' + (user?.uid || 'default')) || '');
-          setPrincipalSigImage(report.principalSignatureImage || safeLocalStorage.getItem('bm_principal_sig') || '');
+          setTeacherSigImage(report.teacherSignatureImage || defaultTeacherSigImg);
+
+          // Override wrong principal signature image if signature name contains "arun shankar"
+          const isWrongPrincipalImage = report.principalSignature?.toLowerCase().includes('arun shankar') || !report.principalSignatureImage;
+          setPrincipalSigImage(isWrongPrincipalImage ? defaultPrincipalSigImg : report.principalSignatureImage);
           setReportAttachTeacherSig(report.attachTeacherSig ?? true);
           setReportAttachPrincipalSig(report.attachPrincipalSig ?? true);
           setReportAttachParentSig(report.attachParentSig ?? true);
@@ -1796,16 +1855,16 @@ export function ReportsTab({
           setAttitudeHomework(report.attitudes?.homeworkCompletion || '');
         } else {
           // Reset form to defaults
-          setReportAttendance('');
+          setReportAttendance(calculatedAttendance);
           setReportComments('');
           setReportCommentsTamil('');
-          setReportTeacherSig('');
-          setReportPrincipalSig('');
+          setReportTeacherSig(teacherUser?.fullName || '');
+          setReportPrincipalSig((isActualPrincipal ? principalUser?.fullName : '') || 'Sanjeev Prabhu Shanmugam');
           setReportParentSigned(false);
           setReportParentSigDate('');
           
-          setTeacherSigImage(safeLocalStorage.getItem('bm_teacher_sig_' + (user?.uid || 'default')) || '');
-          setPrincipalSigImage(safeLocalStorage.getItem('bm_principal_sig') || '');
+          setTeacherSigImage(defaultTeacherSigImg);
+          setPrincipalSigImage(defaultPrincipalSigImg);
           setReportAttachTeacherSig(true);
           setReportAttachPrincipalSig(true);
           setReportAttachParentSig(true);
@@ -1838,7 +1897,7 @@ export function ReportsTab({
     };
     
     loadReport();
-  }, [reportStudentId, reportTerm]);
+  }, [reportStudentId, reportTerm, classes, allUsers]);
 
   // Inject web print CSS rules
   useEffect(() => {
@@ -2046,14 +2105,45 @@ export function ReportsTab({
       const file = e.target.files[0];
       if (file) {
         const reader = new FileReader();
-        reader.onload = (event: any) => {
+        reader.onload = async (event: any) => {
           const base64 = event.target.result;
           if (type === 'teacher') {
             setTeacherSigImage(base64);
-            safeLocalStorage.setItem('bm_teacher_sig_' + (user?.uid || 'default'), base64);
+            safeLocalStorage.setItem('bm_teacher_sig_' + (reportTeacherId || user?.uid || 'default'), base64);
+            
+            const targetTeacherId = reportTeacherId || (['teacher', 'volunteer'].includes(user?.role || '') ? user?.uid : null);
+            if (targetTeacherId) {
+              try {
+                await mockDb.updateUser(targetTeacherId, { signatureImage: base64 });
+              } catch (err) {
+                console.warn('Failed to update teacher signature in database:', err);
+              }
+            }
           } else {
             setPrincipalSigImage(base64);
             safeLocalStorage.setItem('bm_principal_sig', base64);
+            
+            const principalUser = allUsers.find((u: any) => u.designation?.toLowerCase() === 'principal') ||
+                                  allUsers.find((u: any) => u.fullName?.toLowerCase().includes('sanjeev') || u.fullName?.toLowerCase().includes('shanmugam')) ||
+                                  allUsers.find((u: any) => u.role === 'admin' || u.role === 'superadmin');
+
+            const isActualPrincipal = principalUser?.designation?.toLowerCase() === 'principal' ||
+                                      principalUser?.fullName?.toLowerCase().includes('sanjeev') ||
+                                      principalUser?.fullName?.toLowerCase().includes('shanmugam');
+
+            if (principalUser && isActualPrincipal) {
+              try {
+                await mockDb.updateUser(principalUser.uid, { signatureImage: base64 });
+              } catch (err) {
+                console.warn('Failed to update principal signature in database:', err);
+              }
+            } else if (user && (user.designation?.toLowerCase() === 'principal' || user.fullName?.toLowerCase().includes('sanjeev') || user.fullName?.toLowerCase().includes('shanmugam'))) {
+              try {
+                await mockDb.updateUser(user.uid, { signatureImage: base64 });
+              } catch (err) {
+                console.warn('Failed to update principal signature in database:', err);
+              }
+            }
           }
           showToast(i18n.language === 'ta' ? 'கையொப்ப படம் பதிவேற்றப்பட்டது' : 'Signature image uploaded successfully', 'success');
         };
@@ -2064,13 +2154,44 @@ export function ReportsTab({
   };
 
   // Clear signature helper
-  const handleClearSignature = (type: 'teacher' | 'principal') => {
+  const handleClearSignature = async (type: 'teacher' | 'principal') => {
     if (type === 'teacher') {
       setTeacherSigImage('');
-      safeLocalStorage.removeItem('bm_teacher_sig_' + (user?.uid || 'default'));
+      safeLocalStorage.removeItem('bm_teacher_sig_' + (reportTeacherId || user?.uid || 'default'));
+      
+      const targetTeacherId = reportTeacherId || (['teacher', 'volunteer'].includes(user?.role || '') ? user?.uid : null);
+      if (targetTeacherId) {
+        try {
+          await mockDb.updateUser(targetTeacherId, { signatureImage: '' });
+        } catch (err) {
+          console.warn('Failed to clear teacher signature in database:', err);
+        }
+      }
     } else {
       setPrincipalSigImage('');
       safeLocalStorage.removeItem('bm_principal_sig');
+      
+      const principalUser = allUsers.find((u: any) => u.designation?.toLowerCase() === 'principal') ||
+                            allUsers.find((u: any) => u.fullName?.toLowerCase().includes('sanjeev') || u.fullName?.toLowerCase().includes('shanmugam')) ||
+                            allUsers.find((u: any) => u.role === 'admin' || u.role === 'superadmin');
+
+      const isActualPrincipal = principalUser?.designation?.toLowerCase() === 'principal' ||
+                                principalUser?.fullName?.toLowerCase().includes('sanjeev') ||
+                                principalUser?.fullName?.toLowerCase().includes('shanmugam');
+
+      if (principalUser && isActualPrincipal) {
+        try {
+          await mockDb.updateUser(principalUser.uid, { signatureImage: '' });
+        } catch (err) {
+          console.warn('Failed to clear principal signature in database:', err);
+        }
+      } else if (user && (user.designation?.toLowerCase() === 'principal' || user.fullName?.toLowerCase().includes('sanjeev') || user.fullName?.toLowerCase().includes('shanmugam'))) {
+        try {
+          await mockDb.updateUser(user.uid, { signatureImage: '' });
+        } catch (err) {
+          console.warn('Failed to clear principal signature in database:', err);
+        }
+      }
     }
     showToast(i18n.language === 'ta' ? 'கையொப்ப படம் நீக்கப்பட்டது' : 'Signature image cleared', 'success');
   };

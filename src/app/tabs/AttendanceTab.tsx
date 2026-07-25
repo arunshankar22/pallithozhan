@@ -250,6 +250,13 @@ export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentI
     showToast('Absence Alert Authorized! SMS push alert triggered to Parent.', 'success');
   };
 
+  const handleRejectAbsence = async (approvalId: string) => {
+    await mockDb.rejectAbsence(approvalId);
+    const pending = await mockDb.getPendingApprovals();
+    setPendingApprovals(pending);
+    showToast('Absence Alert Rejected. Student roll call status corrected to present.', 'success');
+  };
+
   const handleExportDownload = async () => {
     try {
       setShowExportModal(false);
@@ -1077,15 +1084,26 @@ export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentI
                       </ThemedText>
                     </View>
                     
-                    <Pressable
-                      onPress={() => handleApproveAbsence(item.approvalId)}
-                      style={({ pressed }) => [
-                        styles.approveButton,
-                        { backgroundColor: colors.secondary, opacity: pressed ? 0.8 : 1 }
-                      ]}
-                    >
-                      <ThemedText style={styles.approveButtonText}>Authorize Alert</ThemedText>
-                    </Pressable>
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                      <Pressable
+                        onPress={() => handleApproveAbsence(item.approvalId)}
+                        style={({ pressed }) => [
+                          styles.approveButton,
+                          { backgroundColor: colors.secondary, opacity: pressed ? 0.8 : 1 }
+                        ]}
+                      >
+                        <ThemedText style={styles.approveButtonText}>Authorize Alert</ThemedText>
+                      </Pressable>
+                      <Pressable
+                        onPress={() => handleRejectAbsence(item.approvalId)}
+                        style={({ pressed }) => [
+                          styles.approveButton,
+                          { backgroundColor: '#EF4444', opacity: pressed ? 0.8 : 1 }
+                        ]}
+                      >
+                        <ThemedText style={styles.approveButtonText}>Reject</ThemedText>
+                      </Pressable>
+                    </View>
                   </View>
                 ))}
               </View>

@@ -25,6 +25,16 @@ interface UserModalProps {
   onSaveSuccess: () => void;
 }
 
+const DESIGNATIONS = [
+  'Principal',
+  'President',
+  'Secretary',
+  'Treasurer',
+  'Joint Treasurer',
+  'Admin Coordinator',
+  'IT Coordinator'
+];
+
 export function UserModal({
   visible,
   onClose,
@@ -80,6 +90,7 @@ export function UserModal({
   const [parentVolunteer, setParentVolunteer] = useState(false);
   const [associatedStudents, setAssociatedStudents] = useState<string[]>([]);
   const [studentQuery, setStudentQuery] = useState('');
+  const [designation, setDesignation] = useState('');
 
   // Sync state when visible or editingUser changes
   useEffect(() => {
@@ -90,6 +101,7 @@ export function UserModal({
         setPhone(editingUser.phone || '');
         setRole(editingUser.role || 'student');
         setLanguagePreference(editingUser.languagePreference || 'ta');
+        setDesignation(editingUser.designation || '');
 
         setFullNameTamil(editingUser.fullNameTamil || '');
         setGender(editingUser.gender || '');
@@ -165,6 +177,7 @@ export function UserModal({
         setWwcExpiryDate('');
         setEffectiveFrom('');
         setEffectiveTo('');
+        setDesignation('');
 
         setParentVolunteer(false);
         setAssociatedStudents([]);
@@ -230,6 +243,10 @@ export function UserModal({
       payload.associatedStudents = associatedStudents;
     } else if (role === 'admin') {
       payload.associatedStudents = associatedStudents;
+    }
+
+    if (['teacher', 'volunteer', 'admin'].includes(role)) {
+      payload.designation = designation.trim();
     }
 
     try {
@@ -377,6 +394,61 @@ export function UserModal({
                   placeholderTextColor={colors.textSecondary}
                 />
               </View>
+
+              {['teacher', 'volunteer', 'admin'].includes(role) && (
+                <View style={styles.formGroup}>
+                  <ThemedText style={styles.formLabel}>Designation / பதவி</ThemedText>
+                  
+                  <View style={{ gap: 6, marginTop: 4 }}>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                      {DESIGNATIONS.map((d) => {
+                        const isSel = designation === d;
+                        return (
+                          <Pressable
+                            key={d}
+                            onPress={() => setDesignation(d)}
+                            style={[
+                              { paddingVertical: 5, paddingHorizontal: 10, borderRadius: 6, borderWidth: 1 },
+                              isSel ? { backgroundColor: colors.primary, borderColor: colors.primary } : { backgroundColor: 'transparent', borderColor: colors.border }
+                            ]}
+                          >
+                            <ThemedText style={{ color: isSel ? '#FFF' : colors.text, fontSize: 11, fontWeight: '700' }}>
+                              {d}
+                            </ThemedText>
+                          </Pressable>
+                        );
+                      })}
+                      
+                      {(() => {
+                        const isCustom = designation && !DESIGNATIONS.includes(designation);
+                        return (
+                          <Pressable
+                            onPress={() => setDesignation('')}
+                            style={[
+                              { paddingVertical: 5, paddingHorizontal: 10, borderRadius: 6, borderWidth: 1 },
+                              (!designation || isCustom) ? { backgroundColor: colors.accent, borderColor: colors.accent } : { backgroundColor: 'transparent', borderColor: colors.border }
+                            ]}
+                          >
+                            <ThemedText style={{ color: (!designation || isCustom) ? '#FFF' : colors.text, fontSize: 11, fontWeight: '700' }}>
+                              Other / இதர
+                            </ThemedText>
+                          </Pressable>
+                        );
+                      })()}
+                    </View>
+
+                    {(!designation || !DESIGNATIONS.includes(designation)) && (
+                      <TextInput
+                        style={[styles.formInput, { color: colors.text, borderColor: colors.border, marginTop: 4 }]}
+                        value={designation}
+                        onChangeText={setDesignation}
+                        placeholder="Enter custom designation..."
+                        placeholderTextColor={colors.textSecondary}
+                      />
+                    )}
+                  </View>
+                </View>
+              )}
 
               <View style={styles.formGroup}>
                 <ThemedText style={styles.formLabel}>Role Assignment / பொறுப்பு</ThemedText>

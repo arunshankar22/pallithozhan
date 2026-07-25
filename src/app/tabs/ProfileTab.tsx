@@ -31,6 +31,7 @@ export function ProfileTab({ user, colors, t, showToast, i18n, logout }: TabProp
   // Profile Photo Upload states
   const [photoModalVisible, setPhotoModalVisible] = useState(false);
   const [customPhotoUrl, setCustomPhotoUrl] = useState('');
+  const [signatureModalVisible, setSignatureModalVisible] = useState(false);
 
   const PRESET_AVATARS = [
     { name: 'Student Boy', url: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&q=80&w=150' },
@@ -107,6 +108,44 @@ export function ProfileTab({ user, colors, t, showToast, i18n, logout }: TabProp
       setPhotoModalVisible(false);
     } catch (err) {
       showToast('Failed to remove profile photo.', 'error');
+    }
+  };
+
+  const handleUploadSignature = () => {
+    if (Platform.OS === 'web') {
+      if (typeof document !== 'undefined') {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.onchange = (e: any) => {
+          const file = e.target.files[0];
+          if (file) {
+            const reader = new FileReader();
+            reader.onload = async (readerEvent: any) => {
+              const base64 = readerEvent.target.result;
+              try {
+                await updateProfile(fullName || user?.fullName || '', phone || user?.phone || '', undefined, base64);
+                showToast('Signature updated successfully!', 'success');
+              } catch (err) {
+                showToast('Failed to update signature.', 'error');
+              }
+            };
+            reader.readAsDataURL(file);
+          }
+        };
+        input.click();
+      }
+    } else {
+      showToast('Signature upload is only supported on Web version.', 'warning');
+    }
+  };
+
+  const handleClearSignature = async () => {
+    try {
+      await updateProfile(fullName || user?.fullName || '', phone || user?.phone || '', undefined, '');
+      showToast('Signature removed successfully.', 'success');
+    } catch (err) {
+      showToast('Failed to remove signature.', 'error');
     }
   };
 
@@ -546,6 +585,82 @@ export function ProfileTab({ user, colors, t, showToast, i18n, logout }: TabProp
             </View>
           </View>
 
+          {/* Signature Management Row (For Teachers, Volunteers, Admins) */}
+          {['teacher', 'volunteer', 'admin', 'superadmin'].includes(user?.originalRole || user?.role || '') && (
+            <View style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: Spacing.three,
+              borderBottomWidth: 1,
+              borderColor: colors.border
+            }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, marginRight: 8 }}>
+                <Edit size={18} color={colors.textSecondary} />
+                <View style={{ gap: 2, flex: 1 }}>
+                  <ThemedText style={{ fontSize: 13, fontWeight: '700', color: colors.text }}>
+                    {i18n.language === 'ta' ? 'எனது கையொப்பம்' : 'My Signature'}
+                  </ThemedText>
+                  <ThemedText style={{ fontSize: 11, color: colors.textSecondary }}>
+                    {i18n.language === 'ta' 
+                      ? 'அறிக்கைகளுக்கான கையொப்பம்' 
+                      : 'Saved signature used for student progress reports'}
+                  </ThemedText>
+                </View>
+              </View>
+              
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                {user?.signatureImage ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <View style={{ height: 36, width: 100, borderWidth: 1, borderColor: colors.border, borderRadius: 4, padding: 2, backgroundColor: '#FFF', justifyContent: 'center', alignItems: 'center' }}>
+                      <Image source={{ uri: user.signatureImage }} style={{ height: '100%', width: '100%', resizeMode: 'contain' }} />
+                    </View>
+                    <Pressable
+                      onPress={() => setSignatureModalVisible(true)}
+                      style={{
+                        backgroundColor: colors.primary,
+                        paddingHorizontal: 8,
+                        paddingVertical: 6,
+                        borderRadius: 6
+                      }}
+                    >
+                      <ThemedText style={{ color: '#FFF', fontSize: 10, fontWeight: '800' }}>
+                        {i18n.language === 'ta' ? 'காண்க' : 'View'}
+                      </ThemedText>
+                    </Pressable>
+                    <Pressable
+                      onPress={handleClearSignature}
+                      style={{
+                        backgroundColor: '#EF4444',
+                        paddingHorizontal: 8,
+                        paddingVertical: 6,
+                        borderRadius: 6
+                      }}
+                    >
+                      <ThemedText style={{ color: '#FFF', fontSize: 10, fontWeight: '800' }}>
+                        {i18n.language === 'ta' ? 'நீக்கு' : 'Clear'}
+                      </ThemedText>
+                    </Pressable>
+                  </View>
+                ) : (
+                  <Pressable
+                    onPress={handleUploadSignature}
+                    style={{
+                      backgroundColor: colors.primary,
+                      paddingHorizontal: 10,
+                      paddingVertical: 6,
+                      borderRadius: 6
+                    }}
+                  >
+                    <ThemedText style={{ color: '#FFF', fontSize: 10, fontWeight: '800' }}>
+                      {i18n.language === 'ta' ? 'பதிவேற்று' : 'Upload'}
+                    </ThemedText>
+                  </Pressable>
+                )}
+              </View>
+            </View>
+          )}
+
           {/* Edit Profile Content (Visible in Edit Mode, otherwise static) */}
           {isEditing ? (
             <View style={{ padding: Spacing.three, borderBottomWidth: 1, borderColor: colors.border, gap: 12 }}>
@@ -931,6 +1046,90 @@ export function ProfileTab({ user, colors, t, showToast, i18n, logout }: TabProp
                 </Pressable>
               )}
             </RNScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* View Signature Modal */}
+      <Modal
+        visible={signatureModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setSignatureModalVisible(false)}
+      >
+        <View style={{
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+          backgroundColor: 'rgba(0,0,0,0.6)',
+          padding: 20
+        }}>
+          <View style={{
+            width: '100%',
+            maxWidth: 450,
+            backgroundColor: colors.background,
+            borderRadius: 16,
+            borderWidth: 1,
+            borderColor: colors.border,
+            padding: Spacing.four,
+            gap: 16,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 10 },
+            shadowOpacity: 0.25,
+            shadowRadius: 15,
+            elevation: 10
+          }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <ThemedText style={{ fontSize: 16, fontWeight: '800', color: colors.text }}>
+                {i18n.language === 'ta' ? 'கையொப்பத்தின் பெரிய தோற்றம்' : 'Signature Preview'}
+              </ThemedText>
+              <Pressable 
+                onPress={() => setSignatureModalVisible(false)}
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: 14,
+                  backgroundColor: colors.border,
+                  justifyContent: 'center',
+                  alignItems: 'center'
+                }}
+              >
+                <ThemedText style={{ fontSize: 12, fontWeight: '800', color: colors.text }}>✕</ThemedText>
+              </Pressable>
+            </View>
+
+            <View style={{ 
+              height: 180, 
+              width: '100%', 
+              borderWidth: 1, 
+              borderColor: colors.border, 
+              borderRadius: 8, 
+              padding: 8, 
+              backgroundColor: '#FFF', 
+              justifyContent: 'center', 
+              alignItems: 'center' 
+            }}>
+              {user?.signatureImage ? (
+                <Image 
+                  source={{ uri: user.signatureImage }} 
+                  style={{ height: '100%', width: '100%', resizeMode: 'contain' }} 
+                />
+              ) : null}
+            </View>
+
+            <Pressable
+              onPress={() => setSignatureModalVisible(false)}
+              style={{
+                backgroundColor: colors.primary,
+                paddingVertical: 10,
+                borderRadius: 8,
+                alignItems: 'center'
+              }}
+            >
+              <ThemedText style={{ color: '#FFF', fontSize: 12, fontWeight: '800' }}>
+                {i18n.language === 'ta' ? 'மூடு' : 'Close'}
+              </ThemedText>
+            </Pressable>
           </View>
         </View>
       </Modal>
