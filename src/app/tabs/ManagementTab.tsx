@@ -612,6 +612,14 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
                 cls.studentIds.push(record.uid);
                 enrollmentsUpdated++;
               }
+              // Ensure student is not in teacherIds or volunteerIds
+              if (cls.teacherIds && cls.teacherIds.includes(record.uid)) {
+                cls.teacherIds = cls.teacherIds.filter((id: string) => id !== record.uid);
+                if (cls.teacherId === record.uid) cls.teacherId = cls.teacherIds[0] || '';
+              }
+              if (cls.volunteerIds && cls.volunteerIds.includes(record.uid)) {
+                cls.volunteerIds = cls.volunteerIds.filter((id: string) => id !== record.uid);
+              }
             } else {
               const newClassId = `class_imported_${Date.now()}_${studentsImported}`;
               classUpdates[newClassId] = {
@@ -706,12 +714,27 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
                   enrollmentsUpdated++;
                   logs.push(`🏫 Assigned Teacher ${record.fullName} to Classroom: "${cls.className}"`);
                 }
+                // Ensure they are not in studentIds or volunteerIds
+                if (cls.studentIds && cls.studentIds.includes(record.uid)) {
+                  cls.studentIds = cls.studentIds.filter((id: string) => id !== record.uid);
+                }
+                if (cls.volunteerIds && cls.volunteerIds.includes(record.uid)) {
+                  cls.volunteerIds = cls.volunteerIds.filter((id: string) => id !== record.uid);
+                }
               } else {
                 cls.volunteerIds = cls.volunteerIds || [];
                 if (!cls.volunteerIds.includes(record.uid)) {
                   cls.volunteerIds.push(record.uid);
                   enrollmentsUpdated++;
                   logs.push(`🏫 Assigned Volunteer ${record.fullName} to Classroom: "${cls.className}"`);
+                }
+                // Ensure they are not in studentIds or teacherIds
+                if (cls.studentIds && cls.studentIds.includes(record.uid)) {
+                  cls.studentIds = cls.studentIds.filter((id: string) => id !== record.uid);
+                }
+                if (cls.teacherIds && cls.teacherIds.includes(record.uid)) {
+                  cls.teacherIds = cls.teacherIds.filter((id: string) => id !== record.uid);
+                  if (cls.teacherId === record.uid) cls.teacherId = cls.teacherIds[0] || '';
                 }
               }
             } else if (importRole === 'teacher') {
