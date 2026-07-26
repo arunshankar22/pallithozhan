@@ -282,7 +282,7 @@ export const spreadsheetService = {
 
     const normalizedRowCells = firstRowCells.map(normalizeHeader);
     const matchedHeaderCount = normalizedRowCells.filter(cell => 
-      ['givenname', 'familyname', 'firstname', 'lastname', 'name', 'email', 'studentemail', 'wwc', 'dob', 'dateofbirth', 'schoolcode', 'studentid', 'requestdate', 'registered'].includes(cell)
+      ['givenname', 'familyname', 'firstname', 'lastname', 'name', 'email', 'studentemail', 'wwc', 'dob', 'dateofbirth', 'schoolcode', 'studentid', 'requestdate', 'registered', 'purpose', 'request', 'parent2volunteer'].includes(cell)
     ).length;
     const hasHeader = matchedHeaderCount >= 2;
 
