@@ -600,17 +600,18 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
           logs.push(`👤 Created new Parent profile: ${parentData.fullName} (${email})`);
         }
 
-      } else {
+       } else {
         for (const record of importPreview) {
           const existingUser = dbUsers.find(u => 
             u.uid === record.uid || 
             (u.email && record.email && u.email.toLowerCase() === record.email.toLowerCase()) ||
-            (u.role === record.role && u.fullName && record.fullName && u.fullName.toLowerCase().trim() === record.fullName.toLowerCase().trim())
+            (u.fullName && record.fullName && u.fullName.toLowerCase().trim() === record.fullName.toLowerCase().trim())
           );
           if (existingUser) {
             record.uid = existingUser.uid; // Align UID for classroom and schedule stage linkages
             const updatedData = {
               fullName: record.fullName,
+              role: importRole, // Update role to match the sheet target (e.g. from parent to teacher/volunteer)!
               phone: record.phone || existingUser.phone || '',
               wwcNumber: record.wwcNumber || existingUser.wwcNumber || '',
               dob: record.dob || existingUser.dob || '',
@@ -622,7 +623,13 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
               effectiveTo: record.effectiveTo || existingUser.effectiveTo || '',
             };
             await mockDb.updateUser(existingUser.uid, updatedData);
-            logs.push(`🔄 ${importRole === 'teacher' ? 'Teacher' : 'Volunteer'} ${record.fullName} already exists. Merged & updated profile with sheet details.`);
+            
+            if (existingUser.role !== importRole) {
+              logs.push(`🔄 User ${record.fullName} role updated from "${existingUser.role}" to "${importRole}". Merged & updated profile with sheet details.`);
+            } else {
+              logs.push(`🔄 ${importRole === 'teacher' ? 'Teacher' : 'Volunteer'} ${record.fullName} already exists. Merged & updated profile with sheet details.`);
+            }
+            
             if (importRole === 'teacher') teachersImported++;
             else volunteersImported++;
           } else {
