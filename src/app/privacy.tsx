@@ -44,8 +44,8 @@ export default function PrivacyScreen() {
         </ThemedText>
         <ThemedText style={styles.paragraph}>
           {isTa 
-            ? 'நாங்கள் உங்கள் பெயர், மின்னஞ்சல் முகவரி, தொடர்பு எண் மற்றும் பள்ளி சேர்க்கை விவரங்களை மட்டுமே சேகரிக்கிறோம்.' 
-            : 'We only collect essential personal details such as names, email addresses, phone numbers, and school enrollment data.'}
+            ? 'வகுப்புகள் மற்றும் பள்ளி சேர்க்கைகளை பாதுகாப்பாக நிர்வகிக்க தேவையான தனிப்பட்ட விவரங்களை நாங்கள் சேகரிக்கிறோம்: மாணவர் விவரங்கள் (பெயர், பிறந்த தேதி, பாலினம், பள்ளி வகுப்பு விவரங்கள்); பெற்றோர் விவரங்கள் (பெயர், மின்னஞ்சல் முகவரிகள், தொலைபேசி எண்கள், தன்னார்வ விருப்பங்கள்); பள்ளி ஊழியர் விவரங்கள் (பெயர், தொடர்பு விவரங்கள், Working With Children (WWC) சரிபார்ப்பு எண்கள், கையொப்பங்கள்); மற்றும் வருகைப் பதிவுகள்/கல்வி அறிக்கைகள்.' 
+            : 'We collect personal details necessary to safely run school classes and manage enrollments: Student Details (Names, Date of Birth, Gender, Mainstream School/Grade, Class Enrollment); Parent Details (Names, Emails, Phone Numbers, Volunteer preferences); Staff details (Names, Contact details, Working With Children (WWC) check numbers, verification status, and signatures); and Attendance/Academic Reports.'}
         </ThemedText>
  
         <ThemedText style={styles.sectionTitle}>
@@ -53,8 +53,8 @@ export default function PrivacyScreen() {
         </ThemedText>
         <ThemedText style={styles.paragraph}>
           {isTa 
-            ? 'சேகரிக்கப்பட்ட தகவல்கள் வகுப்புகள், வருகைப் பதிவுகள், பள்ளி அறிவிப்புகள் மற்றும் மாணவர்களின் புள்ளி விவரங்களை நிர்வகிக்க மட்டுமே பயன்படுத்தப்படுகின்றன.' 
-            : 'We use the collected information solely for classroom administration, attendance tracking, school announcements, and student points management.'}
+            ? 'சேகரிக்கப்பட்ட தகவல்கள் வகுப்புகள், வருகைப் பதிவுகள், பள்ளி அறிவிப்புகள், கல்வி அறிக்கைகள் வழங்குதல் மற்றும் புத்தகங்கள்/புள்ளி விவரங்களை நிர்வகிக்க மட்டுமே பயன்படுத்தப்படுகின்றன.' 
+            : 'We use the collected information solely for classroom administration, attendance tracking, school announcements, issuing academic report cards, and student points/book management.'}
         </ThemedText>
  
         <View style={styles.divider} />
@@ -69,12 +69,12 @@ export default function PrivacyScreen() {
         </ThemedText>
 
         <ThemedText style={styles.sectionTitle}>
-          4. {isTa ? 'தகவல் பாதுகாப்பு' : 'Data Protection'}
+          4. {isTa ? 'தகவல் பாதுகாப்பு & சேமிப்பு' : 'Data Protection & Storage'}
         </ThemedText>
         <ThemedText style={styles.paragraph}>
           {isTa 
-            ? 'உங்கள் தரவு Firebase பாதுகாப்பான தரவுத்தளத்தில் வைக்கப்படுகிறது. எக்காரணம் கொண்டும் உங்கள் விவரங்கள் மூன்றாம் தரப்பினருடன் பகிரப்படாது.' 
-            : 'Your data is securely stored using Firebase Cloud hosting. We implement strict security measures to protect your credentials and prevent unauthorized access.'}
+            ? 'உங்கள் தரவு Firebase பாதுகாப்பான கிளவுட் தரவுத்தளத்தில் வைக்கப்படுகிறது. அனைத்து தரவுகளும் Google Cloud Firestore-இல் குறியாக்க முறையில் பாதுகாக்கப்படுகின்றன. எக்காரணம் கொண்டும் உங்கள் விவரங்கள் மூன்றாம் தரப்பினருடன் பகிரப்படாது.' 
+            : 'Your data is securely stored using Firebase Cloud hosting. All information is secured in Google Cloud Firestore with token-based encryption. We do not share, sell, or rent your personal information to third parties.'}
         </ThemedText>
  
         <ThemedText style={styles.sectionTitle}>
