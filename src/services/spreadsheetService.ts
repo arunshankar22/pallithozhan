@@ -317,9 +317,9 @@ export const spreadsheetService = {
 
         if (role === 'student') {
           const email = rowObj.student_email || (rowObj.student_id ? `${rowObj.student_id.trim().toLowerCase()}@balarmalar.nsw.edu.au` : `student_${Date.now()}_${i}@balarmalar.nsw.edu.au`);
-          const givenName = rowObj.given_name || '';
-          const familyName = rowObj.family_name || '';
-          const fullName = `${givenName} ${familyName}`.trim();
+          const givenName = (rowObj.given_name || '').replace(/\s+/g, ' ').trim();
+          const familyName = (rowObj.family_name || '').replace(/\s+/g, ' ').trim();
+          const fullName = `${givenName} ${familyName}`.replace(/\s+/g, ' ').trim();
           
           if (!fullName || !email) {
             const rowNumber = i + 1;
@@ -348,21 +348,21 @@ export const spreadsheetService = {
             effectiveFrom: rowObj.effective_from || '',
             effectiveTo: rowObj.effective_to || '',
             parent1: rowObj.parent1_name ? {
-              fullName: rowObj.parent1_name,
+              fullName: rowObj.parent1_name.replace(/\s+/g, ' ').trim(),
               email: (rowObj.parent1_email || '').toLowerCase(),
               phone: rowObj.parent1_mobile || '',
               volunteer: (rowObj.parent1_volunteer || '').toLowerCase() === 'yes' || rowObj.parent1_volunteer === 'YES',
             } : null,
             parent2: rowObj.parent2_name ? {
-              fullName: rowObj.parent2_name,
+              fullName: rowObj.parent2_name.replace(/\s+/g, ' ').trim(),
               email: (rowObj.parent2_email || '').toLowerCase(),
               phone: rowObj.parent2_mobile || '',
               volunteer: (rowObj.parent2_volunteer || '').toLowerCase() === 'yes' || rowObj.parent2_volunteer === 'YES',
             } : null,
           } as StudentParsedRecord);
         } else if (role === 'waitlist') {
-          const givenName = rowObj.given_name || '';
-          const familyName = rowObj.family_name || '';
+          const givenName = (rowObj.given_name || '').replace(/\s+/g, ' ').trim();
+          const familyName = (rowObj.family_name || '').replace(/\s+/g, ' ').trim();
           const studentEmail = rowObj.student_email || '';
           
           if (!givenName && !familyName) {
@@ -388,11 +388,11 @@ export const spreadsheetService = {
             mainstream_school_name: rowObj.mainstream_school_name || '',
             mainstream_school_class: rowObj.mainstream_school_class || '',
             class_name: rowObj.class_name || '',
-            parent1_name: rowObj.parent1_name || '',
+            parent1_name: (rowObj.parent1_name || '').replace(/\s+/g, ' ').trim(),
             parent1_email: (rowObj.parent1_email || '').toLowerCase(),
             parent1_mobile: rowObj.parent1_mobile || '',
             parent1_volunteer: rowObj.parent1_volunteer || 'NO',
-            parent2_name: rowObj.parent2_name || '',
+            parent2_name: (rowObj.parent2_name || '').replace(/\s+/g, ' ').trim(),
             parent2_email: (rowObj.parent2_email || '').toLowerCase(),
             parent2_mobile: rowObj.parent2_mobile || '',
             parent2_volunteer: rowObj.parent2_volunteer || 'NO',
@@ -413,7 +413,7 @@ export const spreadsheetService = {
             createdAt: rowObj.created_at || new Date().toISOString()
           });
         } else {
-          const name = rowObj.given_name || rowObj.name || '';
+          const name = (rowObj.given_name || rowObj.name || '').replace(/\s+/g, ' ').trim();
           const email = rowObj.student_email || rowObj.email || '';
           if (!name || !email) {
             const rowNumber = i + 1;
