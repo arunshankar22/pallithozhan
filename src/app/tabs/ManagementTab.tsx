@@ -433,10 +433,11 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
         let waitlistUpdated = 0;
         const dbWaitlist = await waitlistService.getWaitlist();
         for (const record of importPreview) {
-          const existing = dbWaitlist.find(w => 
-            w.given_name.toLowerCase().trim() === record.given_name.toLowerCase().trim() && 
-            w.family_name.toLowerCase().trim() === record.family_name.toLowerCase().trim()
-          );
+          const existing = dbWaitlist.find(w => {
+            const wName = `${w.given_name || ''} ${w.family_name || ''}`.toLowerCase().replace(/[^a-z0-9]/g, '');
+            const rName = `${record.given_name || ''} ${record.family_name || ''}`.toLowerCase().replace(/[^a-z0-9]/g, '');
+            return wName === rName;
+          });
           
           if (existing) {
             record.uid = existing.uid;
