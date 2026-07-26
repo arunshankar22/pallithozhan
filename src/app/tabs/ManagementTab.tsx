@@ -2854,6 +2854,9 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
                           { label: 'Mainstream School', width: 160 },
                           { label: 'Grade', width: 70 },
                           { label: 'Pref Class', width: 120 },
+                          { label: 'Purpose', width: 130 },
+                          { label: 'Request Source', width: 120 },
+                          { label: 'Request Date', width: 150 },
                           { label: 'Registered', width: 150 },
                           { label: 'Parent 1 Name', width: 140 },
                           { label: 'Parent 1 Email', width: 180 },
@@ -2930,6 +2933,9 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
                             <View style={{ width: 160, paddingHorizontal: 10 }}><ThemedText style={{ fontSize: 12 }} numberOfLines={1}>{w.mainstream_school_name || '-'}</ThemedText></View>
                             <View style={{ width: 70, paddingHorizontal: 10 }}><ThemedText style={{ fontSize: 12 }} numberOfLines={1}>{w.mainstream_school_class || '-'}</ThemedText></View>
                             <View style={{ width: 120, paddingHorizontal: 10 }}><ThemedText style={{ fontSize: 12 }} numberOfLines={1}>{w.class_name || '-'}</ThemedText></View>
+                            <View style={{ width: 130, paddingHorizontal: 10 }}><ThemedText style={{ fontSize: 12 }} numberOfLines={1}>{w.Purpose || w.purpose || 'New Enrollment'}</ThemedText></View>
+                            <View style={{ width: 120, paddingHorizontal: 10 }}><ThemedText style={{ fontSize: 12 }} numberOfLines={1}>{w.Request || w.request || 'Online Form'}</ThemedText></View>
+                            <View style={{ width: 150, paddingHorizontal: 10 }}><ThemedText style={{ fontSize: 12 }} numberOfLines={1}>{w.RequestDate || w.Request_Date || '-'}</ThemedText></View>
                             <View style={{ width: 150, paddingHorizontal: 10 }}><ThemedText style={{ fontSize: 12 }} numberOfLines={1}>{w.student_created || '-'}</ThemedText></View>
                             <View style={{ width: 140, paddingHorizontal: 10 }}><ThemedText style={{ fontSize: 12 }} numberOfLines={1}>{w.parent1_name || '-'}</ThemedText></View>
                             <View style={{ width: 180, paddingHorizontal: 10 }}><ThemedText style={{ fontSize: 12 }} numberOfLines={1}>{w.parent1_email || '-'}</ThemedText></View>
