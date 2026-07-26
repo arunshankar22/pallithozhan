@@ -269,6 +269,17 @@ export const spreadsheetService = {
     ).length;
     const hasHeader = matchedHeaderCount >= 2;
 
+    // Validate role alignment with sheet headers
+    const hasWwcHeaders = normalizedRowCells.some(cell => ['wwc', 'wwcverified', 'wwcexpirydate', 'mobileno'].includes(cell));
+    const hasStudentHeaders = normalizedRowCells.some(cell => ['parent1name', 'parent2name', 'studentid'].includes(cell));
+    
+    if ((role === 'student' || role === 'waitlist') && hasWwcHeaders) {
+      return { records: [], error: "Detected Teacher/Volunteer columns (WWC, Mobile No, etc.). Please select the 'Teachers' or 'Volunteers' tab before importing this file." };
+    }
+    if ((role === 'teacher' || role === 'volunteer') && hasStudentHeaders) {
+      return { records: [], error: "Detected Student columns (Parent 1 Name, Student ID, etc.). Please select the 'Students & Parents' tab before importing this file." };
+    }
+
     const records: any[] = [];
 
     if (hasHeader) {
