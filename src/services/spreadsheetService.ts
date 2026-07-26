@@ -276,7 +276,7 @@ export const spreadsheetService = {
       
       // Required header validation
       if (role === 'student') {
-        const required = ['given_name', 'family_name', 'student_email'];
+        const required = ['given_name', 'student_email'];
         const missing = required.filter(r => !mappedHeaders.includes(r));
         if (missing.length > 0 && !mappedHeaders.includes('email')) {
           return { records: [], error: `Missing required columns: ${missing.join(', ')}` };
