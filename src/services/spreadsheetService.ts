@@ -427,7 +427,7 @@ export const spreadsheetService = {
             email: email.toLowerCase(),
             phone: rowObj.mobile_no || rowObj.phone || rowObj.mobileno || rowObj.mobile || '',
             role,
-            stage: rowObj.stage || '',
+            stage: rowObj.stage || rowObj.class_name || '',
             wwcNumber: rowObj.wwc || '',
             dob: rowObj.dob || '',
             wwcVerified: rowObj.wwc_verified === '1' || (String(rowObj.wwc_verified || '')).toLowerCase() === 'yes' || (String(rowObj.wwc_verified || '')).toLowerCase() === 'verified' || rowObj.wwcverified === '1' || (String(rowObj.wwcverified || '')).toLowerCase() === 'yes' || (String(rowObj.wwcverified || '')).toLowerCase() === 'verified',

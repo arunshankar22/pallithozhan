@@ -686,8 +686,8 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
             else volunteersImported++;
           }
 
-          if (record.stage) {
-            const targetStage = record.stage.trim();
+          const targetStage = (record.stage || record.className || '').trim();
+          if (targetStage) {
             let matchedClassId = '';
             for (const cid of Object.keys(classUpdates)) {
               if (matchClassByName(targetStage, classUpdates[cid].className)) {
