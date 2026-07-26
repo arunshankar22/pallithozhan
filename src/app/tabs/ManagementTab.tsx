@@ -368,6 +368,40 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
     }
   };
 
+  const matchClassByName = (targetStage: string, className: string): boolean => {
+    const t = targetStage.toLowerCase().trim().replace(/[\s\-_]/g, '');
+    const c = className.toLowerCase().trim().replace(/[\s\-_]/g, '');
+    
+    if (c.includes(t) || t.includes(c)) return true;
+    
+    // Check digit matching: e.g. "year 2" vs "standard 2"
+    const tNum = t.match(/\d+/)?.[0];
+    const cNum = c.match(/\d+/)?.[0];
+    if (tNum && cNum && tNum === cNum) {
+      if ((t.includes('year') || t.includes('standard') || t.includes('grade')) &&
+          (c.includes('year') || c.includes('standard') || c.includes('grade'))) {
+        return true;
+      }
+    }
+    
+    // KG match
+    if ((t.includes('kg') || t.includes('kindergarten')) && (c.includes('kg') || c.includes('kindergarten'))) {
+      return true;
+    }
+    
+    // BC match
+    if ((t.includes('bc') || t.includes('basic')) && (c.includes('bc') || c.includes('basic'))) {
+      // Avoid matching "highschoolbc" with "bc"
+      const isTHigh = t.includes('high');
+      const isCHigh = c.includes('high');
+      if (isTHigh === isCHigh) {
+        return true;
+      }
+    }
+    
+    return false;
+  };
+
   const handleExecuteImport = async () => {
     if (importPreview.length === 0) return;
     setImporting(true);
@@ -565,7 +599,7 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
             const targetClassName = record.className.trim();
             let matchedClassId = '';
             for (const cid of Object.keys(classUpdates)) {
-              if (classUpdates[cid].className.toLowerCase().includes(targetClassName.toLowerCase())) {
+              if (matchClassByName(targetClassName, classUpdates[cid].className)) {
                 matchedClassId = cid;
                 break;
               }
@@ -656,7 +690,7 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
             const targetStage = record.stage.trim();
             let matchedClassId = '';
             for (const cid of Object.keys(classUpdates)) {
-              if (classUpdates[cid].className.toLowerCase().includes(targetStage.toLowerCase())) {
+              if (matchClassByName(targetStage, classUpdates[cid].className)) {
                 matchedClassId = cid;
                 break;
               }
@@ -670,12 +704,14 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
                   cls.teacherIds.push(record.uid);
                   if (!cls.teacherId) cls.teacherId = record.uid;
                   enrollmentsUpdated++;
+                  logs.push(`🏫 Assigned Teacher ${record.fullName} to Classroom: "${cls.className}"`);
                 }
               } else {
                 cls.volunteerIds = cls.volunteerIds || [];
                 if (!cls.volunteerIds.includes(record.uid)) {
                   cls.volunteerIds.push(record.uid);
                   enrollmentsUpdated++;
+                  logs.push(`🏫 Assigned Volunteer ${record.fullName} to Classroom: "${cls.className}"`);
                 }
               }
             } else if (importRole === 'teacher') {
