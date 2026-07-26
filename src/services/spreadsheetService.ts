@@ -1,15 +1,32 @@
 import { Platform } from 'react-native';
 import * as XLSX from 'xlsx';
 
-const formatWaitlistDate = (dateStr: string): string => {
+const formatWaitlistDate = (dateStr: string, fallbackYear?: string): string => {
   if (!dateStr) return '';
   try {
-    let parsedDate = new Date(dateStr);
+    let cleanDateStr = dateStr.trim();
+    // If dateStr doesn't contain a 4-digit year, append the fallback year (e.g. "2026")
+    if (!/\d{4}/.test(cleanDateStr)) {
+      const yearToUse = fallbackYear || new Date().getFullYear().toString();
+      if (cleanDateStr.includes(',')) {
+        const parts = cleanDateStr.split(',');
+        if (parts.length >= 2) {
+          parts[1] = `${parts[1]} ${yearToUse}`;
+          cleanDateStr = parts.join(',');
+        } else {
+          cleanDateStr = `${cleanDateStr}, ${yearToUse}`;
+        }
+      } else {
+        cleanDateStr = `${cleanDateStr} ${yearToUse}`;
+      }
+    }
+
+    let parsedDate = new Date(cleanDateStr);
     
     // Check if invalid date
     if (isNaN(parsedDate.getTime())) {
       // Try parsing formats like "3/7/2026 13:17:14"
-      const slashParts = dateStr.split('/');
+      const slashParts = cleanDateStr.split('/');
       if (slashParts.length === 3) {
         const day = parseInt(slashParts[0], 10);
         const month = parseInt(slashParts[1], 10) - 1; // 0-indexed
@@ -384,7 +401,7 @@ export const spreadsheetService = {
             gender: rowObj.gender || '',
             DATE_OF_BIRTH: rowObj.date_of_birth || '',
             prev_bm_school_class: rowObj.prev_bm_school_class || '',
-            student_created: formatWaitlistDate(rowObj.request_date || rowObj.student_created) || new Date().toISOString().replace('T', ' ').substring(0, 19),
+            student_created: formatWaitlistDate(rowObj.request_date || rowObj.student_created, rowObj.year || '2026') || new Date().toISOString().replace('T', ' ').substring(0, 19),
             mainstream_school_name: rowObj.mainstream_school_name || '',
             mainstream_school_class: rowObj.mainstream_school_class || '',
             class_name: rowObj.class_name || '',
@@ -399,7 +416,7 @@ export const spreadsheetService = {
             Purpose: rowObj.purpose || 'New Enrollment',
             Request: rowObj.request || 'Online Form',
             RequestDate: (() => {
-              const fullDateStr = formatWaitlistDate(rowObj.request_date || rowObj.student_created);
+              const fullDateStr = formatWaitlistDate(rowObj.request_date || rowObj.student_created, rowObj.year || '2026');
               if (fullDateStr && fullDateStr.includes('-')) {
                 const datePart = fullDateStr.split(' ')[0];
                 const parts = datePart.split('-');
@@ -583,7 +600,7 @@ export const spreadsheetService = {
             gender: gender,
             DATE_OF_BIRTH: dob,
             prev_bm_school_class: prevClass,
-            student_created: formatWaitlistDate(studCreated) || new Date().toISOString().replace('T', ' ').substring(0, 19),
+            student_created: formatWaitlistDate(studCreated, '2026') || new Date().toISOString().replace('T', ' ').substring(0, 19),
             mainstream_school_name: mainstreamSch,
             mainstream_school_class: mainstreamGrade,
             class_name: stage,

@@ -2266,9 +2266,15 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
                     <View style={{ gap: 4 }}>
                       {importPreview.slice(0, 5).map((rec, idx) => (
                         <View key={idx} style={{ flexDirection: 'row', gap: 10 }}>
-                          <ThemedText style={{ fontSize: 10, fontWeight: '700', width: 120 }} numberOfLines={1}>👤 {rec.fullName}</ThemedText>
-                          <ThemedText style={{ fontSize: 10, color: colors.textSecondary, width: 180 }} numberOfLines={1}>✉️ {rec.email}</ThemedText>
-                          <ThemedText style={{ fontSize: 10, color: colors.primary, fontWeight: '700' }}>🏫 {rec.className || rec.stage || 'General'}</ThemedText>
+                          <ThemedText style={{ fontSize: 10, fontWeight: '700', width: 120 }} numberOfLines={1}>
+                            👤 {rec.fullName || (rec.given_name ? `${rec.given_name} ${rec.family_name || ''}`.trim() : '')}
+                          </ThemedText>
+                          <ThemedText style={{ fontSize: 10, color: colors.textSecondary, width: 180 }} numberOfLines={1}>
+                            ✉️ {rec.email || rec.student_email || rec.parent1_email || 'No email'}
+                          </ThemedText>
+                          <ThemedText style={{ fontSize: 10, color: colors.primary, fontWeight: '700' }}>
+                            🏫 {rec.className || rec.stage || rec.class_name || rec.mainstream_school_class || 'General'}
+                          </ThemedText>
                         </View>
                       ))}
                       {importPreview.length > 5 && (
