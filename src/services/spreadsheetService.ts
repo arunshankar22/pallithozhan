@@ -244,6 +244,20 @@ export const spreadsheetService = {
           return 'purpose';
         case 'request':
           return 'request';
+        case 'wwcverified':
+          return 'wwc_verified';
+        case 'wwcverifieddate':
+          return 'wwc_verified_date';
+        case 'wwcexpirydate':
+          return 'wwc_expiry_date';
+        case 'effectivefrom':
+          return 'effective_from';
+        case 'effectiveto':
+          return 'effective_to';
+        case 'mobileno':
+        case 'mobile':
+        case 'phone':
+          return 'mobile_no';
         default:
           return normalizedHeader;
       }
@@ -388,8 +402,8 @@ export const spreadsheetService = {
             createdAt: rowObj.created_at || new Date().toISOString()
           });
         } else {
-          const name = rowObj.name || '';
-          const email = rowObj.email || '';
+          const name = rowObj.given_name || rowObj.name || '';
+          const email = rowObj.student_email || rowObj.email || '';
           if (!name || !email) {
             const rowNumber = i + 1;
             warnings.push(`Row ${rowNumber}: Skipped because Name or Email is empty.`);
@@ -400,16 +414,16 @@ export const spreadsheetService = {
             uid: rowObj.id ? `${role}_${rowObj.id}` : `${role}_${Date.now()}_${i}`,
             fullName: name,
             email: email.toLowerCase(),
-            phone: rowObj.mobile_no || rowObj.phone || '',
+            phone: rowObj.mobile_no || rowObj.phone || rowObj.mobileno || rowObj.mobile || '',
             role,
             stage: rowObj.stage || '',
             wwcNumber: rowObj.wwc || '',
             dob: rowObj.dob || '',
-            wwcVerified: rowObj.wwc_verified === '1' || (rowObj.wwc_verified || '').toLowerCase() === 'yes' || (rowObj.wwc_verified || '').toLowerCase() === 'verified',
-            wwcVerifiedDate: rowObj.wwc_verified_date || '',
-            wwcExpiryDate: rowObj.wwc_expiry_date || '',
-            effectiveFrom: rowObj.effective_from || '',
-            effectiveTo: rowObj.effective_to || '',
+            wwcVerified: rowObj.wwc_verified === '1' || (String(rowObj.wwc_verified || '')).toLowerCase() === 'yes' || (String(rowObj.wwc_verified || '')).toLowerCase() === 'verified' || rowObj.wwcverified === '1' || (String(rowObj.wwcverified || '')).toLowerCase() === 'yes' || (String(rowObj.wwcverified || '')).toLowerCase() === 'verified',
+            wwcVerifiedDate: rowObj.wwc_verified_date || rowObj.wwcverifieddate || '',
+            wwcExpiryDate: rowObj.wwc_expiry_date || rowObj.wwcexpirydate || '',
+            effectiveFrom: rowObj.effective_from || rowObj.effectivefrom || '',
+            effectiveTo: rowObj.effective_to || rowObj.effectiveto || '',
           } as StaffParsedRecord);
         }
       }
