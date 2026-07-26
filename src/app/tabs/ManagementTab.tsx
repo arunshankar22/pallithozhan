@@ -461,7 +461,7 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
           const existingStudent = dbUsers.find(u => 
             u.uid === record.uid || 
             (u.email && record.email && u.email.toLowerCase() === record.email.toLowerCase()) ||
-            (u.role === 'student' && u.fullName && record.fullName && u.fullName.toLowerCase().trim() === record.fullName.toLowerCase().trim())
+            (u.role === 'student' && u.fullName && record.fullName && u.fullName.toLowerCase().replace(/[^a-z0-9]/g, '') === record.fullName.toLowerCase().replace(/[^a-z0-9]/g, ''))
           );
           if (existingStudent) {
             record.uid = existingStudent.uid; // Align UID for parent and class linkages
@@ -639,7 +639,7 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
           const existingUser = dbUsers.find(u => 
             u.uid === record.uid || 
             (u.email && record.email && u.email.toLowerCase() === record.email.toLowerCase()) ||
-            (u.fullName && record.fullName && u.fullName.toLowerCase().trim() === record.fullName.toLowerCase().trim())
+            (u.fullName && record.fullName && u.fullName.toLowerCase().replace(/[^a-z0-9]/g, '') === record.fullName.toLowerCase().replace(/[^a-z0-9]/g, ''))
           );
           if (existingUser) {
             record.uid = existingUser.uid; // Align UID for classroom and schedule stage linkages
