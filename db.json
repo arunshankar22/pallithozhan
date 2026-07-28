@@ -105,6 +105,87 @@
       "schoolId": "school_main",
       "languagePreference": "en",
       "associatedStudents": []
+    },
+    {
+      "uid": "demo_admin_placeholder",
+      "email": "demoadmin@balarmalar.nsw.edu.au",
+      "fullName": "Demo Admin (Parramatta)",
+      "role": "admin",
+      "phone": "0400000000",
+      "schoolId": "balarmalar parramatta branch",
+      "languagePreference": "en",
+      "designation": "IT Coordinator"
+    },
+    {
+      "uid": "demo_teacher_placeholder",
+      "email": "demoteacher@balarmalar.nsw.edu.au",
+      "fullName": "Demo Teacher (Parramatta)",
+      "role": "teacher",
+      "phone": "0411111111",
+      "schoolId": "balarmalar parramatta branch",
+      "languagePreference": "ta",
+      "stage": "Standard 1 - Demo",
+      "designation": "Teacher",
+      "dob": "1985-05-15",
+      "wwcNumber": "WWC1234567E",
+      "wwcVerified": true,
+      "wwcVerifiedDate": "2026-07-01",
+      "wwcExpiryDate": "2031-07-01",
+      "effectiveFrom": "2026-07-28 09:00:00",
+      "effectiveTo": ""
+    },
+    {
+      "uid": "demo_volunteer_placeholder",
+      "email": "demovolunteer@balarmalar.nsw.edu.au",
+      "fullName": "Demo Volunteer (Parramatta)",
+      "role": "volunteer",
+      "phone": "0422222222",
+      "schoolId": "balarmalar parramatta branch",
+      "languagePreference": "en",
+      "stage": "Standard 1 - Demo",
+      "designation": "Volunteer",
+      "dob": "1990-10-10",
+      "wwcNumber": "WWC7654321V",
+      "wwcVerified": true,
+      "wwcVerifiedDate": "2026-07-01",
+      "wwcExpiryDate": "2031-10-10",
+      "effectiveFrom": "2026-07-28 09:00:00",
+      "effectiveTo": ""
+    },
+    {
+      "uid": "demo_parent_placeholder",
+      "email": "demoparent@example.com",
+      "fullName": "Demo Parent (Parramatta)",
+      "role": "parent",
+      "phone": "0433333333",
+      "schoolId": "balarmalar parramatta branch",
+      "languagePreference": "ta",
+      "associatedStudents": [
+        "demo_student_placeholder"
+      ],
+      "parentVolunteer": true
+    },
+    {
+      "uid": "demo_student_placeholder",
+      "email": "demostudent@balarmalar.nsw.edu.au",
+      "fullName": "Demo Student (Parramatta)",
+      "role": "student",
+      "phone": "",
+      "schoolId": "balarmalar parramatta branch",
+      "languagePreference": "ta",
+      "fullNameTamil": "டெமோ மாணவர்",
+      "gender": "Male",
+      "dateOfBirth": "2017-06-20",
+      "mainstreamSchoolName": "Parramatta Public School",
+      "mainstreamSchoolClass": "Year 4",
+      "className": "Standard 1 - Demo",
+      "prevBmSchoolClass": "Kindergarten",
+      "studentCreated": "2026-07-28 09:00:00",
+      "okToIssueBooks": "YES",
+      "stationaryIssued": "YES",
+      "booksIssued": "YES",
+      "effectiveFrom": "2026-07-28 09:00:00",
+      "effectiveTo": ""
     }
   ],
   "classes": [
@@ -130,6 +211,20 @@
         "user_1779876882930"
       ],
       "volunteerIds": []
+    },
+    {
+      "classId": "demo_class_1",
+      "className": "Standard 1 - Demo",
+      "teacherId": "demo_teacher_placeholder",
+      "teacherIds": [
+        "demo_teacher_placeholder"
+      ],
+      "volunteerIds": [
+        "demo_volunteer_placeholder"
+      ],
+      "studentIds": [
+        "demo_student_placeholder"
+      ]
     }
   ],
   "newsfeed": [
@@ -464,6 +559,40 @@
       "term": 2,
       "isHoliday": false,
       "customAdded": false
+    }
+  ],
+  "waitlist": [
+    {
+      "uid": "demo_waitlist_1",
+      "school_code": "BMPM",
+      "year": "2026",
+      "student_id": "",
+      "student_email": "",
+      "given_name": "Demo Waitlist",
+      "family_name": "Student",
+      "full_name_tamil": "",
+      "gender": "Female",
+      "DATE_OF_BIRTH": "12/12/2019",
+      "prev_bm_school_class": "",
+      "student_created": "2026-07-28 10:00:00",
+      "mainstream_school_name": "Parramatta Public School",
+      "mainstream_school_class": "Kindergarten",
+      "class_name": "",
+      "parent1_name": "Demo Parent",
+      "parent1_email": "demoparent@example.com",
+      "parent1_mobile": "0433333333",
+      "parent1_volunteer": "NO",
+      "parent2_name": "",
+      "parent2_email": "",
+      "parent2_mobile": "",
+      "parent2_volunteer": "NO",
+      "Purpose": "New",
+      "Request": "Online Form",
+      "RequestDate": "28/07/2026",
+      "OK_TO_ISSUE_BOOKS": "NO",
+      "STATIONARY_ISSUED": "NO",
+      "BOOKS_ISSUED": "NO",
+      "createdAt": "2026-07-28T11:12:45.285Z"
     }
   ]
 }
