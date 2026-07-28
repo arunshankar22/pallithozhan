@@ -134,6 +134,38 @@ export const DEFAULT_WAITLIST = [
     STATIONARY_ISSUED: 'NO',
     BOOKS_ISSUED: 'NO',
     createdAt: '2026-09-03T09:00:00.000Z'
+  },
+  {
+    uid: 'demo_waitlist_1',
+    school_code: 'BMPM',
+    year: '2026',
+    student_id: '',
+    student_email: '',
+    given_name: 'Demo Waitlist',
+    family_name: 'Student',
+    full_name_tamil: '',
+    gender: 'Female',
+    DATE_OF_BIRTH: '12/12/2019',
+    prev_bm_school_class: '',
+    student_created: '2026-07-28 10:00:00',
+    mainstream_school_name: 'Parramatta Public School',
+    mainstream_school_class: 'Kindergarten',
+    class_name: '',
+    parent1_name: 'Demo Parent',
+    parent1_email: 'demoparent@example.com',
+    parent1_mobile: '0433333333',
+    parent1_volunteer: 'NO',
+    parent2_name: '',
+    parent2_email: '',
+    parent2_mobile: '',
+    parent2_volunteer: 'NO',
+    Purpose: 'New',
+    Request: 'Online Form',
+    RequestDate: '28/07/2026',
+    OK_TO_ISSUE_BOOKS: 'NO',
+    STATIONARY_ISSUED: 'NO',
+    BOOKS_ISSUED: 'NO',
+    createdAt: '2026-07-28T10:00:00.000Z'
   }
 ];
 

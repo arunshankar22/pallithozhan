@@ -4,7 +4,15 @@ import { collection, doc, getDoc, getDocs, setDoc, deleteDoc } from 'firebase/fi
 
 export const DEFAULT_CLASSES = [
   { classId: 'class_1', className: 'Standard 1 - A (Tamil Basic)', teacherId: 'teacher_1', teacherIds: ['teacher_1'], studentIds: ['student_1', 'student_2'], volunteerIds: ['volunteer_1'] },
-  { classId: 'class_2', className: 'Standard 2 - B (Tamil Intermediate)', teacherId: 'teacher_1', teacherIds: ['teacher_1'], studentIds: ['student_3'], volunteerIds: [] }
+  { classId: 'class_2', className: 'Standard 2 - B (Tamil Intermediate)', teacherId: 'teacher_1', teacherIds: ['teacher_1'], studentIds: ['student_3'], volunteerIds: [] },
+  { 
+    classId: 'demo_class_1', 
+    className: 'Standard 1 - Demo', 
+    teacherId: 'demo_teacher_placeholder', 
+    teacherIds: ['demo_teacher_placeholder'], 
+    studentIds: ['demo_student_placeholder'], 
+    volunteerIds: ['demo_volunteer_placeholder'] 
+  }
 ];
 
 export const classService = {
