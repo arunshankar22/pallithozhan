@@ -44,19 +44,49 @@ let auth: any;
 let db: any;
 let storage: any;
 
+// Resolve isDemoMode dynamically
+let resolvedDemoMode = false;
+if (typeof window !== 'undefined') {
+  const params = new URLSearchParams(window.location.search);
+  if (params.has('demo')) {
+    resolvedDemoMode = params.get('demo') === 'true';
+    try {
+      window.localStorage.setItem('pallithozhan_demo_mode', resolvedDemoMode ? 'true' : 'false');
+    } catch (e) {}
+  } else {
+    try {
+      const stored = window.localStorage.getItem('pallithozhan_demo_mode');
+      if (stored !== null) {
+        resolvedDemoMode = stored === 'true';
+      }
+    } catch (e) {}
+  }
+}
+
+if (process.env.EXPO_PUBLIC_DEMO_MODE === 'true') {
+  resolvedDemoMode = true;
+}
+
+export const isDemoMode = resolvedDemoMode;
+
 try {
   app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
   auth = getAuth(app);
-  db = initializeFirestore(app, {
-    experimentalForceLongPolling: true
-  }, databaseId);
-  console.log(`[Firebase Init] Connected to Firestore Database ID: "${databaseId}"`);
-  storage = getStorage(app, storageBucketId);
-  storage.maxUploadRetryTime = 30000; // Increase to 30s to allow real mobile uploads
-  storage.maxOperationRetryTime = 30000; // Increase to 30s
+  if (!isDemoMode) {
+    db = initializeFirestore(app, {
+      experimentalForceLongPolling: true
+    }, databaseId);
+    console.log(`[Firebase Init] Connected to Firestore Database ID: "${databaseId}"`);
+    storage = getStorage(app, storageBucketId);
+    storage.maxUploadRetryTime = 30000; // Increase to 30s to allow real mobile uploads
+    storage.maxOperationRetryTime = 30000; // Increase to 30s
+  } else {
+    db = null;
+    storage = null;
+    console.log("[Firebase Init] Running in Demo Mode. Skipping Firestore connection.");
+  }
 } catch (error) {
-  console.error("Failed to initialize production Firebase:", error);
+  console.error("Failed to initialize Firebase:", error);
 }
 
-export const isDemoMode = false;
 export { auth, db, storage };

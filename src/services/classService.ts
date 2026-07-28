@@ -15,38 +15,39 @@ export const DEFAULT_CLASSES = [
   }
 ];
 
+let localClasses = [...DEFAULT_CLASSES];
+
 export const classService = {
   reset: async (): Promise<void> => {
-    // Reset handled via seed scripts
+    localClasses = [...DEFAULT_CLASSES];
   },
 
   getClasses: async (): Promise<any[]> => {
     try {
-      if (!db) return DEFAULT_CLASSES;
+      if (!db) return localClasses;
       const querySnapshot = await getDocs(collection(db, 'classes'));
       const classesList: any[] = [];
       querySnapshot.forEach((docSnap) => {
         classesList.push({ classId: docSnap.id, ...docSnap.data() });
       });
-      return classesList.length > 0 ? classesList : DEFAULT_CLASSES;
+      return classesList.length > 0 ? classesList : localClasses;
     } catch (e) {
-      console.warn('[classService] Falling back to DEFAULT_CLASSES:', e);
-      return DEFAULT_CLASSES;
+      console.warn('[classService] Falling back to localClasses:', e);
+      return localClasses;
     }
   },
 
   getClass: async (classId: string): Promise<any | null> => {
-    if (!db) throw new Error('Firestore database is not initialized');
+    if (!db) return localClasses.find(c => c.classId === classId) || null;
     const docRef = doc(db, 'classes', classId);
     const docSnap = await getDoc(docRef);
     if (docSnap.exists()) {
       return { classId: docSnap.id, ...docSnap.data() };
     }
-    return null;
+    return localClasses.find(c => c.classId === classId) || null;
   },
 
   createClass: async (classData: any): Promise<any> => {
-    if (!db) throw new Error('Firestore database is not initialized');
     const classId = classData.classId || `class_${Date.now()}`;
     const teacherIds = classData.teacherIds || (classData.teacherId ? [classData.teacherId] : []);
     const newClass = {
@@ -58,13 +59,27 @@ export const classService = {
       volunteerIds: classData.volunteerIds || []
     };
 
+    if (!db) {
+      localClasses.push(newClass);
+      return newClass;
+    }
+
     const { classId: omitted, ...details } = newClass;
     await setDoc(doc(db, 'classes', classId), details);
     return newClass;
   },
 
   updateClass: async (classId: string, data: any): Promise<any> => {
-    if (!db) throw new Error('Firestore database is not initialized');
+    if (!db) {
+      const idx = localClasses.findIndex(c => c.classId === classId);
+      if (idx !== -1) {
+        localClasses[idx] = { ...localClasses[idx], ...data };
+        return localClasses[idx];
+      }
+      const newClass = { classId, ...data };
+      localClasses.push(newClass);
+      return newClass;
+    }
     const docRef = doc(db, 'classes', classId);
     await setDoc(docRef, data, { merge: true });
     const docSnap = await getDoc(docRef);
@@ -72,7 +87,10 @@ export const classService = {
   },
 
   deleteClass: async (classId: string): Promise<void> => {
-    if (!db) throw new Error('Firestore database is not initialized');
+    if (!db) {
+      localClasses = localClasses.filter(c => c.classId !== classId);
+      return;
+    }
     await deleteDoc(doc(db, 'classes', classId));
   }
 };

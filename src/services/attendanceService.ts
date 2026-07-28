@@ -16,28 +16,34 @@ const DEFAULT_ATTENDANCE = [
   }
 ];
 
+let localAttendance = [...DEFAULT_ATTENDANCE];
+let localPendingApprovals: any[] = [];
+let localPushedAlerts: any[] = [];
+
 export const attendanceService = {
   reset: async (): Promise<void> => {
-    // Reset database operations are handled via seed functions, no-op here for security
+    localAttendance = [...DEFAULT_ATTENDANCE];
+    localPendingApprovals = [];
+    localPushedAlerts = [];
   },
 
   getAttendance: async (): Promise<any[]> => {
     try {
-      if (!db) return DEFAULT_ATTENDANCE;
+      if (!db) return localAttendance;
       const querySnapshot = await getDocs(collection(db, 'attendance'));
       const attList: any[] = [];
       querySnapshot.forEach((docSnap) => {
         attList.push({ recordId: docSnap.id, ...docSnap.data() });
       });
-      return attList.length > 0 ? attList : DEFAULT_ATTENDANCE;
+      return attList.length > 0 ? attList : localAttendance;
     } catch (e) {
-      console.warn('[attendanceService] Falling back to DEFAULT_ATTENDANCE:', e);
-      return DEFAULT_ATTENDANCE;
+      console.warn('[attendanceService] Falling back to localAttendance:', e);
+      return localAttendance;
     }
   },
 
   getAttendanceRecord: async (classId: string, date: string): Promise<any | null> => {
-    if (!db) throw new Error('Firestore database is not initialized');
+    if (!db) return localAttendance.find(a => a.classId === classId && a.date === date) || null;
     const docId = `${classId}_${date}`;
     const docSnap = await getDoc(doc(db, 'attendance', docId));
     if (docSnap.exists()) {
@@ -55,7 +61,6 @@ export const attendanceService = {
   },
 
   saveAttendance: async (record: any): Promise<any> => {
-    if (!db) throw new Error('Firestore database is not initialized');
     const docId = `${record.classId}_${record.date}`;
     const isAdmin = record.markedByRole === 'admin';
     const cleanRecord = {
@@ -67,9 +72,16 @@ export const attendanceService = {
       approved: isAdmin ? true : false
     };
 
-    await setDoc(doc(db, 'attendance', docId), cleanRecord);
-
-    // Award automated points for attendance
+    if (!db) {
+      const idx = localAttendance.findIndex(a => a.recordId === docId);
+      if (idx !== -1) {
+        localAttendance[idx] = { ...localAttendance[idx], ...cleanRecord };
+      } else {
+        localAttendance.push({ recordId: docId, ...cleanRecord });
+      }
+      return { recordId: docId, ...cleanRecord };
+    }
+    
     try {
       const { pointsService } = require('./pointsService');
       const config = await pointsService.getPointsConfig();
@@ -154,7 +166,7 @@ export const attendanceService = {
   },
 
   getPendingApprovals: async (): Promise<any[]> => {
-    if (!db) throw new Error('Firestore database is not initialized');
+    if (!db) return localPendingApprovals.filter(a => a.status === 'pending');
     const approvalsRef = collection(db, 'pending_approvals');
     const q = query(approvalsRef, where('status', '==', 'pending'));
     const querySnapshot = await getDocs(q);
@@ -166,7 +178,7 @@ export const attendanceService = {
   },
 
   getApprovals: async (): Promise<any[]> => {
-    if (!db) throw new Error('Firestore database is not initialized');
+    if (!db) return localPendingApprovals;
     const querySnapshot = await getDocs(collection(db, 'pending_approvals'));
     const approvalsList: any[] = [];
     querySnapshot.forEach((docSnap) => {
@@ -176,7 +188,17 @@ export const attendanceService = {
   },
 
   approveAbsence: async (approvalId: string): Promise<any | null> => {
-    if (!db) throw new Error('Firestore database is not initialized');
+    if (!db) {
+      const app = localPendingApprovals.find(a => a.approvalId === approvalId);
+      if (app) {
+        app.status = 'approved';
+        const attDocId = `${app.classId}_${app.date}`;
+        const att = localAttendance.find(a => a.recordId === attDocId);
+        if (att) att.approved = true;
+        return app;
+      }
+      return null;
+    }
     const appRef = doc(db, 'pending_approvals', approvalId);
     const appSnap = await getDoc(appRef);
     
@@ -203,7 +225,19 @@ export const attendanceService = {
   },
 
   rejectAbsence: async (approvalId: string): Promise<any | null> => {
-    if (!db) throw new Error('Firestore database is not initialized');
+    if (!db) {
+      const app = localPendingApprovals.find(a => a.approvalId === approvalId);
+      if (app) {
+        app.status = 'rejected';
+        const attDocId = `${app.classId}_${app.date}`;
+        const att = localAttendance.find(a => a.recordId === attDocId);
+        if (att && att.rolls) {
+          (att.rolls as any)[app.studentId] = 'present';
+        }
+        return app;
+      }
+      return null;
+    }
     const appRef = doc(db, 'pending_approvals', approvalId);
     const appSnap = await getDoc(appRef);
     
@@ -228,7 +262,7 @@ export const attendanceService = {
   },
 
   getPushedAlerts: async (parentUid: string): Promise<any[]> => {
-    if (!db) throw new Error('Firestore database is not initialized');
+    if (!db) return localPushedAlerts.filter(a => a.parentUid === parentUid);
     const alertsRef = collection(db, 'pushed_alerts');
     const q = query(alertsRef, where('parentUid', '==', parentUid));
     const querySnapshot = await getDocs(q);
@@ -240,7 +274,7 @@ export const attendanceService = {
   },
 
   getStudentAttendance: async (studentId: string): Promise<any[]> => {
-    if (!db) throw new Error('Firestore database is not initialized');
+    if (!db) return [];
     const attList = await attendanceService.getAttendance();
     
     const approvals: any[] = [];
@@ -278,7 +312,7 @@ export const attendanceService = {
   },
 
   exportAttendanceData: async (classId: string): Promise<{ list: any[]; className: string; schoolDates: any[]; attendanceRecords: any[] }> => {
-    if (!db) throw new Error('Firestore database is not initialized');
+    if (!db) return { list: [], className: 'Class', schoolDates: [], attendanceRecords: [] };
     const list: any[] = [];
     let className = 'Class';
     const schoolDates: any[] = [];
@@ -363,7 +397,7 @@ export const attendanceService = {
     currentUser: any,
     importMode: 'all' | 'missing' = 'all'
   ): Promise<{ updatedCount: number; datesCount: number }> => {
-    if (!db) throw new Error('Firestore database is not initialized');
+    if (!db) return { updatedCount: 0, datesCount: 0 };
     
     // 1. Load users to match names if ID is blank
     const allUsers = await userService.getUsers();
@@ -479,7 +513,7 @@ export const attendanceService = {
   },
 
   exportBulkAttendanceData: async (termSelection: string): Promise<{ list: any[]; schoolDates: any[]; attendanceRecords: any[] }> => {
-    if (!db) throw new Error('Firestore database is not initialized');
+    if (!db) return { list: [], schoolDates: [], attendanceRecords: [] };
     const allUsers = await userService.getUsers();
     
     let schoolDates: any[] = [];
@@ -556,7 +590,7 @@ export const attendanceService = {
     onProgressLog?: (log: string) => void,
     importMode: 'all' | 'missing' = 'all'
   ): Promise<{ updatedCount: number; datesCount: number }> => {
-    if (!db) throw new Error('Firestore database is not initialized');
+    if (!db) return { updatedCount: 0, datesCount: 0 };
     const log = (msg: string) => {
       if (onProgressLog) onProgressLog(msg);
       else console.log(`[Attendance Bulk Import] ${msg}`);

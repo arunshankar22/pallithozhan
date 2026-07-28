@@ -169,35 +169,41 @@ export const DEFAULT_WAITLIST = [
   }
 ];
 
+let localWaitlist = [...DEFAULT_WAITLIST];
+
 export const waitlistService = {
   reset: async (): Promise<void> => {
-    // Reset handled via seed scripts
+    localWaitlist = [...DEFAULT_WAITLIST];
   },
 
   getWaitlist: async (): Promise<any[]> => {
-    if (!db) throw new Error('Firestore database is not initialized');
-    const q = query(collection(db, 'waitlist'), orderBy('createdAt', 'asc'));
-    const querySnapshot = await getDocs(q);
-    const list: any[] = [];
-    querySnapshot.forEach((docSnap) => {
-      list.push({ uid: docSnap.id, ...docSnap.data() });
-    });
-    if (list.length === 0) {
-      const seedDocRef = doc(db, 'metadata', 'waitlist_seeded');
-      const seedSnap = await getDoc(seedDocRef);
-      if (!seedSnap.exists()) {
-        for (const w of DEFAULT_WAITLIST) {
-          await waitlistService.submitWaitlist(w);
-          list.push(w);
+    try {
+      if (!db) return localWaitlist;
+      const q = query(collection(db, 'waitlist'), orderBy('createdAt', 'asc'));
+      const querySnapshot = await getDocs(q);
+      const list: any[] = [];
+      querySnapshot.forEach((docSnap) => {
+        list.push({ uid: docSnap.id, ...docSnap.data() });
+      });
+      if (list.length === 0) {
+        const seedDocRef = doc(db, 'metadata', 'waitlist_seeded');
+        const seedSnap = await getDoc(seedDocRef);
+        if (!seedSnap.exists()) {
+          for (const w of localWaitlist) {
+            await waitlistService.submitWaitlist(w);
+            list.push(w);
+          }
+          await setDoc(seedDocRef, { seeded: true });
         }
-        await setDoc(seedDocRef, { seeded: true });
       }
+      return list;
+    } catch (e) {
+      console.warn('[waitlistService] Falling back to localWaitlist:', e);
+      return localWaitlist;
     }
-    return list;
   },
 
   submitWaitlist: async (record: any): Promise<any> => {
-    if (!db) throw new Error('Firestore database is not initialized');
     const uid = record.uid || `waitlist_${Date.now()}`;
     const newRecord = {
       school_code: 'BMPM',
@@ -225,7 +231,7 @@ export const waitlistService = {
       parent2_volunteer: 'NO',
       Purpose: 'New Enrollment',
       Request: 'Online Form',
-      RequestDate: new Date().toLocaleDateString('en-GB'), // e.g. "11/06/2026"
+      RequestDate: new Date().toLocaleDateString('en-GB'),
       OK_TO_ISSUE_BOOKS: 'NO',
       STATIONARY_ISSUED: 'NO',
       BOOKS_ISSUED: 'NO',
@@ -234,13 +240,27 @@ export const waitlistService = {
       createdAt: record.createdAt || new Date().toISOString()
     };
 
+    if (!db) {
+      localWaitlist.push(newRecord);
+      return newRecord;
+    }
+
     const { uid: omitted, ...details } = newRecord;
     await setDoc(doc(db, 'waitlist', uid), details);
     return newRecord;
   },
 
   updateWaitlist: async (uid: string, data: any): Promise<any> => {
-    if (!db) throw new Error('Firestore database is not initialized');
+    if (!db) {
+      const idx = localWaitlist.findIndex(w => w.uid === uid);
+      if (idx !== -1) {
+        localWaitlist[idx] = { ...localWaitlist[idx], ...data };
+        return localWaitlist[idx];
+      }
+      const newRecord = { uid, ...data };
+      localWaitlist.push(newRecord);
+      return newRecord;
+    }
     const docRef = doc(db, 'waitlist', uid);
     await setDoc(docRef, data, { merge: true });
     const updatedSnap = await getDoc(docRef);
@@ -248,7 +268,10 @@ export const waitlistService = {
   },
 
   deleteWaitlist: async (uid: string): Promise<void> => {
-    if (!db) throw new Error('Firestore database is not initialized');
+    if (!db) {
+      localWaitlist = localWaitlist.filter(w => w.uid !== uid);
+      return;
+    }
     await deleteDoc(doc(db, 'waitlist', uid));
   }
 };

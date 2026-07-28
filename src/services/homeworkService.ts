@@ -96,29 +96,30 @@ const uploadHomeworkMedia = async (
   }
 };
 
+let localHomework = [...DEFAULT_HOMEWORK];
+
 export const homeworkService = {
   reset: async (): Promise<void> => {
-    // Reset handled via seed scripts
+    localHomework = [...DEFAULT_HOMEWORK];
   },
 
   getHomework: async (classId?: string): Promise<any[]> => {
     try {
-      if (!db) return DEFAULT_HOMEWORK;
+      if (!db) return classId ? localHomework.filter((h: any) => h.classId === classId) : localHomework;
       const querySnapshot = await getDocs(collection(db, 'homework'));
       const hwList: any[] = [];
       querySnapshot.forEach((docSnap) => {
         hwList.push({ homeworkId: docSnap.id, ...docSnap.data() });
       });
-      const list = hwList.length > 0 ? hwList : DEFAULT_HOMEWORK;
+      const list = hwList.length > 0 ? hwList : localHomework;
       return classId ? list.filter((h: any) => h.classId === classId) : list;
     } catch (e) {
-      console.warn('[homeworkService] Falling back to DEFAULT_HOMEWORK:', e);
-      return classId ? DEFAULT_HOMEWORK.filter((h: any) => h.classId === classId) : DEFAULT_HOMEWORK;
+      console.warn('[homeworkService] Falling back to localHomework:', e);
+      return classId ? localHomework.filter((h: any) => h.classId === classId) : localHomework;
     }
   },
 
   createHomework: async (homework: any): Promise<any> => {
-    if (!db) throw new Error('Firestore database is not initialized');
     const homeworkId = `hw_${Date.now()}`;
     const newHw = {
       homeworkId,
@@ -133,6 +134,11 @@ export const homeworkService = {
       mediaAttachments: homework.mediaAttachments || [],
       voiceUrl: homework.voiceUrl || ''
     };
+
+    if (!db) {
+      localHomework.push(newHw);
+      return newHw;
+    }
 
     const { ref, uploadString, getDownloadURL } = require('firebase/storage');
     const { storage } = require('./firebase');
@@ -172,7 +178,22 @@ export const homeworkService = {
   },
 
   toggleHomeworkSubmission: async (homeworkId: string, studentId: string): Promise<any> => {
-    if (!db) throw new Error('Firestore database is not initialized');
+    if (!db) {
+      const idx = localHomework.findIndex(h => h.homeworkId === homeworkId);
+      if (idx !== -1) {
+        const submissions = (localHomework[idx].submissions || {}) as any;
+        const current = submissions[studentId];
+        const isCurrentlyCompleted = current === true || (current && typeof current === 'object' && current.completed === true);
+        submissions[studentId] = {
+          completed: !isCurrentlyCompleted,
+          mediaAttachments: isCurrentlyCompleted ? [] : (current?.mediaAttachments || []),
+          submittedAt: new Date().toISOString()
+        };
+        localHomework[idx].submissions = submissions;
+        return localHomework[idx];
+      }
+      return null;
+    }
     const docRef = doc(db, 'homework', homeworkId);
     const docSnap = await getDoc(docRef);
     if (docSnap.exists()) {
@@ -193,9 +214,23 @@ export const homeworkService = {
   },
 
   submitHomework: async (homeworkId: string, studentId: string, attachments?: any[]): Promise<any> => {
-    if (!db) throw new Error('Firestore database is not initialized');
     const isCompleted = true;
     const cleanAttachments = attachments || [];
+
+    if (!db) {
+      const idx = localHomework.findIndex(h => h.homeworkId === homeworkId);
+      if (idx !== -1) {
+        const submissions = (localHomework[idx].submissions || {}) as any;
+        submissions[studentId] = {
+          completed: isCompleted,
+          mediaAttachments: cleanAttachments,
+          submittedAt: new Date().toISOString()
+        };
+        localHomework[idx].submissions = submissions;
+        return localHomework[idx];
+      }
+      return null;
+    }
 
     const { ref, uploadString, uploadBytes, getDownloadURL } = require('firebase/storage');
     const { storage } = require('./firebase');
@@ -276,8 +311,18 @@ export const homeworkService = {
   },
 
   updateHomework: async (homeworkId: string, data: any): Promise<any> => {
-    if (!db) throw new Error('Firestore database is not initialized');
     const updatedHw = { ...data };
+
+    if (!db) {
+      const idx = localHomework.findIndex(h => h.homeworkId === homeworkId);
+      if (idx !== -1) {
+        localHomework[idx] = { ...localHomework[idx], ...updatedHw };
+        return localHomework[idx];
+      }
+      const newHw = { homeworkId, ...updatedHw };
+      localHomework.push(newHw);
+      return newHw;
+    }
 
     const { ref, uploadString, getDownloadURL } = require('firebase/storage');
     const { storage } = require('./firebase');
@@ -317,7 +362,10 @@ export const homeworkService = {
   },
 
   deleteHomework: async (homeworkId: string): Promise<any> => {
-    if (!db) throw new Error('Firestore database is not initialized');
+    if (!db) {
+      localHomework = localHomework.filter(h => h.homeworkId !== homeworkId);
+      return { homeworkId };
+    }
     await deleteDoc(doc(db, 'homework', homeworkId));
     return { homeworkId };
   }

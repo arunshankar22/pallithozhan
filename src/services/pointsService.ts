@@ -1,5 +1,6 @@
 import { db } from './firebase';
 import { collection, doc, getDoc, getDocs, setDoc, deleteDoc, query, where } from 'firebase/firestore';
+import { userService } from './userService';
 
 export interface PointsLog {
   logId: string;
@@ -67,7 +68,7 @@ export const pointsService = {
   },
 
   updatePointsConfig: async (config: PointsConfig): Promise<PointsConfig> => {
-    if (!db) throw new Error('Firestore database is not initialized');
+    if (!db) return config;
     const docRef = doc(db, 'points_config', 'global_settings');
     await setDoc(docRef, config, { merge: true });
     return config;
@@ -81,8 +82,6 @@ export const pointsService = {
     awardedBy: string,
     awardedByName: string
   ): Promise<PointsLog> => {
-    if (!db) throw new Error('Firestore database is not initialized');
-    
     const logId = `plog_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
     const logEntry: PointsLog = {
       logId,
@@ -95,6 +94,19 @@ export const pointsService = {
       timestamp: new Date().toISOString()
     };
 
+    if (!db) {
+      try {
+        const u = await userService.getUser(studentId);
+        if (u) {
+          await userService.updateUser(studentId, { 
+            points: (u.points || 0) + points,
+            lastPointsAwarded: logEntry.timestamp 
+          });
+        }
+      } catch (e) {}
+      return logEntry;
+    }
+    
     // 1. Write the log document
     await setDoc(doc(db, 'points_logs', logId), logEntry);
 
@@ -128,7 +140,7 @@ export const pointsService = {
   },
 
   deletePointsLog: async (logId: string): Promise<void> => {
-    if (!db) throw new Error('Firestore database is not initialized');
+    if (!db) return;
     
     // 1. Fetch log to find target student and points value
     const logRef = doc(db, 'points_logs', logId);

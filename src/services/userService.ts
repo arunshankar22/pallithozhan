@@ -187,49 +187,49 @@ export const DEFAULT_USERS = [
   }
 ];
 
+let localUsers = [...DEFAULT_USERS];
+
 export const userService = {
   reset: async (): Promise<void> => {
-    // Reset handled via seed scripts
+    localUsers = [...DEFAULT_USERS];
   },
 
   getUsers: async (): Promise<any[]> => {
     try {
-      if (!db) return DEFAULT_USERS;
+      if (!db) return localUsers;
       const querySnapshot = await getDocs(collection(db, 'users'));
       const usersList: any[] = [];
       querySnapshot.forEach((docSnap) => {
         usersList.push({ uid: docSnap.id, ...docSnap.data() });
       });
-      for (const u of DEFAULT_USERS) {
+      for (const u of localUsers) {
         const exists = usersList.some((user) => user.email && user.email.toLowerCase() === u.email.toLowerCase());
         if (!exists) {
           usersList.push(u);
         }
       }
-      return usersList.length > 0 ? usersList : DEFAULT_USERS;
+      return usersList.length > 0 ? usersList : localUsers;
     } catch (e) {
-      console.warn('[userService] Falling back to DEFAULT_USERS:', e);
-      return DEFAULT_USERS;
+      console.warn('[userService] Falling back to localUsers:', e);
+      return localUsers;
     }
   },
 
   getUser: async (uid: string): Promise<any | null> => {
     try {
-      if (!db) return DEFAULT_USERS.find(u => u.uid === uid) || null;
+      if (!db) return localUsers.find(u => u.uid === uid) || null;
       const docRef = doc(db, 'users', uid);
       const docSnap = await getDoc(docRef);
       if (docSnap.exists()) {
         return { uid: docSnap.id, ...docSnap.data() };
       }
-      return DEFAULT_USERS.find(u => u.uid === uid) || null;
+      return localUsers.find(u => u.uid === uid) || null;
     } catch (e) {
-      return DEFAULT_USERS.find(u => u.uid === uid) || null;
+      return localUsers.find(u => u.uid === uid) || null;
     }
   },
 
-
   createUser: async (user: any): Promise<any> => {
-    if (!db) throw new Error('Firestore database is not initialized');
     const uid = user.uid || `user_${Date.now()}`;
     const newUser = {
       schoolId: typeof window !== 'undefined' && typeof localStorage !== 'undefined' ? (
@@ -251,13 +251,27 @@ export const userService = {
       uid
     };
 
+    if (!db) {
+      localUsers.push(newUser);
+      return newUser;
+    }
+
     const { uid: omitted, ...details } = newUser;
     await setDoc(doc(db, 'users', uid), details);
     return newUser;
   },
 
   updateUser: async (uid: string, data: any): Promise<any> => {
-    if (!db) throw new Error('Firestore database is not initialized');
+    if (!db) {
+      const idx = localUsers.findIndex(u => u.uid === uid);
+      if (idx !== -1) {
+        localUsers[idx] = { ...localUsers[idx], ...data };
+        return localUsers[idx];
+      }
+      const newUser = { uid, ...data };
+      localUsers.push(newUser);
+      return newUser;
+    }
     const docRef = doc(db, 'users', uid);
     await setDoc(docRef, data, { merge: true });
     const updatedSnap = await getDoc(docRef);
@@ -265,7 +279,10 @@ export const userService = {
   },
 
   deleteUser: async (uid: string): Promise<void> => {
-    if (!db) throw new Error('Firestore database is not initialized');
+    if (!db) {
+      localUsers = localUsers.filter(u => u.uid !== uid);
+      return;
+    }
     await deleteDoc(doc(db, 'users', uid));
   }
 };
