@@ -37,6 +37,8 @@ import {
   AlertCircle
 } from 'lucide-react-native';
 import { PrintRequest } from '@/services/printRequestService';
+import * as FileSystem from 'expo-file-system/build/legacy';
+import * as Sharing from 'expo-sharing';
 
 export function PrintRequestsTab({ showToast }: TabProps) {
   const { t, i18n } = useTranslation();
@@ -311,20 +313,57 @@ export function PrintRequestsTab({ showToast }: TabProps) {
     }
   };
 
+  // Native Mobile File sharing/printing helper
+  const handleOpenFileNative = async (url: string, name: string) => {
+    try {
+      showToast('Preparing document...', 'success');
+
+      // Create a clean path in cache directory
+      const cleanName = name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+      const fileUri = `${FileSystem.cacheDirectory}${cleanName}`;
+
+      if (url.startsWith('data:')) {
+        // Parse base64 content
+        const parts = url.split(';base64,');
+        const base64Content = parts.pop() || '';
+        await FileSystem.writeAsStringAsync(fileUri, base64Content, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+      } else {
+        // Download remote file
+        await FileSystem.downloadAsync(url, fileUri);
+      }
+
+      // Check if sharing is available and open share sheet
+      const isSharingAvailable = await Sharing.isAvailableAsync();
+      if (isSharingAvailable) {
+        await Sharing.shareAsync(fileUri, {
+          mimeType: url.startsWith('data:') ? url.split(';')[0].split(':')[1] : undefined,
+          dialogTitle: `Open/Print ${name}`,
+        });
+      } else {
+        showToast('Sharing is not available on this device', 'error');
+      }
+    } catch (error) {
+      console.error("Error opening document natively:", error);
+      showToast('Failed to open document', 'error');
+    }
+  };
+
   // Open single file preview or download
   const handleOpenFile = (url: string, name: string) => {
     const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(name) || url.startsWith('data:image/');
     const isPdf = /\.pdf$/i.test(name) || url.startsWith('data:application/pdf');
 
-    let resolvedUrl = url;
-    if (Platform.OS === 'web' && url.startsWith('data:')) {
-      const blob = dataURLtoBlob(url);
-      if (blob) {
-        resolvedUrl = URL.createObjectURL(blob);
-      }
-    }
-
     if (Platform.OS === 'web') {
+      let resolvedUrl = url;
+      if (url.startsWith('data:')) {
+        const blob = dataURLtoBlob(url);
+        if (blob) {
+          resolvedUrl = URL.createObjectURL(blob);
+        }
+      }
+
       if (isImage) {
         setPreviewFile({ name, url: resolvedUrl, type: 'image' });
       } else if (isPdf) {
@@ -340,16 +379,16 @@ export function PrintRequestsTab({ showToast }: TabProps) {
         document.body.removeChild(link);
       }
     } else {
-      // Native Mobile opens URL directly using Linking
-      Linking.openURL(url).catch((err) => console.error("Failed to open document URL:", err));
+      // Native Mobile opens via our share helper
+      handleOpenFileNative(url, name);
     }
   };
 
   // Bulk open files
-  const handleOpenAllFiles = (request: PrintRequest) => {
-    request.fileUrls.forEach((url, i) => {
-      const name = request.fileNames[i] || `file_${i}`;
-      if (Platform.OS === 'web') {
+  const handleOpenAllFiles = async (request: PrintRequest) => {
+    if (Platform.OS === 'web') {
+      request.fileUrls.forEach((url, i) => {
+        const name = request.fileNames[i] || `file_${i}`;
         if (url.startsWith('data:')) {
           const blob = dataURLtoBlob(url);
           if (blob) {
@@ -361,10 +400,16 @@ export function PrintRequestsTab({ showToast }: TabProps) {
         } else {
           window.open(url, '_blank');
         }
-      } else {
-        Linking.openURL(url).catch((err) => console.error("Failed to open file:", err));
+      });
+    } else {
+      // Native Mobile: sequentially open sharing sheet for each file with a brief delay
+      for (let i = 0; i < request.fileUrls.length; i++) {
+        const url = request.fileUrls[i];
+        const name = request.fileNames[i] || `file_${i}`;
+        await handleOpenFileNative(url, name);
+        await new Promise((resolve) => setTimeout(resolve, 800));
       }
-    });
+    }
   };
 
   // Render Status Badge
@@ -442,7 +487,8 @@ export function PrintRequestsTab({ showToast }: TabProps) {
 
       {/* FILTER BAR */}
       <View style={styles.filterBar}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 4 }}>
+        {/* Status Filters Row */}
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8, paddingHorizontal: 4 }}>
           <Pressable
             onPress={() => setStatusFilter('All')}
             style={[styles.filterBtn, statusFilter === 'All' && styles.filterBtnActive]}
@@ -475,9 +521,10 @@ export function PrintRequestsTab({ showToast }: TabProps) {
               {i18n.language === 'ta' ? 'முடிந்தவை' : 'Completed'}
             </ThemedText>
           </Pressable>
-          
-          <View style={{ width: 1, height: 24, backgroundColor: colors.border, marginHorizontal: 4 }} />
-          
+        </View>
+
+        {/* Ownership Filters Row */}
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingHorizontal: 4 }}>
           <Pressable
             onPress={() => setViewFilter('All')}
             style={[styles.filterBtn, viewFilter === 'All' && styles.filterBtnActive]}
@@ -494,7 +541,7 @@ export function PrintRequestsTab({ showToast }: TabProps) {
               {i18n.language === 'ta' ? 'என் கோரிக்கைகள்' : 'My Requests'}
             </ThemedText>
           </Pressable>
-        </ScrollView>
+        </View>
       </View>
 
       {loading ? (
