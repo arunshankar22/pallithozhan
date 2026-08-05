@@ -20,7 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/services/auth';
 import { mockDb } from '@/services/mockBackend';
 import { isDemoMode } from '@/services/firebase';
-import { Colors, Spacing, MaxContentWidth } from '@/constants/theme';
+import { Colors, Spacing, MaxContentWidth, Fonts } from '@/constants/theme';
 import { ThemedText } from '@/components/themed-text';
 import { styles } from '@/app/styles';
 import { VideoPlayer } from '@/components/VideoPlayer';
@@ -137,6 +137,16 @@ const cleanTopic = (topicStr: string) => {
   return topicStr.replace(/^(Topic:|தலைப்பு:)\s*/i, '');
 };
 
+const thirukuralData = require('../../assets/thirukural.json');
+
+const getKuralOfTheDay = () => {
+  if (!thirukuralData || !thirukuralData.kurals || thirukuralData.kurals.length === 0) return null;
+  const now = new Date();
+  const daysSinceEpoch = Math.floor(now.getTime() / (1000 * 60 * 60 * 24));
+  const index = daysSinceEpoch % thirukuralData.kurals.length;
+  return thirukuralData.kurals[index];
+};
+
 export default function HomeScreen() {
   const { t, i18n } = useTranslation();
   const { width: windowWidth } = useWindowDimensions();
@@ -194,6 +204,7 @@ export default function HomeScreen() {
   const [newsPosts, setNewsPosts] = useState<any[]>([]);
   const [selectedPost, setSelectedPost] = useState<any | null>(null);
   const [dashboardEditPost, setDashboardEditPost] = useState<any | null>(null);
+  const [showKuralMeaning, setShowKuralMeaning] = useState(false);
   const [enrolmentModalVisible, setEnrolmentModalVisible] = useState(false);
   const [waitlistModalVisible, setWaitlistModalVisible] = useState(false);
   const [schoolsSearch, setSchoolsSearch] = useState('');
@@ -1287,6 +1298,158 @@ export default function HomeScreen() {
             </View>
           </View>
         </View>
+
+        {/* Thirukkural of the Day Widget */}
+        {(() => {
+          const dailyKural = getKuralOfTheDay();
+          if (!dailyKural) return null;
+          
+          const isTa = i18n.language === 'ta';
+          const isDark = scheme === 'dark';
+          const cleanMuVa = dailyKural.meaning.ta_mu_va.replace(/^மு\.வ\s*:\s*/, '');
+          const cleanPappaiah = dailyKural.meaning.ta_salamon.replace(/^சாலமன்\s+பாப்பையா\s*:\s*/, '');
+          
+          return (
+            <View style={{
+              borderRadius: 20,
+              padding: Spacing.three,
+              backgroundColor: colors.accentLight,
+              borderWidth: 1,
+              borderColor: isDark ? '#4A3E20' : '#ffd073',
+              gap: 12,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: isDark ? 0.2 : 0.05,
+              shadowRadius: 6,
+              elevation: 2
+            }}>
+              {/* Header Row */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <BookOpen size={16} color={isDark ? colors.accent : colors.primary} />
+                  <ThemedText style={{ fontSize: 13, fontWeight: '900', color: isDark ? colors.accent : '#5c3a00' }}>
+                    {isTa ? 'இன்றைய திருக்குறள்' : 'Kural of the Day'}
+                  </ThemedText>
+                </View>
+                <View style={{
+                  backgroundColor: isDark ? 'rgba(254, 196, 43, 0.15)' : '#fff3d1',
+                  paddingHorizontal: 8,
+                  paddingVertical: 2,
+                  borderRadius: 6,
+                  borderWidth: 0.5,
+                  borderColor: isDark ? 'rgba(254, 196, 43, 0.3)' : '#ffd073'
+                }}>
+                  <ThemedText style={{ fontSize: 10, fontWeight: '800', color: isDark ? colors.accent : '#825200' }}>
+                    {isTa ? `குறள் ${dailyKural.number}` : `Kural ${dailyKural.number}`}
+                  </ThemedText>
+                </View>
+              </View>
+
+              {/* Kural Couplet Quote */}
+              <View style={{
+                backgroundColor: isDark ? 'rgba(0, 0, 0, 0.2)' : 'rgba(255, 255, 255, 0.4)',
+                borderRadius: 12,
+                padding: 14,
+                borderLeftWidth: 3,
+                borderLeftColor: isDark ? colors.accent : colors.primary,
+                gap: 4
+              }}>
+                <ThemedText style={{
+                  fontSize: 14,
+                  fontWeight: '800',
+                  lineHeight: 20,
+                  color: colors.text,
+                  fontStyle: 'italic'
+                }}>
+                  {dailyKural.kural[0]}
+                </ThemedText>
+                <ThemedText style={{
+                  fontSize: 14,
+                  fontWeight: '800',
+                  lineHeight: 20,
+                  color: colors.text,
+                  fontStyle: 'italic'
+                }}>
+                  {dailyKural.kural[1]}
+                </ThemedText>
+              </View>
+
+              {/* Details & Meanings */}
+              <View style={{ gap: 8 }}>
+                <View style={{ flexDirection: 'row', gap: 12, flexWrap: 'wrap' }}>
+                  <ThemedText style={{ fontSize: 11, fontWeight: '700', color: isDark ? colors.textSecondary : '#665130' }}>
+                    {isTa ? `பிரிவு: ${dailyKural.section}` : `Section: ${dailyKural.section}`}
+                  </ThemedText>
+                  <ThemedText style={{ fontSize: 11, fontWeight: '700', color: isDark ? colors.textSecondary : '#665130' }}>
+                    {isTa ? `அதிகாரம்: ${dailyKural.chapter}` : `Chapter: ${dailyKural.chapter}`}
+                  </ThemedText>
+                </View>
+
+                {/* Show Meaning Toggle Button */}
+                <Pressable
+                  onPress={() => setShowKuralMeaning(!showKuralMeaning)}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    paddingVertical: 8,
+                    backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.7)',
+                    borderRadius: 8,
+                    borderWidth: 0.5,
+                    borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)'
+                  }}
+                >
+                  <ThemedText style={{ fontSize: 11, fontWeight: '800', color: isDark ? colors.accent : colors.primary }}>
+                    {showKuralMeaning 
+                      ? (isTa ? 'பொருளை மறைக்கவும் ▲' : 'Hide Meaning ▲')
+                      : (isTa ? 'பொருள் விளக்கம் பார்க்க ▼' : 'Show Meaning & Translation ▼')
+                    }
+                  </ThemedText>
+                </Pressable>
+
+                {showKuralMeaning && (
+                  <View style={{
+                    gap: 12,
+                    marginTop: 4,
+                    borderTopWidth: 0.5,
+                    borderTopColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)',
+                    paddingTop: 10
+                  }}>
+                    {/* Tamil Explanation 1 */}
+                    <View style={{ gap: 2 }}>
+                      <ThemedText style={{ fontSize: 10, fontWeight: '800', color: isDark ? colors.accent : '#825200', textTransform: 'uppercase' }}>
+                        மு. வரதராசனார் விளக்கம்:
+                      </ThemedText>
+                      <ThemedText style={{ fontSize: 12, lineHeight: 17, color: colors.text }}>
+                        {cleanMuVa}
+                      </ThemedText>
+                    </View>
+
+                    {/* Tamil Explanation 2 */}
+                    <View style={{ gap: 2 }}>
+                      <ThemedText style={{ fontSize: 10, fontWeight: '800', color: isDark ? colors.accent : '#825200', textTransform: 'uppercase' }}>
+                        சாலமன் பாப்பையா விளக்கம்:
+                      </ThemedText>
+                      <ThemedText style={{ fontSize: 12, lineHeight: 17, color: colors.text }}>
+                        {cleanPappaiah}
+                      </ThemedText>
+                    </View>
+
+                    {/* English Explanation */}
+                    <View style={{ gap: 2 }}>
+                      <ThemedText style={{ fontSize: 10, fontWeight: '800', color: isDark ? colors.accent : '#825200', textTransform: 'uppercase' }}>
+                        English Meaning / Explanation:
+                      </ThemedText>
+                      <ThemedText style={{ fontSize: 12, lineHeight: 17, color: colors.text }}>
+                        {dailyKural.meaning.en}
+                      </ThemedText>
+                    </View>
+                  </View>
+                )}
+              </View>
+            </View>
+          );
+        })()}
 
         {/* Points & Ribbons Dashboard Widget for Students and Parents */}
         {(user?.role === 'student' || user?.role === 'parent') && (() => {
