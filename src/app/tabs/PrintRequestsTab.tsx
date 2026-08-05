@@ -37,7 +37,7 @@ import {
   AlertCircle
 } from 'lucide-react-native';
 import { PrintRequest } from '@/services/printRequestService';
-import * as FileSystem from 'expo-file-system/build/legacy';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 
 export function PrintRequestsTab({ showToast }: TabProps) {
