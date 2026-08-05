@@ -11,7 +11,8 @@ import {
   Platform,
   useWindowDimensions,
   StyleSheet,
-  Linking
+  Linking,
+  useColorScheme
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/services/auth';
@@ -49,7 +50,8 @@ export function PrintRequestsTab({ showToast }: TabProps) {
   const { user } = useAuth();
   const { width: screenWidth } = useWindowDimensions();
   const isLargeScreen = Platform.OS === 'web' && screenWidth >= 1024;
-  const isDark = false; // Balar Malar theme is light-based default
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
   const colors = Colors[isDark ? 'dark' : 'light'];
 
   // Tab State
@@ -567,7 +569,7 @@ export function PrintRequestsTab({ showToast }: TabProps) {
               onPress={() => setActiveRequest(req)}
               style={[
                 styles.tableRow,
-                { borderBottomColor: colors.border, backgroundColor: idx % 2 === 0 ? '#FFF' : '#FAF9F6' },
+                { borderBottomColor: colors.border, backgroundColor: idx % 2 === 0 ? colors.cardBg : (isDark ? colors.background : '#FAF9F6') },
                 activeRequest?.requestId === req.requestId && { backgroundColor: colors.primaryLight }
               ]}
             >
@@ -637,22 +639,22 @@ export function PrintRequestsTab({ showToast }: TabProps) {
         </View>
 
         {/* Grid Details */}
-        <View style={styles.gridContainer}>
+        <View style={[styles.gridContainer, { backgroundColor: isDark ? colors.background : '#FDFCF7', borderColor: colors.border }]}>
           <View style={styles.gridItem}>
             <ThemedText style={styles.gridLabel}>Year / Class</ThemedText>
-            <ThemedText style={styles.gridValue}>{req.yearClass}</ThemedText>
+            <ThemedText style={[styles.gridValue, { color: colors.text }]}>{req.yearClass}</ThemedText>
           </View>
           <View style={styles.gridItem}>
             <ThemedText style={styles.gridLabel}>Date Required</ThemedText>
-            <ThemedText style={styles.gridValue}>{req.dateRequired}</ThemedText>
+            <ThemedText style={[styles.gridValue, { color: colors.text }]}>{req.dateRequired}</ThemedText>
           </View>
           <View style={styles.gridItem}>
             <ThemedText style={styles.gridLabel}>Pages per Copy</ThemedText>
-            <ThemedText style={styles.gridValue}>{req.numPages}</ThemedText>
+            <ThemedText style={[styles.gridValue, { color: colors.text }]}>{req.numPages}</ThemedText>
           </View>
           <View style={styles.gridItem}>
             <ThemedText style={styles.gridLabel}>Number of Copies</ThemedText>
-            <ThemedText style={styles.gridValue}>{req.numCopies}</ThemedText>
+            <ThemedText style={[styles.gridValue, { color: colors.text }]}>{req.numCopies}</ThemedText>
           </View>
           <View style={styles.gridItem}>
             <ThemedText style={styles.gridLabel}>Total Pages to Print</ThemedText>
@@ -662,20 +664,20 @@ export function PrintRequestsTab({ showToast }: TabProps) {
           </View>
           <View style={styles.gridItem}>
             <ThemedText style={styles.gridLabel}>Color Option</ThemedText>
-            <ThemedText style={styles.gridValue}>{req.colorOption}</ThemedText>
+            <ThemedText style={[styles.gridValue, { color: colors.text }]}>{req.colorOption}</ThemedText>
           </View>
           <View style={styles.gridItem}>
             <ThemedText style={styles.gridLabel}>Requested By</ThemedText>
-            <ThemedText style={styles.gridValue}>{req.contactName}</ThemedText>
+            <ThemedText style={[styles.gridValue, { color: colors.text }]}>{req.contactName}</ThemedText>
           </View>
           <View style={styles.gridItem}>
             <ThemedText style={styles.gridLabel}>Completed By</ThemedText>
-            <ThemedText style={styles.gridValue}>{req.completedBy || 'N/A'}</ThemedText>
+            <ThemedText style={[styles.gridValue, { color: colors.text }]}>{req.completedBy || 'N/A'}</ThemedText>
           </View>
         </View>
 
         {req.notes ? (
-          <View style={[styles.notesBox, { backgroundColor: colors.backgroundElement }]}>
+          <View style={[styles.notesBox, { backgroundColor: colors.backgroundElement, borderColor: colors.border }]}>
             <ThemedText style={{ fontSize: 11, fontWeight: '700', color: colors.textSecondary, marginBottom: 4 }}>
               Special Instructions / Notes:
             </ThemedText>
@@ -710,7 +712,7 @@ export function PrintRequestsTab({ showToast }: TabProps) {
                 <Pressable
                   key={i}
                   onPress={() => handleOpenFile(url, name)}
-                  style={[styles.attachmentRow, { borderColor: colors.border }]}
+                  style={[styles.attachmentRow, { borderColor: colors.border, backgroundColor: colors.cardBg }]}
                 >
                   <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 8 }}>
                     <FileText size={16} color={colors.primary} />
@@ -829,10 +831,10 @@ export function PrintRequestsTab({ showToast }: TabProps) {
     <View style={styles.container}>
       <View style={[styles.headerContainer, { flexDirection: isLargeScreen ? 'row' : 'column', justifyContent: 'space-between', alignItems: isLargeScreen ? 'center' : 'stretch', gap: 12 }]}>
         <View style={{ gap: 4 }}>
-          <ThemedText style={styles.title}>
+          <ThemedText style={[styles.title, { color: colors.text }]}>
             {i18n.language === 'ta' ? 'அச்சிடும் கோரிக்கைகள்' : 'Print Requests'}
           </ThemedText>
-          <ThemedText style={styles.subtitle}>
+          <ThemedText style={[styles.subtitle, { color: colors.textSecondary }]}>
             {i18n.language === 'ta' ? 'வகுப்பு வினாத்தாள்கள் மற்றும் கற்றல் கோப்புகளை அச்சிட சமர்ப்பிக்கவும்' : 'Submit exam papers and class learning resources for volunteer printing'}
           </ThemedText>
         </View>
@@ -862,43 +864,43 @@ export function PrintRequestsTab({ showToast }: TabProps) {
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8, paddingHorizontal: 4 }}>
           <Pressable
             onPress={() => setStatusFilter('All')}
-            style={[styles.filterBtn, statusFilter === 'All' && styles.filterBtnActive]}
+            style={[styles.filterBtn, { backgroundColor: colors.backgroundSelected, borderColor: colors.border }, statusFilter === 'All' && { backgroundColor: colors.primary, borderColor: colors.primary }]}
           >
-            <ThemedText style={[styles.filterBtnText, statusFilter === 'All' && styles.filterBtnTextActive]}>
+            <ThemedText style={[styles.filterBtnText, { color: colors.textSecondary }, statusFilter === 'All' && { color: '#FFF' }]}>
               {i18n.language === 'ta' ? 'அனைத்தும்' : 'All'}
             </ThemedText>
           </Pressable>
           <Pressable
             onPress={() => setStatusFilter('Pending')}
-            style={[styles.filterBtn, statusFilter === 'Pending' && styles.filterBtnActive]}
+            style={[styles.filterBtn, { backgroundColor: colors.backgroundSelected, borderColor: colors.border }, statusFilter === 'Pending' && { backgroundColor: colors.primary, borderColor: colors.primary }]}
           >
-            <ThemedText style={[styles.filterBtnText, statusFilter === 'Pending' && styles.filterBtnTextActive]}>
+            <ThemedText style={[styles.filterBtnText, { color: colors.textSecondary }, statusFilter === 'Pending' && { color: '#FFF' }]}>
               {i18n.language === 'ta' ? 'காத்திருப்பவை' : 'Pending'}
             </ThemedText>
           </Pressable>
           <Pressable
             onPress={() => setStatusFilter('In Progress')}
-            style={[styles.filterBtn, statusFilter === 'In Progress' && styles.filterBtnActive]}
+            style={[styles.filterBtn, { backgroundColor: colors.backgroundSelected, borderColor: colors.border }, statusFilter === 'In Progress' && { backgroundColor: colors.primary, borderColor: colors.primary }]}
           >
-            <ThemedText style={[styles.filterBtnText, statusFilter === 'In Progress' && styles.filterBtnTextActive]}>
+            <ThemedText style={[styles.filterBtnText, { color: colors.textSecondary }, statusFilter === 'In Progress' && { color: '#FFF' }]}>
               {i18n.language === 'ta' ? 'அச்சிடப்படுபவை' : 'In Progress'}
             </ThemedText>
           </Pressable>
           <Pressable
             onPress={() => setStatusFilter('Completed')}
-            style={[styles.filterBtn, statusFilter === 'Completed' && styles.filterBtnActive]}
+            style={[styles.filterBtn, { backgroundColor: colors.backgroundSelected, borderColor: colors.border }, statusFilter === 'Completed' && { backgroundColor: colors.primary, borderColor: colors.primary }]}
           >
-            <ThemedText style={[styles.filterBtnText, statusFilter === 'Completed' && styles.filterBtnTextActive]}>
+            <ThemedText style={[styles.filterBtnText, { color: colors.textSecondary }, statusFilter === 'Completed' && { color: '#FFF' }]}>
               {i18n.language === 'ta' ? 'முடிந்தவை' : 'Completed'}
             </ThemedText>
           </Pressable>
           {isVolunteerOrAdmin && (
             <Pressable
               onPress={() => setStatusFilter('Archive')}
-              style={[styles.filterBtn, statusFilter === 'Archive' && styles.filterBtnActive, { flexDirection: 'row', alignItems: 'center' }]}
+              style={[styles.filterBtn, { backgroundColor: colors.backgroundSelected, borderColor: colors.border }, statusFilter === 'Archive' && { backgroundColor: colors.primary, borderColor: colors.primary }, { flexDirection: 'row', alignItems: 'center' }]}
             >
-              <Archive size={12} color={statusFilter === 'Archive' ? '#FFF' : '#6C7063'} style={{ marginRight: 4 }} />
-              <ThemedText style={[styles.filterBtnText, statusFilter === 'Archive' && styles.filterBtnTextActive]}>
+              <Archive size={12} color={statusFilter === 'Archive' ? '#FFF' : colors.textSecondary} style={{ marginRight: 4 }} />
+              <ThemedText style={[styles.filterBtnText, { color: colors.textSecondary }, statusFilter === 'Archive' && { color: '#FFF' }]}>
                 {i18n.language === 'ta' ? 'காப்பகம்' : 'Archive'}
               </ThemedText>
             </Pressable>
@@ -910,39 +912,37 @@ export function PrintRequestsTab({ showToast }: TabProps) {
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
             <Pressable
               onPress={() => setViewFilter('All')}
-              style={[styles.filterBtn, viewFilter === 'All' && styles.filterBtnActive]}
+              style={[styles.filterBtn, { backgroundColor: colors.backgroundSelected, borderColor: colors.border }, viewFilter === 'All' && { backgroundColor: colors.primary, borderColor: colors.primary }]}
             >
-              <ThemedText style={[styles.filterBtnText, viewFilter === 'All' && styles.filterBtnTextActive]}>
+              <ThemedText style={[styles.filterBtnText, { color: colors.textSecondary }, viewFilter === 'All' && { color: '#FFF' }]}>
                 {i18n.language === 'ta' ? 'அனைத்து கோரிக்கைகள்' : 'All Requests'}
               </ThemedText>
             </Pressable>
             <Pressable
               onPress={() => setViewFilter('MyRequests')}
-              style={[styles.filterBtn, viewFilter === 'MyRequests' && styles.filterBtnActive]}
+              style={[styles.filterBtn, { backgroundColor: colors.backgroundSelected, borderColor: colors.border }, viewFilter === 'MyRequests' && { backgroundColor: colors.primary, borderColor: colors.primary }]}
             >
-              <ThemedText style={[styles.filterBtnText, viewFilter === 'MyRequests' && styles.filterBtnTextActive]}>
+              <ThemedText style={[styles.filterBtnText, { color: colors.textSecondary }, viewFilter === 'MyRequests' && { color: '#FFF' }]}>
                 {i18n.language === 'ta' ? 'என் கோரிக்கைகள்' : 'My Requests'}
               </ThemedText>
             </Pressable>
           </View>
 
-          {/* Web Layout Toggle Buttons */}
-          {Platform.OS === 'web' && isLargeScreen && (
-            <View style={{ flexDirection: 'row', gap: 4, backgroundColor: '#F7F4EB', borderRadius: 8, padding: 3, borderWidth: 1, borderColor: '#EAE2D5', alignItems: 'center' }}>
-              <Pressable
-                onPress={() => setViewLayout('card')}
-                style={[{ padding: 4, borderRadius: 6 }, viewLayout === 'card' && { backgroundColor: '#af2907' }]}
-              >
-                <LayoutGrid size={14} color={viewLayout === 'card' ? '#FFF' : '#6C7063'} />
-              </Pressable>
-              <Pressable
-                onPress={() => setViewLayout('table')}
-                style={[{ padding: 4, borderRadius: 6 }, viewLayout === 'table' && { backgroundColor: '#af2907' }]}
-              >
-                <Table size={14} color={viewLayout === 'table' ? '#FFF' : '#6C7063'} />
-              </Pressable>
-            </View>
-          )}
+          {/* Layout Toggle Buttons */}
+          <View style={{ flexDirection: 'row', gap: 4, backgroundColor: colors.backgroundSelected, borderRadius: 8, padding: 3, borderWidth: 1, borderColor: colors.border, alignItems: 'center' }}>
+            <Pressable
+              onPress={() => setViewLayout('card')}
+              style={[{ padding: 4, borderRadius: 6 }, viewLayout === 'card' && { backgroundColor: colors.primary }]}
+            >
+              <LayoutGrid size={14} color={viewLayout === 'card' ? '#FFF' : colors.textSecondary} />
+            </Pressable>
+            <Pressable
+              onPress={() => setViewLayout('table')}
+              style={[{ padding: 4, borderRadius: 6 }, viewLayout === 'table' && { backgroundColor: colors.primary }]}
+            >
+              <Table size={14} color={viewLayout === 'table' ? '#FFF' : colors.textSecondary} />
+            </Pressable>
+          </View>
         </View>
       </View>
 
@@ -965,8 +965,16 @@ export function PrintRequestsTab({ showToast }: TabProps) {
             styles.listPanel, 
             isLargeScreen ? (viewLayout === 'table' ? { flex: 1, width: '100%' } : { flex: 4 }) : { flex: 1 }
           ]}>
-            {viewLayout === 'table' && Platform.OS === 'web' && isLargeScreen ? (
-              renderSpreadsheetTable()
+            {viewLayout === 'table' ? (
+              isLargeScreen ? (
+                renderSpreadsheetTable()
+              ) : (
+                <ScrollView horizontal={true} showsHorizontalScrollIndicator={true} contentContainerStyle={{ paddingBottom: 12 }}>
+                  <View style={{ width: 850 }}>
+                    {renderSpreadsheetTable()}
+                  </View>
+                </ScrollView>
+              )
             ) : (
               <ScrollView contentContainerStyle={{ gap: 10 }}>
                 {sortedRequests.map(req => {
@@ -977,7 +985,7 @@ export function PrintRequestsTab({ showToast }: TabProps) {
                       onPress={() => setActiveRequest(req)}
                       style={[
                         styles.card,
-                        { borderColor: colors.border },
+                        { borderColor: colors.border, backgroundColor: colors.cardBg },
                         isActive && { borderColor: colors.primary, borderWidth: 1.5, backgroundColor: colors.primaryLight }
                       ]}
                     >
@@ -1009,8 +1017,8 @@ export function PrintRequestsTab({ showToast }: TabProps) {
             )}
           </View>
 
-          {/* RIGHT DETAIL PANEL (Only in Card layout or mobile stacked view) */}
-          {(viewLayout === 'card' || !isLargeScreen) && activeRequest && (
+          {/* RIGHT DETAIL PANEL (Only in Card layout) */}
+          {viewLayout === 'card' && activeRequest && (
             <View style={[styles.detailPanel, isLargeScreen ? { flex: 6, marginLeft: Spacing.four } : { marginTop: Spacing.four }]}>
               <ScrollView contentContainerStyle={{ gap: 16 }}>
                 {renderRequestDetailsContent(activeRequest)}
@@ -1019,7 +1027,7 @@ export function PrintRequestsTab({ showToast }: TabProps) {
           )}
 
           {/* TABLE DETAIL MODAL */}
-          {viewLayout === 'table' && isLargeScreen && activeRequest && (
+          {viewLayout === 'table' && activeRequest && (
             <Modal visible={true} animationType="fade" transparent>
               <View style={styles.modalBg}>
                 <View style={[styles.modalCard, { backgroundColor: colors.cardBg, borderColor: colors.border, maxWidth: 650, width: '90%', padding: 0 }]}>
