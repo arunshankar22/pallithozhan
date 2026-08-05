@@ -12,6 +12,7 @@ import { waitlistService } from './waitlistService';
 import { achievementService } from './achievementService';
 import { newsletterService } from './newsletterService';
 import { progressReportService } from './progressReportService';
+import { printRequestService } from './printRequestService';
 import { checkServerStatus } from './dbCommon';
 
 // Export Presets and status checks
@@ -29,6 +30,7 @@ export const mockDb = {
     await eventService.reset();
     await schoolDateService.reset();
     await waitlistService.reset();
+    await printRequestService.reset();
     await achievementService.reset();
   },
 
@@ -79,6 +81,7 @@ export const mockDb = {
   approveAbsence: attendanceService.approveAbsence,
   rejectAbsence: attendanceService.rejectAbsence,
   getPushedAlerts: attendanceService.getPushedAlerts,
+  pushAlertDirect: attendanceService.pushAlertDirect,
   getStudentAttendance: attendanceService.getStudentAttendance,
   exportBulkAttendanceData: attendanceService.exportBulkAttendanceData,
   importBulkAttendanceData: attendanceService.importBulkAttendanceData,
@@ -122,6 +125,13 @@ export const mockDb = {
   getProgressReports: progressReportService.getProgressReports,
   saveProgressReport: progressReportService.saveProgressReport,
   getProgressReport: progressReportService.getProgressReport,
+
+  // --- PRINT REQUESTS ---
+  getPrintRequests: printRequestService.getPrintRequests,
+  createPrintRequest: printRequestService.createPrintRequest,
+  updatePrintRequest: printRequestService.updatePrintRequest,
+  updatePrintRequestStatus: printRequestService.updatePrintRequestStatus,
+  deletePrintRequest: printRequestService.deletePrintRequest,
 
   // --- SEED CLOUD DATABASE ---
   seedCloudDatabase: async (firebaseConfig: any): Promise<void> => {

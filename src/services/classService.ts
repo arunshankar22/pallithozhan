@@ -10,7 +10,15 @@ export const DEFAULT_CLASSES = [
     className: 'Standard 1 - Demo', 
     teacherId: 'demo_teacher_placeholder', 
     teacherIds: ['demo_teacher_placeholder'], 
-    studentIds: ['demo_student_placeholder'], 
+    studentIds: [
+      'student_1', 
+      'student_2', 
+      'student_3', 
+      'demo_student_placeholder', 
+      'demo_student_2_placeholder',
+      'dummy_student_1', 
+      'dummy_student_2'
+    ], 
     volunteerIds: ['demo_volunteer_placeholder'] 
   }
 ];

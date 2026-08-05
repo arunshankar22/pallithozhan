@@ -44,35 +44,38 @@ let auth: any;
 let db: any;
 let storage: any;
 
-// Resolve isDemoMode dynamically
-let resolvedDemoMode = false;
-if (typeof window !== 'undefined') {
-  const params = new URLSearchParams(window.location.search);
-  if (params.has('demo')) {
-    resolvedDemoMode = params.get('demo') === 'true';
-    try {
-      window.localStorage.setItem('pallithozhan_demo_mode', resolvedDemoMode ? 'true' : 'false');
-    } catch (e) {}
-  } else {
-    try {
-      const stored = window.localStorage.getItem('pallithozhan_demo_mode');
-      if (stored !== null) {
-        resolvedDemoMode = stored === 'true';
-      }
-    } catch (e) {}
-  }
-}
+// Resolve isDemoMode dynamically (defaulting to true)
+let resolvedDemoMode = true;
 
-if (process.env.EXPO_PUBLIC_DEMO_MODE === 'true') {
+if (process.env.EXPO_PUBLIC_DEMO_MODE === 'false') {
+  resolvedDemoMode = false;
+} else if (process.env.EXPO_PUBLIC_DEMO_MODE === 'true') {
   resolvedDemoMode = true;
+} else {
+  if (typeof window !== 'undefined') {
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('demo')) {
+      resolvedDemoMode = params.get('demo') === 'true';
+      try {
+        window.localStorage.setItem('pallithozhan_demo_mode', resolvedDemoMode ? 'true' : 'false');
+      } catch (e) {}
+    } else {
+      try {
+        const stored = window.localStorage.getItem('pallithozhan_demo_mode');
+        if (stored !== null) {
+          resolvedDemoMode = stored === 'true';
+        }
+      } catch (e) {}
+    }
+  }
 }
 
 export const isDemoMode = resolvedDemoMode;
 
 try {
   app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-  auth = getAuth(app);
   if (!isDemoMode) {
+    auth = getAuth(app);
     db = initializeFirestore(app, {
       experimentalForceLongPolling: true
     }, databaseId);
@@ -81,9 +84,10 @@ try {
     storage.maxUploadRetryTime = 30000; // Increase to 30s to allow real mobile uploads
     storage.maxOperationRetryTime = 30000; // Increase to 30s
   } else {
+    auth = null;
     db = null;
     storage = null;
-    console.log("[Firebase Init] Running in Demo Mode. Skipping Firestore connection.");
+    console.log("[Firebase Init] Running in Demo Mode. Skipping all Firebase SDK initialization.");
   }
 } catch (error) {
   console.error("Failed to initialize Firebase:", error);

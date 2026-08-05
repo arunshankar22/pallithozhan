@@ -261,6 +261,22 @@ export const attendanceService = {
     return null;
   },
 
+  pushAlertDirect: async (parentUid: string, title: string, body: string): Promise<any> => {
+    const alertId = `alert_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+    const newAlert = {
+      parentUid,
+      title,
+      body,
+      createdAt: new Date().toISOString()
+    };
+    if (!db) {
+      localPushedAlerts.push({ alertId, ...newAlert });
+      return { alertId, ...newAlert };
+    }
+    await setDoc(doc(db, 'pushed_alerts', alertId), newAlert);
+    return { alertId, ...newAlert };
+  },
+
   getPushedAlerts: async (parentUid: string): Promise<any[]> => {
     if (!db) return localPushedAlerts.filter(a => a.parentUid === parentUid);
     const alertsRef = collection(db, 'pushed_alerts');

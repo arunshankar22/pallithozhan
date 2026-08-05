@@ -26,13 +26,17 @@ export const DEFAULT_SCHOOL_DATES: SchoolDate[] = [
   { dateId: '2026-07-04', date: '2026-07-04', term: 2, isHoliday: false, customAdded: false }
 ];
 
+let localSchoolDates = [...DEFAULT_SCHOOL_DATES];
+
 export const schoolDateService = {
   reset: async (): Promise<void> => {
-    // Reset handled via seed scripts
+    localSchoolDates = [...DEFAULT_SCHOOL_DATES];
   },
 
   getSchoolDates: async (): Promise<SchoolDate[]> => {
-    if (!db) throw new Error('Firestore database is not initialized');
+    if (!db) {
+      return [...localSchoolDates].sort((a, b) => a.date.localeCompare(b.date));
+    }
     const querySnapshot = await getDocs(collection(db, 'schooldates'));
     const datesList: SchoolDate[] = [];
     querySnapshot.forEach((docSnap) => {
@@ -50,14 +54,21 @@ export const schoolDateService = {
   },
 
   saveSchoolDateDirect: async (schoolDate: SchoolDate): Promise<SchoolDate> => {
-    if (!db) throw new Error('Firestore database is not initialized');
+    if (!db) {
+      const idx = localSchoolDates.findIndex(d => d.dateId === schoolDate.dateId);
+      if (idx !== -1) {
+        localSchoolDates[idx] = schoolDate;
+      } else {
+        localSchoolDates.push(schoolDate);
+      }
+      return schoolDate;
+    }
     const { dateId, ...details } = schoolDate;
     await setDoc(doc(db, 'schooldates', dateId), details);
     return schoolDate;
   },
 
   generateTermDates: async (year: number, term: number, pattern: 'saturdays' | 'weekdays', startDate: string, endDate: string): Promise<SchoolDate[]> => {
-    if (!db) throw new Error('Firestore database is not initialized');
     const start = new Date(startDate);
     const end = new Date(endDate);
     const generated: SchoolDate[] = [];
@@ -89,6 +100,18 @@ export const schoolDateService = {
       current.setDate(current.getDate() + 1);
     }
 
+    if (!db) {
+      for (const sd of generated) {
+        const idx = localSchoolDates.findIndex(d => d.dateId === sd.dateId);
+        if (idx !== -1) {
+          localSchoolDates[idx] = sd;
+        } else {
+          localSchoolDates.push(sd);
+        }
+      }
+      return generated.sort((a, b) => a.date.localeCompare(b.date));
+    }
+
     for (const sd of generated) {
       const { dateId, ...details } = sd;
       await setDoc(doc(db, 'schooldates', dateId), details);
@@ -97,7 +120,18 @@ export const schoolDateService = {
   },
 
   toggleHolidayOverride: async (dateId: string, isHoliday: boolean, holidayName?: string): Promise<SchoolDate | null> => {
-    if (!db) throw new Error('Firestore database is not initialized');
+    if (!db) {
+      const idx = localSchoolDates.findIndex(d => d.dateId === dateId);
+      if (idx !== -1) {
+        localSchoolDates[idx] = {
+          ...localSchoolDates[idx],
+          isHoliday,
+          holidayName: isHoliday ? (holidayName || 'Holiday Break') : ''
+        };
+        return localSchoolDates[idx];
+      }
+      return null;
+    }
     const patch = { isHoliday, holidayName: isHoliday ? (holidayName || 'Holiday Break') : '' };
 
     const docRef = doc(db, 'schooldates', dateId);
@@ -110,7 +144,6 @@ export const schoolDateService = {
   },
 
   addCustomDate: async (date: string, term: number): Promise<SchoolDate> => {
-    if (!db) throw new Error('Firestore database is not initialized');
     const newDate: SchoolDate = {
       dateId: date,
       date,
@@ -118,6 +151,16 @@ export const schoolDateService = {
       isHoliday: false,
       customAdded: true
     };
+
+    if (!db) {
+      const idx = localSchoolDates.findIndex(d => d.dateId === date);
+      if (idx !== -1) {
+        localSchoolDates[idx] = newDate;
+      } else {
+        localSchoolDates.push(newDate);
+      }
+      return newDate;
+    }
 
     const { dateId, ...details } = newDate;
     await setDoc(doc(db, 'schooldates', dateId), details);

@@ -46,6 +46,7 @@ import {
   Award,
   X,
   FileText,
+  Printer,
   RefreshCw
 } from 'lucide-react-native';
 
@@ -58,6 +59,7 @@ import { HomeworkTab } from '@/app/tabs/HomeworkTab';
 import { MessagesTab } from '@/app/tabs/MessagesTab';
 import { CalendarTab } from '@/app/tabs/CalendarTab';
 import { ReportsTab } from '@/app/tabs/ReportsTab';
+import { PrintRequestsTab } from '@/app/tabs/PrintRequestsTab';
 import { ManagementTab } from '@/app/tabs/ManagementTab';
 import { ProfileTab } from '@/app/tabs/ProfileTab';
 import { StudentsTab } from '@/app/tabs/StudentsTab';
@@ -168,7 +170,7 @@ export default function HomeScreen() {
   };
 
   // Layout Tab State
-  const [activeTab, setActiveTab] = useState<'newsfeed' | 'attendance' | 'homework' | 'messages' | 'calendar' | 'reports' | 'management' | 'profile' | 'schools' | 'full-newsfeed' | 'students' | 'newsletter' | 'superadmin' | 'points'>('newsfeed');
+  const [activeTab, setActiveTab] = useState<'newsfeed' | 'attendance' | 'homework' | 'messages' | 'calendar' | 'reports' | 'management' | 'profile' | 'schools' | 'full-newsfeed' | 'students' | 'newsletter' | 'superadmin' | 'points' | 'print-requests'>('newsfeed');
 
   // Points System states
   const [pointsConfig, setPointsConfig] = useState<any>(null);
@@ -246,6 +248,8 @@ export default function HomeScreen() {
     topic: 'Nature & Elements in Tamil Literature'
   });
 
+  const [pendingPrintRequestsCount, setPendingPrintRequestsCount] = useState(0);
+
   const reloadDashboardData = async () => {
     try {
       const allHomework = await mockDb.getHomework();
@@ -253,6 +257,15 @@ export default function HomeScreen() {
       const allClassList = await mockDb.getClasses();
       setClasses(allClassList);
       const allEvents = await mockDb.getEvents();
+
+      // Load pending print requests count
+      try {
+        const printRequests = await mockDb.getPrintRequests();
+        const pendingCount = printRequests.filter((pr: any) => pr.status === 'Pending').length;
+        setPendingPrintRequestsCount(pendingCount);
+      } catch (err) {
+        console.warn('Failed to load pending print requests count:', err);
+      }
 
       // Load points config
       try {
@@ -1070,6 +1083,16 @@ export default function HomeScreen() {
           onPress: () => setActiveTab('management')
         });
       }
+      if (['superadmin', 'admin', 'teacher', 'volunteer'].includes(role)) {
+        actions.push({
+          key: 'print-requests',
+          label: i18n.language === 'ta' ? 'அச்சிடும் கோரிக்கைகள்' : 'Print Requests',
+          icon: Printer,
+          color: '#FFF0F2',
+          iconColor: colors.primary,
+          onPress: () => setActiveTab('print-requests')
+        });
+      }
     }
     const mainKeys = mainNavItems.map((item: any) => item.key);
     return actions.filter(action => !action.key || !mainKeys.includes(action.key));
@@ -1718,6 +1741,26 @@ export default function HomeScreen() {
                         </Text>
                       </View>
                     )}
+                    {action.key === 'print-requests' && pendingPrintRequestsCount > 0 && ['superadmin', 'admin', 'volunteer'].includes(user?.role || '') && (
+                      <View style={{
+                        position: 'absolute',
+                        top: -4,
+                        right: -4,
+                        backgroundColor: '#FF3B30',
+                        borderRadius: 9,
+                        minWidth: 18,
+                        height: 18,
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        paddingHorizontal: 4,
+                        borderWidth: 1.5,
+                        borderColor: colors.cardBg,
+                      }}>
+                        <Text style={{ color: '#FFF', fontSize: 9, fontWeight: '800', lineHeight: 11 }}>
+                          {pendingPrintRequestsCount}
+                        </Text>
+                      </View>
+                    )}
                   </View>
                   <ThemedText style={{ fontSize: 12, fontWeight: '700', color: colors.text, textAlign: 'center' }}>
                     {action.label}
@@ -2206,6 +2249,8 @@ export default function HomeScreen() {
         return <SuperAdminTab {...props} />;
       case 'points':
         return <PointsPortalTab {...props} />;
+      case 'print-requests':
+        return <PrintRequestsTab {...props} />;
       case 'schools':
         return renderSchoolsTab();
       case 'students':
@@ -2380,6 +2425,21 @@ export default function HomeScreen() {
                       }}>
                         <Text style={{ color: '#FFF', fontSize: 10, fontWeight: '700', lineHeight: 12 }}>
                           {totalUnreadMessages}
+                        </Text>
+                      </View>
+                    )}
+                    {item.key === 'print-requests' && pendingPrintRequestsCount > 0 && ['superadmin', 'admin', 'volunteer'].includes(user?.role || '') && (
+                      <View style={{
+                        backgroundColor: '#FF3B30',
+                        borderRadius: 10,
+                        minWidth: 18,
+                        height: 18,
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        paddingHorizontal: 5,
+                      }}>
+                        <Text style={{ color: '#FFF', fontSize: 10, fontWeight: '700', lineHeight: 12 }}>
+                          {pendingPrintRequestsCount}
                         </Text>
                       </View>
                     )}
@@ -2724,6 +2784,24 @@ export default function HomeScreen() {
                     }}>
                       <Text style={{ color: '#FFF', fontSize: 8, fontWeight: '700', lineHeight: 10 }}>
                         {totalUnreadMessages}
+                      </Text>
+                    </View>
+                  )}
+                  {item.key === 'print-requests' && pendingPrintRequestsCount > 0 && ['superadmin', 'admin', 'volunteer'].includes(user?.role || '') && (
+                    <View style={{
+                      position: 'absolute',
+                      top: 2,
+                      right: 10,
+                      backgroundColor: '#FF3B30',
+                      borderRadius: 8,
+                      minWidth: 16,
+                      height: 16,
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      paddingHorizontal: 4,
+                    }}>
+                      <Text style={{ color: '#FFF', fontSize: 8, fontWeight: '700', lineHeight: 10 }}>
+                        {pendingPrintRequestsCount}
                       </Text>
                     </View>
                   )}
