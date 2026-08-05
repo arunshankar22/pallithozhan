@@ -34,7 +34,11 @@ import {
   ChevronRight,
   ExternalLink,
   Eye,
-  AlertCircle
+  AlertCircle,
+  Archive,
+  RotateCcw,
+  LayoutGrid,
+  Table
 } from 'lucide-react-native';
 import { PrintRequest } from '@/services/printRequestService';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -66,8 +70,11 @@ export function PrintRequestsTab({ showToast }: TabProps) {
   const [attachedFiles, setAttachedFiles] = useState<{ name: string; size: number; url: string }[]>([]);
 
   // Filter State
-  const [statusFilter, setStatusFilter] = useState<'All' | 'Pending' | 'In Progress' | 'Completed' | 'Rejected'>('All');
+  const [statusFilter, setStatusFilter] = useState<'All' | 'Pending' | 'In Progress' | 'Completed' | 'Rejected' | 'Archive'>('All');
   const [viewFilter, setViewFilter] = useState<'All' | 'MyRequests'>('All');
+  const [viewLayout, setViewLayout] = useState<'card' | 'table'>(Platform.OS === 'web' && isLargeScreen ? 'table' : 'card');
+  const [sortField, setSortField] = useState<keyof PrintRequest>('dateRequired');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
   // Preview Modal State
   const [previewFile, setPreviewFile] = useState<{ name: string; url: string; type: string } | null>(null);
@@ -283,6 +290,36 @@ export function PrintRequestsTab({ showToast }: TabProps) {
     }
   };
 
+  // Archive Request
+  const handleArchiveRequest = async (requestId: string) => {
+    try {
+      const updated = await mockDb.archivePrintRequest(requestId);
+      if (updated) {
+        setRequests(prev => prev.map(r => r.requestId === requestId ? updated : r));
+        setActiveRequest(prev => prev?.requestId === requestId ? updated : prev);
+        showToast('Print request archived successfully.', 'success');
+      }
+    } catch (e) {
+      console.warn('Archive failed:', e);
+      showToast('Failed to archive request.', 'error');
+    }
+  };
+
+  // Unarchive Request
+  const handleUnarchiveRequest = async (requestId: string) => {
+    try {
+      const updated = await mockDb.unarchivePrintRequest(requestId);
+      if (updated) {
+        setRequests(prev => prev.map(r => r.requestId === requestId ? updated : r));
+        setActiveRequest(prev => prev?.requestId === requestId ? updated : prev);
+        showToast('Print request restored successfully.', 'success');
+      }
+    } catch (e) {
+      console.warn('Restore failed:', e);
+      showToast('Failed to restore request.', 'error');
+    }
+  };
+
   // Format bytes helper
   const formatBytes = (bytes: number) => {
     if (bytes === 0) return '0 Bytes';
@@ -443,8 +480,14 @@ export function PrintRequestsTab({ showToast }: TabProps) {
   };
 
   const filteredRequests = requests.filter(req => {
-    // Status Filter
-    if (statusFilter !== 'All' && req.status !== statusFilter) return false;
+    // Archived Filter
+    const isArchived = !!req.isArchived;
+    if (statusFilter === 'Archive') {
+      if (!isArchived) return false;
+    } else {
+      if (isArchived) return false;
+      if (statusFilter !== 'All' && req.status !== statusFilter) return false;
+    }
     
     // View Filter (My requests only)
     if (viewFilter === 'MyRequests') {
@@ -453,6 +496,334 @@ export function PrintRequestsTab({ showToast }: TabProps) {
     }
     return true;
   });
+
+  const sortedRequests = [...filteredRequests].sort((a, b) => {
+    let valA = a[sortField];
+    let valB = b[sortField];
+
+    if (valA === undefined) return 1;
+    if (valB === undefined) return -1;
+
+    if (typeof valA === 'string' && typeof valB === 'string') {
+      return sortDirection === 'asc' 
+        ? valA.localeCompare(valB)
+        : valB.localeCompare(valA);
+    } else {
+      const numA = Number(valA);
+      const numB = Number(valB);
+      return sortDirection === 'asc' ? numA - numB : numB - numA;
+    }
+  });
+
+  const toggleSort = (field: keyof PrintRequest) => {
+    if (sortField === field) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const renderSpreadsheetTable = () => {
+    const columns: { label: string; field: keyof PrintRequest | null; width: string }[] = [
+      { label: 'File Name', field: 'fileName', width: '22%' },
+      { label: 'Year/Class', field: 'yearClass', width: '10%' },
+      { label: 'Pages', field: 'numPages', width: '8%' },
+      { label: 'Copies', field: 'numCopies', width: '8%' },
+      { label: 'Total Pages', field: 'totalPages', width: '10%' },
+      { label: 'Color/BW', field: 'colorOption', width: '10%' },
+      { label: 'Requested By', field: 'contactName', width: '12%' },
+      { label: 'Required Date', field: 'dateRequired', width: '10%' },
+      { label: 'Status', field: 'status', width: '10%' }
+    ];
+
+    return (
+      <View style={[styles.tableContainer, { borderColor: colors.border }]}>
+        <View style={[styles.tableHeaderRow, { backgroundColor: colors.backgroundElement, borderBottomColor: colors.border }]}>
+          {columns.map((col, idx) => (
+            <Pressable
+              key={idx}
+              onPress={() => col.field && toggleSort(col.field)}
+              disabled={!col.field}
+              style={[styles.tableHeaderCell, { width: col.width as any }]}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <ThemedText style={{ fontSize: 11, fontWeight: '800', color: colors.textSecondary }}>
+                  {col.label}
+                </ThemedText>
+                {col.field && sortField === col.field && (
+                  <ThemedText style={{ fontSize: 10, color: colors.primary, marginLeft: 2 }}>
+                    {sortDirection === 'asc' ? ' ▲' : ' ▼'}
+                  </ThemedText>
+                )}
+              </View>
+            </Pressable>
+          ))}
+        </View>
+        <ScrollView style={{ flex: 1 }}>
+          {sortedRequests.map((req, idx) => (
+            <Pressable
+              key={req.requestId}
+              onPress={() => setActiveRequest(req)}
+              style={[
+                styles.tableRow,
+                { borderBottomColor: colors.border, backgroundColor: idx % 2 === 0 ? '#FFF' : '#FAF9F6' },
+                activeRequest?.requestId === req.requestId && { backgroundColor: colors.primaryLight }
+              ]}
+            >
+              <View style={[styles.tableCell, { width: '22%' }]}>
+                <ThemedText numberOfLines={1} style={{ fontSize: 12, fontWeight: '700', color: colors.text }}>
+                  {req.fileName}
+                </ThemedText>
+              </View>
+              <View style={[styles.tableCell, { width: '10%' }]}>
+                <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>
+                  {req.yearClass}
+                </ThemedText>
+              </View>
+              <View style={[styles.tableCell, { width: '8%' }]}>
+                <ThemedText style={{ fontSize: 12, color: colors.text }}>
+                  {req.numPages}
+                </ThemedText>
+              </View>
+              <View style={[styles.tableCell, { width: '8%' }]}>
+                <ThemedText style={{ fontSize: 12, color: colors.text }}>
+                  {req.numCopies}
+                </ThemedText>
+              </View>
+              <View style={[styles.tableCell, { width: '10%' }]}>
+                <ThemedText style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>
+                  {req.totalPages}
+                </ThemedText>
+              </View>
+              <View style={[styles.tableCell, { width: '10%' }]}>
+                <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>
+                  {req.colorOption}
+                </ThemedText>
+              </View>
+              <View style={[styles.tableCell, { width: '12%' }]}>
+                <ThemedText numberOfLines={1} style={{ fontSize: 12, color: colors.text }}>
+                  {req.contactName}
+                </ThemedText>
+              </View>
+              <View style={[styles.tableCell, { width: '10%' }]}>
+                <ThemedText style={{ fontSize: 12, color: colors.text }}>
+                  {req.dateRequired}
+                </ThemedText>
+              </View>
+              <View style={[styles.tableCell, { width: '10%' }]}>
+                {renderStatusBadge(req.status)}
+              </View>
+            </Pressable>
+          ))}
+        </ScrollView>
+      </View>
+    );
+  };
+
+  const renderRequestDetailsContent = (req: PrintRequest) => {
+    return (
+      <View style={{ gap: 16 }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', borderBottomWidth: 1, borderBottomColor: colors.border, paddingBottom: 12 }}>
+          <View style={{ gap: 4, flex: 1 }}>
+            <ThemedText style={{ fontSize: 18, fontWeight: '900', color: colors.text }}>
+              {req.fileName}
+            </ThemedText>
+            <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>
+              Submitted on: {new Date(req.dateSubmitted).toLocaleString()}
+            </ThemedText>
+          </View>
+          {renderStatusBadge(req.status)}
+        </View>
+
+        {/* Grid Details */}
+        <View style={styles.gridContainer}>
+          <View style={styles.gridItem}>
+            <ThemedText style={styles.gridLabel}>Year / Class</ThemedText>
+            <ThemedText style={styles.gridValue}>{req.yearClass}</ThemedText>
+          </View>
+          <View style={styles.gridItem}>
+            <ThemedText style={styles.gridLabel}>Date Required</ThemedText>
+            <ThemedText style={styles.gridValue}>{req.dateRequired}</ThemedText>
+          </View>
+          <View style={styles.gridItem}>
+            <ThemedText style={styles.gridLabel}>Pages per Copy</ThemedText>
+            <ThemedText style={styles.gridValue}>{req.numPages}</ThemedText>
+          </View>
+          <View style={styles.gridItem}>
+            <ThemedText style={styles.gridLabel}>Number of Copies</ThemedText>
+            <ThemedText style={styles.gridValue}>{req.numCopies}</ThemedText>
+          </View>
+          <View style={styles.gridItem}>
+            <ThemedText style={styles.gridLabel}>Total Pages to Print</ThemedText>
+            <ThemedText style={[styles.gridValue, { color: colors.primary, fontWeight: '900' }]}>
+              {req.totalPages}
+            </ThemedText>
+          </View>
+          <View style={styles.gridItem}>
+            <ThemedText style={styles.gridLabel}>Color Option</ThemedText>
+            <ThemedText style={styles.gridValue}>{req.colorOption}</ThemedText>
+          </View>
+          <View style={styles.gridItem}>
+            <ThemedText style={styles.gridLabel}>Requested By</ThemedText>
+            <ThemedText style={styles.gridValue}>{req.contactName}</ThemedText>
+          </View>
+          <View style={styles.gridItem}>
+            <ThemedText style={styles.gridLabel}>Completed By</ThemedText>
+            <ThemedText style={styles.gridValue}>{req.completedBy || 'N/A'}</ThemedText>
+          </View>
+        </View>
+
+        {req.notes ? (
+          <View style={[styles.notesBox, { backgroundColor: colors.backgroundElement }]}>
+            <ThemedText style={{ fontSize: 11, fontWeight: '700', color: colors.textSecondary, marginBottom: 4 }}>
+              Special Instructions / Notes:
+            </ThemedText>
+            <ThemedText style={{ fontSize: 13, color: colors.text }}>{req.notes}</ThemedText>
+          </View>
+        ) : null}
+
+        {/* Attachments Section */}
+        <View style={{ gap: 8 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <ThemedText style={{ fontSize: 14, fontWeight: '800', color: colors.text }}>
+              📁 Print Attachments ({req.fileUrls.length})
+            </ThemedText>
+            {req.fileUrls.length > 1 && (
+              <Pressable
+                onPress={() => handleOpenAllFiles(req)}
+                style={styles.actionBtnSmall}
+              >
+                <ExternalLink size={12} color={colors.primary} style={{ marginRight: 4 }} />
+                <ThemedText style={{ fontSize: 11, color: colors.primary, fontWeight: '700' }}>
+                  Print All Files
+                </ThemedText>
+              </Pressable>
+            )}
+          </View>
+
+          <View style={{ gap: 8 }}>
+            {req.fileUrls.map((url, i) => {
+              const name = req.fileNames[i] || `Document_${i + 1}`;
+              const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(name) || url.startsWith('data:image/');
+              return (
+                <Pressable
+                  key={i}
+                  onPress={() => handleOpenFile(url, name)}
+                  style={[styles.attachmentRow, { borderColor: colors.border }]}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 8 }}>
+                    <FileText size={16} color={colors.primary} />
+                    <ThemedText numberOfLines={1} style={{ fontSize: 13, color: colors.text, flex: 1 }}>
+                      {name}
+                    </ThemedText>
+                  </View>
+                  
+                  <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+                    {isImage && <Eye size={14} color={colors.textSecondary} />}
+                    <Download size={14} color={colors.primary} />
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+
+        {/* Volunteer Action buttons */}
+        {isVolunteerOrAdmin && (
+          <View style={{ flexDirection: 'row', gap: 8, marginTop: 12, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 16 }}>
+            {req.status === 'Pending' && (
+              <Pressable
+                onPress={() => handleUpdateStatus(req.requestId, 'In Progress')}
+                style={[styles.actionBtn, { backgroundColor: '#E5F6FF', flex: 1 }]}
+              >
+                <Clock size={14} color="#006699" style={{ marginRight: 6 }} />
+                <ThemedText style={{ fontSize: 13, color: '#006699', fontWeight: '800' }}>Claim / Print</ThemedText>
+              </Pressable>
+            )}
+            {(req.status === 'Pending' || req.status === 'In Progress') && (
+              <>
+                <Pressable
+                  onPress={() => handleUpdateStatus(req.requestId, 'Completed')}
+                  style={[styles.actionBtn, { backgroundColor: '#ECFDF3', flex: 2 }]}
+                >
+                  <CheckCircle size={14} color="#027A48" style={{ marginRight: 6 }} />
+                  <ThemedText style={{ fontSize: 13, color: '#027A48', fontWeight: '800' }}>Mark Completed</ThemedText>
+                </Pressable>
+                <Pressable
+                  onPress={() => handleUpdateStatus(req.requestId, 'Rejected')}
+                  style={[styles.actionBtn, { backgroundColor: '#FEF3F2', flex: 1 }]}
+                >
+                  <XCircle size={14} color="#B42318" style={{ marginRight: 6 }} />
+                  <ThemedText style={{ fontSize: 13, color: '#B42318', fontWeight: '800' }}>Reject</ThemedText>
+                </Pressable>
+              </>
+            )}
+          </View>
+        )}
+
+        {/* Archive / Restore actions for Completed/Rejected or Archived requests */}
+        {isVolunteerOrAdmin && (
+          <View style={{ gap: 8, marginTop: 8 }}>
+            {(req.status === 'Completed' || req.status === 'Rejected') && !req.isArchived && (
+              <Pressable
+                onPress={() => handleArchiveRequest(req.requestId)}
+                style={[styles.actionBtn, { backgroundColor: '#F2F4F7', borderWidth: 1, borderColor: '#D0D5DD', width: '100%' }]}
+              >
+                <Archive size={14} color="#344054" style={{ marginRight: 6 }} />
+                <ThemedText style={{ fontSize: 13, color: '#344054', fontWeight: '800' }}>Archive Request</ThemedText>
+              </Pressable>
+            )}
+            {req.isArchived && (
+              <Pressable
+                onPress={() => handleUnarchiveRequest(req.requestId)}
+                style={[styles.actionBtn, { backgroundColor: '#F9F5FF', borderWidth: 1, borderColor: '#D6BBFB', width: '100%' }]}
+              >
+                <RotateCcw size={14} color="#6941C6" style={{ marginRight: 6 }} />
+                <ThemedText style={{ fontSize: 13, color: '#6941C6', fontWeight: '800' }}>Restore / Unarchive</ThemedText>
+              </Pressable>
+            )}
+          </View>
+        )}
+
+        {/* Owner Edit & Delete buttons */}
+        {req.contactEmail.toLowerCase() === (user?.email || '').toLowerCase() && req.status === 'Pending' && (
+          <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+            <Pressable
+              onPress={() => {
+                setEditingRequest(req);
+                setYearClass(req.yearClass);
+                setNumPages(String(req.numPages));
+                setNumCopies(String(req.numCopies));
+                setColorOption(req.colorOption);
+                setDateRequired(req.dateRequired);
+                setNotes(req.notes || '');
+                
+                const prefilledFiles = req.fileUrls.map((url, idx) => ({
+                  name: req.fileNames[idx] || `file_${idx + 1}`,
+                  size: req.fileSizes ? req.fileSizes[idx] || 0 : 0,
+                  url
+                }));
+                setAttachedFiles(prefilledFiles);
+                setShowFormModal(true);
+              }}
+              style={[styles.actionBtn, { backgroundColor: '#E5F6FF', flex: 1 }]}
+            >
+              <Printer size={14} color="#006699" style={{ marginRight: 6 }} />
+              <ThemedText style={{ fontSize: 13, color: '#006699', fontWeight: '800' }}>Edit Request</ThemedText>
+            </Pressable>
+            <Pressable
+              onPress={() => handleDeleteRequest(req.requestId)}
+              style={[styles.actionBtn, { backgroundColor: '#FEF3F2', flex: 1 }]}
+            >
+              <Trash2 size={14} color="#B42318" style={{ marginRight: 6 }} />
+              <ThemedText style={{ fontSize: 13, color: '#B42318', fontWeight: '800' }}>Delete Request</ThemedText>
+            </Pressable>
+          </View>
+        )}
+      </View>
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -521,26 +892,57 @@ export function PrintRequestsTab({ showToast }: TabProps) {
               {i18n.language === 'ta' ? 'முடிந்தவை' : 'Completed'}
             </ThemedText>
           </Pressable>
+          {isVolunteerOrAdmin && (
+            <Pressable
+              onPress={() => setStatusFilter('Archive')}
+              style={[styles.filterBtn, statusFilter === 'Archive' && styles.filterBtnActive, { flexDirection: 'row', alignItems: 'center' }]}
+            >
+              <Archive size={12} color={statusFilter === 'Archive' ? '#FFF' : '#6C7063'} style={{ marginRight: 4 }} />
+              <ThemedText style={[styles.filterBtnText, statusFilter === 'Archive' && styles.filterBtnTextActive]}>
+                {i18n.language === 'ta' ? 'காப்பகம்' : 'Archive'}
+              </ThemedText>
+            </Pressable>
+          )}
         </View>
 
-        {/* Ownership Filters Row */}
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingHorizontal: 4 }}>
-          <Pressable
-            onPress={() => setViewFilter('All')}
-            style={[styles.filterBtn, viewFilter === 'All' && styles.filterBtnActive]}
-          >
-            <ThemedText style={[styles.filterBtnText, viewFilter === 'All' && styles.filterBtnTextActive]}>
-              {i18n.language === 'ta' ? 'அனைத்து கோரிக்கைகள்' : 'All Requests'}
-            </ThemedText>
-          </Pressable>
-          <Pressable
-            onPress={() => setViewFilter('MyRequests')}
-            style={[styles.filterBtn, viewFilter === 'MyRequests' && styles.filterBtnActive]}
-          >
-            <ThemedText style={[styles.filterBtnText, viewFilter === 'MyRequests' && styles.filterBtnTextActive]}>
-              {i18n.language === 'ta' ? 'என் கோரிக்கைகள்' : 'My Requests'}
-            </ThemedText>
-          </Pressable>
+        {/* Ownership Filters & Layout Toggle Row */}
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 8, paddingHorizontal: 4 }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+            <Pressable
+              onPress={() => setViewFilter('All')}
+              style={[styles.filterBtn, viewFilter === 'All' && styles.filterBtnActive]}
+            >
+              <ThemedText style={[styles.filterBtnText, viewFilter === 'All' && styles.filterBtnTextActive]}>
+                {i18n.language === 'ta' ? 'அனைத்து கோரிக்கைகள்' : 'All Requests'}
+              </ThemedText>
+            </Pressable>
+            <Pressable
+              onPress={() => setViewFilter('MyRequests')}
+              style={[styles.filterBtn, viewFilter === 'MyRequests' && styles.filterBtnActive]}
+            >
+              <ThemedText style={[styles.filterBtnText, viewFilter === 'MyRequests' && styles.filterBtnTextActive]}>
+                {i18n.language === 'ta' ? 'என் கோரிக்கைகள்' : 'My Requests'}
+              </ThemedText>
+            </Pressable>
+          </View>
+
+          {/* Web Layout Toggle Buttons */}
+          {Platform.OS === 'web' && isLargeScreen && (
+            <View style={{ flexDirection: 'row', gap: 4, backgroundColor: '#F7F4EB', borderRadius: 8, padding: 3, borderWidth: 1, borderColor: '#EAE2D5', alignItems: 'center' }}>
+              <Pressable
+                onPress={() => setViewLayout('card')}
+                style={[{ padding: 4, borderRadius: 6 }, viewLayout === 'card' && { backgroundColor: '#af2907' }]}
+              >
+                <LayoutGrid size={14} color={viewLayout === 'card' ? '#FFF' : '#6C7063'} />
+              </Pressable>
+              <Pressable
+                onPress={() => setViewLayout('table')}
+                style={[{ padding: 4, borderRadius: 6 }, viewLayout === 'table' && { backgroundColor: '#af2907' }]}
+              >
+                <Table size={14} color={viewLayout === 'table' ? '#FFF' : '#6C7063'} />
+              </Pressable>
+            </View>
+          )}
         </View>
       </View>
 
@@ -557,228 +959,84 @@ export function PrintRequestsTab({ showToast }: TabProps) {
         </View>
       ) : (
         /* RESPONSIVE LAYOUT CONTAINER */
-        <View style={[styles.layoutWrapper, { flexDirection: isLargeScreen ? 'row' : 'column' }]}>
-          {/* LEFT LIST PANEL */}
-          <View style={[styles.listPanel, isLargeScreen ? { flex: 4 } : { flex: 1 }]}>
-            <ScrollView contentContainerStyle={{ gap: 10 }}>
-              {filteredRequests.map(req => {
-                const isActive = activeRequest?.requestId === req.requestId;
-                return (
-                  <Pressable
-                    key={req.requestId}
-                    onPress={() => setActiveRequest(req)}
-                    style={[
-                      styles.card,
-                      { borderColor: colors.border },
-                      isActive && { borderColor: colors.primary, borderWidth: 1.5, backgroundColor: colors.primaryLight }
-                    ]}
-                  >
-                    <View style={{ gap: 8 }}>
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                        <View style={{ flex: 1, gap: 2 }}>
-                          <ThemedText style={{ fontSize: 14, fontWeight: '800', color: colors.text }}>
-                            {req.fileName}
-                          </ThemedText>
-                          <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>
-                            {req.yearClass} • {req.contactName}
-                          </ThemedText>
-                        </View>
-                        {renderStatusBadge(req.status)}
-                      </View>
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <ThemedText style={{ fontSize: 11, color: colors.textSecondary }}>
-                          Required: {req.dateRequired}
-                        </ThemedText>
-                        <ThemedText style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>
-                          {req.totalPages} {i18n.language === 'ta' ? 'பக்கங்கள்' : 'Total Pages'} ({req.numPages}p × {req.numCopies}c)
-                        </ThemedText>
-                      </View>
-                    </View>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-          </View>
-
-          {/* RIGHT DETAIL PANEL */}
-          {activeRequest && (
-            <View style={[styles.detailPanel, isLargeScreen ? { flex: 6, marginLeft: Spacing.four } : { marginTop: Spacing.four }]}>
-              <ScrollView contentContainerStyle={{ gap: 16 }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', borderBottomWidth: 1, borderBottomColor: colors.border, paddingBottom: 12 }}>
-                  <View style={{ gap: 4, flex: 1 }}>
-                    <ThemedText style={{ fontSize: 18, fontWeight: '900', color: colors.text }}>
-                      {activeRequest.fileName}
-                    </ThemedText>
-                    <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>
-                      Submitted on: {new Date(activeRequest.dateSubmitted).toLocaleString()}
-                    </ThemedText>
-                  </View>
-                  {renderStatusBadge(activeRequest.status)}
-                </View>
-
-                {/* Grid Details */}
-                <View style={styles.gridContainer}>
-                  <View style={styles.gridItem}>
-                    <ThemedText style={styles.gridLabel}>Year / Class</ThemedText>
-                    <ThemedText style={styles.gridValue}>{activeRequest.yearClass}</ThemedText>
-                  </View>
-                  <View style={styles.gridItem}>
-                    <ThemedText style={styles.gridLabel}>Date Required</ThemedText>
-                    <ThemedText style={styles.gridValue}>{activeRequest.dateRequired}</ThemedText>
-                  </View>
-                  <View style={styles.gridItem}>
-                    <ThemedText style={styles.gridLabel}>Pages per Copy</ThemedText>
-                    <ThemedText style={styles.gridValue}>{activeRequest.numPages}</ThemedText>
-                  </View>
-                  <View style={styles.gridItem}>
-                    <ThemedText style={styles.gridLabel}>Number of Copies</ThemedText>
-                    <ThemedText style={styles.gridValue}>{activeRequest.numCopies}</ThemedText>
-                  </View>
-                  <View style={styles.gridItem}>
-                    <ThemedText style={styles.gridLabel}>Total Pages to Print</ThemedText>
-                    <ThemedText style={[styles.gridValue, { color: colors.primary, fontWeight: '900' }]}>
-                      {activeRequest.totalPages}
-                    </ThemedText>
-                  </View>
-                  <View style={styles.gridItem}>
-                    <ThemedText style={styles.gridLabel}>Color Option</ThemedText>
-                    <ThemedText style={styles.gridValue}>{activeRequest.colorOption}</ThemedText>
-                  </View>
-                  <View style={styles.gridItem}>
-                    <ThemedText style={styles.gridLabel}>Requested By</ThemedText>
-                    <ThemedText style={styles.gridValue}>{activeRequest.contactName}</ThemedText>
-                  </View>
-                  <View style={styles.gridItem}>
-                    <ThemedText style={styles.gridLabel}>Completed By</ThemedText>
-                    <ThemedText style={styles.gridValue}>{activeRequest.completedBy || 'N/A'}</ThemedText>
-                  </View>
-                </View>
-
-                {activeRequest.notes ? (
-                  <View style={[styles.notesBox, { backgroundColor: colors.backgroundElement }]}>
-                    <ThemedText style={{ fontSize: 11, fontWeight: '700', color: colors.textSecondary, marginBottom: 4 }}>
-                      Special Instructions / Notes:
-                    </ThemedText>
-                    <ThemedText style={{ fontSize: 13, color: colors.text }}>{activeRequest.notes}</ThemedText>
-                  </View>
-                ) : null}
-
-                {/* Attachments Section */}
-                <View style={{ gap: 8 }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <ThemedText style={{ fontSize: 14, fontWeight: '800', color: colors.text }}>
-                      📁 Print Attachments ({activeRequest.fileUrls.length})
-                    </ThemedText>
-                    {activeRequest.fileUrls.length > 1 && (
-                      <Pressable
-                        onPress={() => handleOpenAllFiles(activeRequest)}
-                        style={styles.actionBtnSmall}
-                      >
-                        <ExternalLink size={12} color={colors.primary} style={{ marginRight: 4 }} />
-                        <ThemedText style={{ fontSize: 11, color: colors.primary, fontWeight: '700' }}>
-                          Print All Files
-                        </ThemedText>
-                      </Pressable>
-                    )}
-                  </View>
-
-                  <View style={{ gap: 8 }}>
-                    {activeRequest.fileUrls.map((url, i) => {
-                      const name = activeRequest.fileNames[i] || `Document_${i + 1}`;
-                      const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(name) || url.startsWith('data:image/');
-                      return (
-                        <Pressable
-                          key={i}
-                          onPress={() => handleOpenFile(url, name)}
-                          style={[styles.attachmentRow, { borderColor: colors.border }]}
-                        >
-                          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 8 }}>
-                            <FileText size={16} color={colors.primary} />
-                            <ThemedText numberOfLines={1} style={{ fontSize: 13, color: colors.text, flex: 1 }}>
-                              {name}
+        <View style={[styles.layoutWrapper, { flexDirection: (isLargeScreen && viewLayout === 'card') ? 'row' : 'column' }]}>
+          {/* LEFT LIST OR TABLE PANEL */}
+          <View style={[
+            styles.listPanel, 
+            isLargeScreen ? (viewLayout === 'table' ? { flex: 1, width: '100%' } : { flex: 4 }) : { flex: 1 }
+          ]}>
+            {viewLayout === 'table' && Platform.OS === 'web' && isLargeScreen ? (
+              renderSpreadsheetTable()
+            ) : (
+              <ScrollView contentContainerStyle={{ gap: 10 }}>
+                {sortedRequests.map(req => {
+                  const isActive = activeRequest?.requestId === req.requestId;
+                  return (
+                    <Pressable
+                      key={req.requestId}
+                      onPress={() => setActiveRequest(req)}
+                      style={[
+                        styles.card,
+                        { borderColor: colors.border },
+                        isActive && { borderColor: colors.primary, borderWidth: 1.5, backgroundColor: colors.primaryLight }
+                      ]}
+                    >
+                      <View style={{ gap: 8 }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <View style={{ flex: 1, gap: 2 }}>
+                            <ThemedText style={{ fontSize: 14, fontWeight: '800', color: colors.text }}>
+                              {req.fileName}
+                            </ThemedText>
+                            <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>
+                              {req.yearClass} • {req.contactName}
                             </ThemedText>
                           </View>
-                          
-                          <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
-                            {isImage && <Eye size={14} color={colors.textSecondary} />}
-                            <Download size={14} color={colors.primary} />
-                          </View>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-                </View>
-
-                {/* Volunteer Action buttons */}
-                {isVolunteerOrAdmin && (
-                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 12, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 16 }}>
-                    {activeRequest.status === 'Pending' && (
-                      <Pressable
-                        onPress={() => handleUpdateStatus(activeRequest.requestId, 'In Progress')}
-                        style={[styles.actionBtn, { backgroundColor: '#E5F6FF', flex: 1 }]}
-                      >
-                        <Clock size={14} color="#006699" style={{ marginRight: 6 }} />
-                        <ThemedText style={{ fontSize: 13, color: '#006699', fontWeight: '800' }}>Claim / Print</ThemedText>
-                      </Pressable>
-                    )}
-                    {(activeRequest.status === 'Pending' || activeRequest.status === 'In Progress') && (
-                      <>
-                        <Pressable
-                          onPress={() => handleUpdateStatus(activeRequest.requestId, 'Completed')}
-                          style={[styles.actionBtn, { backgroundColor: '#ECFDF3', flex: 2 }]}
-                        >
-                          <CheckCircle size={14} color="#027A48" style={{ marginRight: 6 }} />
-                          <ThemedText style={{ fontSize: 13, color: '#027A48', fontWeight: '800' }}>Mark Completed</ThemedText>
-                        </Pressable>
-                        <Pressable
-                          onPress={() => handleUpdateStatus(activeRequest.requestId, 'Rejected')}
-                          style={[styles.actionBtn, { backgroundColor: '#FEF3F2', flex: 1 }]}
-                        >
-                          <XCircle size={14} color="#B42318" style={{ marginRight: 6 }} />
-                          <ThemedText style={{ fontSize: 13, color: '#B42318', fontWeight: '800' }}>Reject</ThemedText>
-                        </Pressable>
-                      </>
-                    )}
-                  </View>
-                )}
-
-                {/* Owner Edit & Delete buttons */}
-                {activeRequest.contactEmail.toLowerCase() === (user?.email || '').toLowerCase() && activeRequest.status === 'Pending' && (
-                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
-                    <Pressable
-                      onPress={() => {
-                        setEditingRequest(activeRequest);
-                        setYearClass(activeRequest.yearClass);
-                        setNumPages(String(activeRequest.numPages));
-                        setNumCopies(String(activeRequest.numCopies));
-                        setColorOption(activeRequest.colorOption);
-                        setDateRequired(activeRequest.dateRequired);
-                        setNotes(activeRequest.notes || '');
-                        
-                        const prefilledFiles = activeRequest.fileUrls.map((url, idx) => ({
-                          name: activeRequest.fileNames[idx] || `file_${idx + 1}`,
-                          size: activeRequest.fileSizes ? activeRequest.fileSizes[idx] || 0 : 0,
-                          url
-                        }));
-                        setAttachedFiles(prefilledFiles);
-                        setShowFormModal(true);
-                      }}
-                      style={[styles.actionBtn, { backgroundColor: '#E5F6FF', flex: 1 }]}
-                    >
-                      <Printer size={14} color="#006699" style={{ marginRight: 6 }} />
-                      <ThemedText style={{ fontSize: 13, color: '#006699', fontWeight: '800' }}>Edit Request</ThemedText>
+                          {renderStatusBadge(req.status)}
+                        </View>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <ThemedText style={{ fontSize: 11, color: colors.textSecondary }}>
+                            Required: {req.dateRequired}
+                          </ThemedText>
+                          <ThemedText style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>
+                            {req.totalPages} {i18n.language === 'ta' ? 'பக்கங்கள்' : 'Total Pages'} ({req.numPages}p × {req.numCopies}c)
+                          </ThemedText>
+                        </View>
+                      </View>
                     </Pressable>
-                    <Pressable
-                      onPress={() => handleDeleteRequest(activeRequest.requestId)}
-                      style={[styles.actionBtn, { backgroundColor: '#FEF3F2', flex: 1 }]}
-                    >
-                      <Trash2 size={14} color="#B42318" style={{ marginRight: 6 }} />
-                      <ThemedText style={{ fontSize: 13, color: '#B42318', fontWeight: '800' }}>Delete Request</ThemedText>
-                    </Pressable>
-                  </View>
-                )}
+                  );
+                })}
+              </ScrollView>
+            )}
+          </View>
+
+          {/* RIGHT DETAIL PANEL (Only in Card layout or mobile stacked view) */}
+          {(viewLayout === 'card' || !isLargeScreen) && activeRequest && (
+            <View style={[styles.detailPanel, isLargeScreen ? { flex: 6, marginLeft: Spacing.four } : { marginTop: Spacing.four }]}>
+              <ScrollView contentContainerStyle={{ gap: 16 }}>
+                {renderRequestDetailsContent(activeRequest)}
               </ScrollView>
             </View>
+          )}
+
+          {/* TABLE DETAIL MODAL */}
+          {viewLayout === 'table' && isLargeScreen && activeRequest && (
+            <Modal visible={true} animationType="fade" transparent>
+              <View style={styles.modalBg}>
+                <View style={[styles.modalCard, { backgroundColor: colors.cardBg, borderColor: colors.border, maxWidth: 650, width: '90%', padding: 0 }]}>
+                  <View style={[styles.modalHeader, { paddingHorizontal: 20, paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
+                    <ThemedText style={{ fontSize: 16, fontWeight: '900', color: colors.text }}>
+                      {i18n.language === 'ta' ? 'கோரிக்கை விவரங்கள்' : 'Request Details'}
+                    </ThemedText>
+                    <Pressable onPress={() => setActiveRequest(null)} style={styles.closeBtn}>
+                      <ThemedText style={{ fontSize: 24, color: colors.textSecondary, fontWeight: '600' }}>×</ThemedText>
+                    </Pressable>
+                  </View>
+                  <ScrollView style={{ maxHeight: '80%' }} contentContainerStyle={{ padding: 20 }}>
+                    {renderRequestDetailsContent(activeRequest)}
+                  </ScrollView>
+                </View>
+              </View>
+            </Modal>
           )}
         </View>
       )}
@@ -1302,5 +1560,33 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 8,
     overflow: 'hidden',
+  },
+  tableContainer: {
+    borderWidth: 1,
+    borderRadius: 12,
+    overflow: 'hidden',
+    flex: 1,
+    backgroundColor: '#FFF',
+  },
+  tableHeaderRow: {
+    flexDirection: 'row',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+  },
+  tableHeaderCell: {
+    justifyContent: 'center',
+    paddingRight: 8,
+  },
+  tableRow: {
+    flexDirection: 'row',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    alignItems: 'center',
+  },
+  tableCell: {
+    justifyContent: 'center',
+    paddingRight: 8,
   }
 }) as any;

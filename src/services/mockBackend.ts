@@ -131,6 +131,8 @@ export const mockDb = {
   createPrintRequest: printRequestService.createPrintRequest,
   updatePrintRequest: printRequestService.updatePrintRequest,
   updatePrintRequestStatus: printRequestService.updatePrintRequestStatus,
+  archivePrintRequest: printRequestService.archivePrintRequest,
+  unarchivePrintRequest: printRequestService.unarchivePrintRequest,
   deletePrintRequest: printRequestService.deletePrintRequest,
 
   // --- SEED CLOUD DATABASE ---

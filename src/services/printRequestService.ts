@@ -21,6 +21,7 @@ export interface PrintRequest {
   fileUrls: string[];
   fileNames: string[];
   fileSizes?: number[];
+  isArchived?: boolean;
 }
 
 export const DEFAULT_PRINT_REQUESTS: PrintRequest[] = [
@@ -211,7 +212,8 @@ export const printRequestService = {
       notes: request.notes || '',
       fileUrls: request.fileUrls || [],
       fileNames: request.fileNames || [],
-      fileSizes: request.fileSizes || []
+      fileSizes: request.fileSizes || [],
+      isArchived: false
     };
 
     if (!db) {
@@ -502,6 +504,90 @@ export const printRequestService = {
       return updatedData;
     }
     return null;
+  },
+
+  archivePrintRequest: async (requestId: string): Promise<PrintRequest | null> => {
+    let existing: PrintRequest | null = null;
+    if (!db) {
+      existing = localPrintRequests.find(pr => pr.requestId === requestId) || null;
+    } else {
+      try {
+        const docRef = doc(db, 'print_requests', requestId);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          existing = { requestId, ...docSnap.data() } as PrintRequest;
+        } else {
+          existing = localPrintRequests.find(pr => pr.requestId === requestId) || null;
+        }
+      } catch (getErr) {
+        console.warn('[printRequestService] Failed to get doc from Firestore, using local cache:', getErr);
+        existing = localPrintRequests.find(pr => pr.requestId === requestId) || null;
+      }
+    }
+
+    if (!existing) return null;
+
+    const newRequest: PrintRequest = {
+      ...existing,
+      isArchived: true
+    };
+
+    if (db) {
+      try {
+        const { requestId: omitted, ...details } = newRequest;
+        await setDoc(doc(db, 'print_requests', requestId), details);
+      } catch (dbErr) {
+        console.warn('[printRequestService] Failed to archive print request in Firestore. Saving to local memory cache:', dbErr);
+      }
+    }
+
+    const idx = localPrintRequests.findIndex(pr => pr.requestId === requestId);
+    if (idx !== -1) {
+      localPrintRequests[idx] = newRequest;
+    }
+    return newRequest;
+  },
+
+  unarchivePrintRequest: async (requestId: string): Promise<PrintRequest | null> => {
+    let existing: PrintRequest | null = null;
+    if (!db) {
+      existing = localPrintRequests.find(pr => pr.requestId === requestId) || null;
+    } else {
+      try {
+        const docRef = doc(db, 'print_requests', requestId);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          existing = { requestId, ...docSnap.data() } as PrintRequest;
+        } else {
+          existing = localPrintRequests.find(pr => pr.requestId === requestId) || null;
+        }
+      } catch (getErr) {
+        console.warn('[printRequestService] Failed to get doc from Firestore, using local cache:', getErr);
+        existing = localPrintRequests.find(pr => pr.requestId === requestId) || null;
+      }
+    }
+
+    if (!existing) return null;
+
+    const newRequest: PrintRequest = {
+      ...existing,
+      isArchived: false
+    };
+
+    if (db) {
+      try {
+        const { requestId: omitted, ...details } = newRequest;
+        await setDoc(doc(db, 'print_requests', requestId), details);
+      } catch (dbErr) {
+        console.warn('[printRequestService] Failed to unarchive print request in Firestore. Saving to local memory cache:', dbErr);
+      }
+    }
+
+    const idx = localPrintRequests.findIndex(pr => pr.requestId === requestId);
+    if (idx !== -1) {
+      localPrintRequests[idx] = newRequest;
+    }
+    return newRequest;
   },
 
   deletePrintRequest: async (requestId: string): Promise<void> => {
