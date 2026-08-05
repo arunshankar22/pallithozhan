@@ -19,6 +19,7 @@ import { mockDb } from '@/services/mockBackend';
 import { Spacing } from '@/constants/theme';
 import { spreadsheetService } from '@/services/spreadsheetService';
 import { waitlistService } from '@/services/waitlistService';
+import { expenseService } from '@/services/expenseService';
 import { UserModal } from '@/components/UserModal';
 import { UserBulkBar } from '@/components/UserBulkBar';
 import { DateTimePicker } from '@/components/DateTimePicker';
@@ -53,7 +54,15 @@ const FlatScrollContainer = ({
 export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabProps) {
   const { width: windowWidth } = useWindowDimensions();
   const isLargeScreen = windowWidth >= 768;
-  const [subTab, setSubTab] = useState<'users' | 'classes' | 'calendar' | 'import_export' | 'waitlist'>('users');
+  const [subTab, setSubTab] = useState<'users' | 'classes' | 'calendar' | 'import_export' | 'waitlist' | 'expense_config'>('users');
+  
+  // Expense config states
+  const [treasurerUid, setTreasurerUid] = useState('');
+  const [secretaryUid, setSecretaryUid] = useState('');
+  const [presidentUid, setPresidentUid] = useState('');
+  const [allowedSubmitRoles, setAllowedSubmitRoles] = useState<string[]>([]);
+  const [savingExpenseConfig, setSavingExpenseConfig] = useState(false);
+
   const [headerCollapsed, setHeaderCollapsed] = useState(false);
   const [showHelp, setShowHelp] = useState(() => {
     if (typeof window !== 'undefined' && window.localStorage) {
@@ -805,6 +814,12 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
       setClasses(cList);
       setSchoolDates(dList);
       setWaitlist(wList);
+
+      const expConfig = await expenseService.getApproverConfig();
+      setTreasurerUid(expConfig.treasurerUid || '');
+      setSecretaryUid(expConfig.secretaryUid || '');
+      setPresidentUid(expConfig.presidentUid || '');
+      setAllowedSubmitRoles(expConfig.allowedSubmitRoles || ['volunteer', 'admin', 'superadmin']);
     } catch (e) {
       showToast('Failed to sync administrative portal data.', 'error');
     } finally {
@@ -1326,6 +1341,19 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
             >
               <ThemedText style={{ color: subTab === 'waitlist' ? '#FFF' : colors.text, fontWeight: '700', fontSize: 13 }}>
                 📝 Waitlist Directory
+              </ThemedText>
+            </Pressable>
+            <Pressable
+              onPress={() => setSubTab('expense_config')}
+              style={[
+                { paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20, borderWidth: 1 },
+                subTab === 'expense_config' 
+                  ? { backgroundColor: colors.primary, borderColor: colors.primary } 
+                  : { backgroundColor: 'transparent', borderColor: colors.border }
+              ]}
+            >
+              <ThemedText style={{ color: subTab === 'expense_config' ? '#FFF' : colors.text, fontWeight: '700', fontSize: 13 }}>
+                💸 Expense Settings
               </ThemedText>
             </Pressable>
           </View>
@@ -2526,7 +2554,7 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
             </View>
           </View>
         </FlatScrollContainer>
-      ) : (
+      ) : subTab === 'waitlist' ? (
         /* WAITLIST SUB-TAB */
         <View style={{ flex: 1 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8, marginTop: 4 }}>
@@ -3007,6 +3035,197 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
             );
           })()}
         </View>
+      ) : (
+        /* EXPENSE CONFIG SUB-TAB */
+        <FlatScrollContainer style={{ flex: 1 }} contentContainerStyle={{ gap: Spacing.three, paddingBottom: isLargeScreen ? Spacing.three : 0 }}>
+          <View style={{ flexDirection: 'row', gap: Spacing.two, borderBottomWidth: 1, borderColor: colors.border, paddingBottom: 10 }}>
+            <ThemedText style={{ fontSize: 16, fontWeight: '800', color: colors.primary }}>💸 Expense Settings / செலவு கட்டமைப்பு</ThemedText>
+          </View>
+
+          <View style={{ gap: Spacing.three }}>
+            
+            {/* CONFIG SECTION */}
+            <View style={{ padding: 20, borderRadius: 16, borderWidth: 1, backgroundColor: colors.cardBg, borderColor: colors.border, gap: 16 }}>
+              <ThemedText style={{ fontSize: 14, fontWeight: '800', color: colors.text }}>⚙️ Designated Approvers & Submit Roles</ThemedText>
+
+              {/* Secretary Selector */}
+              <View style={{ gap: 6 }}>
+                <ThemedText style={{ fontSize: 13, fontWeight: '700', color: colors.textSecondary }}>Secretary (செயலாளர்) - Stage 1 Approval</ThemedText>
+                <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden', backgroundColor: colors.background }}>
+                  <ScrollView style={{ maxHeight: 150 }} nestedScrollEnabled>
+                    {users.filter(u => ['volunteer', 'admin', 'superadmin'].includes(u.role)).map(u => {
+                      const isSelected = secretaryUid === u.uid;
+                      return (
+                        <Pressable
+                          key={u.uid}
+                          onPress={() => setSecretaryUid(u.uid)}
+                          style={{
+                            padding: 10,
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 8,
+                            backgroundColor: isSelected ? colors.primaryLight : 'transparent',
+                            borderBottomWidth: 0.5,
+                            borderBottomColor: colors.border
+                          }}
+                        >
+                          <View style={{ width: 14, height: 14, borderRadius: 7, borderWidth: 1.5, borderColor: isSelected ? colors.primary : colors.border, backgroundColor: isSelected ? colors.primary : 'transparent' }} />
+                          <ThemedText style={{ fontSize: 12, fontWeight: isSelected ? '700' : '400', color: isSelected ? colors.primary : colors.text }}>
+                            {u.fullName || u.given_name + ' ' + u.family_name} ({u.email})
+                          </ThemedText>
+                        </Pressable>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+              </View>
+
+              {/* Treasurer Selector */}
+              <View style={{ gap: 6 }}>
+                <ThemedText style={{ fontSize: 13, fontWeight: '700', color: colors.textSecondary }}>Treasurer (பொருளாளர்) - Stage 2 Approval & Reimbursement</ThemedText>
+                <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden', backgroundColor: colors.background }}>
+                  <ScrollView style={{ maxHeight: 150 }} nestedScrollEnabled>
+                    {users.filter(u => ['volunteer', 'admin', 'superadmin'].includes(u.role)).map(u => {
+                      const isSelected = treasurerUid === u.uid;
+                      return (
+                        <Pressable
+                          key={u.uid}
+                          onPress={() => setTreasurerUid(u.uid)}
+                          style={{
+                            padding: 10,
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 8,
+                            backgroundColor: isSelected ? colors.primaryLight : 'transparent',
+                            borderBottomWidth: 0.5,
+                            borderBottomColor: colors.border
+                          }}
+                        >
+                          <View style={{ width: 14, height: 14, borderRadius: 7, borderWidth: 1.5, borderColor: isSelected ? colors.primary : colors.border, backgroundColor: isSelected ? colors.primary : 'transparent' }} />
+                          <ThemedText style={{ fontSize: 12, fontWeight: isSelected ? '700' : '400', color: isSelected ? colors.primary : colors.text }}>
+                            {u.fullName || u.given_name + ' ' + u.family_name} ({u.email})
+                          </ThemedText>
+                        </Pressable>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+              </View>
+
+              {/* President Selector */}
+              <View style={{ gap: 6 }}>
+                <ThemedText style={{ fontSize: 13, fontWeight: '700', color: colors.textSecondary }}>President (தலைவர்) - Stage 3 Final Sign-off</ThemedText>
+                <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden', backgroundColor: colors.background }}>
+                  <ScrollView style={{ maxHeight: 150 }} nestedScrollEnabled>
+                    {users.filter(u => ['volunteer', 'admin', 'superadmin'].includes(u.role)).map(u => {
+                      const isSelected = presidentUid === u.uid;
+                      return (
+                        <Pressable
+                          key={u.uid}
+                          onPress={() => setPresidentUid(u.uid)}
+                          style={{
+                            padding: 10,
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 8,
+                            backgroundColor: isSelected ? colors.primaryLight : 'transparent',
+                            borderBottomWidth: 0.5,
+                            borderBottomColor: colors.border
+                          }}
+                        >
+                          <View style={{ width: 14, height: 14, borderRadius: 7, borderWidth: 1.5, borderColor: isSelected ? colors.primary : colors.border, backgroundColor: isSelected ? colors.primary : 'transparent' }} />
+                          <ThemedText style={{ fontSize: 12, fontWeight: isSelected ? '700' : '400', color: isSelected ? colors.primary : colors.text }}>
+                            {u.fullName || u.given_name + ' ' + u.family_name} ({u.email})
+                          </ThemedText>
+                        </Pressable>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+              </View>
+
+              {/* Allowed Submit Roles Configuration */}
+              <View style={{ gap: 8, marginTop: 4 }}>
+                <ThemedText style={{ fontSize: 13, fontWeight: '700', color: colors.textSecondary }}>Who can submit expenses? (அனுமதி உள்ள பாத்திரங்கள்)</ThemedText>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
+                  {['teacher', 'volunteer', 'admin', 'parent'].map(role => {
+                    const isAllowed = allowedSubmitRoles.includes(role);
+                    return (
+                      <Pressable
+                        key={role}
+                        onPress={() => {
+                          setAllowedSubmitRoles(prev =>
+                            isAllowed ? prev.filter(r => r !== role) : [...prev, role]
+                          );
+                        }}
+                        style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
+                      >
+                        <View style={{
+                          width: 18,
+                          height: 18,
+                          borderWidth: 2,
+                          borderColor: isAllowed ? colors.primary : colors.border,
+                          borderRadius: 4,
+                          backgroundColor: isAllowed ? colors.primary : 'transparent',
+                          justifyContent: 'center',
+                          alignItems: 'center'
+                        }}>
+                          {isAllowed && <CheckCircle size={12} color="#FFF" />}
+                        </View>
+                        <ThemedText style={{ fontSize: 13, textTransform: 'capitalize' }}>{role}</ThemedText>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+
+              {/* Submit Config Button */}
+              <Pressable
+                onPress={async () => {
+                  setSavingExpenseConfig(true);
+                  try {
+                    const sUser = users.find(u => u.uid === secretaryUid);
+                    const tUser = users.find(u => u.uid === treasurerUid);
+                    const pUser = users.find(u => u.uid === presidentUid);
+
+                    await expenseService.updateApproverConfig({
+                      secretaryUid,
+                      secretaryName: sUser ? sUser.fullName || `${sUser.given_name} ${sUser.family_name}` : 'Secretary',
+                      secretaryEmail: sUser ? sUser.email : '',
+                      
+                      treasurerUid,
+                      treasurerName: tUser ? tUser.fullName || `${tUser.given_name} ${tUser.family_name}` : 'Treasurer',
+                      treasurerEmail: tUser ? tUser.email : '',
+                      
+                      presidentUid,
+                      presidentName: pUser ? pUser.fullName || `${pUser.given_name} ${pUser.family_name}` : 'President',
+                      presidentEmail: pUser ? pUser.email : '',
+
+                      allowedSubmitRoles
+                    });
+                    showToast('Expense configuration updated successfully!', 'success');
+                  } catch (e) {
+                    showToast('Failed to save expense configuration.', 'error');
+                  } finally {
+                    setSavingExpenseConfig(false);
+                  }
+                }}
+                disabled={savingExpenseConfig}
+                style={({ pressed }) => [
+                  { backgroundColor: colors.primary, paddingVertical: 12, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginTop: 12 },
+                  { opacity: pressed || savingExpenseConfig ? 0.9 : 1 }
+                ]}
+              >
+                {savingExpenseConfig ? (
+                  <ActivityIndicator size="small" color="#FFF" />
+                ) : (
+                  <ThemedText style={{ color: '#FFF', fontWeight: '700', fontSize: 13 }}>💾 Save Expense Settings</ThemedText>
+                )}
+              </Pressable>
+
+            </View>
+          </View>
+        </FlatScrollContainer>
       )}
 
       {/* ==================== USER MODAL FORM ==================== */}

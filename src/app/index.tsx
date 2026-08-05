@@ -20,6 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/services/auth';
 import { mockDb } from '@/services/mockBackend';
 import { isDemoMode } from '@/services/firebase';
+import { expenseService } from '@/services/expenseService';
 import { Colors, Spacing, MaxContentWidth, Fonts } from '@/constants/theme';
 import { ThemedText } from '@/components/themed-text';
 import { styles } from '@/app/styles';
@@ -47,7 +48,8 @@ import {
   X,
   FileText,
   Printer,
-  RefreshCw
+  RefreshCw,
+  DollarSign
 } from 'lucide-react-native';
 
 
@@ -60,6 +62,7 @@ import { MessagesTab } from '@/app/tabs/MessagesTab';
 import { CalendarTab } from '@/app/tabs/CalendarTab';
 import { ReportsTab } from '@/app/tabs/ReportsTab';
 import { PrintRequestsTab } from '@/app/tabs/PrintRequestsTab';
+import { ExpensesTab } from '@/app/tabs/ExpensesTab';
 import { ManagementTab } from '@/app/tabs/ManagementTab';
 import { ProfileTab } from '@/app/tabs/ProfileTab';
 import { StudentsTab } from '@/app/tabs/StudentsTab';
@@ -180,7 +183,7 @@ export default function HomeScreen() {
   };
 
   // Layout Tab State
-  const [activeTab, setActiveTab] = useState<'newsfeed' | 'attendance' | 'homework' | 'messages' | 'calendar' | 'reports' | 'management' | 'profile' | 'schools' | 'full-newsfeed' | 'students' | 'newsletter' | 'superadmin' | 'points' | 'print-requests'>('newsfeed');
+  const [activeTab, setActiveTab] = useState<'newsfeed' | 'attendance' | 'homework' | 'messages' | 'calendar' | 'reports' | 'management' | 'profile' | 'schools' | 'full-newsfeed' | 'students' | 'newsletter' | 'superadmin' | 'points' | 'print-requests' | 'expenses'>('newsfeed');
 
   // Points System states
   const [pointsConfig, setPointsConfig] = useState<any>(null);
@@ -260,6 +263,35 @@ export default function HomeScreen() {
   });
 
   const [pendingPrintRequestsCount, setPendingPrintRequestsCount] = useState(0);
+  const [pendingExpensesCount, setPendingExpensesCount] = useState(0);
+
+  const reloadExpensesBadge = async () => {
+    if (!user) return;
+    try {
+      const list = await expenseService.getExpenses();
+      const cfg = await expenseService.getApproverConfig();
+      
+      let count = 0;
+      for (const exp of list) {
+        if (exp.status === 'Pending Approval') {
+          if (exp.currentApproverRole === 'secretary' && cfg.secretaryUid === user.uid) count++;
+          else if (exp.currentApproverRole === 'treasurer' && cfg.treasurerUid === user.uid) count++;
+          else if (exp.currentApproverRole === 'president' && cfg.presidentUid === user.uid) count++;
+        } else if (exp.status === 'Approved' && exp.paymentStatus === 'Pending Payment') {
+          if (cfg.treasurerUid === user.uid) count++;
+        }
+      }
+      setPendingExpensesCount(count);
+    } catch (e) {
+      console.warn('Failed to load pending expenses badge:', e);
+    }
+  };
+
+  useEffect(() => {
+    reloadExpensesBadge();
+    const intv = setInterval(reloadExpensesBadge, 5000);
+    return () => clearInterval(intv);
+  }, [user]);
 
   const reloadDashboardData = async () => {
     try {
@@ -1103,6 +1135,14 @@ export default function HomeScreen() {
           iconColor: colors.primary,
           onPress: () => setActiveTab('print-requests')
         });
+        actions.push({
+          key: 'expenses',
+          label: i18n.language === 'ta' ? 'செலவு கண்காணிப்பு' : 'Expense Tracker',
+          icon: DollarSign,
+          color: '#E6F4EA',
+          iconColor: colors.success,
+          onPress: () => setActiveTab('expenses')
+        });
       }
     }
     const mainKeys = mainNavItems.map((item: any) => item.key);
@@ -1924,6 +1964,26 @@ export default function HomeScreen() {
                         </Text>
                       </View>
                     )}
+                    {action.key === 'expenses' && pendingExpensesCount > 0 && (
+                      <View style={{
+                        position: 'absolute',
+                        top: -4,
+                        right: -4,
+                        backgroundColor: '#FF3B30',
+                        borderRadius: 9,
+                        minWidth: 18,
+                        height: 18,
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        paddingHorizontal: 4,
+                        borderWidth: 1.5,
+                        borderColor: colors.cardBg,
+                      }}>
+                        <Text style={{ color: '#FFF', fontSize: 9, fontWeight: '800', lineHeight: 11 }}>
+                          {pendingExpensesCount}
+                        </Text>
+                      </View>
+                    )}
                   </View>
                   <ThemedText style={{ fontSize: 12, fontWeight: '700', color: colors.text, textAlign: 'center' }}>
                     {action.label}
@@ -2414,6 +2474,8 @@ export default function HomeScreen() {
         return <PointsPortalTab {...props} />;
       case 'print-requests':
         return <PrintRequestsTab {...props} />;
+      case 'expenses':
+        return <ExpensesTab {...props} />;
       case 'schools':
         return renderSchoolsTab();
       case 'students':
