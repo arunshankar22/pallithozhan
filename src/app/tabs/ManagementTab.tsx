@@ -112,8 +112,10 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
 
   // Filtered users
   const filteredUsers = users.filter(u => {
-    const matchSearch = u.fullName.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                        u.email.toLowerCase().includes(searchQuery.toLowerCase());
+    const fName = u.fullName || `${u.given_name || ''} ${u.family_name || ''}`.trim() || '';
+    const emailAddr = u.email || '';
+    const matchSearch = fName.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                        emailAddr.toLowerCase().includes(searchQuery.toLowerCase());
     const matchRole = roleFilter === 'all' || u.role === roleFilter;
     return matchSearch && matchRole && u.uid !== 'admin_1'; // Hide base admin from deleting
   });
