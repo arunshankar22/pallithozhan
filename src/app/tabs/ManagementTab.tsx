@@ -1491,7 +1491,7 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
                             <ThemedText style={{ fontSize: 15, fontWeight: '700', flexShrink: 1 }}>{u.fullName}</ThemedText>
                             <View style={{ backgroundColor: u.role === 'teacher' ? colors.primaryLight : u.role === 'volunteer' ? colors.secondaryLight : colors.background, paddingVertical: 2, paddingHorizontal: 6, borderRadius: 4 }}>
                               <ThemedText style={{ fontSize: 9, fontWeight: '700', color: u.role === 'teacher' ? colors.primary : u.role === 'volunteer' ? colors.secondary : colors.textSecondary }}>
-                                {u.role.toUpperCase()}
+                                {(u.role || '').toUpperCase()}
                               </ThemedText>
                             </View>
                           </View>
@@ -1789,7 +1789,7 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
                               </View>
                               {/* Role (90) */}
                               <View style={{ width: 90, paddingHorizontal: 8 }}>
-                                {renderBadge(u.role.toUpperCase(), u.role === 'teacher' ? 'primary' : 'secondary')}
+                                {renderBadge((u.role || '').toUpperCase(), u.role === 'teacher' ? 'primary' : 'secondary')}
                               </View>
                               {/* Email (200) */}
                               <View style={{ width: 200, paddingHorizontal: 8 }}>
@@ -1875,7 +1875,7 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
                               </View>
                               {/* Role (90) */}
                               <View style={{ width: 90, paddingHorizontal: 8 }}>
-                                {renderBadge(u.role.toUpperCase(), u.role === 'admin' ? 'primary' : 'neutral')}
+                                {renderBadge((u.role || '').toUpperCase(), u.role === 'admin' ? 'primary' : 'neutral')}
                               </View>
                               {/* Email (200) */}
                               <View style={{ width: 200, paddingHorizontal: 8 }}>
