@@ -50,76 +50,7 @@ export interface ExpenseApproverConfig {
 }
 
 // In-memory local fallback cache for local dev/demo mode
-let localExpenses: Expense[] = [
-  {
-    expenseId: 'exp_1',
-    title: 'Textbooks for Bridging Class',
-    amount: 120.50,
-    category: 'teaching materials',
-    notes: 'Bought from Dymocks Parramatta. Receipt attached.',
-    submittedBy: 'Rafiq',
-    submittedByEmail: 'rafiq@balarmalar.nsw.edu.au',
-    submittedByUid: 'teacher_1',
-    dateSubmitted: '2026-07-28T09:00:00.000Z',
-    fileUrls: ['https://www.w3schools.com/html/placeholder.pdf'],
-    fileNames: ['dymocks_receipt.pdf'],
-    fileSizes: [153600],
-    status: 'Approved',
-    currentApproverRole: 'completed',
-    approvals: [
-      {
-        role: 'secretary',
-        approvedBy: 'Chandra',
-        approvedByEmail: 'chandra@balarmalar.nsw.edu.au',
-        approvedByUid: 'volunteer_1',
-        dateActioned: '2026-07-28T10:00:00.000Z',
-        action: 'Approved',
-        comments: 'Verified with classroom curriculum.'
-      },
-      {
-        role: 'treasurer',
-        approvedBy: 'Treasurer User',
-        approvedByEmail: 'treasurer@balarmalar.nsw.edu.au',
-        approvedByUid: 'treasurer_uid',
-        dateActioned: '2026-07-28T11:00:00.000Z',
-        action: 'Approved',
-        comments: 'Fund matches monthly budget.'
-      },
-      {
-        role: 'president',
-        approvedBy: 'President User',
-        approvedByEmail: 'president@balarmalar.nsw.edu.au',
-        approvedByUid: 'president_uid',
-        dateActioned: '2026-07-28T12:00:00.000Z',
-        action: 'Approved',
-        comments: 'Final sign off.'
-      }
-    ],
-    paymentStatus: 'Paid',
-    paidDate: '2026-07-29',
-    paidBy: 'Treasurer User',
-    paidByUid: 'treasurer_uid',
-    paymentReference: 'TXN-90218310'
-  },
-  {
-    expenseId: 'exp_2',
-    title: 'Catering for Annual Day rehearsal',
-    amount: 350.00,
-    category: 'catering',
-    notes: 'Samosas and drinks for 50 kids.',
-    submittedBy: 'Rafiq',
-    submittedByEmail: 'rafiq@balarmalar.nsw.edu.au',
-    submittedByUid: 'teacher_1',
-    dateSubmitted: '2026-07-29T14:00:00.000Z',
-    fileUrls: ['https://www.w3schools.com/html/placeholder.pdf'],
-    fileNames: ['catering_invoice.pdf'],
-    fileSizes: [245760],
-    status: 'Pending Approval',
-    currentApproverRole: 'secretary',
-    approvals: [],
-    paymentStatus: 'Pending Payment'
-  }
-];
+let localExpenses: Expense[] = [];
 
 let localApproverConfig: ExpenseApproverConfig = {
   treasurerUids: ['volunteer_1'],
@@ -176,10 +107,10 @@ export const expenseService = {
       querySnapshot.forEach((docSnap) => {
         list.push({ expenseId: docSnap.id, ...docSnap.data() } as Expense);
       });
-      return list.length > 0 ? list : localExpenses;
+      return list;
     } catch (e) {
       console.warn('[expenseService] Failed to fetch expenses from Firestore:', e);
-      return localExpenses;
+      return [];
     }
   },
 
