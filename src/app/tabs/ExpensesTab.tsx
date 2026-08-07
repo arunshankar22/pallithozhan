@@ -247,8 +247,43 @@ export function ExpensesTab({ user, colors, t, showToast, i18n, insets }: TabPro
                 reader.readAsDataURL(file);
               });
 
+              // Compress if it is an image to fit payload size limits (e.g. Vercel 4.5MB limit)
+              let scanBase64 = fileData.base64;
+              if (file.type.startsWith('image/')) {
+                try {
+                  scanBase64 = await new Promise<string>((resolve) => {
+                    const img = new Image();
+                    img.onload = () => {
+                      const canvas = document.createElement('canvas');
+                      let width = img.width;
+                      let height = img.height;
+                      const MAX_SIZE = 1000;
+                      if (width > height) {
+                        if (width > MAX_SIZE) {
+                          height *= MAX_SIZE / width;
+                          width = MAX_SIZE;
+                        }
+                      } else {
+                        if (height > MAX_SIZE) {
+                          width *= MAX_SIZE / height;
+                          height = MAX_SIZE;
+                        }
+                      }
+                      canvas.width = width;
+                      canvas.height = height;
+                      const ctx = canvas.getContext('2d');
+                      ctx?.drawImage(img, 0, 0, width, height);
+                      resolve(canvas.toDataURL('image/jpeg', 0.6));
+                    };
+                    img.src = fileData.base64;
+                  });
+                } catch (compressErr) {
+                  console.warn('Failed to compress web image:', compressErr);
+                }
+              }
+
               // Call AI Scanner
-              const scanResult = await expenseService.scanReceipt(fileData.base64, file.type || 'image/jpeg');
+              const scanResult = await expenseService.scanReceipt(scanBase64, file.type || 'image/jpeg');
               
               // Autofill form fields
               setTitle(scanResult.title || '');
@@ -287,11 +322,28 @@ export function ExpensesTab({ user, colors, t, showToast, i18n, insets }: TabPro
           }
           setScanning(true);
           try {
+            const mimeType = asset.mimeType || 'image/jpeg';
+            let scanUri = asset.uri;
+
+            // Compress if it is an image using expo-image-manipulator on mobile
+            if (mimeType.startsWith('image/')) {
+              try {
+                const ImageManipulator = require('expo-image-manipulator');
+                const manipResult = await ImageManipulator.manipulateAsync(
+                  asset.uri,
+                  [{ resize: { width: 1000 } }], // downscale to width 1000px preserving ratio
+                  { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG } // 60% quality jpeg
+                );
+                scanUri = manipResult.uri;
+              } catch (manipErr) {
+                console.warn('Failed to compress image on mobile, using original file:', manipErr);
+              }
+            }
+
             const FileSystem = require('expo-file-system');
-            const base64Data = await FileSystem.readAsStringAsync(asset.uri, {
+            const base64Data = await FileSystem.readAsStringAsync(scanUri, {
               encoding: FileSystem.EncodingType.Base64
             });
-            const mimeType = asset.mimeType || 'image/jpeg';
 
             // Call AI Scanner
             const scanResult = await expenseService.scanReceipt(base64Data, mimeType);
@@ -1082,7 +1134,7 @@ export function ExpensesTab({ user, colors, t, showToast, i18n, insets }: TabPro
                     >
                       <Sparkles size={11} color={colors.primary} />
                       <ThemedText style={{ fontSize: 11, color: colors.primary, fontWeight: '800' }}>
-                        {scanning ? 'Scanning...' : 'AI Scan'}
+                        {scanning ? 'Scanning...' : 'Smart Scan'}
                       </ThemedText>
                     </Pressable>
                     <Pressable
