@@ -142,8 +142,11 @@ export const expenseService = {
         // Backward compatibility safeguards (if previous run saved singular fields)
         return {
           treasurerUids: data.treasurerUids || (data.treasurerUid ? [data.treasurerUid] : []),
+          treasurerNames: data.treasurerNames || (data.treasurerName ? [data.treasurerName] : []),
           secretaryUids: data.secretaryUids || (data.secretaryUid ? [data.secretaryUid] : []),
+          secretaryNames: data.secretaryNames || (data.secretaryName ? [data.secretaryName] : []),
           presidentUids: data.presidentUids || (data.presidentUid ? [data.presidentUid] : []),
+          presidentNames: data.presidentNames || (data.presidentName ? [data.presidentName] : []),
           allowedSubmitRoles: data.allowedSubmitRoles || ['volunteer', 'admin', 'superadmin']
         } as ExpenseApproverConfig;
       }
