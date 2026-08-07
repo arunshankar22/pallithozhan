@@ -57,9 +57,9 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
   const [subTab, setSubTab] = useState<'users' | 'classes' | 'calendar' | 'import_export' | 'waitlist' | 'expense_config'>('users');
   
   // Expense config states
-  const [treasurerUid, setTreasurerUid] = useState('');
-  const [secretaryUid, setSecretaryUid] = useState('');
-  const [presidentUid, setPresidentUid] = useState('');
+  const [treasurerUids, setTreasurerUids] = useState<string[]>([]);
+  const [secretaryUids, setSecretaryUids] = useState<string[]>([]);
+  const [presidentUids, setPresidentUids] = useState<string[]>([]);
   const [allowedSubmitRoles, setAllowedSubmitRoles] = useState<string[]>([]);
   const [savingExpenseConfig, setSavingExpenseConfig] = useState(false);
 
@@ -818,9 +818,9 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
       setWaitlist(wList);
 
       const expConfig = await expenseService.getApproverConfig();
-      setTreasurerUid(expConfig.treasurerUid || '');
-      setSecretaryUid(expConfig.secretaryUid || '');
-      setPresidentUid(expConfig.presidentUid || '');
+      setTreasurerUids(expConfig.treasurerUids || []);
+      setSecretaryUids(expConfig.secretaryUids || []);
+      setPresidentUids(expConfig.presidentUids || []);
       setAllowedSubmitRoles(expConfig.allowedSubmitRoles || ['volunteer', 'admin', 'superadmin']);
     } catch (e) {
       showToast('Failed to sync administrative portal data.', 'error');
@@ -3056,11 +3056,15 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
                 <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden', backgroundColor: colors.background }}>
                   <ScrollView style={{ maxHeight: 150 }} nestedScrollEnabled>
                     {users.filter(u => ['volunteer', 'admin', 'superadmin'].includes(u.role)).map(u => {
-                      const isSelected = secretaryUid === u.uid;
+                      const isSelected = secretaryUids.includes(u.uid);
                       return (
                         <Pressable
                           key={u.uid}
-                          onPress={() => setSecretaryUid(u.uid)}
+                          onPress={() => {
+                            setSecretaryUids(prev =>
+                              isSelected ? prev.filter(id => id !== u.uid) : [...prev, u.uid]
+                            );
+                          }}
                           style={{
                             padding: 10,
                             flexDirection: 'row',
@@ -3071,7 +3075,9 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
                             borderBottomColor: colors.border
                           }}
                         >
-                          <View style={{ width: 14, height: 14, borderRadius: 7, borderWidth: 1.5, borderColor: isSelected ? colors.primary : colors.border, backgroundColor: isSelected ? colors.primary : 'transparent' }} />
+                          <View style={{ width: 16, height: 16, borderRadius: 4, borderWidth: 1.5, borderColor: isSelected ? colors.primary : colors.border, backgroundColor: isSelected ? colors.primary : 'transparent', justifyContent: 'center', alignItems: 'center' }}>
+                            {isSelected && <CheckCircle size={10} color="#FFF" />}
+                          </View>
                           <ThemedText style={{ fontSize: 12, fontWeight: isSelected ? '700' : '400', color: isSelected ? colors.primary : colors.text }}>
                             {u.fullName || u.given_name + ' ' + u.family_name} ({u.email})
                           </ThemedText>
@@ -3088,11 +3094,15 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
                 <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden', backgroundColor: colors.background }}>
                   <ScrollView style={{ maxHeight: 150 }} nestedScrollEnabled>
                     {users.filter(u => ['volunteer', 'admin', 'superadmin'].includes(u.role)).map(u => {
-                      const isSelected = treasurerUid === u.uid;
+                      const isSelected = treasurerUids.includes(u.uid);
                       return (
                         <Pressable
                           key={u.uid}
-                          onPress={() => setTreasurerUid(u.uid)}
+                          onPress={() => {
+                            setTreasurerUids(prev =>
+                              isSelected ? prev.filter(id => id !== u.uid) : [...prev, u.uid]
+                            );
+                          }}
                           style={{
                             padding: 10,
                             flexDirection: 'row',
@@ -3103,7 +3113,9 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
                             borderBottomColor: colors.border
                           }}
                         >
-                          <View style={{ width: 14, height: 14, borderRadius: 7, borderWidth: 1.5, borderColor: isSelected ? colors.primary : colors.border, backgroundColor: isSelected ? colors.primary : 'transparent' }} />
+                          <View style={{ width: 16, height: 16, borderRadius: 4, borderWidth: 1.5, borderColor: isSelected ? colors.primary : colors.border, backgroundColor: isSelected ? colors.primary : 'transparent', justifyContent: 'center', alignItems: 'center' }}>
+                            {isSelected && <CheckCircle size={10} color="#FFF" />}
+                          </View>
                           <ThemedText style={{ fontSize: 12, fontWeight: isSelected ? '700' : '400', color: isSelected ? colors.primary : colors.text }}>
                             {u.fullName || u.given_name + ' ' + u.family_name} ({u.email})
                           </ThemedText>
@@ -3120,11 +3132,15 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
                 <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, overflow: 'hidden', backgroundColor: colors.background }}>
                   <ScrollView style={{ maxHeight: 150 }} nestedScrollEnabled>
                     {users.filter(u => ['volunteer', 'admin', 'superadmin'].includes(u.role)).map(u => {
-                      const isSelected = presidentUid === u.uid;
+                      const isSelected = presidentUids.includes(u.uid);
                       return (
                         <Pressable
                           key={u.uid}
-                          onPress={() => setPresidentUid(u.uid)}
+                          onPress={() => {
+                            setPresidentUids(prev =>
+                              isSelected ? prev.filter(id => id !== u.uid) : [...prev, u.uid]
+                            );
+                          }}
                           style={{
                             padding: 10,
                             flexDirection: 'row',
@@ -3135,7 +3151,9 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
                             borderBottomColor: colors.border
                           }}
                         >
-                          <View style={{ width: 14, height: 14, borderRadius: 7, borderWidth: 1.5, borderColor: isSelected ? colors.primary : colors.border, backgroundColor: isSelected ? colors.primary : 'transparent' }} />
+                          <View style={{ width: 16, height: 16, borderRadius: 4, borderWidth: 1.5, borderColor: isSelected ? colors.primary : colors.border, backgroundColor: isSelected ? colors.primary : 'transparent', justifyContent: 'center', alignItems: 'center' }}>
+                            {isSelected && <CheckCircle size={10} color="#FFF" />}
+                          </View>
                           <ThemedText style={{ fontSize: 12, fontWeight: isSelected ? '700' : '400', color: isSelected ? colors.primary : colors.text }}>
                             {u.fullName || u.given_name + ' ' + u.family_name} ({u.email})
                           </ThemedText>
@@ -3186,23 +3204,26 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
                 onPress={async () => {
                   setSavingExpenseConfig(true);
                   try {
-                    const sUser = users.find(u => u.uid === secretaryUid);
-                    const tUser = users.find(u => u.uid === treasurerUid);
-                    const pUser = users.find(u => u.uid === presidentUid);
+                    const sNames = secretaryUids.map(uid => {
+                      const u = users.find(usr => usr.uid === uid);
+                      return u ? u.fullName || `${u.given_name || ''} ${u.family_name || ''}`.trim() : 'Unknown';
+                    });
+                    const tNames = treasurerUids.map(uid => {
+                      const u = users.find(usr => usr.uid === uid);
+                      return u ? u.fullName || `${u.given_name || ''} ${u.family_name || ''}`.trim() : 'Unknown';
+                    });
+                    const pNames = presidentUids.map(uid => {
+                      const u = users.find(usr => usr.uid === uid);
+                      return u ? u.fullName || `${u.given_name || ''} ${u.family_name || ''}`.trim() : 'Unknown';
+                    });
 
                     await expenseService.updateApproverConfig({
-                      secretaryUid,
-                      secretaryName: sUser ? sUser.fullName || `${sUser.given_name} ${sUser.family_name}` : 'Secretary',
-                      secretaryEmail: sUser ? sUser.email : '',
-                      
-                      treasurerUid,
-                      treasurerName: tUser ? tUser.fullName || `${tUser.given_name} ${tUser.family_name}` : 'Treasurer',
-                      treasurerEmail: tUser ? tUser.email : '',
-                      
-                      presidentUid,
-                      presidentName: pUser ? pUser.fullName || `${pUser.given_name} ${pUser.family_name}` : 'President',
-                      presidentEmail: pUser ? pUser.email : '',
-
+                      secretaryUids,
+                      secretaryNames: sNames,
+                      treasurerUids,
+                      treasurerNames: tNames,
+                      presidentUids,
+                      presidentNames: pNames,
                       allowedSubmitRoles
                     });
                     showToast('Expense configuration updated successfully!', 'success');

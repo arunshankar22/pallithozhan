@@ -274,11 +274,11 @@ export default function HomeScreen() {
       let count = 0;
       for (const exp of list) {
         if (exp.status === 'Pending Approval') {
-          if (exp.currentApproverRole === 'secretary' && cfg.secretaryUid === user.uid) count++;
-          else if (exp.currentApproverRole === 'treasurer' && cfg.treasurerUid === user.uid) count++;
-          else if (exp.currentApproverRole === 'president' && cfg.presidentUid === user.uid) count++;
+          if (exp.currentApproverRole === 'secretary' && (cfg.secretaryUids || []).includes(user.uid)) count++;
+          else if (exp.currentApproverRole === 'treasurer' && (cfg.treasurerUids || []).includes(user.uid)) count++;
+          else if (exp.currentApproverRole === 'president' && (cfg.presidentUids || []).includes(user.uid)) count++;
         } else if (exp.status === 'Approved' && exp.paymentStatus === 'Pending Payment') {
-          if (cfg.treasurerUid === user.uid) count++;
+          if ((cfg.treasurerUids || []).includes(user.uid)) count++;
         }
       }
       setPendingExpensesCount(count);

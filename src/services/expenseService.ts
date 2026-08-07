@@ -1,6 +1,5 @@
 import { db, storage } from './firebase';
 import { collection, doc, getDoc, getDocs, setDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
-import { userService } from './userService';
 import { attendanceService } from './attendanceService';
 
 export interface ExpenseApproval {
@@ -41,20 +40,13 @@ export interface Expense {
 }
 
 export interface ExpenseApproverConfig {
-  treasurerEmail: string;
-  treasurerName: string;
-  treasurerUid: string;
-  
-  secretaryEmail: string;
-  secretaryName: string;
-  secretaryUid: string;
-  
-  presidentEmail: string;
-  presidentName: string;
-  presidentUid: string;
-
-  // Access control
-  allowedSubmitRoles: string[]; // e.g. ['volunteer', 'admin', 'superadmin']
+  treasurerUids: string[];
+  treasurerNames?: string[];
+  secretaryUids: string[];
+  secretaryNames?: string[];
+  presidentUids: string[];
+  presidentNames?: string[];
+  allowedSubmitRoles: string[];
 }
 
 // In-memory local fallback cache for local dev/demo mode
@@ -130,19 +122,13 @@ let localExpenses: Expense[] = [
 ];
 
 let localApproverConfig: ExpenseApproverConfig = {
-  treasurerEmail: 'treasurer@balarmalar.nsw.edu.au',
-  treasurerName: 'Chandra',
-  treasurerUid: 'volunteer_1', // fallback default
-  
-  secretaryEmail: 'secretary@balarmalar.nsw.edu.au',
-  secretaryName: 'Chandra',
-  secretaryUid: 'volunteer_1',
-  
-  presidentEmail: 'president@balarmalar.nsw.edu.au',
-  presidentName: 'Chandra',
-  presidentUid: 'volunteer_1',
-
-  allowedSubmitRoles: ['volunteer', 'admin', 'superadmin'] // Default roles (teachers excluded initially, can configure)
+  treasurerUids: ['volunteer_1'],
+  treasurerNames: ['Chandra'],
+  secretaryUids: ['volunteer_1'],
+  secretaryNames: ['Chandra'],
+  presidentUids: ['volunteer_1'],
+  presidentNames: ['Chandra'],
+  allowedSubmitRoles: ['volunteer', 'admin', 'superadmin']
 };
 
 export const expenseService = {
@@ -152,9 +138,13 @@ export const expenseService = {
       const docRef = doc(db, 'settings', 'expense_approvers');
       const docSnap = await getDoc(docRef);
       if (docSnap.exists()) {
+        const data = docSnap.data();
+        // Backward compatibility safeguards (if previous run saved singular fields)
         return {
-          ...localApproverConfig,
-          ...docSnap.data()
+          treasurerUids: data.treasurerUids || (data.treasurerUid ? [data.treasurerUid] : []),
+          secretaryUids: data.secretaryUids || (data.secretaryUid ? [data.secretaryUid] : []),
+          presidentUids: data.presidentUids || (data.presidentUid ? [data.presidentUid] : []),
+          allowedSubmitRoles: data.allowedSubmitRoles || ['volunteer', 'admin', 'superadmin']
         } as ExpenseApproverConfig;
       }
     } catch (e) {
@@ -219,12 +209,12 @@ export const expenseService = {
       }
       localExpenses.unshift(newExpense);
       
-      // Trigger notification alert in local mode
+      // Trigger notification alerts to all Secretaries
       try {
         const config = await expenseService.getApproverConfig();
-        if (config.secretaryUid) {
+        for (const secUid of config.secretaryUids) {
           await attendanceService.pushAlertDirect(
-            config.secretaryUid,
+            secUid,
             'New Expense Pending Approval',
             `A new expense claim of $${newExpense.amount} for "${newExpense.title}" was submitted by ${newExpense.submittedBy} and awaits your approval.`
           );
@@ -290,12 +280,12 @@ export const expenseService = {
       localExpenses.unshift(newExpense);
     }
 
-    // Trigger notification to Secretary
+    // Trigger notification alerts to all Secretaries
     try {
       const config = await expenseService.getApproverConfig();
-      if (config.secretaryUid) {
+      for (const secUid of config.secretaryUids) {
         await attendanceService.pushAlertDirect(
-          config.secretaryUid,
+          secUid,
           'New Expense Pending Approval',
           `A new expense claim of $${newExpense.amount} for "${newExpense.title}" was submitted by ${newExpense.submittedBy} and awaits your approval.`
         );
@@ -351,38 +341,38 @@ export const expenseService = {
     try {
       const config = await expenseService.getApproverConfig();
       
-      // If Secretary approved, alert the Treasurer
+      // If Secretary approved, alert all Treasurers
       if (updates.currentApproverRole === 'treasurer' && existing.currentApproverRole === 'secretary') {
-        if (config.treasurerUid) {
+        for (const trUid of config.treasurerUids) {
           await attendanceService.pushAlertDirect(
-            config.treasurerUid,
+            trUid,
             'Expense Approved by Secretary',
             `Expense claim of $${updatedExpense.amount} for "${updatedExpense.title}" has been approved by the Secretary and awaits your Treasurer approval.`
           );
         }
       }
       
-      // If Treasurer approved, alert the President
+      // If Treasurer approved, alert all Presidents
       if (updates.currentApproverRole === 'president' && existing.currentApproverRole === 'treasurer') {
-        if (config.presidentUid) {
+        for (const prUid of config.presidentUids) {
           await attendanceService.pushAlertDirect(
-            config.presidentUid,
+            prUid,
             'Expense Approved by Treasurer',
             `Expense claim of $${updatedExpense.amount} for "${updatedExpense.title}" has been approved by the Treasurer and awaits final President sign-off.`
           );
         }
       }
       
-      // If fully approved, alert the submitter and Treasurer (for payment)
+      // If fully approved, alert the submitter and all Treasurers (for payment)
       if (updates.status === 'Approved' && existing.status !== 'Approved') {
         await attendanceService.pushAlertDirect(
           updatedExpense.submittedByUid,
           'Expense Claim Approved! / கோரிக்கை அங்கீகரிக்கப்பட்டது',
           `Your expense claim of $${updatedExpense.amount} for "${updatedExpense.title}" has been fully approved and is pending reimbursement.`
         );
-        if (config.treasurerUid) {
+        for (const trUid of config.treasurerUids) {
           await attendanceService.pushAlertDirect(
-            config.treasurerUid,
+            trUid,
             'Payment Pending: Approved Expense',
             `Expense claim of $${updatedExpense.amount} for "${updatedExpense.title}" is fully approved. Please reimburse the user.`
           );

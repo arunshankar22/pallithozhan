@@ -86,7 +86,9 @@ export function ExpensesTab({ user, colors, t, showToast, i18n, insets }: TabPro
   // Check permissions
   const isApprover = (uid: string) => {
     if (!config) return false;
-    return config.treasurerUid === uid || config.secretaryUid === uid || config.presidentUid === uid;
+    return (config.treasurerUids || []).includes(uid) || 
+           (config.secretaryUids || []).includes(uid) || 
+           (config.presidentUids || []).includes(uid);
   };
 
   const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
@@ -521,11 +523,13 @@ export function ExpensesTab({ user, colors, t, showToast, i18n, insets }: TabPro
           {filteredExpenses.map(exp => {
             const catLabel = categories.find(c => c.value === exp.category)?.label || exp.category;
             const waitingForRole = exp.currentApproverRole;
-            const waitingForName = config ? (config as any)[`${waitingForRole}Name`] : '';
+            const uidsList = config ? ((config as any)[`${waitingForRole}Uids`] || []) : [];
+            const namesList = config ? ((config as any)[`${waitingForRole}Names`] || []) : [];
+            const waitingForName = namesList.length > 0 ? namesList.join(', ') : 'No approver configured';
             const isPendingApproval = exp.status === 'Pending Approval';
             
-            const userIsStageApprover = config && (config as any)[`${waitingForRole}Uid`] === user?.uid && isPendingApproval;
-            const userIsPaidApprover = config && config.treasurerUid === user?.uid && exp.status === 'Approved' && exp.paymentStatus === 'Pending Payment';
+            const userIsStageApprover = config && uidsList.includes(user?.uid) && isPendingApproval;
+            const userIsPaidApprover = config && (config.treasurerUids || []).includes(user?.uid || '') && exp.status === 'Approved' && exp.paymentStatus === 'Pending Payment';
 
             return (
               <View
@@ -752,8 +756,9 @@ export function ExpensesTab({ user, colors, t, showToast, i18n, insets }: TabPro
                 const catLabel = categories.find(c => c.value === exp.category)?.label || exp.category;
                 const isPendingApproval = exp.status === 'Pending Approval';
                 const waitingForRole = exp.currentApproverRole;
-                const userIsStageApprover = config && (config as any)[`${waitingForRole}Uid`] === user?.uid && isPendingApproval;
-                const userIsPaidApprover = config && config.treasurerUid === user?.uid && exp.status === 'Approved' && exp.paymentStatus === 'Pending Payment';
+                const uidsList = config ? ((config as any)[`${waitingForRole}Uids`] || []) : [];
+                const userIsStageApprover = config && uidsList.includes(user?.uid) && isPendingApproval;
+                const userIsPaidApprover = config && (config.treasurerUids || []).includes(user?.uid || '') && exp.status === 'Approved' && exp.paymentStatus === 'Pending Payment';
 
                 return (
                   <View
