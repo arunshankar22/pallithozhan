@@ -818,9 +818,10 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
       setWaitlist(wList);
 
       const expConfig = await expenseService.getApproverConfig();
-      setTreasurerUids(expConfig.treasurerUids || []);
-      setSecretaryUids(expConfig.secretaryUids || []);
-      setPresidentUids(expConfig.presidentUids || []);
+      const filterValidUids = (uids: string[]) => uids.filter(id => uList.some(usr => usr.uid === id));
+      setTreasurerUids(filterValidUids(expConfig.treasurerUids || []));
+      setSecretaryUids(filterValidUids(expConfig.secretaryUids || []));
+      setPresidentUids(filterValidUids(expConfig.presidentUids || []));
       setAllowedSubmitRoles(expConfig.allowedSubmitRoles || ['volunteer', 'admin', 'superadmin']);
     } catch (e) {
       showToast('Failed to sync administrative portal data.', 'error');
