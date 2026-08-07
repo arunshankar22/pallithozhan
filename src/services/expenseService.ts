@@ -346,5 +346,46 @@ export const expenseService = {
         console.warn('[expenseService] Failed to delete expense in Firestore:', e);
       }
     }
+  },
+
+  scanReceipt: async (fileData: string, mimeType: string): Promise<{
+    title: string;
+    amount: number;
+    category: string;
+    date: string;
+    notes: string;
+  }> => {
+    try {
+      // offline / mock mode fallback simulation
+      const isOfflineMode = !db || process.env.EXPO_PUBLIC_DEMO_MODE === 'true';
+      if (isOfflineMode) {
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        return {
+          title: 'Officeworks Parramatta',
+          amount: 145.80,
+          category: 'stationeries',
+          date: new Date().toISOString().split('T')[0],
+          notes: '• HP LaserJet Toner cartridge - $120.00\n• A4 Reflex Copy paper reams x2 - $15.80\n• Blue Ballpoint Pens 10pack - $10.00'
+        };
+      }
+
+      const response = await fetch('/api/expenses/scan-receipt', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ fileData, mimeType })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || `HTTP ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (e) {
+      console.error('[expenseService] Failed to scan receipt:', e);
+      throw e;
+    }
   }
 };

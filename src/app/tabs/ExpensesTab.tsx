@@ -22,7 +22,8 @@ import {
   Table,
   LayoutGrid,
   Shield,
-  CircleSlash
+  CircleSlash,
+  Sparkles
 } from 'lucide-react-native';
 
 import { ThemedText } from '@/components/themed-text';
@@ -57,6 +58,7 @@ export function ExpensesTab({ user, colors, t, showToast, i18n, insets }: TabPro
   const [notes, setNotes] = useState('');
   const [attachedFiles, setAttachedFiles] = useState<{ name: string; size: number; url: string }[]>([]);
   const [submittingForm, setSubmittingForm] = useState(false);
+  const [scanning, setScanning] = useState(false);
 
   // Approval / Action state
   const [actionModalVisible, setActionModalVisible] = useState(false);
@@ -209,6 +211,106 @@ export function ExpensesTab({ user, colors, t, showToast, i18n, insets }: TabPro
             });
           }
           setAttachedFiles(prev => [...prev, ...newFiles].slice(0, 5));
+        }
+      } catch (err) {
+        showToast('Document Picker error.', 'error');
+      }
+    }
+  };
+
+  const handleScanReceipt = async () => {
+    if (Platform.OS === 'web') {
+      try {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*,application/pdf';
+        input.onchange = async (e: any) => {
+          const files = e.target.files;
+          if (files && files.length > 0) {
+            const file = files[0];
+            if (file.size > 10 * 1024 * 1024) {
+              showToast('File exceeds 10MB limit.', 'warning');
+              return;
+            }
+            setScanning(true);
+            try {
+              const fileData = await new Promise<{ name: string; size: number; url: string; base64: string }>((resolve) => {
+                const reader = new FileReader();
+                reader.onload = () => {
+                  resolve({
+                    name: file.name,
+                    size: file.size,
+                    url: reader.result as string,
+                    base64: reader.result as string
+                  });
+                };
+                reader.readAsDataURL(file);
+              });
+
+              // Call AI Scanner
+              const scanResult = await expenseService.scanReceipt(fileData.base64, file.type || 'image/jpeg');
+              
+              // Autofill form fields
+              setTitle(scanResult.title || '');
+              setAmount(String(scanResult.amount || ''));
+              setCategory(scanResult.category || 'other');
+              setNotes(scanResult.notes || '');
+
+              // Attach file to form automatically
+              setAttachedFiles([{ name: fileData.name, size: fileData.size, url: fileData.url }]);
+              showToast('Receipt scanned & fields populated!', 'success');
+            } catch (err: any) {
+              console.warn('AI Receipt Scanner error:', err);
+              showToast('AI scanning failed. Please enter manually.', 'error');
+            } finally {
+              setScanning(false);
+            }
+          }
+        };
+        input.click();
+      } catch (err) {
+        console.warn('Web file picker error:', err);
+      }
+    } else {
+      try {
+        const DocumentPicker = require('expo-document-picker');
+        const res = await DocumentPicker.getDocumentAsync({
+          type: ['application/pdf', 'image/*'],
+          multiple: false
+        });
+
+        if (!res.canceled && res.assets && res.assets.length > 0) {
+          const asset = res.assets[0];
+          if (asset.size && asset.size > 10 * 1024 * 1024) {
+            showToast('File exceeds 10MB limit.', 'warning');
+            return;
+          }
+          setScanning(true);
+          try {
+            const FileSystem = require('expo-file-system');
+            const base64Data = await FileSystem.readAsStringAsync(asset.uri, {
+              encoding: FileSystem.EncodingType.Base64
+            });
+            const mimeType = asset.mimeType || 'image/jpeg';
+
+            // Call AI Scanner
+            const scanResult = await expenseService.scanReceipt(base64Data, mimeType);
+
+            // Autofill form fields
+            setTitle(scanResult.title || '');
+            setAmount(String(scanResult.amount || ''));
+            setCategory(scanResult.category || 'other');
+            setNotes(scanResult.notes || '');
+
+            // Attach file to form automatically
+            setAttachedFiles([{ name: asset.name, size: asset.size || 0, url: asset.uri }]);
+            showToast('Receipt scanned & fields populated!', 'success');
+          } catch (err: any) {
+            console.warn('AI Receipt Scanner error:', err);
+            showToast('AI scanning failed. Please enter manually.', 'error');
+          } finally {
+            setScanning(false);
+          }
         }
       } catch (err) {
         showToast('Document Picker error.', 'error');
@@ -962,23 +1064,45 @@ export function ExpensesTab({ user, colors, t, showToast, i18n, insets }: TabPro
               <View style={styles.formGroup}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                   <ThemedText style={styles.formLabel}>Receipt / Invoice (ரசீது)*</ThemedText>
-                  <Pressable
-                    onPress={handlePickFile}
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: 4,
-                      backgroundColor: colors.background,
-                      borderWidth: 1,
-                      borderColor: colors.border,
-                      paddingVertical: 4,
-                      paddingHorizontal: 10,
-                      borderRadius: 8
-                    }}
-                  >
-                    <Plus size={12} color={colors.primary} />
-                    <ThemedText style={{ fontSize: 11, color: colors.primary, fontWeight: '800' }}>Add Receipt</ThemedText>
-                  </Pressable>
+                  <View style={{ flexDirection: 'row', gap: 6 }}>
+                    <Pressable
+                      onPress={handleScanReceipt}
+                      disabled={scanning}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 4,
+                        backgroundColor: colors.primaryLight,
+                        borderWidth: 1,
+                        borderColor: colors.primary,
+                        paddingVertical: 4,
+                        paddingHorizontal: 8,
+                        borderRadius: 8
+                      }}
+                    >
+                      <Sparkles size={11} color={colors.primary} />
+                      <ThemedText style={{ fontSize: 11, color: colors.primary, fontWeight: '800' }}>
+                        {scanning ? 'Scanning...' : 'AI Scan'}
+                      </ThemedText>
+                    </Pressable>
+                    <Pressable
+                      onPress={handlePickFile}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 4,
+                        backgroundColor: colors.background,
+                        borderWidth: 1,
+                        borderColor: colors.border,
+                        paddingVertical: 4,
+                        paddingHorizontal: 8,
+                        borderRadius: 8
+                      }}
+                    >
+                      <Plus size={11} color={colors.primary} />
+                      <ThemedText style={{ fontSize: 11, color: colors.primary, fontWeight: '800' }}>Add File</ThemedText>
+                    </Pressable>
+                  </View>
                 </View>
 
                 <View style={{ gap: 6, marginTop: 8 }}>

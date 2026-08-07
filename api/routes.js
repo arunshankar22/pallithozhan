@@ -691,6 +691,112 @@ async function handleApiRoutes(req, res, pathname, method, dbData, writeDb, urlO
     return true;
   }
 
+  // POST /api/expenses/scan-receipt
+  if (pathname === '/api/expenses/scan-receipt' && method === 'POST') {
+    try {
+      const body = await parseBody(req);
+      const fileData = body.fileData || '';
+      const mimeType = body.mimeType || 'image/jpeg';
+      
+      if (!fileData) {
+        sendJson(res, 400, { error: 'fileData (base64 string) is required.' });
+        return true;
+      }
+
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        console.error('Error: GEMINI_API_KEY is not defined.');
+        sendJson(res, 500, { error: 'Gemini API key is not configured on the server.' });
+        return true;
+      }
+
+      // Format the prompt
+      const prompt = `Analyze this receipt image or document. Extract the following details:
+1. Title: The name of the merchant/store (e.g. Officeworks, Dymocks, Woolworths).
+2. Amount: The final total amount paid as a raw number (e.g. 120.50).
+3. Category: Classify the purchase into exactly one of these options: 'teaching materials', 'catering', 'stationeries', 'events', 'rentals', 'other'.
+4. Date: The purchase date in YYYY-MM-DD format.
+5. Notes: A clean, bulleted, itemized list of all products purchased and their individual prices, followed by a brief summary of items if appropriate.
+
+Respond ONLY with a valid JSON object matching the schema below. Do NOT wrap the JSON in markdown formatting (do NOT use \`\`\`json or \`\`\`), do NOT include any comments, explanations, or chat introductory/concluding text.
+
+Response Schema:
+{
+  "title": string,
+  "amount": number,
+  "category": string,
+  "date": string,
+  "notes": string
+}`;
+
+      // strip base64 prefix if present (e.g. "data:image/jpeg;base64,...")
+      let cleanBase64 = fileData;
+      if (fileData.includes(';base64,')) {
+        cleanBase64 = fileData.split(';base64,')[1];
+      }
+
+      // Query Gemini API using standard REST endpoint
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            contents: [{
+              parts: [
+                {
+                  inlineData: {
+                    mimeType: mimeType,
+                    data: cleanBase64
+                  }
+                },
+                {
+                  text: prompt
+                }
+              ]
+            }],
+            generationConfig: {
+              responseMimeType: "application/json",
+              temperature: 0.1,
+              maxOutputTokens: 2048
+            }
+          })
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Gemini API error during receipt scan:', errorText);
+        sendJson(res, 502, { error: 'Gemini API receipt scan request failed.', details: errorText });
+        return true;
+      }
+
+      const data = await response.json();
+      const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
+      
+      let parsedResult = null;
+      try {
+        parsedResult = JSON.parse(rawText);
+      } catch (parseErr) {
+        console.warn('Failed to parse Gemini receipt scan response as JSON:', rawText);
+        parsedResult = {
+          title: 'Scanned Receipt',
+          amount: 0,
+          category: 'other',
+          notes: rawText
+        };
+      }
+
+      sendJson(res, 200, parsedResult);
+    } catch (err) {
+      console.error('Error in /api/expenses/scan-receipt:', err);
+      sendJson(res, 500, { error: 'Failed to process receipt scan request.', message: err.message });
+    }
+    return true;
+  }
+
   // POST /api/auth/send-reset-email
   if (pathname === '/api/auth/send-reset-email' && method === 'POST') {
     try {
