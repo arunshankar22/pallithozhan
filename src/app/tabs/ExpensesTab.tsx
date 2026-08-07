@@ -295,8 +295,8 @@ export function ExpensesTab({ user, colors, t, showToast, i18n, insets }: TabPro
               setAttachedFiles([{ name: fileData.name, size: fileData.size, url: fileData.url }]);
               showToast('Receipt scanned & fields populated!', 'success');
             } catch (err: any) {
-              console.warn('AI Receipt Scanner error:', err);
-              showToast('AI scanning failed. Please enter manually.', 'error');
+              console.warn('Smart Receipt Scanner error:', err);
+              showToast('Smart scan failed. Please enter manually.', 'error');
             } finally {
               setScanning(false);
             }
@@ -358,8 +358,8 @@ export function ExpensesTab({ user, colors, t, showToast, i18n, insets }: TabPro
             setAttachedFiles([{ name: asset.name, size: asset.size || 0, url: asset.uri }]);
             showToast('Receipt scanned & fields populated!', 'success');
           } catch (err: any) {
-            console.warn('AI Receipt Scanner error:', err);
-            showToast('AI scanning failed. Please enter manually.', 'error');
+            console.warn('Smart Receipt Scanner error:', err);
+            showToast('Smart scan failed. Please enter manually.', 'error');
           } finally {
             setScanning(false);
           }

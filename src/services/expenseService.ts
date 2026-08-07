@@ -1,6 +1,7 @@
 import { db, storage } from './firebase';
 import { collection, doc, getDoc, getDocs, setDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
 import { attendanceService } from './attendanceService';
+import { API_URL } from './dbCommon';
 
 export interface ExpenseApproval {
   role: 'secretary' | 'treasurer' | 'president';
@@ -369,7 +370,7 @@ export const expenseService = {
         };
       }
 
-      const response = await fetch('/api/expenses/scan-receipt', {
+      const response = await fetch(`${API_URL}/expenses/scan-receipt`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
