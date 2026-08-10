@@ -211,8 +211,10 @@ export function UtraThozhanWidget({ user, colors, branch = 'main' }: UtraThozhan
                 <Bot size={20} color="#FFF" />
               </View>
               <View>
-                <Text style={[styles.headerTitle, { color: colors.text }]}>உற்ற தோழன்</Text>
-                <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>உரையாடலைத் தொடங்குங்கள்</Text>
+                <Text style={[styles.headerTitle, { color: colors.text }]}>Utra Thozhan (உற்ற தோழன்)</Text>
+                <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
+                  {messages.length > 1 ? "Active Session" : "Start a conversation"}
+                </Text>
               </View>
             </View>
 
