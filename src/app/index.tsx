@@ -63,6 +63,7 @@ import { CalendarTab } from '@/app/tabs/CalendarTab';
 import { ReportsTab } from '@/app/tabs/ReportsTab';
 import { PrintRequestsTab } from '@/app/tabs/PrintRequestsTab';
 import { ExpensesTab } from '@/app/tabs/ExpensesTab';
+import { LibraryTab } from '@/app/tabs/LibraryTab';
 import { ManagementTab } from '@/app/tabs/ManagementTab';
 import { ProfileTab } from '@/app/tabs/ProfileTab';
 import { StudentsTab } from '@/app/tabs/StudentsTab';
@@ -183,7 +184,7 @@ export default function HomeScreen() {
   };
 
   // Layout Tab State
-  const [activeTab, setActiveTab] = useState<'newsfeed' | 'attendance' | 'homework' | 'messages' | 'calendar' | 'reports' | 'management' | 'profile' | 'schools' | 'full-newsfeed' | 'students' | 'newsletter' | 'superadmin' | 'points' | 'print-requests' | 'expenses'>('newsfeed');
+  const [activeTab, setActiveTab] = useState<'newsfeed' | 'attendance' | 'homework' | 'library' | 'messages' | 'calendar' | 'reports' | 'management' | 'profile' | 'schools' | 'full-newsfeed' | 'students' | 'newsletter' | 'superadmin' | 'points' | 'print-requests' | 'expenses'>('newsfeed');
 
   // Points System states
   const [pointsConfig, setPointsConfig] = useState<any>(null);
@@ -2476,6 +2477,8 @@ export default function HomeScreen() {
         return <PrintRequestsTab {...props} />;
       case 'expenses':
         return <ExpensesTab {...props} />;
+      case 'library':
+        return <LibraryTab {...props} />;
       case 'schools':
         return renderSchoolsTab();
       case 'students':
@@ -2501,6 +2504,7 @@ export default function HomeScreen() {
     { key: 'newsletter', label: t('nav.newsletter'), icon: Newspaper, roles: ['superadmin', 'admin', 'teacher', 'volunteer', 'parent', 'student'] },
     { key: 'attendance', label: t('nav.attendance'), icon: CheckSquare, roles: ['superadmin', 'admin', 'teacher', 'volunteer', 'parent'] },
     { key: 'homework', label: t('nav.homework'), icon: BookOpen, roles: ['superadmin', 'admin', 'teacher', 'parent', 'student'] },
+    { key: 'library', label: t('nav.library') || 'Library', icon: BookOpen, roles: ['superadmin', 'admin', 'teacher', 'volunteer', 'parent', 'student'] },
     { key: 'messages', label: t('nav.messages'), icon: MessageSquare, roles: ['superadmin', 'admin', 'teacher', 'volunteer', 'parent', 'student'] },
     { key: 'calendar', label: t('nav.calendar'), icon: CalendarIcon, roles: ['superadmin', 'admin', 'teacher', 'volunteer', 'parent', 'student'] },
     { key: 'reports', label: t('nav.reports'), icon: Award, roles: ['superadmin', 'admin', 'teacher', 'volunteer', 'parent'] },

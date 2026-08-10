@@ -1028,6 +1028,90 @@ Response Schema:
     return true;
   }
 
+  // GET /api/library/books
+  if (pathname === '/api/library/books' && method === 'GET') {
+    sendJson(res, 200, dbData.books || []);
+    return true;
+  }
+
+  // POST /api/library/books
+  if (pathname === '/api/library/books' && method === 'POST') {
+    try {
+      const book = await parseBody(req);
+      if (!book.title || !book.gradeLevel) {
+        sendJson(res, 400, { error: 'Title and grade level are required.' });
+        return true;
+      }
+      book.bookId = book.bookId || 'book_' + Date.now();
+      book.createdDate = new Date().toISOString();
+      dbData.books = dbData.books || [];
+      dbData.books.push(book);
+      writeDb(dbData);
+      sendJson(res, 201, book);
+    } catch (err) {
+      sendJson(res, 500, { error: 'Failed to create book.', message: err.message });
+    }
+    return true;
+  }
+
+  // DELETE /api/library/books/:id
+  if (pathname.startsWith('/api/library/books/') && method === 'DELETE') {
+    const bookId = pathname.split('/').pop();
+    dbData.books = (dbData.books || []).filter(b => b.bookId !== bookId);
+    writeDb(dbData);
+    sendJson(res, 200, { success: true, message: 'Book deleted.' });
+    return true;
+  }
+
+  // GET /api/library/progress/:uid
+  if (pathname.startsWith('/api/library/progress/') && method === 'GET') {
+    const uid = pathname.split('/').pop();
+    const progressList = (dbData.reading_progress || []).filter(p => p.uid === uid);
+    sendJson(res, 200, progressList);
+    return true;
+  }
+
+  // POST /api/library/progress
+  if (pathname === '/api/library/progress' && method === 'POST') {
+    try {
+      const { uid, bookId, status, currentPage, pointsEarned } = await parseBody(req);
+      if (!uid || !bookId || !status) {
+        sendJson(res, 400, { error: 'uid, bookId, and status are required.' });
+        return true;
+      }
+      dbData.reading_progress = dbData.reading_progress || [];
+      let entry = dbData.reading_progress.find(p => p.uid === uid && p.bookId === bookId);
+      if (!entry) {
+        entry = { uid, bookId, createdDate: new Date().toISOString() };
+        dbData.reading_progress.push(entry);
+      }
+      entry.status = status;
+      entry.currentPage = currentPage || 0;
+      entry.lastReadTime = new Date().toISOString();
+
+      // Award points in student's profile if completed and points not earned yet
+      if (status === 'completed' && !entry.pointsEarned && !pointsEarned) {
+        const book = (dbData.books || []).find(b => b.bookId === bookId);
+        const pts = book ? (book.readingPoints || 50) : 50;
+        
+        // Find user
+        const userObj = dbData.users.find(u => u.uid === uid);
+        if (userObj) {
+          userObj.points = (userObj.points || 0) + pts;
+          entry.pointsEarned = true;
+        }
+      } else if (pointsEarned !== undefined) {
+        entry.pointsEarned = pointsEarned;
+      }
+
+      writeDb(dbData);
+      sendJson(res, 200, entry);
+    } catch (err) {
+      sendJson(res, 500, { error: 'Failed to update reading progress.', message: err.message });
+    }
+    return true;
+  }
+
   return false;
 }
 
