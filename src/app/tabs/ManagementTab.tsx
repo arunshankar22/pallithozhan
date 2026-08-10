@@ -20,6 +20,7 @@ import { Spacing } from '@/constants/theme';
 import { spreadsheetService } from '@/services/spreadsheetService';
 import { waitlistService } from '@/services/waitlistService';
 import { expenseService } from '@/services/expenseService';
+import { featureFlagsService } from '@/services/featureFlagsService';
 import { UserModal } from '@/components/UserModal';
 import { UserBulkBar } from '@/components/UserBulkBar';
 import { DateTimePicker } from '@/components/DateTimePicker';
@@ -51,10 +52,10 @@ const FlatScrollContainer = ({
   );
 };
 
-export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabProps) {
+export function ManagementTab({ user, colors, t, showToast, i18n, insets, onFeatureFlagsUpdated }: TabProps) {
   const { width: windowWidth } = useWindowDimensions();
   const isLargeScreen = windowWidth >= 768;
-  const [subTab, setSubTab] = useState<'users' | 'classes' | 'calendar' | 'import_export' | 'waitlist' | 'expense_config'>('users');
+  const [subTab, setSubTab] = useState<'users' | 'classes' | 'calendar' | 'import_export' | 'waitlist' | 'expense_config' | 'feature_flags'>('users');
   
   // Expense config states
   const [treasurerUids, setTreasurerUids] = useState<string[]>([]);
@@ -62,6 +63,14 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
   const [presidentUids, setPresidentUids] = useState<string[]>([]);
   const [allowedSubmitRoles, setAllowedSubmitRoles] = useState<string[]>([]);
   const [savingExpenseConfig, setSavingExpenseConfig] = useState(false);
+
+  // Feature flags states
+  const [flagState, setFlagState] = useState<any>({
+    enableAIAssistant: true,
+    enableDigitalLibrary: true,
+    enableThirukkural: true
+  });
+  const [savingFlags, setSavingFlags] = useState(false);
 
   const [headerCollapsed, setHeaderCollapsed] = useState(false);
   const [showHelp, setShowHelp] = useState(() => {
@@ -823,10 +832,32 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
       setSecretaryUids(filterValidUids(expConfig.secretaryUids || []));
       setPresidentUids(filterValidUids(expConfig.presidentUids || []));
       setAllowedSubmitRoles(expConfig.allowedSubmitRoles || ['volunteer', 'admin', 'superadmin']);
+
+      try {
+        const flags = await featureFlagsService.getFeatureFlags();
+        setFlagState(flags);
+      } catch (err) {
+        console.warn('Failed to load feature flags in refreshData:', err);
+      }
     } catch (e) {
       showToast('Failed to sync administrative portal data.', 'error');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSaveFeatureFlags = async () => {
+    setSavingFlags(true);
+    try {
+      await featureFlagsService.updateFeatureFlags(flagState);
+      showToast('Portal features configuration updated successfully!', 'success');
+      if (onFeatureFlagsUpdated) {
+        onFeatureFlagsUpdated();
+      }
+    } catch (e) {
+      showToast('Failed to save portal features configuration.', 'error');
+    } finally {
+      setSavingFlags(false);
     }
   };
 
@@ -1357,6 +1388,19 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
             >
               <ThemedText style={{ color: subTab === 'expense_config' ? '#FFF' : colors.text, fontWeight: '700', fontSize: 13 }}>
                 💸 Expense Settings
+              </ThemedText>
+            </Pressable>
+            <Pressable
+              onPress={() => setSubTab('feature_flags')}
+              style={[
+                { paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20, borderWidth: 1 },
+                subTab === 'feature_flags' 
+                  ? { backgroundColor: colors.primary, borderColor: colors.primary } 
+                  : { backgroundColor: 'transparent', borderColor: colors.border }
+              ]}
+            >
+              <ThemedText style={{ color: subTab === 'feature_flags' ? '#FFF' : colors.text, fontWeight: '700', fontSize: 13 }}>
+                ⚙️ Portal Features
               </ThemedText>
             </Pressable>
           </View>
@@ -3038,7 +3082,7 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
             );
           })()}
         </View>
-      ) : (
+      ) : subTab === 'expense_config' ? (
         /* EXPENSE CONFIG SUB-TAB */
         <FlatScrollContainer style={{ flex: 1 }} contentContainerStyle={{ gap: Spacing.three, paddingBottom: isLargeScreen ? Spacing.three : 0 }}>
           <View style={{ flexDirection: 'row', gap: Spacing.two, borderBottomWidth: 1, borderColor: colors.border, paddingBottom: 10 }}>
@@ -3248,6 +3292,145 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets }: TabP
               </Pressable>
 
             </View>
+          </View>
+        </FlatScrollContainer>
+      ) : (
+        /* PORTAL FEATURES / FEATURE FLAGS SUB-TAB */
+        <FlatScrollContainer style={{ flex: 1 }} contentContainerStyle={{ gap: Spacing.three, paddingBottom: isLargeScreen ? Spacing.three : 0 }}>
+          <View style={{ flexDirection: 'row', gap: Spacing.two, borderBottomWidth: 1, borderColor: colors.border, paddingBottom: 10 }}>
+            <ThemedText style={{ fontSize: 16, fontWeight: '800', color: colors.primary }}>⚙️ Portal Features / போர்டல் அம்சங்கள்</ThemedText>
+          </View>
+
+          <View style={{ gap: Spacing.three }}>
+            {/* AIAssistant Toggle */}
+            <View style={{
+              padding: 16,
+              borderRadius: 16,
+              borderWidth: 1,
+              borderColor: colors.border,
+              backgroundColor: colors.cardBg,
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <View style={{ flex: 1, marginRight: 16 }}>
+                <ThemedText style={{ fontSize: 14, fontWeight: 'bold' }}>உற்ற தோழன் AI Assistant</ThemedText>
+                <ThemedText style={{ fontSize: 12, color: colors.textSecondary, marginTop: 4 }}>
+                  Enable or disable the floating conversational AI assistant widget for all school members.
+                </ThemedText>
+              </View>
+              <Pressable
+                onPress={() => setFlagState((prev: any) => ({ ...prev, enableAIAssistant: !prev.enableAIAssistant }))}
+                style={{
+                  width: 48,
+                  height: 28,
+                  borderRadius: 14,
+                  backgroundColor: flagState.enableAIAssistant ? colors.primary : colors.border,
+                  justifyContent: 'center',
+                  paddingHorizontal: 4
+                }}
+              >
+                <View style={{
+                  width: 20,
+                  height: 20,
+                  borderRadius: 10,
+                  backgroundColor: '#FFF',
+                  alignSelf: flagState.enableAIAssistant ? 'flex-end' : 'flex-start'
+                }} />
+              </Pressable>
+            </View>
+
+            {/* Digital Library Toggle */}
+            <View style={{
+              padding: 16,
+              borderRadius: 16,
+              borderWidth: 1,
+              borderColor: colors.border,
+              backgroundColor: colors.cardBg,
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <View style={{ flex: 1, marginRight: 16 }}>
+                <ThemedText style={{ fontSize: 14, fontWeight: 'bold' }}>நூலகம் / Tamil Digital Library</ThemedText>
+                <ThemedText style={{ fontSize: 12, color: colors.textSecondary, marginTop: 4 }}>
+                  Toggle the KG to Year 9 digital storybook and textbook library quick actions.
+                </ThemedText>
+              </View>
+              <Pressable
+                onPress={() => setFlagState((prev: any) => ({ ...prev, enableDigitalLibrary: !prev.enableDigitalLibrary }))}
+                style={{
+                  width: 48,
+                  height: 28,
+                  borderRadius: 14,
+                  backgroundColor: flagState.enableDigitalLibrary ? colors.primary : colors.border,
+                  justifyContent: 'center',
+                  paddingHorizontal: 4
+                }}
+              >
+                <View style={{
+                  width: 20,
+                  height: 20,
+                  borderRadius: 10,
+                  backgroundColor: '#FFF',
+                  alignSelf: flagState.enableDigitalLibrary ? 'flex-end' : 'flex-start'
+                }} />
+              </Pressable>
+            </View>
+
+            {/* Thirukkural Toggle */}
+            <View style={{
+              padding: 16,
+              borderRadius: 16,
+              borderWidth: 1,
+              borderColor: colors.border,
+              backgroundColor: colors.cardBg,
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <View style={{ flex: 1, marginRight: 16 }}>
+                <ThemedText style={{ fontSize: 14, fontWeight: 'bold' }}>இன்றைய திருக்குறள் / Thirukkural of the Day</ThemedText>
+                <ThemedText style={{ fontSize: 12, color: colors.textSecondary, marginTop: 4 }}>
+                  Toggle the epochs-based daily sequential Thirukkural widget card on dashboard home.
+                </ThemedText>
+              </View>
+              <Pressable
+                onPress={() => setFlagState((prev: any) => ({ ...prev, enableThirukkural: !prev.enableThirukkural }))}
+                style={{
+                  width: 48,
+                  height: 28,
+                  borderRadius: 14,
+                  backgroundColor: flagState.enableThirukkural ? colors.primary : colors.border,
+                  justifyContent: 'center',
+                  paddingHorizontal: 4
+                }}
+              >
+                <View style={{
+                  width: 20,
+                  height: 20,
+                  borderRadius: 10,
+                  backgroundColor: '#FFF',
+                  alignSelf: flagState.enableThirukkural ? 'flex-end' : 'flex-start'
+                }} />
+              </Pressable>
+            </View>
+
+            {/* Save Button */}
+            <Pressable
+              onPress={handleSaveFeatureFlags}
+              disabled={savingFlags}
+              style={({ pressed }) => [
+                { backgroundColor: colors.primary, paddingVertical: 12, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginTop: 12 },
+                { opacity: pressed || savingFlags ? 0.9 : 1 }
+              ]}
+            >
+              {savingFlags ? (
+                <ActivityIndicator size="small" color="#FFF" />
+              ) : (
+                <ThemedText style={{ color: '#FFF', fontWeight: '700', fontSize: 13 }}>💾 Save Feature Config</ThemedText>
+              )}
+            </Pressable>
           </View>
         </FlatScrollContainer>
       )}

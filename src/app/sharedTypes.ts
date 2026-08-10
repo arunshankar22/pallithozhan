@@ -10,6 +10,7 @@ export interface TabProps {
   logout?: () => void;
   activeStudentId?: string;
   insets?: any;
+  onFeatureFlagsUpdated?: () => void;
 }
 
 export interface DriveItem {

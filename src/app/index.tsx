@@ -69,6 +69,7 @@ import { ProfileTab } from '@/app/tabs/ProfileTab';
 import { StudentsTab } from '@/app/tabs/StudentsTab';
 import { SuperAdminTab } from '@/app/tabs/SuperAdminTab';
 import { UtraThozhanWidget } from '@/app/components/UtraThozhanWidget';
+import { featureFlagsService } from '@/services/featureFlagsService';
 import { PointsPortalTab } from '@/app/tabs/PointsPortalTab';
 import { auditLogService } from '@/services/auditLogService';
 import { chatNotificationService } from '@/services/chatNotificationService';
@@ -189,6 +190,7 @@ export default function HomeScreen() {
 
   // Points System states
   const [pointsConfig, setPointsConfig] = useState<any>(null);
+  const [featureFlags, setFeatureFlags] = useState<any>({ enableAIAssistant: true, enableDigitalLibrary: true, enableThirukkural: true });
   const [leaderboardModalVisible, setLeaderboardModalVisible] = useState(false);
   const [leaderboardList, setLeaderboardList] = useState<any[]>([]);
   const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
@@ -319,6 +321,14 @@ export default function HomeScreen() {
         setPointsConfig(ptsConfig);
       } catch (err) {
         console.warn('Failed to load points config in reloadDashboardData:', err);
+      }
+
+      // Load feature flags config
+      try {
+        const flags = await featureFlagsService.getFeatureFlags();
+        setFeatureFlags(flags);
+      } catch (err) {
+        console.warn('Failed to load feature flags config in reloadDashboardData:', err);
       }
 
       // Find standard classes for current logged in user:
@@ -1148,15 +1158,17 @@ export default function HomeScreen() {
       }
     }
     
-    // Unconditionally push Library quick action for all logged-in roles
-    actions.push({
-      key: 'library',
-      label: i18n.language === 'ta' ? 'நூலகம்' : 'School Library',
-      icon: BookOpen,
-      color: '#FFFDF0',
-      iconColor: '#D97706',
-      onPress: () => setActiveTab('library')
-    });
+    // Push Library quick action if enabled
+    if (featureFlags.enableDigitalLibrary !== false) {
+      actions.push({
+        key: 'library',
+        label: i18n.language === 'ta' ? 'நூலகம்' : 'School Library',
+        icon: BookOpen,
+        color: '#FFFDF0',
+        iconColor: '#D97706',
+        onPress: () => setActiveTab('library')
+      });
+    }
 
     const mainKeys = mainNavItems.map((item: any) => item.key);
     return actions.filter(action => !action.key || !mainKeys.includes(action.key));
@@ -1354,6 +1366,7 @@ export default function HomeScreen() {
 
         {/* Thirukkural of the Day Widget */}
         {(() => {
+          if (featureFlags.enableThirukkural === false) return null;
           const dailyKural = getKuralOfTheDay();
           if (!dailyKural) return null;
           
@@ -2480,7 +2493,7 @@ export default function HomeScreen() {
           />
         );
       case 'management':
-        return <ManagementTab {...props} />;
+        return <ManagementTab {...props} onFeatureFlagsUpdated={reloadDashboardData} />;
       case 'superadmin':
         return <SuperAdminTab {...props} />;
       case 'points':
@@ -4055,7 +4068,7 @@ export default function HomeScreen() {
         </View>
       )}
 
-      {user && (
+      {user && featureFlags.enableAIAssistant !== false && (
         <UtraThozhanWidget 
           user={{
             uid: user.uid,
