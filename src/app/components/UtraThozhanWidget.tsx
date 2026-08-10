@@ -131,7 +131,7 @@ export function UtraThozhanWidget({ user, colors, branch = 'main' }: UtraThozhan
       // Append failure node so the user has visual feedback
       setMessages(prev => [
         ...prev,
-        { role: 'model' as const, parts: [{ text: 'மன்னிக்கவும், தற்காலிக சேவை இடையூறு ஏற்பட்டுள்ளது. மீண்டும் உங்கள் கேள்வியை அனுப்பவும்.' }] }
+        { role: 'model' as const, parts: [{ text: 'Sorry, a temporary network or server error occurred. Please try sending your message again. \n\n(மன்னிக்கவும், தற்காலிக சேவை இடையூறு ஏற்பட்டுள்ளது. மீண்டும் முயலவும்.)' }] }
       ]);
     } finally {
       setIsLoading(false);
@@ -145,7 +145,7 @@ export function UtraThozhanWidget({ user, colors, branch = 'main' }: UtraThozhan
       setMessages([
         {
           role: 'model',
-          parts: [{ text: `உரையாடல் வரலாறு அழிக்கப்பட்டது. நான் உங்களுக்கு எவ்வாறு உதவ வேண்டும்?` }]
+          parts: [{ text: `Chat history cleared. How can I help you? \n\n(உரையாடல் வரலாறு அழிக்கப்பட்டது. நான் உங்களுக்கு எவ்வாறு உதவ வேண்டும்?)` }]
         }
       ]);
     } catch (err) {
@@ -153,17 +153,17 @@ export function UtraThozhanWidget({ user, colors, branch = 'main' }: UtraThozhan
     }
   };
 
-  // Pre-configured suggestions based on user role
+  // Pre-configured suggestions based on user role (now in English as requested)
   const getSuggestions = () => {
     const common = [
-      'ஆத்திசூடி முதல் வரி என்ன?',
-      'தமிழ் உயிர் எழுத்துக்கள் எத்தனை?',
-      'வகுப்பு விதிகள் என்ன?'
+      'What is the first line of Aathichoodi?',
+      'How many Tamil vowels (Uyir Ezhuthukkal) are there?',
+      'What are the classroom rules?'
     ];
     const adminTeacher = [
-      'வகுப்பு வருகை அறிக்கை',
-      'இந்த வார செலவினங்கள் எவ்வளவு?',
-      'மாணவர் பட்டியல் காட்டு'
+      'Show class attendance statistics',
+      'What is this week\'s total expenses?',
+      'Show student directory'
     ];
     return user.role === 'admin' || user.role === 'teacher' ? [...adminTeacher, ...common] : common;
   };
@@ -283,8 +283,8 @@ export function UtraThozhanWidget({ user, colors, branch = 'main' }: UtraThozhan
           {/* Suggestions Layer */}
           {messages.length <= 1 && !isLoading && (
             <View style={styles.suggestionsContainer}>
-              <Text style={[styles.suggestionTitle, { color: colors.textSecondary }]}>கேள்விப் பரிந்துரைகள்:</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.suggestionsScroll}>
+              <Text style={[styles.suggestionTitle, { color: colors.textSecondary }]}>Suggested Questions:</Text>
+              <View style={styles.suggestionsScroll}>
                 {getSuggestions().map((sug, i) => (
                   <TouchableOpacity
                     key={i}
@@ -295,7 +295,7 @@ export function UtraThozhanWidget({ user, colors, branch = 'main' }: UtraThozhan
                     <Text style={[styles.suggestionText, { color: colors.text }]}>{sug}</Text>
                   </TouchableOpacity>
                 ))}
-              </ScrollView>
+              </View>
             </View>
           )}
 
@@ -473,6 +473,7 @@ const styles = StyleSheet.create({
   },
   suggestionsScroll: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
   },
   suggestionPill: {
     flexDirection: 'row',
@@ -482,6 +483,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     marginRight: 8,
+    marginBottom: 8,
   },
   suggestionText: {
     fontSize: 12,

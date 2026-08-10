@@ -4,22 +4,282 @@ const { readDb } = require('./db');
 
 const apiKey = process.env.GEMINI_API_KEY || process.env.EXPO_PUBLIC_GEMINI_API_KEY;
 
+// Pure JavaScript SQL query evaluator fallback for Serverless (Vercel) environments
+function executeAnalyticsQueryJS(dbData, sqlQuery) {
+  const query = sqlQuery.replace(/\s+/g, ' ').trim();
+  const lowerQuery = query.toLowerCase();
+
+  const fromMatch = query.match(/from\s+([a-zA-Z0-9_]+)(?:\s+as)?(?:\s+([a-zA-Z0-9_]+))?/i);
+  if (!fromMatch) {
+    throw new Error("Could not parse FROM clause from SQL query.");
+  }
+  
+  const mainTableName = fromMatch[1].trim();
+  let dataset = [];
+
+  if (mainTableName === 'users') {
+    dataset = (dbData.users || []).map(u => ({
+      uid: u.uid,
+      email: u.email || '',
+      fullName: u.fullName || '',
+      role: u.role || '',
+      phone: u.phone || '',
+      className: u.className || '',
+      associatedStudents: JSON.stringify(u.associatedStudents || [])
+    }));
+  } else if (mainTableName === 'classes') {
+    dataset = (dbData.classes || []).map(c => ({
+      classId: c.classId,
+      className: c.className || '',
+      teacherName: c.teacherName || ''
+    }));
+  } else if (mainTableName === 'attendance') {
+    dataset = (dbData.attendance || []).map(a => ({
+      recordId: a.recordId,
+      classId: a.classId || '',
+      date: a.date || '',
+      approved: a.approved ? 1 : 0
+    }));
+  } else if (mainTableName === 'attendance_rolls') {
+    (dbData.attendance || []).forEach(a => {
+      if (a.rolls && typeof a.rolls === 'object') {
+        Object.keys(a.rolls).forEach(studentId => {
+          dataset.push({
+            recordId: a.recordId,
+            studentId: studentId,
+            status: a.rolls[studentId]
+          });
+        });
+      }
+    });
+  } else if (mainTableName === 'homework') {
+    dataset = (dbData.homework || []).map(h => ({
+      homeworkId: h.homeworkId,
+      classId: h.classId || '',
+      title: h.title || '',
+      dueDate: h.dueDate || '',
+      description: h.description || ''
+    }));
+  } else if (mainTableName === 'expenses') {
+    dataset = (dbData.expenses || []).map(e => ({
+      expenseId: e.expenseId,
+      title: e.title || '',
+      amount: Number(e.amount || 0.0),
+      category: e.category || '',
+      status: e.status || '',
+      paymentStatus: e.paymentStatus || '',
+      dateSubmitted: e.dateSubmitted || '',
+      submittedBy: e.submittedBy || ''
+    }));
+  } else if (mainTableName === 'reading_progress') {
+    dataset = (dbData.reading_progress || []).map(p => ({
+      progressId: p.progressId || `${p.studentId}_${p.bookId}`,
+      studentId: p.studentId,
+      bookId: p.bookId,
+      status: p.status || '',
+      lastReadTime: p.lastReadTime || ''
+    }));
+  }
+
+  // Simple JOIN support (e.g. JOIN users ON users.uid = attendance_rolls.studentId)
+  const joinMatch = query.match(/join\s+([a-zA-Z0-9_]+)\s+(?:as\s+)?([a-zA-Z0-9_]+)?\s+on\s+([a-zA-Z0-9_\.]+)\s*=\s*([a-zA-Z0-9_\.]+)/i);
+  if (joinMatch) {
+    const joinTable = joinMatch[1].trim();
+    const joinOnLeft = joinMatch[3].trim();
+    const joinOnRight = joinMatch[4].trim();
+
+    let joinDataset = [];
+    if (joinTable === 'users') {
+      joinDataset = (dbData.users || []).map(u => ({
+        uid: u.uid,
+        email: u.email || '',
+        fullName: u.fullName || '',
+        role: u.role || '',
+        phone: u.phone || '',
+        className: u.className || '',
+        associatedStudents: JSON.stringify(u.associatedStudents || [])
+      }));
+    } else if (joinTable === 'attendance_rolls') {
+      (dbData.attendance || []).forEach(a => {
+        if (a.rolls && typeof a.rolls === 'object') {
+          Object.keys(a.rolls).forEach(studentId => {
+            joinDataset.push({
+              recordId: a.recordId,
+              studentId: studentId,
+              status: a.rolls[studentId]
+            });
+          });
+        }
+      });
+    }
+
+    const merged = [];
+    dataset.forEach(row => {
+      joinDataset.forEach(joinRow => {
+        const leftKey = joinOnLeft.split('.').pop();
+        const rightKey = joinOnRight.split('.').pop();
+        
+        let match = false;
+        if (row[leftKey] !== undefined && joinRow[rightKey] !== undefined) {
+          match = String(row[leftKey]) === String(joinRow[rightKey]);
+        } else if (row[rightKey] !== undefined && joinRow[leftKey] !== undefined) {
+          match = String(row[rightKey]) === String(joinRow[leftKey]);
+        }
+
+        if (match) {
+          merged.push({ ...joinRow, ...row });
+        }
+      });
+    });
+    if (merged.length > 0 || lowerQuery.includes('join')) {
+      dataset = merged;
+    }
+  }
+
+  // Parse WHERE conditions
+  const whereMatch = query.match(/where\s+(.+?)(?:group\s+by|order\s+by|$)/i);
+  if (whereMatch) {
+    const whereClause = whereMatch[1].trim();
+    const conditions = whereClause.split(/\band\b/i).map(c => c.trim());
+    
+    dataset = dataset.filter(row => {
+      return conditions.every(cond => {
+        const opMatch = cond.match(/([a-zA-Z0-9_\.]+)\s*(=|!=|>=|<=|>|<|\blike\b)\s*(.+)/i);
+        if (!opMatch) return true;
+        
+        const col = opMatch[1].trim().split('.').pop();
+        const op = opMatch[2].trim().toLowerCase();
+        const val = opMatch[3].trim().replace(/^['"]|['"]$/g, '');
+
+        const rowVal = row[col];
+        if (rowVal === undefined) return false;
+
+        if (op === '=') return String(rowVal).toLowerCase() === val.toLowerCase();
+        if (op === '!=') return String(rowVal).toLowerCase() !== val.toLowerCase();
+        if (op === '>=') return Number(rowVal) >= Number(val) || String(rowVal) >= val;
+        if (op === '<=') return Number(rowVal) <= Number(val) || String(rowVal) <= val;
+        if (op === '>') return Number(rowVal) > Number(val) || String(rowVal) > val;
+        if (op === '<') return Number(rowVal) < Number(val) || String(rowVal) < val;
+        if (op === 'like') {
+          const regexStr = val.replace(/%/g, '.*');
+          const regex = new RegExp(`^${regexStr}$`, 'i');
+          return regex.test(String(rowVal));
+        }
+        return true;
+      });
+    });
+  }
+
+  // Project / Aggregate columns (SELECT ...)
+  const selectMatch = query.match(/select\s+(.+?)\s+from/i);
+  if (!selectMatch) {
+    throw new Error("Could not parse SELECT clause from SQL query.");
+  }
+  
+  const selectClause = selectMatch[1].trim();
+  
+  // Group By execution
+  const groupByMatch = query.match(/group\s+by\s+([a-zA-Z0-9_\.]+)/i);
+  if (groupByMatch) {
+    const groupCol = groupByMatch[1].trim().split('.').pop();
+    const groups = {};
+    dataset.forEach(row => {
+      const key = String(row[groupCol]);
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(row);
+    });
+
+    const resultRows = [];
+    Object.keys(groups).forEach(key => {
+      const groupRows = groups[key];
+      const resultRow = {};
+      resultRow[groupCol] = groupRows[0][groupCol];
+
+      const aggTerms = selectClause.split(',').map(t => t.trim());
+      aggTerms.forEach(term => {
+        const countMatch = term.match(/count\(\*\)/i);
+        const sumMatch = term.match(/sum\(([a-zA-Z0-9_]+)\)/i);
+        const avgMatch = term.match(/avg\(([a-zA-Z0-9_]+)\)/i);
+
+        if (countMatch) {
+          resultRow['COUNT(*)'] = groupRows.length;
+        } else if (sumMatch) {
+          const col = sumMatch[1];
+          const sum = groupRows.reduce((acc, r) => acc + (Number(r[col]) || 0), 0);
+          resultRow[`SUM(${col})`] = sum;
+        } else if (avgMatch) {
+          const col = avgMatch[1];
+          const sum = groupRows.reduce((acc, r) => acc + (Number(r[col]) || 0), 0);
+          resultRow[`AVG(${col})`] = groupRows.length ? (sum / groupRows.length) : 0;
+        }
+      });
+      resultRows.push(resultRow);
+    });
+    return resultRows;
+  }
+
+  // Handle standard aggregations without group by
+  if (selectClause.toLowerCase().includes('count(') || selectClause.toLowerCase().includes('sum(') || selectClause.toLowerCase().includes('avg(')) {
+    const resultRow = {};
+    const aggTerms = selectClause.split(',').map(t => t.trim());
+    
+    aggTerms.forEach(term => {
+      const countMatch = term.match(/count\(\*\)/i);
+      const sumMatch = term.match(/sum\(([a-zA-Z0-9_]+)\)/i);
+      const avgMatch = term.match(/avg\(([a-zA-Z0-9_]+)\)/i);
+
+      if (countMatch) {
+        resultRow['COUNT(*)'] = dataset.length;
+      } else if (sumMatch) {
+        const col = sumMatch[1];
+        const sum = dataset.reduce((acc, r) => acc + (Number(r[col]) || 0), 0);
+        resultRow[`SUM(${col})`] = sum;
+      } else if (avgMatch) {
+        const col = avgMatch[1];
+        const sum = dataset.reduce((acc, r) => acc + (Number(r[col]) || 0), 0);
+        resultRow[`AVG(${col})`] = dataset.length ? (sum / dataset.length) : 0;
+      }
+    });
+    return [resultRow];
+  }
+
+  // Handle * or specific projection list
+  if (selectClause === '*') {
+    return dataset;
+  } else {
+    const projectCols = selectClause.split(',').map(c => c.trim().split('.').pop());
+    return dataset.map(row => {
+      const projected = {};
+      projectCols.forEach(col => {
+        projected[col] = row[col];
+      });
+      return projected;
+    });
+  }
+}
+
 // 1. In-Memory SQLite Analytics Query Engine
 function executeAnalyticsQuery(branch = 'main', sqlQuery) {
   return new Promise((resolve, reject) => {
-    let sqlite3;
-    try {
-      sqlite3 = require('sqlite3');
-    } catch (err) {
-      return reject(new Error("SQLite is not supported in this runtime environment: " + err.message));
-    }
-
     // 1. Load latest JSON database snapshot
     let dbData;
     try {
       dbData = readDb(branch);
     } catch (e) {
       return reject(new Error("Failed to load branch database JSON: " + e.message));
+    }
+
+    let sqlite3;
+    try {
+      sqlite3 = require('sqlite3');
+    } catch (err) {
+      // Gracefully fall back to our pure JS SQL interpreter on Serverless environments
+      try {
+        const jsResult = executeAnalyticsQueryJS(dbData, sqlQuery);
+        return resolve(jsResult);
+      } catch (jsErr) {
+        return reject(new Error("JS SQL Evaluator Error: " + jsErr.message));
+      }
     }
 
     // 2. Open temporary in-memory database
