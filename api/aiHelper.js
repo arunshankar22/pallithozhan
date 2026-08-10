@@ -1,6 +1,5 @@
 const fs = require('fs');
 const path = require('path');
-const sqlite3 = require('sqlite3');
 const { readDb } = require('./db');
 
 const apiKey = process.env.GEMINI_API_KEY || process.env.EXPO_PUBLIC_GEMINI_API_KEY;
@@ -8,6 +7,13 @@ const apiKey = process.env.GEMINI_API_KEY || process.env.EXPO_PUBLIC_GEMINI_API_
 // 1. In-Memory SQLite Analytics Query Engine
 function executeAnalyticsQuery(branch = 'main', sqlQuery) {
   return new Promise((resolve, reject) => {
+    let sqlite3;
+    try {
+      sqlite3 = require('sqlite3');
+    } catch (err) {
+      return reject(new Error("SQLite is not supported in this runtime environment: " + err.message));
+    }
+
     // 1. Load latest JSON database snapshot
     let dbData;
     try {
