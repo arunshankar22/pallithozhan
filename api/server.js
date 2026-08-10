@@ -86,9 +86,13 @@ const server = http.createServer(async (req, res) => {
 });
 
 // Start the HTTP API Server
-server.listen(PORT, () => {
-  console.log(`================================================================`);
-  console.log(`🚀 Balar Malar Parramatta Live REST API Server running on port ${PORT}`);
-  console.log(`📂 JSON Database persisting state to: ${DB_FILE}`);
-  console.log(`================================================================`);
-});
+if (require.main === module) {
+  server.listen(PORT, () => {
+    console.log(`================================================================`);
+    console.log(`🚀 Balar Malar Parramatta Live REST API Server running on port ${PORT}`);
+    console.log(`📂 JSON Database persisting state to: ${DB_FILE}`);
+    console.log(`================================================================`);
+  });
+}
+
+module.exports = server;
