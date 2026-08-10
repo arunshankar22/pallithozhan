@@ -968,7 +968,6 @@ export default function HomeScreen() {
       items.push({ key: 'messages', label: i18n.language === 'ta' ? 'செய்திகள்' : 'Messages', labelTa: 'செய்திகள்', icon: MessageSquare });
     }
 
-    items.push({ key: 'library', label: t('nav.library') || 'Library', labelTa: 'நூலகம்', icon: BookOpen });
     items.push({ key: 'profile', label: 'Profile', labelTa: 'சுயவிவரம்', icon: UserIcon });
     return items;
   };
@@ -1147,6 +1146,17 @@ export default function HomeScreen() {
         });
       }
     }
+    
+    // Unconditionally push Library quick action for all logged-in roles
+    actions.push({
+      key: 'library',
+      label: i18n.language === 'ta' ? 'நூலகம்' : 'School Library',
+      icon: BookOpen,
+      color: '#FFFDF0',
+      iconColor: '#D97706',
+      onPress: () => setActiveTab('library')
+    });
+
     const mainKeys = mainNavItems.map((item: any) => item.key);
     return actions.filter(action => !action.key || !mainKeys.includes(action.key));
   };
