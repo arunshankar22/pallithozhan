@@ -67,7 +67,7 @@ export function UtraThozhanWidget({ user, colors, branch = 'main' }: UtraThozhan
           setMessages([
             {
               role: 'model',
-              parts: [{ text: `வணக்கம் ${user.fullName}! நான் தான் **உற்ற தோழன் (Utra Thozhan)**. \n\nஉங்களுக்கு தமிழ் மொழி கற்றல், வகுப்பறை செய்திகள் அல்லது பள்ளி விவரங்களை அறிய உதவி தேவையா? கீழே உள்ள கேள்விகளைத் தேர்ந்தெடுக்கவும் அல்லது தட்டச்சு செய்யவும்!` }]
+              parts: [{ text: `Hello ${user.fullName}! I am **உற்ற தோழன் (Utra Thozhan)**, your school assistant. \n\nHow can I help you today? You can ask me in English or use a Tamil keyboard to chat in Tamil! \n\n(வணக்கம்! நான் உங்களுக்கு எவ்வாறு உதவ முடியும்?)` }]
             }
           ]);
         }
