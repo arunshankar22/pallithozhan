@@ -1,4 +1,5 @@
 const { parseBody, sendJson, INITIAL_DB } = require('./db');
+const aiHelper = require('./aiHelper');
 
 async function handleApiRoutes(req, res, pathname, method, dbData, writeDb, urlObj) {
   // GET /api/health
@@ -1108,6 +1109,166 @@ Response Schema:
       sendJson(res, 200, entry);
     } catch (err) {
       sendJson(res, 500, { error: 'Failed to update reading progress.', message: err.message });
+    }
+    return true;
+  }
+
+  // POST /api/ai/chat
+  if (pathname === '/api/ai/chat' && method === 'POST') {
+    try {
+      const body = await parseBody(req);
+      const userRole = body.userRole || 'student';
+      const branch = urlObj.searchParams.get('branch') || 'main';
+      
+      const apiKey = process.env.GEMINI_API_KEY || process.env.EXPO_PUBLIC_GEMINI_API_KEY;
+      if (!apiKey) {
+        sendJson(res, 500, { error: 'Gemini API key is not configured on the server.' });
+        return true;
+      }
+      
+      const contents = [...(body.history || [])];
+      contents.push({ role: 'user', parts: [{ text: body.message }] });
+      
+      // Determine allowed tools based on role
+      const tools = [];
+      const functionDeclarations = [
+        {
+          name: "searchDocuments",
+          description: "Searches the school's unstructured document library (privacy policy, terms of service, curriculum guidelines, code of conduct) for sections relevant to the query.",
+          parameters: {
+            type: "OBJECT",
+            properties: {
+              searchQuery: {
+                type: "STRING",
+                description: "The natural language search query. E.g., 'student drop off rules' or 'Year 1 curriculum'"
+              }
+            },
+            required: ["searchQuery"]
+          }
+        }
+      ];
+      
+      if (userRole === 'admin' || userRole === 'teacher') {
+        functionDeclarations.push({
+          name: "executeSQL",
+          description: "Executes a read-only SQL query against the platform's database containing tables: users, classes, attendance, attendance_rolls, homework, expenses, reading_progress. Returns matching data rows.",
+          parameters: {
+            type: "OBJECT",
+            properties: {
+              sqlQuery: {
+                type: "STRING",
+                description: "The exact SQL query to execute. E.g., 'SELECT COUNT(*) FROM users WHERE role = \"student\"'"
+              }
+            },
+            required: ["sqlQuery"]
+          }
+        });
+      }
+      
+      tools.push({ functionDeclarations });
+
+      const systemInstruction = {
+        parts: [{
+          text: `You are 'உற்ற தோழன்' (Utra Thozhan), a helpful, warm AI assistant for the Balar Malar Tamil School portal (Pallithozhan). 
+Your goal is to assist users (students, parents, teachers, and administrators) with queries related to the Tamil language, school curriculum, code of conduct, and database analytics.
+Respond in a friendly, concise manner. You can converse in both Tamil and English.
+If you need to search rules or policies, use the searchDocuments tool.
+If you need database statistics (attendance, homework, expenses, users, points), use the executeSQL tool.
+
+Guidelines for SQL generation:
+- Table "users" has fields: uid, email, fullName, role, phone, className, associatedStudents (JSON array)
+- Table "classes" has fields: classId, className, teacherName
+- Table "attendance" has fields: recordId, classId, date, approved
+- Table "attendance_rolls" has fields: recordId, studentId, status ('present' or 'absent')
+- Table "homework" has fields: homeworkId, classId, title, dueDate, description
+- Table "expenses" has fields: expenseId, title, amount, category, status, paymentStatus, dateSubmitted, submittedBy
+- Table "reading_progress" has fields: progressId, studentId, bookId, status ('reading' or 'completed'), lastReadTime
+- Only write SELECT queries. DDL and modification queries are prohibited. Use standard SQLite syntax.`
+        }]
+      };
+
+      async function callGemini(contentsList) {
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${apiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: contentsList,
+              tools: tools,
+              systemInstruction: systemInstruction
+            })
+          }
+        );
+        if (!response.ok) {
+          const text = await response.text();
+          throw new Error(`Gemini API error: ${response.status} - ${text}`);
+        }
+        return await response.json();
+      }
+
+      let geminiResponse = await callGemini(contents);
+      let attempts = 0;
+      
+      while (geminiResponse.candidates?.[0]?.content?.parts?.[0]?.functionCall && attempts < 3) {
+        attempts++;
+        const callPart = geminiResponse.candidates[0].content.parts[0];
+        const functionCall = callPart.functionCall;
+        const name = functionCall.name;
+        const args = functionCall.args;
+        
+        let result;
+        try {
+          if (name === 'executeSQL') {
+            const query = args.sqlQuery.trim();
+            const lowerQuery = query.toLowerCase();
+            if (lowerQuery.includes('insert') || lowerQuery.includes('update') || lowerQuery.includes('delete') || lowerQuery.includes('drop') || lowerQuery.includes('alter') || lowerQuery.includes('create table') || lowerQuery.includes('write')) {
+              result = { error: "Security Exception: Writing/modifying queries are prohibited." };
+            } else {
+              result = await aiHelper.executeAnalyticsQuery(branch, query);
+            }
+          } else if (name === 'searchDocuments') {
+            result = await aiHelper.searchDocumentsCloud(args.searchQuery, dbData);
+          } else {
+            result = { error: `Unknown tool name: ${name}` };
+          }
+        } catch (err) {
+          result = { error: err.message };
+        }
+        
+        // Push the call to history
+        contents.push({
+          role: 'model',
+          parts: [callPart]
+        });
+        
+        // Push the result back
+        contents.push({
+          role: 'function',
+          parts: [{
+            functionResponse: {
+              name: name,
+              response: { result: result }
+            }
+          }]
+        });
+        
+        geminiResponse = await callGemini(contents);
+      }
+
+      const finalContent = geminiResponse.candidates?.[0]?.content;
+      if (finalContent) {
+        contents.push(finalContent);
+        sendJson(res, 200, {
+          response: finalContent.parts?.[0]?.text || '',
+          history: contents
+        });
+      } else {
+        sendJson(res, 502, { error: 'Invalid response from Gemini model.' });
+      }
+    } catch (err) {
+      console.error("Error in AI Assistant endpoint:", err);
+      sendJson(res, 500, { error: 'AI Assistant failed to generate response.', message: err.message });
     }
     return true;
   }

@@ -68,6 +68,7 @@ import { ManagementTab } from '@/app/tabs/ManagementTab';
 import { ProfileTab } from '@/app/tabs/ProfileTab';
 import { StudentsTab } from '@/app/tabs/StudentsTab';
 import { SuperAdminTab } from '@/app/tabs/SuperAdminTab';
+import { UtraThozhanWidget } from '@/app/components/UtraThozhanWidget';
 import { PointsPortalTab } from '@/app/tabs/PointsPortalTab';
 import { auditLogService } from '@/services/auditLogService';
 import { chatNotificationService } from '@/services/chatNotificationService';
@@ -4052,6 +4053,19 @@ export default function HomeScreen() {
             </ScrollView>
           </View>
         </View>
+      )}
+
+      {user && (
+        <UtraThozhanWidget 
+          user={{
+            uid: user.uid,
+            fullName: user.fullName,
+            role: user.role,
+            className: (user as any).className || (user as any).stage || ''
+          }}
+          colors={colors}
+          branch={typeof window !== 'undefined' && typeof window.localStorage !== 'undefined' ? window.localStorage.getItem('pallithozhan_active_branch') || 'parramatta' : 'parramatta'}
+        />
       )}
 
     </View>

@@ -1,0 +1,29 @@
+Balar Malar Parramatta Data Privacy and Compliance Policy
+
+1. What Information We Collect:
+We collect personal information necessary to safely run school classes and manage enrollments:
+- Student Details: Full Name, Tamil Name, Date of Birth, Gender, Mainstream School/Grade, and Class Enrollment.
+- Parent/Guardian Details: Names, Email Addresses, Mobile Phone Numbers, and Volunteer preferences.
+- Staff/Volunteer Details: Names, Contact Details, Working With Children (WWC) check numbers, verification status, and signatures.
+- Attendance & Academic Reports: Attendance records, homework records, and term report card grades.
+
+2. Why We Collect It:
+We collect and use this information to:
+- Manage student enrollments and class allocations.
+- Keep attendance sheets for safety and child protection requirements.
+- Communicate with parents regarding class announcements or emergencies.
+- Issue academic report cards and school books/materials.
+
+3. How We Store and Protect Your Data:
+- All data is stored securely in Google Cloud Firestore (Sydney Region) using secure token-based encryption.
+- Only authorized staff members (Admins, class Teachers) can access contact details or student records.
+- We do not sell, rent, or share personal data with third-party advertisers or external organisations.
+
+4. Accessing or Correcting Your Data:
+Parents have the right to request access to, or correction of, the personal information we hold about them or their children. Requests can be sent via email to the School Administrator.
+
+5. Data Breach Response Plan (IT & Admin Team):
+- Step 1: Containment. Identify the source of the breach and isolate it to prevent further data exposure. Revoke active tokens in Firebase Console, rotate database secrets, or disable compromised accounts.
+- Step 2: Assessment. Within 24 Hours, assess what data was exposed and determine if the breach is likely to result in serious harm (identity theft, harassment, or child safety risks).
+- Step 3: Notification. Within 72 Hours, send a clear notification email to affected parents/volunteers. Describe what happened, what data was involved, and recommended actions they should take. Report eligible data breaches to the OAIC under Australian law if required.
+- Step 4: Prevention. Review database security rules, security logs, and user authorization claims to prevent recurrence.
