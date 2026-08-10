@@ -968,6 +968,7 @@ export default function HomeScreen() {
       items.push({ key: 'messages', label: i18n.language === 'ta' ? 'செய்திகள்' : 'Messages', labelTa: 'செய்திகள்', icon: MessageSquare });
     }
 
+    items.push({ key: 'library', label: t('nav.library') || 'Library', labelTa: 'நூலகம்', icon: BookOpen });
     items.push({ key: 'profile', label: 'Profile', labelTa: 'சுயவிவரம்', icon: UserIcon });
     return items;
   };
