@@ -357,9 +357,17 @@ function executeAnalyticsQuery(branch = 'main', sqlQuery) {
     }
 
     let sqlite3;
+    let useJSFallback = false;
     try {
       sqlite3 = require('sqlite3');
+      if (!sqlite3 || typeof sqlite3.Database !== 'function') {
+        useJSFallback = true;
+      }
     } catch (err) {
+      useJSFallback = true;
+    }
+
+    if (useJSFallback) {
       // Gracefully fall back to our pure JS SQL interpreter on Serverless environments
       try {
         const jsResult = executeAnalyticsQueryJS(dbData, sqlQuery);
@@ -370,9 +378,26 @@ function executeAnalyticsQuery(branch = 'main', sqlQuery) {
     }
 
     // 2. Open temporary in-memory database
-    const db = new sqlite3.Database(':memory:', (err) => {
-      if (err) return reject(new Error("Failed to initialize SQLite in-memory DB: " + err.message));
-    });
+    let db;
+    try {
+      db = new sqlite3.Database(':memory:', (err) => {
+        if (err) {
+          try {
+            const jsResult = executeAnalyticsQueryJS(dbData, sqlQuery);
+            return resolve(jsResult);
+          } catch (jsErr) {
+            return reject(new Error("JS SQL Evaluator Error: " + jsErr.message));
+          }
+        }
+      });
+    } catch (dbErr) {
+      try {
+        const jsResult = executeAnalyticsQueryJS(dbData, sqlQuery);
+        return resolve(jsResult);
+      } catch (jsErr) {
+        return reject(new Error("JS SQL Evaluator Error: " + jsErr.message));
+      }
+    }
 
     db.serialize(() => {
       // 3. Create tables matching platform schema
