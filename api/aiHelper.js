@@ -144,12 +144,52 @@ function executeAnalyticsQueryJS(dbData, sqlQuery) {
     
     dataset = dataset.filter(row => {
       return conditions.every(cond => {
+        const resolveValue = (v) => {
+          v = v.trim();
+          if (v.toLowerCase().startsWith("date('now'")) {
+            const modifierMatch = v.match(/['"]\s*([+-]\d+)\s+(day|week|month|year)s?\s*['"]/i);
+            const d = new Date();
+            if (modifierMatch) {
+              const num = parseInt(modifierMatch[1]);
+              const unit = modifierMatch[2].toLowerCase();
+              if (unit === 'day') d.setDate(d.getDate() + num);
+              if (unit === 'week') d.setDate(d.getDate() + num * 7);
+              if (unit === 'month') d.setMonth(d.getMonth() + num);
+              if (unit === 'year') d.setFullYear(d.getFullYear() + num);
+            }
+            return d.toISOString().split('T')[0];
+          }
+          return v.replace(/^['"]|['"]$/g, '');
+        };
+
+        // 1. IN subquery matching
+        const inSubqueryMatch = cond.match(/([a-zA-Z0-9_\.]+)\s+in\s*\(\s*(select\s+.+?)\s*\)/i);
+        if (inSubqueryMatch) {
+          const col = inSubqueryMatch[1].trim().split('.').pop();
+          const subQuery = inSubqueryMatch[2].trim();
+          
+          let subResults = [];
+          try {
+            subResults = executeAnalyticsQueryJS(dbData, subQuery);
+          } catch (e) {
+            return false;
+          }
+          
+          const subSelectMatch = subQuery.match(/select\s+([a-zA-Z0-9_\*]+)/i);
+          const subCol = subSelectMatch ? subSelectMatch[1].trim().split('.').pop() : '';
+          const allowedValues = subResults.map(r => String(r[subCol] !== undefined ? r[subCol] : Object.values(r)[0]));
+          
+          return allowedValues.includes(String(row[col]));
+        }
+
+        // 2. Standard comparisons
         const opMatch = cond.match(/([a-zA-Z0-9_\.]+)\s*(=|!=|>=|<=|>|<|\blike\b)\s*(.+)/i);
         if (!opMatch) return true;
         
         const col = opMatch[1].trim().split('.').pop();
         const op = opMatch[2].trim().toLowerCase();
-        const val = opMatch[3].trim().replace(/^['"]|['"]$/g, '');
+        const rawVal = opMatch[3].trim();
+        const val = resolveValue(rawVal);
 
         const rowVal = row[col];
         if (rowVal === undefined) return false;

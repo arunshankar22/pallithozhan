@@ -68,7 +68,7 @@ import { ManagementTab } from '@/app/tabs/ManagementTab';
 import { ProfileTab } from '@/app/tabs/ProfileTab';
 import { StudentsTab } from '@/app/tabs/StudentsTab';
 import { SuperAdminTab } from '@/app/tabs/SuperAdminTab';
-import { UtraThozhanWidget } from '@/app/components/UtraThozhanWidget';
+import { AIAssistantTab } from '@/app/tabs/AIAssistantTab';
 import { featureFlagsService } from '@/services/featureFlagsService';
 import { PointsPortalTab } from '@/app/tabs/PointsPortalTab';
 import { auditLogService } from '@/services/auditLogService';
@@ -186,7 +186,7 @@ export default function HomeScreen() {
   };
 
   // Layout Tab State
-  const [activeTab, setActiveTab] = useState<'newsfeed' | 'attendance' | 'homework' | 'library' | 'messages' | 'calendar' | 'reports' | 'management' | 'profile' | 'schools' | 'full-newsfeed' | 'students' | 'newsletter' | 'superadmin' | 'points' | 'print-requests' | 'expenses'>('newsfeed');
+  const [activeTab, setActiveTab] = useState<'newsfeed' | 'attendance' | 'homework' | 'library' | 'messages' | 'calendar' | 'reports' | 'management' | 'profile' | 'schools' | 'full-newsfeed' | 'students' | 'newsletter' | 'superadmin' | 'points' | 'print-requests' | 'expenses' | 'ai-assistant'>('newsfeed');
 
   // Points System states
   const [pointsConfig, setPointsConfig] = useState<any>(null);
@@ -2504,6 +2504,8 @@ export default function HomeScreen() {
         return <ExpensesTab {...props} />;
       case 'library':
         return <LibraryTab {...props} />;
+      case 'ai-assistant':
+        return <AIAssistantTab {...props} />;
       case 'schools':
         return renderSchoolsTab();
       case 'students':
@@ -2527,6 +2529,7 @@ export default function HomeScreen() {
   const navItems = [
     { key: 'newsfeed', label: t('nav.newsfeed'), icon: Newspaper, roles: ['superadmin', 'admin', 'teacher', 'volunteer', 'parent', 'student'] },
     { key: 'newsletter', label: t('nav.newsletter'), icon: Newspaper, roles: ['superadmin', 'admin', 'teacher', 'volunteer', 'parent', 'student'] },
+    { key: 'ai-assistant', label: 'Utra Thozhan AI', icon: MessageSquare, roles: ['superadmin', 'admin', 'teacher', 'volunteer', 'parent', 'student'] },
     { key: 'attendance', label: t('nav.attendance'), icon: CheckSquare, roles: ['superadmin', 'admin', 'teacher', 'volunteer', 'parent'] },
     { key: 'homework', label: t('nav.homework'), icon: BookOpen, roles: ['superadmin', 'admin', 'teacher', 'parent', 'student'] },
     { key: 'library', label: t('nav.library') || 'Library', icon: BookOpen, roles: ['superadmin', 'admin', 'teacher', 'volunteer', 'parent', 'student'] },
@@ -2537,8 +2540,12 @@ export default function HomeScreen() {
     { key: 'superadmin', label: 'Super Admin', icon: Shield, roles: ['superadmin'] },
   ] as const;
 
-  // Filter Nav Items based on user role
-  const allowedNavItems = navItems.filter(item => (item.roles as readonly string[]).includes(user?.role || ''));
+  // Filter Nav Items based on user role and active portal feature flags
+  const allowedNavItems = navItems.filter(item => {
+    if (item.key === 'library' && featureFlags.enableDigitalLibrary === false) return false;
+    if (item.key === 'ai-assistant' && featureFlags.enableAIAssistant === false) return false;
+    return (item.roles as readonly string[]).includes(user?.role || '');
+  });
 
   // Ensure activeTab is valid for user role (fallback to newsfeed)
   useEffect(() => {
@@ -4068,18 +4075,6 @@ export default function HomeScreen() {
         </View>
       )}
 
-      {user && featureFlags.enableAIAssistant !== false && (
-        <UtraThozhanWidget 
-          user={{
-            uid: user.uid,
-            fullName: user.fullName,
-            role: user.role,
-            className: (user as any).className || (user as any).stage || ''
-          }}
-          colors={colors}
-          branch={typeof window !== 'undefined' && typeof window.localStorage !== 'undefined' ? window.localStorage.getItem('pallithozhan_active_branch') || 'parramatta' : 'parramatta'}
-        />
-      )}
 
     </View>
   );

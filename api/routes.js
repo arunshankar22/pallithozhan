@@ -1127,7 +1127,11 @@ Response Schema:
       }
       
       const contents = [...(body.history || [])];
-      contents.push({ role: 'user', parts: [{ text: body.message }] });
+      const lastItem = contents[contents.length - 1];
+      const lastItemText = lastItem?.parts?.find(p => p.text)?.text;
+      if (lastItemText !== body.message) {
+        contents.push({ role: 'user', parts: [{ text: body.message }] });
+      }
       
       // Determine allowed tools based on role
       const tools = [];
