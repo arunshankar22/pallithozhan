@@ -980,7 +980,7 @@ export default function HomeScreen() {
     }
 
     if (featureFlags.enableAIAssistant !== false) {
-      items.push({ key: 'ai-assistant', label: 'Utra Thozhan AI', labelTa: 'உற்ற தோழன் AI', icon: MessageSquare });
+      items.push({ key: 'ai-assistant', label: 'AI Assistant', labelTa: 'உற்ற தோழன்', icon: MessageSquare });
     }
 
     items.push({ key: 'profile', label: 'Profile', labelTa: 'சுயவிவரம்', icon: UserIcon });

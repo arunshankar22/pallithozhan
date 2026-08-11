@@ -299,14 +299,61 @@ function executeAnalyticsQueryJS(dbData, sqlQuery) {
 }
 
 // 1. In-Memory SQLite Analytics Query Engine
-function executeAnalyticsQuery(branch = 'main', sqlQuery) {
-  return new Promise((resolve, reject) => {
-    // 1. Load latest JSON database snapshot
-    let dbData;
+let adminApp;
+
+async function getLiveFirestoreData(branch = 'main') {
+  const admin = require('firebase-admin');
+  const dbId = (branch === 'main' || branch === 'production') ? 'pallithozhan-prod-db' : 'pallithozhandb';
+
+  if (admin.apps.length === 0) {
+    adminApp = admin.initializeApp({
+      projectId: 'pallithozhan'
+    });
+  }
+
+  const firestoreDb = admin.firestore(dbId);
+  const collections = ['users', 'classes', 'attendance', 'homework', 'expenses', 'reading_progress'];
+  const dbData = {};
+
+  await Promise.all(collections.map(async (colName) => {
     try {
-      dbData = readDb(branch);
+      const snap = await firestoreDb.collection(colName).get();
+      dbData[colName] = [];
+      snap.forEach(doc => {
+        dbData[colName].push({
+          id: doc.id,
+          ...doc.data()
+        });
+      });
     } catch (e) {
-      return reject(new Error("Failed to load branch database JSON: " + e.message));
+      console.warn(`[Firestore Fetch] Failed to fetch collection ${colName}:`, e);
+      dbData[colName] = [];
+    }
+  }));
+
+  return dbData;
+}
+
+function executeAnalyticsQuery(branch = 'main', sqlQuery) {
+  return new Promise(async (resolve, reject) => {
+    // 1. Resolve DB data snapshot (live Firestore in dev/prod Vercel, local JSON fallback locally)
+    let dbData;
+    const isVercel = process.env.VERCEL || process.env.NOW_BUILDER;
+    
+    if (isVercel) {
+      try {
+        dbData = await getLiveFirestoreData(branch);
+      } catch (err) {
+        console.warn("[Firestore Fetch] Failed to fetch live Firestore data, using JSON fallback:", err);
+      }
+    }
+
+    if (!dbData) {
+      try {
+        dbData = readDb(branch);
+      } catch (e) {
+        return reject(new Error("Failed to load branch database JSON: " + e.message));
+      }
     }
 
     let sqlite3;
