@@ -356,41 +356,32 @@ function executeAnalyticsQuery(branch = 'main', sqlQuery) {
       }
     }
 
-    let sqlite3;
-    let useJSFallback = false;
-    try {
-      sqlite3 = require('sqlite3');
-      if (!sqlite3 || typeof sqlite3.Database !== 'function') {
-        useJSFallback = true;
-      }
-    } catch (err) {
-      useJSFallback = true;
-    }
-
-    if (useJSFallback) {
-      // Gracefully fall back to our pure JS SQL interpreter on Serverless environments
-      try {
-        const jsResult = executeAnalyticsQueryJS(dbData, sqlQuery);
-        return resolve(jsResult);
-      } catch (jsErr) {
-        return reject(new Error("JS SQL Evaluator Error: " + jsErr.message));
-      }
-    }
-
-    // 2. Open temporary in-memory database
+    // Initialize WebAssembly SQLite
     let db;
     try {
-      db = new sqlite3.Database(':memory:', (err) => {
-        if (err) {
-          try {
-            const jsResult = executeAnalyticsQueryJS(dbData, sqlQuery);
-            return resolve(jsResult);
-          } catch (jsErr) {
-            return reject(new Error("JS SQL Evaluator Error: " + jsErr.message));
-          }
+      const initSqlJs = require('sql.js');
+      
+      const wasmPath = (() => {
+        const tracePath = path.join(__dirname, '../node_modules/sql.js/dist/sql-wasm.wasm');
+        const searchPaths = [
+          tracePath,
+          path.join(__dirname, 'node_modules/sql.js/dist/sql-wasm.wasm'),
+          path.join(process.cwd(), 'node_modules/sql.js/dist/sql-wasm.wasm'),
+          path.join(process.cwd(), '../node_modules/sql.js/dist/sql-wasm.wasm'),
+          path.join(__dirname, 'sql-wasm.wasm'),
+          path.join(__dirname, '../sql-wasm.wasm')
+        ];
+        for (const p of searchPaths) {
+          if (fs.existsSync(p)) return p;
         }
-      });
-    } catch (dbErr) {
+        throw new Error("Could not find sql-wasm.wasm binary");
+      })();
+
+      const wasmBinary = fs.readFileSync(wasmPath);
+      const SQL = await initSqlJs({ wasmBinary });
+      db = new SQL.Database();
+    } catch (err) {
+      console.warn("[WASM SQLite] Failed to load sql.js, falling back to pure JS SQL engine:", err);
       try {
         const jsResult = executeAnalyticsQueryJS(dbData, sqlQuery);
         return resolve(jsResult);
@@ -399,7 +390,8 @@ function executeAnalyticsQuery(branch = 'main', sqlQuery) {
       }
     }
 
-    db.serialize(() => {
+    // Run table setup and query inside try-catch to ensure we close DB and free memory
+    try {
       // 3. Create tables matching platform schema
       db.run("CREATE TABLE users (uid TEXT PRIMARY KEY, email TEXT, fullName TEXT, role TEXT, phone TEXT, className TEXT, associatedStudents TEXT)");
       db.run("CREATE TABLE classes (classId TEXT PRIMARY KEY, className TEXT, teacherName TEXT)");
@@ -413,7 +405,7 @@ function executeAnalyticsQuery(branch = 'main', sqlQuery) {
       if (dbData.users && Array.isArray(dbData.users)) {
         const stmt = db.prepare("INSERT INTO users VALUES (?, ?, ?, ?, ?, ?, ?)");
         dbData.users.forEach(u => {
-          stmt.run(
+          stmt.run([
             u.uid,
             u.email || '',
             u.fullName || '',
@@ -421,18 +413,18 @@ function executeAnalyticsQuery(branch = 'main', sqlQuery) {
             u.phone || '',
             u.className || '',
             u.associatedStudents ? JSON.stringify(u.associatedStudents) : '[]'
-          );
+          ]);
         });
-        stmt.finalize();
+        stmt.free();
       }
 
       // 5. Populate classes
       if (dbData.classes && Array.isArray(dbData.classes)) {
         const stmt = db.prepare("INSERT INTO classes VALUES (?, ?, ?)");
         dbData.classes.forEach(c => {
-          stmt.run(c.classId, c.className || '', c.teacherName || '');
+          stmt.run([c.classId, c.className || '', c.teacherName || '']);
         });
-        stmt.finalize();
+        stmt.free();
       }
 
       // 6. Populate attendance and rolls
@@ -440,31 +432,31 @@ function executeAnalyticsQuery(branch = 'main', sqlQuery) {
         const stmtAtt = db.prepare("INSERT INTO attendance VALUES (?, ?, ?, ?)");
         const stmtRoll = db.prepare("INSERT INTO attendance_rolls VALUES (?, ?, ?)");
         dbData.attendance.forEach(a => {
-          stmtAtt.run(a.recordId, a.classId || '', a.date || '', a.approved ? 1 : 0);
+          stmtAtt.run([a.recordId, a.classId || '', a.date || '', a.approved ? 1 : 0]);
           if (a.rolls && typeof a.rolls === 'object') {
             Object.keys(a.rolls).forEach(studentId => {
-              stmtRoll.run(a.recordId, studentId, a.rolls[studentId]);
+              stmtRoll.run([a.recordId, studentId, a.rolls[studentId]]);
             });
           }
         });
-        stmtAtt.finalize();
-        stmtRoll.finalize();
+        stmtAtt.free();
+        stmtRoll.free();
       }
 
       // 7. Populate homework
       if (dbData.homework && Array.isArray(dbData.homework)) {
         const stmt = db.prepare("INSERT INTO homework VALUES (?, ?, ?, ?, ?)");
         dbData.homework.forEach(h => {
-          stmt.run(h.homeworkId, h.classId || '', h.title || '', h.dueDate || '', h.description || '');
+          stmt.run([h.homeworkId, h.classId || '', h.title || '', h.dueDate || '', h.description || '']);
         });
-        stmt.finalize();
+        stmt.free();
       }
 
       // 8. Populate expenses
       if (dbData.expenses && Array.isArray(dbData.expenses)) {
         const stmt = db.prepare("INSERT INTO expenses VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
         dbData.expenses.forEach(e => {
-          stmt.run(
+          stmt.run([
             e.expenseId,
             e.title || '',
             e.amount || 0.0,
@@ -473,30 +465,36 @@ function executeAnalyticsQuery(branch = 'main', sqlQuery) {
             e.paymentStatus || '',
             e.dateSubmitted || '',
             e.submittedBy || ''
-          );
+          ]);
         });
-        stmt.finalize();
+        stmt.free();
       }
 
       // 9. Populate reading progress
       if (dbData.reading_progress && Array.isArray(dbData.reading_progress)) {
         const stmt = db.prepare("INSERT INTO reading_progress VALUES (?, ?, ?, ?, ?)");
         dbData.reading_progress.forEach(p => {
-          stmt.run(p.progressId || `${p.studentId}_${p.bookId}`, p.studentId, p.bookId, p.status || '', p.lastReadTime || '');
+          stmt.run([p.progressId || `${p.studentId}_${p.bookId}`, p.studentId, p.bookId, p.status || '', p.lastReadTime || '']);
         });
-        stmt.finalize();
+        stmt.free();
       }
 
-      // 10. Execute the requested SQL Query in read-only transaction context
-      db.all(sqlQuery, [], (queryErr, rows) => {
-        // Clean up connection
-        db.close();
-        if (queryErr) {
-          return reject(new Error("SQL Query Error: " + queryErr.message));
-        }
-        resolve(rows);
-      });
-    });
+      // 10. Execute the requested SQL Query
+      const queryStmt = db.prepare(sqlQuery);
+      const rows = [];
+      while (queryStmt.step()) {
+        rows.push(queryStmt.getAsObject());
+      }
+      queryStmt.free();
+      
+      db.close();
+      resolve(rows);
+    } catch (queryErr) {
+      if (db) {
+        try { db.close(); } catch (e) {}
+      }
+      return reject(new Error("SQL Query Error: " + queryErr.message));
+    }
   });
 }
 
