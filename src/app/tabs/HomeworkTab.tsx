@@ -6,7 +6,8 @@ import {
   ScrollView,
   ActivityIndicator,
   Platform,
-  Image
+  Image,
+  Modal
 } from 'react-native';
 
 import { Plus, BookOpen, CheckCircle, Clock, Trash2, Edit, Mic, Square, Upload, Video, Image as ImageIcon, X, HelpCircle } from 'lucide-react-native';
@@ -605,8 +606,37 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
       )}
 
       {/* Homework Creation Form */}
-      {modalVisible && (
-        <View style={[styles.formCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+      <Modal
+        visible={modalVisible}
+        onRequestClose={() => setModalVisible(false)}
+        animationType="slide"
+        transparent={true}
+      >
+        <View style={{
+          flex: 1,
+          backgroundColor: 'rgba(0,0,0,0.6)',
+          justifyContent: 'center',
+          alignItems: 'center',
+          padding: 16
+        }}>
+          <View style={[
+            styles.formCard,
+            {
+              backgroundColor: colors.cardBg,
+              borderColor: colors.border,
+              width: '100%',
+              maxWidth: 600,
+              maxHeight: '90%',
+              borderRadius: 16,
+              elevation: 5,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.25,
+              shadowRadius: 4,
+              padding: 16
+            }
+          ]}>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: Spacing.two }}>
             <ThemedText style={[styles.formTitle, { marginBottom: 0 }]}>
               {editingHwId ? 'Edit Homework' : 'Post New Homework'}
@@ -951,8 +981,10 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
               </ThemedText>
             </Pressable>
           </View>
+            </ScrollView>
+          </View>
         </View>
-      )}
+      </Modal>
 
       {/* My Courses / Games switcher for Parents and Students */}
       {['parent', 'student'].includes(user?.role || '') && (
