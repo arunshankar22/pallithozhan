@@ -362,13 +362,13 @@ function executeAnalyticsQuery(branch = 'main', sqlQuery) {
       const initSqlJs = require('sql.js');
       
       const wasmPath = (() => {
-        const tracePath = path.join(__dirname, '../node_modules/sql.js/dist/sql-wasm.wasm');
+        const localPath = path.join(__dirname, 'sql-wasm.wasm');
         const searchPaths = [
-          tracePath,
+          localPath,
+          path.join(__dirname, '../node_modules/sql.js/dist/sql-wasm.wasm'),
           path.join(__dirname, 'node_modules/sql.js/dist/sql-wasm.wasm'),
           path.join(process.cwd(), 'node_modules/sql.js/dist/sql-wasm.wasm'),
           path.join(process.cwd(), '../node_modules/sql.js/dist/sql-wasm.wasm'),
-          path.join(__dirname, 'sql-wasm.wasm'),
           path.join(__dirname, '../sql-wasm.wasm')
         ];
         for (const p of searchPaths) {

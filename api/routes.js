@@ -1251,6 +1251,7 @@ Guidelines for SQL generation:
             result = { error: `Unknown tool name: ${name}` };
           }
         } catch (err) {
+          console.error('[AI Tool Error]:', err);
           result = { error: err.message };
         }
         
