@@ -132,7 +132,8 @@ export const homeworkService = {
       mediaUrl: homework.mediaUrl || '',
       mediaType: homework.mediaType || 'image',
       mediaAttachments: homework.mediaAttachments || [],
-      voiceUrl: homework.voiceUrl || ''
+      voiceUrl: homework.voiceUrl || '',
+      assignedStudentIds: homework.assignedStudentIds || null
     };
 
     if (!db) {

@@ -177,6 +177,7 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
   const [originalDescEn, setOriginalDescEn] = useState('');
   const [assignedStudentIds, setAssignedStudentIds] = useState<string[]>([]);
   const [isAutoTranslateEnabled, setIsAutoTranslateEnabled] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Automatically assign to all students of the class when a class is selected (for new homework tasks)
   useEffect(() => {
@@ -388,11 +389,13 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
   };
 
   const handleCreateHomework = async () => {
+    if (isSaving) return;
     if (!selectedClassId || !titleEn || !titleTa || !descEn || !descTa) {
       showToast('Please fill out all fields in both English and Tamil, and select a class.', 'warning');
       return;
     }
 
+    setIsSaving(true);
     const hwData = {
       classId: selectedClassId,
       title: { en: titleEn, ta: titleTa },
@@ -419,6 +422,8 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
       }
     } catch (e) {
       showToast('Failed to save homework task.', 'error');
+    } finally {
+      setIsSaving(false);
     }
 
     // Reset
@@ -898,18 +903,21 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
 
           <View style={styles.formButtonRow}>
             <Pressable
+              disabled={isSaving}
               onPress={() => setModalVisible(false)}
-              style={[styles.formCancelButton, { borderColor: colors.border }]}
+              style={[styles.formCancelButton, { borderColor: colors.border, opacity: isSaving ? 0.6 : 1 }]}
             >
               <ThemedText>{t('common.cancel')}</ThemedText>
             </Pressable>
             
             <Pressable
+              disabled={isSaving}
               onPress={handleCreateHomework}
-              style={[styles.formSubmitButton, { backgroundColor: colors.primary }]}
+              style={[styles.formSubmitButton, { backgroundColor: colors.primary, opacity: isSaving ? 0.6 : 1, flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center' }]}
             >
+              {isSaving && <ActivityIndicator size="small" color="#FFF" />}
               <ThemedText style={{ color: '#FFF', fontWeight: '700' }}>
-                {editingHwId ? 'Save Changes' : 'Post Homework'}
+                {isSaving ? 'Saving...' : (editingHwId ? 'Save Changes' : 'Post Homework')}
               </ThemedText>
             </Pressable>
           </View>
@@ -1214,6 +1222,22 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
                   <ThemedText style={[styles.homeworkAuthor, { color: colors.textSecondary }]}>
                     Posted by: {item.createdByName}
                   </ThemedText>
+
+                  {['admin', 'teacher', 'volunteer'].includes(user?.role || '') && (
+                    <View style={{ marginTop: 8, padding: 8, borderRadius: 8, backgroundColor: colors.background, borderWidth: 0.5, borderColor: colors.border }}>
+                      <ThemedText style={{ fontSize: 11, fontWeight: '700', color: colors.textSecondary }}>
+                        🎯 {i18n.language === 'ta' ? 'நியமிக்கப்பட்ட மாணவர்கள்:' : 'Assigned Students:'}
+                      </ThemedText>
+                      <ThemedText style={{ fontSize: 11, color: colors.text, marginTop: 2, fontWeight: '600' }}>
+                        {item.assignedStudentIds && Array.isArray(item.assignedStudentIds) && item.assignedStudentIds.length > 0
+                          ? item.assignedStudentIds
+                              .map((uid: string) => users.find(u => u.uid === uid)?.fullName)
+                              .filter(Boolean)
+                              .join(', ')
+                          : (i18n.language === 'ta' ? 'முழு வகுப்பு' : 'Entire Class')}
+                      </ThemedText>
+                    </View>
+                  )}
 
                   {(() => {
                     const isThirukkuralTask = item.homeworkId === 'hw_1' || 
