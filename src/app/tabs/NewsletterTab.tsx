@@ -114,6 +114,7 @@ export function NewsletterTab({
   const [newsTitleTaDirty, setNewsTitleTaDirty] = useState(false);
   const [newsDescTaDirty, setNewsDescTaDirty] = useState(false);
   const [isAutoTranslateEnabled, setIsAutoTranslateEnabled] = useState(true);
+  const [isTranslating, setIsTranslating] = useState(false);
 
   // Debouncing for translation inputs
   const debouncedArtTitle = useDebounce(articleTitleEn, 700);
@@ -187,105 +188,90 @@ export function NewsletterTab({
     loadData();
   }, [user]);
 
-  // Translate Article Title
-  useEffect(() => {
+  // Explicit translation on Blur (focus change/tab out)
+  const translateArtTitleOnBlur = async () => {
     if (!isAutoTranslateEnabled) return;
+    if (artTitleTaDirty) return;
     if (!articleTitleEn || articleTitleEn.trim() === '') {
       setArticleTitleTa('');
       setArtTitleTaDirty(false);
       return;
     }
-    if (!articleTitleTa || articleTitleTa.trim() === '') {
-      setArtTitleTaDirty(false);
-    }
-    if (artTitleTaDirty) return;
-    const translate = async () => {
-      try {
-        const result = await translateWithGemini(debouncedArtTitle);
-        if (!artTitleTaDirty) {
-          setArticleTitleTa(result);
-        }
-      } catch (err) {
-        console.error(err);
+    setIsTranslating(true);
+    try {
+      const result = await translateWithGemini(articleTitleEn);
+      if (!artTitleTaDirty) {
+        setArticleTitleTa(result);
       }
-    };
-    translate();
-  }, [debouncedArtTitle, articleTitleEn, articleTitleTa, artTitleTaDirty, isAutoTranslateEnabled]);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsTranslating(false);
+    }
+  };
 
-  // Translate Article Content
-  useEffect(() => {
+  const translateArtContentOnBlur = async () => {
     if (!isAutoTranslateEnabled) return;
+    if (artContentTaDirty) return;
     if (!articleContentEn || articleContentEn.trim() === '') {
       setArticleContentTa('');
       setArtContentTaDirty(false);
       return;
     }
-    if (!articleContentTa || articleContentTa.trim() === '') {
-      setArtContentTaDirty(false);
-    }
-    if (artContentTaDirty) return;
-    const translate = async () => {
-      try {
-        const result = await translateWithGemini(debouncedArtContent);
-        if (!artContentTaDirty) {
-          setArticleContentTa(result);
-        }
-      } catch (err) {
-        console.error(err);
+    setIsTranslating(true);
+    try {
+      const result = await translateWithGemini(articleContentEn);
+      if (!artContentTaDirty) {
+        setArticleContentTa(result);
       }
-    };
-    translate();
-  }, [debouncedArtContent, articleContentEn, articleContentTa, artContentTaDirty, isAutoTranslateEnabled]);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsTranslating(false);
+    }
+  };
 
-  // Translate Newsletter Title
-  useEffect(() => {
+  const translateNewsTitleOnBlur = async () => {
     if (!isAutoTranslateEnabled) return;
+    if (newsTitleTaDirty) return;
     if (!newsTitleEn || newsTitleEn.trim() === '') {
       setNewsTitleTa('');
       setNewsTitleTaDirty(false);
       return;
     }
-    if (!newsTitleTa || newsTitleTa.trim() === '') {
-      setNewsTitleTaDirty(false);
-    }
-    if (newsTitleTaDirty) return;
-    const translate = async () => {
-      try {
-        const result = await translateWithGemini(debouncedNewsTitle);
-        if (!newsTitleTaDirty) {
-          setNewsTitleTa(result);
-        }
-      } catch (err) {
-        console.error(err);
+    setIsTranslating(true);
+    try {
+      const result = await translateWithGemini(newsTitleEn);
+      if (!newsTitleTaDirty) {
+        setNewsTitleTa(result);
       }
-    };
-    translate();
-  }, [debouncedNewsTitle, newsTitleEn, newsTitleTa, newsTitleTaDirty, isAutoTranslateEnabled]);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsTranslating(false);
+    }
+  };
 
-  // Translate Newsletter Description
-  useEffect(() => {
+  const translateNewsDescOnBlur = async () => {
     if (!isAutoTranslateEnabled) return;
+    if (newsDescTaDirty) return;
     if (!newsDescriptionEn || newsDescriptionEn.trim() === '') {
       setNewsDescriptionTa('');
       setNewsDescTaDirty(false);
       return;
     }
-    if (!newsDescriptionTa || newsDescriptionTa.trim() === '') {
-      setNewsDescTaDirty(false);
-    }
-    if (newsDescTaDirty) return;
-    const translate = async () => {
-      try {
-        const result = await translateWithGemini(debouncedNewsDesc);
-        if (!newsDescTaDirty) {
-          setNewsDescriptionTa(result);
-        }
-      } catch (err) {
-        console.error(err);
+    setIsTranslating(true);
+    try {
+      const result = await translateWithGemini(newsDescriptionEn);
+      if (!newsDescTaDirty) {
+        setNewsDescriptionTa(result);
       }
-    };
-    translate();
-  }, [debouncedNewsDesc, newsDescriptionEn, newsDescriptionTa, newsDescTaDirty, isAutoTranslateEnabled]);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsTranslating(false);
+    }
+  };
 
   const openCustomPicker = (title: string, items: { label: string; value: string }[], onSelect: (value: string) => void) => {
     setPickerTitle(title);
@@ -1067,8 +1053,12 @@ export function NewsletterTab({
                 value={articleTitleEn}
                 onChangeText={(text) => {
                   setArticleTitleEn(text);
-                  setArtTitleTaDirty(false);
+                  if (!text || text.trim() === '') {
+                    setArticleTitleTa('');
+                    setArtTitleTaDirty(false);
+                  }
                 }}
+                onBlur={translateArtTitleOnBlur}
               />
             </View>
 
@@ -1092,7 +1082,11 @@ export function NewsletterTab({
                 value={articleTitleTa}
                 onChangeText={(text) => {
                   setArticleTitleTa(text);
-                  setArtTitleTaDirty(true);
+                  if (!text || text.trim() === '') {
+                    setArtTitleTaDirty(false);
+                  } else {
+                    setArtTitleTaDirty(true);
+                  }
                 }}
               />
             </View>
@@ -1111,8 +1105,12 @@ export function NewsletterTab({
                 value={articleContentEn}
                 onChangeText={(text) => {
                   setArticleContentEn(text);
-                  setArtContentTaDirty(false);
+                  if (!text || text.trim() === '') {
+                    setArticleContentTa('');
+                    setArtContentTaDirty(false);
+                  }
                 }}
+                onBlur={translateArtContentOnBlur}
               />
             </View>
 
@@ -1138,7 +1136,11 @@ export function NewsletterTab({
                 value={articleContentTa}
                 onChangeText={(text) => {
                   setArticleContentTa(text);
-                  setArtContentTaDirty(true);
+                  if (!text || text.trim() === '') {
+                    setArtContentTaDirty(false);
+                  } else {
+                    setArtContentTaDirty(true);
+                  }
                 }}
               />
             </View>
@@ -1576,8 +1578,12 @@ export function NewsletterTab({
                 value={newsTitleEn}
                 onChangeText={(text) => {
                   setNewsTitleEn(text);
-                  setNewsTitleTaDirty(false);
+                  if (!text || text.trim() === '') {
+                    setNewsTitleTa('');
+                    setNewsTitleTaDirty(false);
+                  }
                 }}
+                onBlur={translateNewsTitleOnBlur}
               />
             </View>
 
@@ -1601,7 +1607,11 @@ export function NewsletterTab({
                 value={newsTitleTa}
                 onChangeText={(text) => {
                   setNewsTitleTa(text);
-                  setNewsTitleTaDirty(true);
+                  if (!text || text.trim() === '') {
+                    setNewsTitleTaDirty(false);
+                  } else {
+                    setNewsTitleTaDirty(true);
+                  }
                 }}
               />
             </View>
@@ -1620,8 +1630,12 @@ export function NewsletterTab({
                 value={newsDescriptionEn}
                 onChangeText={(text) => {
                   setNewsDescriptionEn(text);
-                  setNewsDescTaDirty(false);
+                  if (!text || text.trim() === '') {
+                    setNewsDescriptionTa('');
+                    setNewsDescTaDirty(false);
+                  }
                 }}
+                onBlur={translateNewsDescOnBlur}
               />
             </View>
 
@@ -1647,7 +1661,11 @@ export function NewsletterTab({
                 value={newsDescriptionTa}
                 onChangeText={(text) => {
                   setNewsDescriptionTa(text);
-                  setNewsDescTaDirty(true);
+                  if (!text || text.trim() === '') {
+                    setNewsDescTaDirty(false);
+                  } else {
+                    setNewsDescTaDirty(true);
+                  }
                 }}
               />
             </View>

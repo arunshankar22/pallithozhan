@@ -146,74 +146,56 @@ export function NewsfeedTab({
   const [originalContentEn, setOriginalContentEn] = useState('');
   const [isAutoTranslateEnabled, setIsAutoTranslateEnabled] = useState(true);
 
-  // Translation loading & debouncing states
+  // Translation loading states
   const [isTitleTranslating, setIsTitleTranslating] = useState(false);
   const [isContentTranslating, setIsContentTranslating] = useState(false);
 
-  const debouncedTitleEn = useDebounce(titleEn, 700);
-  const debouncedContentEn = useDebounce(contentEn, 850);
-
-  // Auto-translate Title
-  useEffect(() => {
+  // Explicit translation on Blur (focus change/tab out)
+  const translateTitleOnBlur = async () => {
     if (!isAutoTranslateEnabled) return;
+    if (titleTaDirty) return;
     if (!titleEn || titleEn.trim() === '') {
       setTitleTa('');
       setTitleTaDirty(false);
       return;
     }
-    if (!titleTa || titleTa.trim() === '') {
-      setTitleTaDirty(false);
-    }
-    if (titleTaDirty) return;
-    if (debouncedTitleEn === originalTitleEn) return;
+    if (titleEn === originalTitleEn) return;
 
-    const translateTitle = async () => {
-      setIsTitleTranslating(true);
-      try {
-        const result = await translateWithGemini(debouncedTitleEn);
-        if (!titleTaDirty) {
-          setTitleTa(result);
-        }
-      } catch (err) {
-        console.error('Title translation error:', err);
-      } finally {
-        setIsTitleTranslating(false);
+    setIsTitleTranslating(true);
+    try {
+      const result = await translateWithGemini(titleEn);
+      if (!titleTaDirty) {
+        setTitleTa(result);
       }
-    };
+    } catch (err) {
+      console.error('Title translation error:', err);
+    } finally {
+      setIsTitleTranslating(false);
+    }
+  };
 
-    translateTitle();
-  }, [debouncedTitleEn, titleEn, titleTa, titleTaDirty, originalTitleEn, isAutoTranslateEnabled]);
-
-  // Auto-translate Content/Description
-  useEffect(() => {
+  const translateContentOnBlur = async () => {
     if (!isAutoTranslateEnabled) return;
+    if (contentTaDirty) return;
     if (!contentEn || contentEn.trim() === '') {
       setContentTa('');
       setContentTaDirty(false);
       return;
     }
-    if (!contentTa || contentTa.trim() === '') {
-      setContentTaDirty(false);
-    }
-    if (contentTaDirty) return;
-    if (debouncedContentEn === originalContentEn) return;
+    if (contentEn === originalContentEn) return;
 
-    const translateContent = async () => {
-      setIsContentTranslating(true);
-      try {
-        const result = await translateWithGemini(debouncedContentEn);
-        if (!contentTaDirty) {
-          setContentTa(result);
-        }
-      } catch (err) {
-        console.error('Content translation error:', err);
-      } finally {
-        setIsContentTranslating(false);
+    setIsContentTranslating(true);
+    try {
+      const result = await translateWithGemini(contentEn);
+      if (!contentTaDirty) {
+        setContentTa(result);
       }
-    };
-
-    translateContent();
-  }, [debouncedContentEn, contentEn, contentTa, contentTaDirty, originalContentEn, isAutoTranslateEnabled]);
+    } catch (err) {
+      console.error('Content translation error:', err);
+    } finally {
+      setIsContentTranslating(false);
+    }
+  };
   
   // Media attachment state
   const [selectedMediaIndex, setSelectedMediaIndex] = useState(0);
@@ -329,10 +311,18 @@ export function NewsfeedTab({
 
   const handleTitleEnChange = (text: string) => {
     setTitleEn(text);
+    if (!text || text.trim() === '') {
+      setTitleTa('');
+      setTitleTaDirty(false);
+    }
   };
 
   const handleContentEnChange = (text: string) => {
     setContentEn(text);
+    if (!text || text.trim() === '') {
+      setContentTa('');
+      setContentTaDirty(false);
+    }
   };
 
   // Google Drive simulation helpers
@@ -959,6 +949,7 @@ export function NewsfeedTab({
                 placeholderTextColor={colors.textSecondary}
                 value={titleEn}
                 onChangeText={handleTitleEnChange}
+                onBlur={translateTitleOnBlur}
               />
             </View>
             <View style={styles.formCol}>
@@ -970,7 +961,14 @@ export function NewsfeedTab({
                 placeholder="தமிழ் தலைப்பு..."
                 placeholderTextColor={colors.textSecondary}
                 value={titleTa}
-                onChangeText={(txt) => { setTitleTa(txt); setTitleTaDirty(true); }}
+                onChangeText={(text) => {
+                  setTitleTa(text);
+                  if (!text || text.trim() === '') {
+                    setTitleTaDirty(false);
+                  } else {
+                    setTitleTaDirty(true);
+                  }
+                }}
               />
             </View>
           </View>
@@ -986,6 +984,7 @@ export function NewsfeedTab({
                 numberOfLines={2}
                 value={contentEn}
                 onChangeText={handleContentEnChange}
+                onBlur={translateContentOnBlur}
               />
             </View>
             <View style={styles.formCol}>
@@ -999,7 +998,14 @@ export function NewsfeedTab({
                 multiline
                 numberOfLines={2}
                 value={contentTa}
-                onChangeText={(txt) => { setContentTa(txt); setContentTaDirty(true); }}
+                onChangeText={(text) => {
+                  setContentTa(text);
+                  if (!text || text.trim() === '') {
+                    setContentTaDirty(false);
+                  } else {
+                    setContentTaDirty(true);
+                  }
+                }}
               />
             </View>
           </View>

@@ -190,74 +190,56 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
     }
   }, [selectedClassId, classes, editingHwId]);
 
-  // Translation loading & debouncing states
+  // Translation loading states
   const [isTitleTranslating, setIsTitleTranslating] = useState(false);
   const [isDescTranslating, setIsDescTranslating] = useState(false);
 
-  const debouncedTitleEn = useDebounce(titleEn, 700);
-  const debouncedDescEn = useDebounce(descEn, 850);
-
-  // Auto-translate Title
-  useEffect(() => {
+  // Explicit translation on Blur (focus change/tab out)
+  const translateTitleOnBlur = async () => {
     if (!isAutoTranslateEnabled) return;
+    if (titleTaDirty) return;
     if (!titleEn || titleEn.trim() === '') {
       setTitleTa('');
       setTitleTaDirty(false);
       return;
     }
-    if (!titleTa || titleTa.trim() === '') {
-      setTitleTaDirty(false);
-    }
-    if (titleTaDirty) return;
-    if (debouncedTitleEn === originalTitleEn) return;
+    if (titleEn === originalTitleEn) return;
 
-    const translateTitle = async () => {
-      setIsTitleTranslating(true);
-      try {
-        const result = await translateWithGemini(debouncedTitleEn);
-        if (!titleTaDirty) {
-          setTitleTa(result);
-        }
-      } catch (err) {
-        console.error('Title translation error:', err);
-      } finally {
-        setIsTitleTranslating(false);
+    setIsTitleTranslating(true);
+    try {
+      const result = await translateWithGemini(titleEn);
+      if (!titleTaDirty) {
+        setTitleTa(result);
       }
-    };
+    } catch (err) {
+      console.error('Title translation error:', err);
+    } finally {
+      setIsTitleTranslating(false);
+    }
+  };
 
-    translateTitle();
-  }, [debouncedTitleEn, titleEn, titleTa, titleTaDirty, originalTitleEn, isAutoTranslateEnabled]);
-
-  // Auto-translate Description
-  useEffect(() => {
+  const translateDescOnBlur = async () => {
     if (!isAutoTranslateEnabled) return;
+    if (descTaDirty) return;
     if (!descEn || descEn.trim() === '') {
       setDescTa('');
       setDescTaDirty(false);
       return;
     }
-    if (!descTa || descTa.trim() === '') {
-      setDescTaDirty(false);
-    }
-    if (descTaDirty) return;
-    if (debouncedDescEn === originalDescEn) return;
+    if (descEn === originalDescEn) return;
 
-    const translateDesc = async () => {
-      setIsDescTranslating(true);
-      try {
-        const result = await translateWithGemini(debouncedDescEn);
-        if (!descTaDirty) {
-          setDescTa(result);
-        }
-      } catch (err) {
-        console.error('Description translation error:', err);
-      } finally {
-        setIsDescTranslating(false);
+    setIsDescTranslating(true);
+    try {
+      const result = await translateWithGemini(descEn);
+      if (!descTaDirty) {
+        setDescTa(result);
       }
-    };
-
-    translateDesc();
-  }, [debouncedDescEn, descEn, descTa, descTaDirty, originalDescEn, isAutoTranslateEnabled]);
+    } catch (err) {
+      console.error('Description translation error:', err);
+    } finally {
+      setIsDescTranslating(false);
+    }
+  };
 
   // Audio Guide recording states
   const [recordedVoiceBase64, setRecordedVoiceBase64] = useState<string | null>(null);
@@ -364,13 +346,20 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
     loadData();
   }, []);
 
-  // Real-time auto-translate triggers (debounced via useEffect)
   const handleTitleEnChange = (text: string) => {
     setTitleEn(text);
+    if (!text || text.trim() === '') {
+      setTitleTa('');
+      setTitleTaDirty(false);
+    }
   };
 
   const handleDescEnChange = (text: string) => {
     setDescEn(text);
+    if (!text || text.trim() === '') {
+      setDescTa('');
+      setDescTaDirty(false);
+    }
   };
 
   const handleStartRecord = async () => {
@@ -735,6 +724,7 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
                 placeholderTextColor={colors.textSecondary}
                 value={titleEn}
                 onChangeText={handleTitleEnChange}
+                onBlur={translateTitleOnBlur}
               />
             </View>
             <View style={styles.formCol}>
@@ -746,7 +736,14 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
                 placeholder="தமிழ் தலைப்பு..."
                 placeholderTextColor={colors.textSecondary}
                 value={titleTa}
-                onChangeText={(text) => { setTitleTa(text); setTitleTaDirty(true); }}
+                onChangeText={(text) => {
+                  setTitleTa(text);
+                  if (!text || text.trim() === '') {
+                    setTitleTaDirty(false);
+                  } else {
+                    setTitleTaDirty(true);
+                  }
+                }}
               />
             </View>
           </View>
@@ -762,6 +759,7 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
                 numberOfLines={2}
                 value={descEn}
                 onChangeText={handleDescEnChange}
+                onBlur={translateDescOnBlur}
               />
             </View>
             <View style={styles.formCol}>
@@ -775,7 +773,14 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
                 multiline
                 numberOfLines={2}
                 value={descTa}
-                onChangeText={(text) => { setDescTa(text); setDescTaDirty(true); }}
+                onChangeText={(text) => {
+                  setDescTa(text);
+                  if (!text || text.trim() === '') {
+                    setDescTaDirty(false);
+                  } else {
+                    setDescTaDirty(true);
+                  }
+                }}
               />
             </View>
           </View>

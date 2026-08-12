@@ -594,65 +594,48 @@ export function ReportsTab({
     }
   };
 
-  // Debouncing for Translation Triggers
-  const debouncedAwardNameEn = useDebounce(formAwardNameEn, 700);
-  const debouncedNotesEn = useDebounce(formNotesEn, 850);
-
-  // Auto-translate Award Title
-  useEffect(() => {
+  // Explicit translation on Blur (focus change/tab out)
+  const translateAwardTitleOnBlur = async () => {
     if (!isAutoTranslateEnabled) return;
+    if (awardNameTaDirty) return;
     if (!formAwardNameEn || formAwardNameEn.trim() === '') {
       setFormAwardNameTa('');
       setAwardNameTaDirty(false);
       return;
     }
-    if (!formAwardNameTa || formAwardNameTa.trim() === '') {
-      setAwardNameTaDirty(false);
-    }
-    if (awardNameTaDirty) return;
-    const translateTitle = async () => {
-      setIsAwardTranslating(true);
-      try {
-        const result = await translateWithGemini(debouncedAwardNameEn);
-        if (!awardNameTaDirty) {
-          setFormAwardNameTa(result);
-        }
-      } catch (err) {
-        console.error('Award title translation error:', err);
-      } finally {
-        setIsAwardTranslating(false);
+    setIsAwardTranslating(true);
+    try {
+      const result = await translateWithGemini(formAwardNameEn);
+      if (!awardNameTaDirty) {
+        setFormAwardNameTa(result);
       }
-    };
-    translateTitle();
-  }, [debouncedAwardNameEn, formAwardNameEn, formAwardNameTa, awardNameTaDirty, isAutoTranslateEnabled]);
+    } catch (err) {
+      console.error('Award title translation error:', err);
+    } finally {
+      setIsAwardTranslating(false);
+    }
+  };
 
-  // Auto-translate Notes
-  useEffect(() => {
+  const translateNotesOnBlur = async () => {
     if (!isAutoTranslateEnabled) return;
+    if (notesTaDirty) return;
     if (!formNotesEn || formNotesEn.trim() === '') {
       setFormNotesTa('');
       setNotesTaDirty(false);
       return;
     }
-    if (!formNotesTa || formNotesTa.trim() === '') {
-      setNotesTaDirty(false);
-    }
-    if (notesTaDirty) return;
-    const translateNotes = async () => {
-      setIsNotesTranslating(true);
-      try {
-        const result = await translateWithGemini(debouncedNotesEn);
-        if (!notesTaDirty) {
-          setFormNotesTa(result);
-        }
-      } catch (err) {
-        console.error('Award notes translation error:', err);
-      } finally {
-        setIsNotesTranslating(false);
+    setIsNotesTranslating(true);
+    try {
+      const result = await translateWithGemini(formNotesEn);
+      if (!notesTaDirty) {
+        setFormNotesTa(result);
       }
-    };
-    translateNotes();
-  }, [debouncedNotesEn, formNotesEn, formNotesTa, notesTaDirty, isAutoTranslateEnabled]);
+    } catch (err) {
+      console.error('Award notes translation error:', err);
+    } finally {
+      setIsNotesTranslating(false);
+    }
+  };
 
   useEffect(() => {
     if (initialSubTab) {
@@ -5713,7 +5696,14 @@ export function ReportsTab({
                   placeholder="e.g. Outstanding Tamil Speaker"
                   placeholderTextColor={colors.textSecondary}
                   value={formAwardNameEn}
-                  onChangeText={setFormAwardNameEn}
+                  onChangeText={(text) => {
+                    setFormAwardNameEn(text);
+                    if (!text || text.trim() === '') {
+                      setFormAwardNameTa('');
+                      setAwardNameTaDirty(false);
+                    }
+                  }}
+                  onBlur={translateAwardTitleOnBlur}
                   style={[localStyles.textInput, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
                 />
               </View>
@@ -5729,7 +5719,11 @@ export function ReportsTab({
                   value={formAwardNameTa}
                   onChangeText={(text) => {
                     setFormAwardNameTa(text);
-                    setAwardNameTaDirty(true);
+                    if (!text || text.trim() === '') {
+                      setAwardNameTaDirty(false);
+                    } else {
+                      setAwardNameTaDirty(true);
+                    }
                   }}
                   style={[localStyles.textInput, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
                 />
@@ -5800,7 +5794,14 @@ export function ReportsTab({
                   placeholder="Describe why this student won this award..."
                   placeholderTextColor={colors.textSecondary}
                   value={formNotesEn}
-                  onChangeText={setFormNotesEn}
+                  onChangeText={(text) => {
+                    setFormNotesEn(text);
+                    if (!text || text.trim() === '') {
+                      setFormNotesTa('');
+                      setNotesTaDirty(false);
+                    }
+                  }}
+                  onBlur={translateNotesOnBlur}
                   multiline
                   numberOfLines={3}
                   style={[
@@ -5822,7 +5823,11 @@ export function ReportsTab({
                   value={formNotesTa}
                   onChangeText={(text) => {
                     setFormNotesTa(text);
-                    setNotesTaDirty(true);
+                    if (!text || text.trim() === '') {
+                      setNotesTaDirty(false);
+                    } else {
+                      setNotesTaDirty(true);
+                    }
                   }}
                   multiline
                   numberOfLines={3}
