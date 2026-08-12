@@ -331,6 +331,7 @@ export function ReportsTab({
   const [formNotesTa, setFormNotesTa] = useState('');
   const [notesTaDirty, setNotesTaDirty] = useState(false);
   const [isNotesTranslating, setIsNotesTranslating] = useState(false);
+  const [isAutoTranslateEnabled, setIsAutoTranslateEnabled] = useState(true);
 
   // --- Progress Report States ---
   const [reportStudentId, setReportStudentId] = useState('');
@@ -599,11 +600,16 @@ export function ReportsTab({
 
   // Auto-translate Award Title
   useEffect(() => {
-    if (awardNameTaDirty) return;
-    if (!debouncedAwardNameEn || debouncedAwardNameEn.trim() === '') {
+    if (!isAutoTranslateEnabled) return;
+    if (!formAwardNameEn || formAwardNameEn.trim() === '') {
       setFormAwardNameTa('');
+      setAwardNameTaDirty(false);
       return;
     }
+    if (!formAwardNameTa || formAwardNameTa.trim() === '') {
+      setAwardNameTaDirty(false);
+    }
+    if (awardNameTaDirty) return;
     const translateTitle = async () => {
       setIsAwardTranslating(true);
       try {
@@ -618,15 +624,20 @@ export function ReportsTab({
       }
     };
     translateTitle();
-  }, [debouncedAwardNameEn, awardNameTaDirty]);
+  }, [debouncedAwardNameEn, formAwardNameEn, formAwardNameTa, awardNameTaDirty, isAutoTranslateEnabled]);
 
   // Auto-translate Notes
   useEffect(() => {
-    if (notesTaDirty) return;
-    if (!debouncedNotesEn || debouncedNotesEn.trim() === '') {
+    if (!isAutoTranslateEnabled) return;
+    if (!formNotesEn || formNotesEn.trim() === '') {
       setFormNotesTa('');
+      setNotesTaDirty(false);
       return;
     }
+    if (!formNotesTa || formNotesTa.trim() === '') {
+      setNotesTaDirty(false);
+    }
+    if (notesTaDirty) return;
     const translateNotes = async () => {
       setIsNotesTranslating(true);
       try {
@@ -641,7 +652,7 @@ export function ReportsTab({
       }
     };
     translateNotes();
-  }, [debouncedNotesEn, notesTaDirty]);
+  }, [debouncedNotesEn, formNotesEn, formNotesTa, notesTaDirty, isAutoTranslateEnabled]);
 
   useEffect(() => {
     if (initialSubTab) {
@@ -5583,6 +5594,34 @@ export function ReportsTab({
 
               {!isBulkImportMode && (
                 <View style={{ gap: 0 }}>
+                  {/* Auto Translate Toggle Button */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+                    <Pressable
+                      onPress={() => setIsAutoTranslateEnabled(!isAutoTranslateEnabled)}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        backgroundColor: isAutoTranslateEnabled ? colors.primaryLight : colors.border,
+                        paddingVertical: 6,
+                        paddingHorizontal: 12,
+                        borderRadius: 20,
+                        borderWidth: 1,
+                        borderColor: isAutoTranslateEnabled ? colors.primary : colors.border
+                      }}
+                    >
+                      <View style={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: 4,
+                        backgroundColor: isAutoTranslateEnabled ? colors.primary : colors.textSecondary,
+                        marginRight: 6
+                      }} />
+                      <ThemedText style={{ fontSize: 11, fontWeight: '700', color: isAutoTranslateEnabled ? colors.primary : colors.textSecondary }}>
+                        {isAutoTranslateEnabled ? 'Auto-Translate: ON' : 'Auto-Translate: OFF'}
+                      </ThemedText>
+                    </Pressable>
+                  </View>
+
                   {/* Form Input fields */}
               
               {/* Class Selector (Staff Only) */}

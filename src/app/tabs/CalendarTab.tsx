@@ -124,6 +124,7 @@ export function CalendarTab({ user, colors, t, showToast, i18n, activeStudentId 
   const [descTaDirty, setDescTaDirty] = useState(false);
   const [originalTitleEn, setOriginalTitleEn] = useState('');
   const [originalDescEn, setOriginalDescEn] = useState('');
+  const [isAutoTranslateEnabled, setIsAutoTranslateEnabled] = useState(true);
 
   // Translation loading & debouncing states
   const [isTitleTranslating, setIsTitleTranslating] = useState(false);
@@ -134,11 +135,16 @@ export function CalendarTab({ user, colors, t, showToast, i18n, activeStudentId 
 
   // Auto-translate Title
   useEffect(() => {
-    if (titleTaDirty) return;
-    if (!debouncedTitleEn || debouncedTitleEn.trim() === '') {
+    if (!isAutoTranslateEnabled) return;
+    if (!titleEn || titleEn.trim() === '') {
       setTitleTa('');
+      setTitleTaDirty(false);
       return;
     }
+    if (!titleTa || titleTa.trim() === '') {
+      setTitleTaDirty(false);
+    }
+    if (titleTaDirty) return;
     if (debouncedTitleEn === originalTitleEn) return;
 
     const translateTitle = async () => {
@@ -156,15 +162,20 @@ export function CalendarTab({ user, colors, t, showToast, i18n, activeStudentId 
     };
 
     translateTitle();
-  }, [debouncedTitleEn, titleTaDirty, originalTitleEn]);
+  }, [debouncedTitleEn, titleEn, titleTa, titleTaDirty, originalTitleEn, isAutoTranslateEnabled]);
 
   // Auto-translate Description
   useEffect(() => {
-    if (descTaDirty) return;
-    if (!debouncedDescEn || debouncedDescEn.trim() === '') {
+    if (!isAutoTranslateEnabled) return;
+    if (!descEn || descEn.trim() === '') {
       setDescTa('');
+      setDescTaDirty(false);
       return;
     }
+    if (!descTa || descTa.trim() === '') {
+      setDescTaDirty(false);
+    }
+    if (descTaDirty) return;
     if (debouncedDescEn === originalDescEn) return;
 
     const translateDesc = async () => {
@@ -182,7 +193,7 @@ export function CalendarTab({ user, colors, t, showToast, i18n, activeStudentId 
     };
 
     translateDesc();
-  }, [debouncedDescEn, descTaDirty, originalDescEn]);
+  }, [debouncedDescEn, descEn, descTa, descTaDirty, originalDescEn, isAutoTranslateEnabled]);
 
   useEffect(() => {
     const load = async () => {
@@ -409,8 +420,36 @@ export function CalendarTab({ user, colors, t, showToast, i18n, activeStudentId 
       {modalVisible && (
         <View style={[styles.formCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
           <ThemedText style={styles.formTitle}>
-            {editingEventId ? 'Edit Event (ஆட்டோ-தமிழ் வசதியுடன்)' : 'Schedule New Event (ஆட்டோ-தமிழ் வசதியுடன்)'}
+            {editingEventId ? 'Edit Event' : 'Schedule New Event'}
           </ThemedText>
+
+          {/* Auto Translate Toggle Button */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+            <Pressable
+              onPress={() => setIsAutoTranslateEnabled(!isAutoTranslateEnabled)}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: isAutoTranslateEnabled ? colors.primaryLight : colors.border,
+                paddingVertical: 6,
+                paddingHorizontal: 12,
+                borderRadius: 20,
+                borderWidth: 1,
+                borderColor: isAutoTranslateEnabled ? colors.primary : colors.border
+              }}
+            >
+              <View style={{
+                width: 8,
+                height: 8,
+                borderRadius: 4,
+                backgroundColor: isAutoTranslateEnabled ? colors.primary : colors.textSecondary,
+                marginRight: 6
+              }} />
+              <ThemedText style={{ fontSize: 11, fontWeight: '700', color: isAutoTranslateEnabled ? colors.primary : colors.textSecondary }}>
+                {isAutoTranslateEnabled ? 'Auto-Translate: ON' : 'Auto-Translate: OFF'}
+              </ThemedText>
+            </Pressable>
+          </View>
 
           <View style={styles.rowForm}>
             <View style={styles.formCol}>

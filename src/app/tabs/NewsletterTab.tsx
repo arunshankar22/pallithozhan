@@ -113,6 +113,7 @@ export function NewsletterTab({
   const [artContentTaDirty, setArtContentTaDirty] = useState(false);
   const [newsTitleTaDirty, setNewsTitleTaDirty] = useState(false);
   const [newsDescTaDirty, setNewsDescTaDirty] = useState(false);
+  const [isAutoTranslateEnabled, setIsAutoTranslateEnabled] = useState(true);
 
   // Debouncing for translation inputs
   const debouncedArtTitle = useDebounce(articleTitleEn, 700);
@@ -188,75 +189,103 @@ export function NewsletterTab({
 
   // Translate Article Title
   useEffect(() => {
-    if (artTitleTaDirty) return;
-    if (!debouncedArtTitle || debouncedArtTitle.trim() === '') {
+    if (!isAutoTranslateEnabled) return;
+    if (!articleTitleEn || articleTitleEn.trim() === '') {
       setArticleTitleTa('');
+      setArtTitleTaDirty(false);
       return;
     }
+    if (!articleTitleTa || articleTitleTa.trim() === '') {
+      setArtTitleTaDirty(false);
+    }
+    if (artTitleTaDirty) return;
     const translate = async () => {
       try {
         const result = await translateWithGemini(debouncedArtTitle);
-        setArticleTitleTa(result);
+        if (!artTitleTaDirty) {
+          setArticleTitleTa(result);
+        }
       } catch (err) {
         console.error(err);
       }
     };
     translate();
-  }, [debouncedArtTitle, artTitleTaDirty]);
+  }, [debouncedArtTitle, articleTitleEn, articleTitleTa, artTitleTaDirty, isAutoTranslateEnabled]);
 
   // Translate Article Content
   useEffect(() => {
-    if (artContentTaDirty) return;
-    if (!debouncedArtContent || debouncedArtContent.trim() === '') {
+    if (!isAutoTranslateEnabled) return;
+    if (!articleContentEn || articleContentEn.trim() === '') {
       setArticleContentTa('');
+      setArtContentTaDirty(false);
       return;
     }
+    if (!articleContentTa || articleContentTa.trim() === '') {
+      setArtContentTaDirty(false);
+    }
+    if (artContentTaDirty) return;
     const translate = async () => {
       try {
         const result = await translateWithGemini(debouncedArtContent);
-        setArticleContentTa(result);
+        if (!artContentTaDirty) {
+          setArticleContentTa(result);
+        }
       } catch (err) {
         console.error(err);
       }
     };
     translate();
-  }, [debouncedArtContent, artContentTaDirty]);
+  }, [debouncedArtContent, articleContentEn, articleContentTa, artContentTaDirty, isAutoTranslateEnabled]);
 
   // Translate Newsletter Title
   useEffect(() => {
-    if (newsTitleTaDirty) return;
-    if (!debouncedNewsTitle || debouncedNewsTitle.trim() === '') {
+    if (!isAutoTranslateEnabled) return;
+    if (!newsTitleEn || newsTitleEn.trim() === '') {
       setNewsTitleTa('');
+      setNewsTitleTaDirty(false);
       return;
     }
+    if (!newsTitleTa || newsTitleTa.trim() === '') {
+      setNewsTitleTaDirty(false);
+    }
+    if (newsTitleTaDirty) return;
     const translate = async () => {
       try {
         const result = await translateWithGemini(debouncedNewsTitle);
-        setNewsTitleTa(result);
+        if (!newsTitleTaDirty) {
+          setNewsTitleTa(result);
+        }
       } catch (err) {
         console.error(err);
       }
     };
     translate();
-  }, [debouncedNewsTitle, newsTitleTaDirty]);
+  }, [debouncedNewsTitle, newsTitleEn, newsTitleTa, newsTitleTaDirty, isAutoTranslateEnabled]);
 
   // Translate Newsletter Description
   useEffect(() => {
-    if (newsDescTaDirty) return;
-    if (!debouncedNewsDesc || debouncedNewsDesc.trim() === '') {
+    if (!isAutoTranslateEnabled) return;
+    if (!newsDescriptionEn || newsDescriptionEn.trim() === '') {
       setNewsDescriptionTa('');
+      setNewsDescTaDirty(false);
       return;
     }
+    if (!newsDescriptionTa || newsDescriptionTa.trim() === '') {
+      setNewsDescTaDirty(false);
+    }
+    if (newsDescTaDirty) return;
     const translate = async () => {
       try {
         const result = await translateWithGemini(debouncedNewsDesc);
-        setNewsDescriptionTa(result);
+        if (!newsDescTaDirty) {
+          setNewsDescriptionTa(result);
+        }
       } catch (err) {
         console.error(err);
       }
     };
     translate();
-  }, [debouncedNewsDesc, newsDescTaDirty]);
+  }, [debouncedNewsDesc, newsDescriptionEn, newsDescriptionTa, newsDescTaDirty, isAutoTranslateEnabled]);
 
   const openCustomPicker = (title: string, items: { label: string; value: string }[], onSelect: (value: string) => void) => {
     setPickerTitle(title);
@@ -998,6 +1027,34 @@ export function NewsletterTab({
               </ThemedText>
             </View>
 
+            {/* Auto Translate Toggle Button */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+              <Pressable
+                onPress={() => setIsAutoTranslateEnabled(!isAutoTranslateEnabled)}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  backgroundColor: isAutoTranslateEnabled ? colors.primaryLight : colors.border,
+                  paddingVertical: 6,
+                  paddingHorizontal: 12,
+                  borderRadius: 20,
+                  borderWidth: 1,
+                  borderColor: isAutoTranslateEnabled ? colors.primary : colors.border
+                }}
+              >
+                <View style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: 4,
+                  backgroundColor: isAutoTranslateEnabled ? colors.primary : colors.textSecondary,
+                  marginRight: 6
+                }} />
+                <ThemedText style={{ fontSize: 11, fontWeight: '700', color: isAutoTranslateEnabled ? colors.primary : colors.textSecondary }}>
+                  {isAutoTranslateEnabled ? 'Auto-Translate: ON' : 'Auto-Translate: OFF'}
+                </ThemedText>
+              </Pressable>
+            </View>
+
             <View style={localStyles.formGroup}>
               <ThemedText style={[localStyles.inputLabel, { color: colors.textSecondary }]}>
                 {i18n.language === 'ta' ? 'கட்டுரைத் தலைப்பு (ஆங்கிலம்)' : 'Article Title (English)'}
@@ -1477,6 +1534,34 @@ export function NewsletterTab({
               <ThemedText style={{ fontSize: 16, fontWeight: '800', color: colors.text }}>
                 {i18n.language === 'ta' ? 'புதிய செய்திமடல் பதிவேற்றவும்' : 'Upload Newsletter Edition'}
               </ThemedText>
+            </View>
+
+            {/* Auto Translate Toggle Button */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+              <Pressable
+                onPress={() => setIsAutoTranslateEnabled(!isAutoTranslateEnabled)}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  backgroundColor: isAutoTranslateEnabled ? colors.primaryLight : colors.border,
+                  paddingVertical: 6,
+                  paddingHorizontal: 12,
+                  borderRadius: 20,
+                  borderWidth: 1,
+                  borderColor: isAutoTranslateEnabled ? colors.primary : colors.border
+                }}
+              >
+                <View style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: 4,
+                  backgroundColor: isAutoTranslateEnabled ? colors.primary : colors.textSecondary,
+                  marginRight: 6
+                }} />
+                <ThemedText style={{ fontSize: 11, fontWeight: '700', color: isAutoTranslateEnabled ? colors.primary : colors.textSecondary }}>
+                  {isAutoTranslateEnabled ? 'Auto-Translate: ON' : 'Auto-Translate: OFF'}
+                </ThemedText>
+              </Pressable>
             </View>
 
             <View style={localStyles.formGroup}>

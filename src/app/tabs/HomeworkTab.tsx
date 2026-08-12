@@ -176,6 +176,7 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
   const [originalTitleEn, setOriginalTitleEn] = useState('');
   const [originalDescEn, setOriginalDescEn] = useState('');
   const [assignedStudentIds, setAssignedStudentIds] = useState<string[]>([]);
+  const [isAutoTranslateEnabled, setIsAutoTranslateEnabled] = useState(true);
 
   // Automatically assign to all students of the class when a class is selected (for new homework tasks)
   useEffect(() => {
@@ -198,6 +199,7 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
 
   // Auto-translate Title
   useEffect(() => {
+    if (!isAutoTranslateEnabled) return;
     if (!titleEn || titleEn.trim() === '') {
       setTitleTa('');
       setTitleTaDirty(false);
@@ -224,10 +226,11 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
     };
 
     translateTitle();
-  }, [debouncedTitleEn, titleEn, titleTa, titleTaDirty, originalTitleEn]);
+  }, [debouncedTitleEn, titleEn, titleTa, titleTaDirty, originalTitleEn, isAutoTranslateEnabled]);
 
   // Auto-translate Description
   useEffect(() => {
+    if (!isAutoTranslateEnabled) return;
     if (!descEn || descEn.trim() === '') {
       setDescTa('');
       setDescTaDirty(false);
@@ -254,7 +257,7 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
     };
 
     translateDesc();
-  }, [debouncedDescEn, descEn, descTa, descTaDirty, originalDescEn]);
+  }, [debouncedDescEn, descEn, descTa, descTaDirty, originalDescEn, isAutoTranslateEnabled]);
 
   // Audio Guide recording states
   const [recordedVoiceBase64, setRecordedVoiceBase64] = useState<string | null>(null);
@@ -594,13 +597,41 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
         <View style={[styles.formCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: Spacing.two }}>
             <ThemedText style={[styles.formTitle, { marginBottom: 0 }]}>
-              {editingHwId ? 'Edit Homework (ஆட்டோ-தமிழ் வசதியுடன்)' : 'Post New Homework (ஆட்டோ-தமிழ் வசதியுடன்)'}
+              {editingHwId ? 'Edit Homework' : 'Post New Homework'}
             </ThemedText>
             <HelperTooltip 
               size={15}
               content="Post new homework tasks for a specific class. You can type in English, and the built-in translator will automatically translate it to Tamil as you type!"
               contentTa="புதிய வீட்டுப்பாடத்தைப் பதிவு செய்யும் போது ஆட்டோ-தமிழ் மொழிபெயர்ப்பு வசதியைப் பயன்படுத்தலாம்."
             />
+          </View>
+
+          {/* Auto Translate Toggle Button */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+            <Pressable
+              onPress={() => setIsAutoTranslateEnabled(!isAutoTranslateEnabled)}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: isAutoTranslateEnabled ? colors.primaryLight : colors.border,
+                paddingVertical: 6,
+                paddingHorizontal: 12,
+                borderRadius: 20,
+                borderWidth: 1,
+                borderColor: isAutoTranslateEnabled ? colors.primary : colors.border
+              }}
+            >
+              <View style={{
+                width: 8,
+                height: 8,
+                borderRadius: 4,
+                backgroundColor: isAutoTranslateEnabled ? colors.primary : colors.textSecondary,
+                marginRight: 6
+              }} />
+              <ThemedText style={{ fontSize: 11, fontWeight: '700', color: isAutoTranslateEnabled ? colors.primary : colors.textSecondary }}>
+                {isAutoTranslateEnabled ? 'Auto-Translate: ON' : 'Auto-Translate: OFF'}
+              </ThemedText>
+            </Pressable>
           </View>
 
           

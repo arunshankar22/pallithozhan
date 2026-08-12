@@ -144,6 +144,7 @@ export function NewsfeedTab({
   const [contentTaDirty, setContentTaDirty] = useState(false);
   const [originalTitleEn, setOriginalTitleEn] = useState('');
   const [originalContentEn, setOriginalContentEn] = useState('');
+  const [isAutoTranslateEnabled, setIsAutoTranslateEnabled] = useState(true);
 
   // Translation loading & debouncing states
   const [isTitleTranslating, setIsTitleTranslating] = useState(false);
@@ -154,11 +155,16 @@ export function NewsfeedTab({
 
   // Auto-translate Title
   useEffect(() => {
-    if (titleTaDirty) return;
-    if (!debouncedTitleEn || debouncedTitleEn.trim() === '') {
+    if (!isAutoTranslateEnabled) return;
+    if (!titleEn || titleEn.trim() === '') {
       setTitleTa('');
+      setTitleTaDirty(false);
       return;
     }
+    if (!titleTa || titleTa.trim() === '') {
+      setTitleTaDirty(false);
+    }
+    if (titleTaDirty) return;
     if (debouncedTitleEn === originalTitleEn) return;
 
     const translateTitle = async () => {
@@ -176,15 +182,20 @@ export function NewsfeedTab({
     };
 
     translateTitle();
-  }, [debouncedTitleEn, titleTaDirty, originalTitleEn]);
+  }, [debouncedTitleEn, titleEn, titleTa, titleTaDirty, originalTitleEn, isAutoTranslateEnabled]);
 
   // Auto-translate Content/Description
   useEffect(() => {
-    if (contentTaDirty) return;
-    if (!debouncedContentEn || debouncedContentEn.trim() === '') {
+    if (!isAutoTranslateEnabled) return;
+    if (!contentEn || contentEn.trim() === '') {
       setContentTa('');
+      setContentTaDirty(false);
       return;
     }
+    if (!contentTa || contentTa.trim() === '') {
+      setContentTaDirty(false);
+    }
+    if (contentTaDirty) return;
     if (debouncedContentEn === originalContentEn) return;
 
     const translateContent = async () => {
@@ -202,7 +213,7 @@ export function NewsfeedTab({
     };
 
     translateContent();
-  }, [debouncedContentEn, contentTaDirty, originalContentEn]);
+  }, [debouncedContentEn, contentEn, contentTa, contentTaDirty, originalContentEn, isAutoTranslateEnabled]);
   
   // Media attachment state
   const [selectedMediaIndex, setSelectedMediaIndex] = useState(0);
@@ -908,8 +919,36 @@ export function NewsfeedTab({
       {modalVisible && (
         <View style={[styles.formCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
           <ThemedText style={styles.formTitle}>
-            {editingPostId ? 'Edit Broadcast Announcement' : 'Draft Bilingual Announcement'}
+            {editingPostId ? 'Edit Announcement' : 'Draft Bilingual Announcement'}
           </ThemedText>
+
+          {/* Auto Translate Toggle Button */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+            <Pressable
+              onPress={() => setIsAutoTranslateEnabled(!isAutoTranslateEnabled)}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: isAutoTranslateEnabled ? colors.primaryLight : colors.border,
+                paddingVertical: 6,
+                paddingHorizontal: 12,
+                borderRadius: 20,
+                borderWidth: 1,
+                borderColor: isAutoTranslateEnabled ? colors.primary : colors.border
+              }}
+            >
+              <View style={{
+                width: 8,
+                height: 8,
+                borderRadius: 4,
+                backgroundColor: isAutoTranslateEnabled ? colors.primary : colors.textSecondary,
+                marginRight: 6
+              }} />
+              <ThemedText style={{ fontSize: 11, fontWeight: '700', color: isAutoTranslateEnabled ? colors.primary : colors.textSecondary }}>
+                {isAutoTranslateEnabled ? 'Auto-Translate: ON' : 'Auto-Translate: OFF'}
+              </ThemedText>
+            </Pressable>
+          </View>
 
           <View style={styles.rowForm}>
             <View style={styles.formCol}>
