@@ -175,6 +175,19 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
   const [descTaDirty, setDescTaDirty] = useState(false);
   const [originalTitleEn, setOriginalTitleEn] = useState('');
   const [originalDescEn, setOriginalDescEn] = useState('');
+  const [assignedStudentIds, setAssignedStudentIds] = useState<string[]>([]);
+
+  // Automatically assign to all students of the class when a class is selected (for new homework tasks)
+  useEffect(() => {
+    if (!editingHwId && selectedClassId) {
+      const selectedClass = classes.find(c => c.classId === selectedClassId);
+      if (selectedClass && selectedClass.studentIds) {
+        setAssignedStudentIds(selectedClass.studentIds);
+      } else {
+        setAssignedStudentIds([]);
+      }
+    }
+  }, [selectedClassId, classes, editingHwId]);
 
   // Translation loading & debouncing states
   const [isTitleTranslating, setIsTitleTranslating] = useState(false);
@@ -185,11 +198,15 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
 
   // Auto-translate Title
   useEffect(() => {
-    if (titleTaDirty) return;
-    if (!debouncedTitleEn || debouncedTitleEn.trim() === '') {
+    if (!titleEn || titleEn.trim() === '') {
       setTitleTa('');
+      setTitleTaDirty(false);
       return;
     }
+    if (!titleTa || titleTa.trim() === '') {
+      setTitleTaDirty(false);
+    }
+    if (titleTaDirty) return;
     if (debouncedTitleEn === originalTitleEn) return;
 
     const translateTitle = async () => {
@@ -207,15 +224,19 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
     };
 
     translateTitle();
-  }, [debouncedTitleEn, titleTaDirty, originalTitleEn]);
+  }, [debouncedTitleEn, titleEn, titleTa, titleTaDirty, originalTitleEn]);
 
   // Auto-translate Description
   useEffect(() => {
-    if (descTaDirty) return;
-    if (!debouncedDescEn || debouncedDescEn.trim() === '') {
+    if (!descEn || descEn.trim() === '') {
       setDescTa('');
+      setDescTaDirty(false);
       return;
     }
+    if (!descTa || descTa.trim() === '') {
+      setDescTaDirty(false);
+    }
+    if (descTaDirty) return;
     if (debouncedDescEn === originalDescEn) return;
 
     const translateDesc = async () => {
@@ -233,7 +254,7 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
     };
 
     translateDesc();
-  }, [debouncedDescEn, descTaDirty, originalDescEn]);
+  }, [debouncedDescEn, descEn, descTa, descTaDirty, originalDescEn]);
 
   // Audio Guide recording states
   const [recordedVoiceBase64, setRecordedVoiceBase64] = useState<string | null>(null);
@@ -392,7 +413,8 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
         name: f.name,
         type: f.type,
         url: f.data
-      }))
+      })),
+      assignedStudentIds: assignedStudentIds // Save customized list of students!
     };
 
     try {
@@ -417,6 +439,7 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
     setTitleTaDirty(false);
     setDescTaDirty(false);
     setSelectedClassId('');
+    setAssignedStudentIds([]);
     setEditingHwId(null);
     setRecordedVoiceBase64(null);
     setAttachedHomeworkFiles([]);
@@ -435,6 +458,7 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
     setOriginalTitleEn(item.title.en);
     setOriginalDescEn(item.description.en);
     setRecordedVoiceBase64(item.voiceUrl || null);
+    setAssignedStudentIds(item.assignedStudentIds || []);
     
     const mappedAttachments: { name: string; type: 'image' | 'video'; data: string; }[] = [];
     if (item.mediaAttachments && item.mediaAttachments.length > 0) {
@@ -483,7 +507,16 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
     const studentId = activeStudentId || (user?.role === 'parent' ? (user.associatedStudents?.[0] || 'student_1') : (user?.uid || 'student_1'));
     const studentClass = classes.find(c => c.studentIds && c.studentIds.includes(studentId));
     if (!studentClass) return false;
-    return item.classId === studentClass.classId;
+    
+    // 1. Class level check
+    if (item.classId !== studentClass.classId) return false;
+
+    // 2. Student level check (targeted homework assignment)
+    if (item.assignedStudentIds && Array.isArray(item.assignedStudentIds)) {
+      return item.assignedStudentIds.includes(studentId);
+    }
+    
+    return true;
   });
 
   return (
@@ -509,6 +542,7 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
               setOriginalDescEn('');
               setRecordedVoiceBase64(null);
               setAttachedHomeworkFiles([]);
+              setAssignedStudentIds([]);
               clearRecording();
               setTitleTaDirty(false);
               setDescTaDirty(false);
@@ -594,6 +628,72 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
               );
             })}
           </View>
+
+          {/* Student Selector Checklist */}
+          {selectedClassId ? (() => {
+            const selectedClass = classes.find(c => c.classId === selectedClassId);
+            const classStudentIds = selectedClass ? (selectedClass.studentIds || []) : [];
+            const classStudents = users.filter(u => classStudentIds.includes(u.uid));
+
+            if (classStudents.length === 0) return null;
+
+            return (
+              <View style={{ marginBottom: 16 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <ThemedText style={{ fontSize: 13, fontWeight: '700', color: colors.text }}>
+                    Assign to Specific Students (குறிப்பிட்ட மாண்பாளர்கள் தேர்வு):
+                  </ThemedText>
+                  <Pressable 
+                    onPress={() => {
+                      if (assignedStudentIds.length === classStudentIds.length) {
+                        setAssignedStudentIds([]); // Deselect all
+                      } else {
+                        setAssignedStudentIds(classStudentIds); // Select all
+                      }
+                    }}
+                    style={{ paddingVertical: 4, paddingHorizontal: 8, borderRadius: 6, backgroundColor: colors.border }}
+                  >
+                    <ThemedText style={{ fontSize: 11, color: colors.textSecondary, fontWeight: '600' }}>
+                      {assignedStudentIds.length === classStudentIds.length ? 'Deselect All' : 'Select All'}
+                    </ThemedText>
+                  </Pressable>
+                </View>
+                
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                  {classStudents.map(student => {
+                    const isChecked = assignedStudentIds.includes(student.uid);
+                    return (
+                      <Pressable
+                        key={student.uid}
+                        onPress={() => {
+                          if (isChecked) {
+                            setAssignedStudentIds(assignedStudentIds.filter(id => id !== student.uid));
+                          } else {
+                            setAssignedStudentIds([...assignedStudentIds, student.uid]);
+                          }
+                        }}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          paddingVertical: 6,
+                          paddingHorizontal: 12,
+                          borderRadius: 20,
+                          borderWidth: 1,
+                          backgroundColor: isChecked ? colors.primaryLight : colors.background,
+                          borderColor: isChecked ? colors.primary : colors.border
+                        }}
+                      >
+                        <CheckCircle size={14} color={isChecked ? colors.primary : colors.textSecondary} style={{ marginRight: 6 }} />
+                        <ThemedText style={{ fontSize: 12, color: colors.text }}>
+                          {student.fullName}
+                        </ThemedText>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+            );
+          })() : null}
 
           <View style={styles.rowForm}>
             <View style={styles.formCol}>
