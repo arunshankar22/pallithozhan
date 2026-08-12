@@ -299,25 +299,39 @@ function executeAnalyticsQueryJS(dbData, sqlQuery) {
 }
 
 // 1. In-Memory SQLite Analytics Query Engine
-let adminApp;
+let clientApp;
+let firestoreDbInstances = {};
 
 async function getLiveFirestoreData(branch = 'main') {
-  const admin = require('firebase-admin');
+  const { initializeApp } = require('firebase/app');
+  const { initializeFirestore, collection, getDocs } = require('firebase/firestore');
+
+  const firebaseConfig = {
+    apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY || "AIzaSyBjdndDGmh4ZQt_SJRf8_aL0QtBgidGMUw",
+    authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN || "pallithozhan.firebaseapp.com",
+    projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID || "pallithozhan",
+    storageBucket: "pallithozhan.firebasestorage.app",
+    messagingSenderId: "278118172684",
+    appId: "1:278118172684:web:fd50511d1a859ebc578629"
+  };
+
   const dbId = (branch === 'main' || branch === 'production') ? 'pallithozhan-prod-db' : 'pallithozhandb';
 
-  if (admin.apps.length === 0) {
-    adminApp = admin.initializeApp({
-      projectId: 'pallithozhan'
-    });
+  if (!clientApp) {
+    clientApp = initializeApp(firebaseConfig);
   }
 
-  const firestoreDb = admin.firestore(dbId);
+  if (!firestoreDbInstances[dbId]) {
+    firestoreDbInstances[dbId] = initializeFirestore(clientApp, {}, dbId);
+  }
+
+  const firestoreDb = firestoreDbInstances[dbId];
   const collections = ['users', 'classes', 'attendance', 'homework', 'expenses', 'reading_progress'];
   const dbData = {};
 
   await Promise.all(collections.map(async (colName) => {
     try {
-      const snap = await firestoreDb.collection(colName).get();
+      const snap = await getDocs(collection(firestoreDb, colName));
       dbData[colName] = [];
       snap.forEach(doc => {
         dbData[colName].push({
