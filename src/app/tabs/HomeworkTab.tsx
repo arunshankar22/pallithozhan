@@ -22,6 +22,7 @@ import { AudioPlayer } from '@/components/AudioPlayer';
 import { Spacing } from '@/constants/theme';
 import { ThirukkuralPracticeGuide } from '@/components/ThirukkuralPracticeGuide';
 import { VideoPlayer } from '@/components/VideoPlayer';
+import { DateTimePicker } from '@/components/DateTimePicker';
 
 export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId }: TabProps) {
   const [homework, setHomework] = useState<any[]>([]);
@@ -178,6 +179,21 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
   const [assignedStudentIds, setAssignedStudentIds] = useState<string[]>([]);
   const [isAutoTranslateEnabled, setIsAutoTranslateEnabled] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+
+  const getFollowingSaturday = () => {
+    const today = new Date();
+    const dayOfWeek = today.getDay(); // 0 is Sunday, 6 is Saturday
+    const daysUntilSaturday = 6 - dayOfWeek;
+    const result = new Date(today);
+    if (daysUntilSaturday === 0) {
+      result.setDate(today.getDate() + 7);
+    } else {
+      result.setDate(today.getDate() + daysUntilSaturday);
+    }
+    return result.toISOString().split('T')[0];
+  };
+
+  const [dueDate, setDueDate] = useState<string>(getFollowingSaturday());
 
   // Automatically assign to all students of the class when a class is selected (for new homework tasks)
   useEffect(() => {
@@ -400,7 +416,7 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
       classId: selectedClassId,
       title: { en: titleEn, ta: titleTa },
       description: { en: descEn, ta: descTa },
-      dueDate: new Date(Date.now() + 3600000 * 24).toISOString(), // Dummy tomorrow
+      dueDate: new Date(dueDate).toISOString(),
       createdByName: user?.fullName || 'Teacher',
       createdBy: user?.uid,
       voiceUrl: recordedVoiceBase64, // Attach audio guide!
@@ -436,6 +452,7 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
     setTitleTaDirty(false);
     setDescTaDirty(false);
     setSelectedClassId('');
+    setDueDate(getFollowingSaturday());
     setAssignedStudentIds([]);
     setEditingHwId(null);
     setRecordedVoiceBase64(null);
@@ -456,6 +473,7 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
     setOriginalDescEn(item.description.en);
     setRecordedVoiceBase64(item.voiceUrl || null);
     setAssignedStudentIds(item.assignedStudentIds || []);
+    setDueDate(item.dueDate ? new Date(item.dueDate).toISOString().split('T')[0] : getFollowingSaturday());
     
     const mappedAttachments: { name: string; type: 'image' | 'video'; data: string; }[] = [];
     if (item.mediaAttachments && item.mediaAttachments.length > 0) {
@@ -900,6 +918,18 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
               <ThemedText style={{ fontWeight: '700', fontSize: 12 }}>🖼️ Attach Photo/Video / புகைப்படம்/வீடியோவை இணைக்கவும்</ThemedText>
             </Pressable>
           </View>
+          {/* Due Date Calendar Picker */}
+          <View style={{ marginVertical: 8, gap: 4 }}>
+            <ThemedText style={styles.formInputLabel}>
+              📅 Expected Completion Date / எதிர்பார்க்கும் நிறைவுத் தேதி
+            </ThemedText>
+            <DateTimePicker
+              value={dueDate}
+              onChange={setDueDate}
+              colors={colors}
+              mode="date"
+            />
+          </View>
 
           <View style={styles.formButtonRow}>
             <Pressable
@@ -1250,144 +1280,162 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
                   })()}
 
                   {/* Submissions interactive checklist */}
-                  {['parent', 'student'].includes(user?.role || '') && (
-                    <View style={{ gap: Spacing.two, marginTop: Spacing.two }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.background, padding: 8, borderRadius: 12, borderWidth: 0.5, borderColor: colors.border }}>
-                        <ThemedText style={{ fontSize: 12, fontWeight: '700', color: colors.textSecondary }}>
-                          👦 {i18n.language === 'ta' ? 'மாணவர்:' : 'Child/Student:'} <ThemedText style={{ color: colors.text, fontWeight: '800' }}>{studentName}</ThemedText>
-                        </ThemedText>
-                        
-                        <Pressable
-                          onPress={() => handleToggleSub(item.homeworkId)}
-                          style={[
-                            styles.completedButton,
-                            {
-                              backgroundColor: isCompleted ? colors.secondaryLight : colors.background,
-                              borderColor: isCompleted ? colors.secondary : colors.border,
-                              marginTop: 0,
-                              alignSelf: 'auto',
-                              paddingVertical: 6,
-                              paddingHorizontal: 12
-                            }
-                          ]}
-                        >
-                          <CheckCircle size={14} color={isCompleted ? colors.secondary : colors.textSecondary} style={{ marginRight: 4 }} />
-                          <ThemedText style={[styles.completedButtonText, { color: isCompleted ? colors.secondary : colors.text, fontSize: 11 }]}>
-                            {isCompleted ? (i18n.language === 'ta' ? 'முடிந்தது' : 'Completed') : (i18n.language === 'ta' ? 'முடிவடையவில்லை' : 'Mark Completed')}
-                          </ThemedText>
-                        </Pressable>
-                      </View>
+                  {['parent', 'student'].includes(user?.role || '') && (() => {
+                    const isPastDue = new Date() > new Date(item.dueDate);
+                    return (
+                      <View style={{ gap: Spacing.two, marginTop: Spacing.two }}>
+                        {isPastDue && (
+                          <View style={{ padding: 8, borderRadius: 8, backgroundColor: colors.dangerLight, borderWidth: 0.5, borderColor: colors.danger, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <Clock size={14} color={colors.danger} />
+                            <ThemedText style={{ fontSize: 11, color: colors.danger, fontWeight: '700' }}>
+                              ⚠️ {i18n.language === 'ta' ? 'பூட்டப்பட்டது: நிறைவுத் தேதி கடந்துவிட்டது' : 'Locked: Expected completion date has passed'}
+                            </ThemedText>
+                          </View>
+                        )}
 
-                      {/* File Upload Manager */}
-                      <View style={{ 
-                        backgroundColor: colors.cardBg, 
-                        borderWidth: 1, 
-                        borderColor: colors.border, 
-                        borderRadius: 16, 
-                        padding: 12, 
-                        gap: 8 
-                      }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <ThemedText style={{ fontSize: 12, fontWeight: '700', color: colors.text }}>
-                            📎 {i18n.language === 'ta' ? 'வீட்டுப்பாடப் கோப்புகள் (படங்கள்/வீடியோக்கள்):' : 'Homework Attachments (Photos/Videos):'}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.background, padding: 8, borderRadius: 12, borderWidth: 0.5, borderColor: colors.border }}>
+                          <ThemedText style={{ fontSize: 12, fontWeight: '700', color: colors.textSecondary }}>
+                            👦 {i18n.language === 'ta' ? 'மாணவர்:' : 'Child/Student:'} <ThemedText style={{ color: colors.text, fontWeight: '800' }}>{studentName}</ThemedText>
                           </ThemedText>
-                          {uploadingHwId === item.homeworkId ? (
-                            <ActivityIndicator size="small" color={colors.primary} />
-                          ) : (
-                            <Pressable 
-                              onPress={() => handleUploadSubmissionFile(item.homeworkId)}
-                              style={{ 
-                                flexDirection: 'row', 
-                                alignItems: 'center', 
-                                gap: 4, 
-                                backgroundColor: colors.primary, 
-                                paddingHorizontal: 10, 
-                                paddingVertical: 5, 
-                                borderRadius: 8 
-                              }}
-                            >
-                              <Upload size={12} color="#FFF" />
-                              <ThemedText style={{ color: '#FFF', fontSize: 10, fontWeight: '700' }}>
-                                {i18n.language === 'ta' ? 'கோப்பை இணைக்கவும்' : 'Upload File'}
-                              </ThemedText>
-                            </Pressable>
-                          )}
+                          
+                          <Pressable
+                            disabled={isPastDue}
+                            onPress={() => handleToggleSub(item.homeworkId)}
+                            style={[
+                              styles.completedButton,
+                              {
+                                backgroundColor: isCompleted ? colors.secondaryLight : colors.background,
+                                borderColor: isCompleted ? colors.secondary : colors.border,
+                                marginTop: 0,
+                                alignSelf: 'auto',
+                                paddingVertical: 6,
+                                paddingHorizontal: 12,
+                                opacity: isPastDue ? 0.5 : 1
+                              }
+                            ]}
+                          >
+                            <CheckCircle size={14} color={isCompleted ? colors.secondary : colors.textSecondary} style={{ marginRight: 4 }} />
+                            <ThemedText style={[styles.completedButtonText, { color: isCompleted ? colors.secondary : colors.text, fontSize: 11 }]}>
+                              {isCompleted ? (i18n.language === 'ta' ? 'முடிந்தது' : 'Completed') : (i18n.language === 'ta' ? 'முடிவடையவில்லை' : 'Mark Completed')}
+                            </ThemedText>
+                          </Pressable>
                         </View>
 
-                        {/* List of uploaded files */}
-                        {subFiles.length > 0 ? (
-                          <View style={{ gap: 6, marginTop: 4 }}>
-                            {subFiles.map((file: any, index: number) => (
-                              <View 
-                                key={index} 
-                                style={{ 
-                                  flexDirection: 'row', 
-                                  alignItems: 'center', 
-                                  justifyContent: 'space-between', 
-                                  backgroundColor: colors.background, 
-                                  padding: 8, 
-                                  borderRadius: 8, 
-                                  borderWidth: 0.5, 
-                                  borderColor: colors.border 
-                                }}
-                              >
-                                <Pressable
-                                  onPress={() => {
-                                    if (file.url && Platform.OS === 'web') {
-                                      window.open(file.url, '_blank');
-                                    } else {
-                                      showToast(`Viewing simulated attachment: ${file.name}`, 'success');
-                                    }
+                        {/* File Upload Manager */}
+                        <View style={{ 
+                          backgroundColor: colors.cardBg, 
+                          borderWidth: 1, 
+                          borderColor: colors.border, 
+                          borderRadius: 16, 
+                          padding: 12, 
+                          gap: 8 
+                        }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <ThemedText style={{ fontSize: 12, fontWeight: '700', color: colors.text }}>
+                              📎 {i18n.language === 'ta' ? 'வீட்டுப்பாடப் கோப்புகள் (படங்கள்/வீடியோக்கள்):' : 'Homework Attachments (Photos/Videos):'}
+                            </ThemedText>
+                            {!isPastDue && (
+                              uploadingHwId === item.homeworkId ? (
+                                <ActivityIndicator size="small" color={colors.primary} />
+                              ) : (
+                                <Pressable 
+                                  onPress={() => handleUploadSubmissionFile(item.homeworkId)}
+                                  style={{ 
+                                    flexDirection: 'row', 
+                                    alignItems: 'center', 
+                                    gap: 4, 
+                                    backgroundColor: colors.primary, 
+                                    paddingHorizontal: 10, 
+                                    paddingVertical: 5, 
+                                    borderRadius: 8 
                                   }}
-                                  style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, marginRight: 10 }}
                                 >
-                                  {file.type === 'video' ? (
-                                    Platform.OS === 'web' ? (
-                                      <video 
-                                        src={file.url} 
-                                        style={{ width: 36, height: 36, borderRadius: 6, objectFit: 'cover', backgroundColor: '#000' }} 
-                                      />
-                                    ) : (
-                                      <View style={{ width: 36, height: 36, borderRadius: 6, backgroundColor: '#1a1a1a', justifyContent: 'center', alignItems: 'center' }}>
-                                        <Video size={16} color={colors.secondary} />
-                                      </View>
-                                    )
-                                  ) : (
-                                    Platform.OS === 'web' ? (
-                                      <img 
-                                        src={file.url} 
-                                        alt={file.name} 
-                                        style={{ width: 36, height: 36, borderRadius: 6, objectFit: 'cover' }} 
-                                      />
-                                    ) : (
-                                      <Image 
-                                        source={{ uri: file.url }} 
-                                        style={{ width: 36, height: 36, borderRadius: 6 }} 
-                                        resizeMode="cover"
-                                      />
-                                    )
-                                  )}
-                                  <ThemedText numberOfLines={1} style={{ fontSize: 11, color: colors.text, flex: 1 }}>
-                                    {file.name}
+                                  <Upload size={12} color="#FFF" />
+                                  <ThemedText style={{ color: '#FFF', fontSize: 10, fontWeight: '700' }}>
+                                    {i18n.language === 'ta' ? 'கோப்பை இணைக்கவும்' : 'Upload File'}
                                   </ThemedText>
                                 </Pressable>
-                                <Pressable 
-                                  onPress={() => handleRemoveSubmissionFile(item.homeworkId, index)}
-                                  style={{ padding: 4 }}
-                                >
-                                  <Trash2 size={13} color={colors.danger} />
-                                </Pressable>
-                              </View>
-                            ))}
+                              )
+                            )}
                           </View>
-                        ) : (
-                          <ThemedText style={{ fontSize: 11, color: colors.textSecondary, fontStyle: 'italic', paddingVertical: 4 }}>
-                            {i18n.language === 'ta' ? 'கோப்புகள் எதுவும் இணைக்கப்படவில்லை. புகைப்படங்கள் அல்லது வீடியோக்களைப் பதிவேற்றவும்.' : 'No files uploaded yet. Add photos or videos of the homework.'}
-                          </ThemedText>
-                        )}
+
+                          {/* List of uploaded files */}
+                          {subFiles.length > 0 ? (
+                            <View style={{ gap: 6, marginTop: 4 }}>
+                              {subFiles.map((file: any, index: number) => (
+                                <View 
+                                  key={index} 
+                                  style={{ 
+                                    flexDirection: 'row', 
+                                    alignItems: 'center', 
+                                    justifyContent: 'space-between', 
+                                    backgroundColor: colors.background, 
+                                    padding: 8, 
+                                    borderRadius: 8, 
+                                    borderWidth: 0.5, 
+                                    borderColor: colors.border 
+                                  }}
+                                >
+                                  <Pressable
+                                    onPress={() => {
+                                      if (file.url && Platform.OS === 'web') {
+                                        window.open(file.url, '_blank');
+                                      } else {
+                                        showToast(`Viewing simulated attachment: ${file.name}`, 'success');
+                                      }
+                                    }}
+                                    style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, marginRight: 10 }}
+                                  >
+                                    {file.type === 'video' ? (
+                                      Platform.OS === 'web' ? (
+                                        <video 
+                                          src={file.url} 
+                                          style={{ width: 36, height: 36, borderRadius: 6, objectFit: 'cover', backgroundColor: '#000' }} 
+                                        />
+                                      ) : (
+                                        <View style={{ width: 36, height: 36, borderRadius: 6, backgroundColor: '#1a1a1a', justifyContent: 'center', alignItems: 'center' }}>
+                                          <Video size={16} color={colors.secondary} />
+                                        </View>
+                                      )
+                                    ) : (
+                                      Platform.OS === 'web' ? (
+                                        <img 
+                                          src={file.url} 
+                                          alt={file.name} 
+                                          style={{ width: 36, height: 36, borderRadius: 6, objectFit: 'cover' }} 
+                                        />
+                                      ) : (
+                                        <Image 
+                                          source={{ uri: file.url }} 
+                                          style={{ width: 36, height: 36, borderRadius: 6 }} 
+                                          resizeMode="cover"
+                                        />
+                                      )
+                                    )}
+                                    <ThemedText numberOfLines={1} style={{ fontSize: 11, color: colors.text, flex: 1 }}>
+                                      {file.name}
+                                    </ThemedText>
+                                  </Pressable>
+                                  {!isPastDue && (
+                                    <Pressable 
+                                      onPress={() => handleRemoveSubmissionFile(item.homeworkId, index)}
+                                      style={{ padding: 4 }}
+                                    >
+                                      <Trash2 size={13} color={colors.danger} />
+                                    </Pressable>
+                                  )}
+                                </View>
+                              ))}
+                            </View>
+                          ) : (
+                            <ThemedText style={{ fontSize: 11, color: colors.textSecondary, fontStyle: 'italic', paddingVertical: 4 }}>
+                              {i18n.language === 'ta' ? 'கோப்புகள் எதுவும் இணைக்கப்படவில்லை. புகைப்படங்கள் அல்லது வீடியோக்களைப் பதிவேற்றவும்.' : 'No files uploaded yet. Add photos or videos of the homework.'}
+                            </ThemedText>
+                          )}
+                        </View>
                       </View>
-                    </View>
-                  )}
+                    );
+                  })()}
 
                   {/* Completed names display for teachers/admins */}
                   {['admin', 'teacher', 'volunteer'].includes(user?.role || '') && (
