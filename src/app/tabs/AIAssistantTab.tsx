@@ -12,7 +12,7 @@ import {
   useWindowDimensions,
   Modal
 } from 'react-native';
-import { Bot, Send, Trash2, Sparkles, MessageSquare, Plus, Menu, X, Mic, Copy, ExternalLink, FileCode } from 'lucide-react-native';
+import { Bot, Send, Trash2, Sparkles, MessageSquare, Plus, Menu, X, Mic, Copy, ExternalLink, FileCode, PanelLeftClose, PanelLeft } from 'lucide-react-native';
 import { aiService, ChatSession, ChatMessage } from '@/services/aiService';
 
 interface AIAssistantTabProps {
@@ -72,6 +72,7 @@ export function AIAssistantTab({ user, colors, t, showToast, insets, i18n }: AIA
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [showSidebar, setShowSidebar] = useState(false);
+  const [showHistorySidebar, setShowHistorySidebar] = useState(true);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -596,7 +597,7 @@ export function AIAssistantTab({ user, colors, t, showToast, insets, i18n }: AIA
   return (
     <View style={[styles.mainLayout, { backgroundColor: colors.background }]}>
       {/* A. Sidebar Column for Desktop */}
-      {isLargeScreen && (
+      {isLargeScreen && showHistorySidebar && (
         <View style={styles.desktopSidebar}>
           {renderSidebarContent()}
         </View>
@@ -627,6 +628,19 @@ export function AIAssistantTab({ user, colors, t, showToast, insets, i18n }: AIA
               {!isLargeScreen && (
                 <TouchableOpacity style={styles.menuBtn} onPress={() => setShowSidebar(true)}>
                   <Menu size={20} color={colors.text} />
+                </TouchableOpacity>
+              )}
+              {isLargeScreen && (
+                <TouchableOpacity 
+                  style={{ marginRight: 12, padding: 4 }} 
+                  onPress={() => setShowHistorySidebar(!showHistorySidebar)}
+                  activeOpacity={0.7}
+                >
+                  {showHistorySidebar ? (
+                    <PanelLeftClose size={20} color={colors.text} />
+                  ) : (
+                    <PanelLeft size={20} color={colors.text} />
+                  )}
                 </TouchableOpacity>
               )}
               <View style={styles.avatar}>

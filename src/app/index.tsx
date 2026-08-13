@@ -49,7 +49,9 @@ import {
   FileText,
   Printer,
   RefreshCw,
-  DollarSign
+  DollarSign,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react-native';
 
 
@@ -187,6 +189,7 @@ export default function HomeScreen() {
 
   // Layout Tab State
   const [activeTab, setActiveTab] = useState<'newsfeed' | 'attendance' | 'homework' | 'library' | 'messages' | 'calendar' | 'reports' | 'management' | 'profile' | 'schools' | 'full-newsfeed' | 'students' | 'newsletter' | 'superadmin' | 'points' | 'print-requests' | 'expenses' | 'ai-assistant'>('newsfeed');
+  const [isMainSidebarCollapsed, setIsMainSidebarCollapsed] = useState(false);
 
   // Points System states
   const [pointsConfig, setPointsConfig] = useState<any>(null);
@@ -2632,8 +2635,20 @@ export default function HomeScreen() {
 
       {/* DESKTOP SPLIT VIEW SIDEBAR */}
       {isLargeScreen ? (
-        <View style={[styles.sidebar, getGlassStyle(colors.cardBg, 0.75, 20), { borderRightWidth: 1, borderColor: colors.border }]}>
-          <BalarMalarBranchLogo size={32} />
+        <View style={[styles.sidebar, getGlassStyle(colors.cardBg, 0.75, 20), { borderRightWidth: 1, borderColor: colors.border }, isMainSidebarCollapsed && { width: 76, paddingHorizontal: Spacing.two, alignItems: 'center' }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: isMainSidebarCollapsed ? 'center' : 'space-between', width: '100%', marginBottom: Spacing.one }}>
+            <BalarMalarBranchLogo size={isMainSidebarCollapsed ? 18 : 32} showBranch={!isMainSidebarCollapsed} />
+            <Pressable 
+              onPress={() => setIsMainSidebarCollapsed(!isMainSidebarCollapsed)}
+              style={{ padding: 6, borderRadius: 8, backgroundColor: colors.border + '11' }}
+            >
+              {isMainSidebarCollapsed ? (
+                <ChevronRight size={15} color={colors.textSecondary} />
+              ) : (
+                <ChevronLeft size={15} color={colors.textSecondary} />
+              )}
+            </Pressable>
+          </View>
 
           {/* Navigation Links */}
           <View style={styles.sidebarNav}>
@@ -2664,87 +2679,134 @@ export default function HomeScreen() {
                       backgroundColor: 'transparent',
                       paddingVertical: 10,
                       paddingHorizontal: 12,
-                    }
+                    },
+                    isMainSidebarCollapsed && { paddingHorizontal: 0, justifyContent: 'center', width: 44, height: 44, borderRadius: 12 }
                   ]}
                 >
                   <Icon size={18} color={isActive ? '#FFFFFF' : colors.textSecondary} />
-                  <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <ThemedText
-                      style={[
-                        styles.sidebarNavText,
-                        { color: isActive ? '#FFFFFF' : colors.text },
-                        isActive && { fontWeight: '800' }
-                      ]}
-                    >
-                      {labelText}
-                    </ThemedText>
-                    {item.key === 'messages' && totalUnreadMessages > 0 && (
-                      <View style={{
-                        backgroundColor: '#FF3B30',
-                        borderRadius: 10,
-                        minWidth: 18,
-                        height: 18,
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        paddingHorizontal: 5,
-                      }}>
-                        <Text style={{ color: '#FFF', fontSize: 10, fontWeight: '700', lineHeight: 12 }}>
-                          {totalUnreadMessages}
-                        </Text>
-                      </View>
-                    )}
-                    {item.key === 'print-requests' && pendingPrintRequestsCount > 0 && ['superadmin', 'admin', 'volunteer'].includes(user?.role || '') && (
-                      <View style={{
-                        backgroundColor: '#FF3B30',
-                        borderRadius: 10,
-                        minWidth: 18,
-                        height: 18,
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        paddingHorizontal: 5,
-                      }}>
-                        <Text style={{ color: '#FFF', fontSize: 10, fontWeight: '700', lineHeight: 12 }}>
-                          {pendingPrintRequestsCount}
-                        </Text>
-                      </View>
-                    )}
-                  </View>
+                  {!isMainSidebarCollapsed && (
+                    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <ThemedText
+                        style={[
+                          styles.sidebarNavText,
+                          { color: isActive ? '#FFFFFF' : colors.text },
+                          isActive && { fontWeight: '800' }
+                        ]}
+                      >
+                        {labelText}
+                      </ThemedText>
+                      {item.key === 'messages' && totalUnreadMessages > 0 && (
+                        <View style={{
+                          backgroundColor: '#FF3B30',
+                          borderRadius: 10,
+                          minWidth: 18,
+                          height: 18,
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          paddingHorizontal: 5,
+                        }}>
+                          <Text style={{ color: '#FFF', fontSize: 10, fontWeight: '700', lineHeight: 12 }}>
+                            {totalUnreadMessages}
+                          </Text>
+                        </View>
+                      )}
+                      {item.key === 'print-requests' && pendingPrintRequestsCount > 0 && ['superadmin', 'admin', 'volunteer'].includes(user?.role || '') && (
+                        <View style={{
+                          backgroundColor: '#FF3B30',
+                          borderRadius: 10,
+                          minWidth: 18,
+                          height: 18,
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          paddingHorizontal: 5,
+                        }}>
+                          <Text style={{ color: '#FFF', fontSize: 10, fontWeight: '700', lineHeight: 12 }}>
+                            {pendingPrintRequestsCount}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  )}
+
+                  {/* Collapsed Unread Indicators */}
+                  {isMainSidebarCollapsed && item.key === 'messages' && totalUnreadMessages > 0 && (
+                    <View style={{
+                      position: 'absolute',
+                      top: 4,
+                      right: 4,
+                      backgroundColor: '#FF3B30',
+                      borderRadius: 6,
+                      width: 10,
+                      height: 10
+                    }} />
+                  )}
+                  {isMainSidebarCollapsed && item.key === 'print-requests' && pendingPrintRequestsCount > 0 && ['superadmin', 'admin', 'volunteer'].includes(user?.role || '') && (
+                    <View style={{
+                      position: 'absolute',
+                      top: 4,
+                      right: 4,
+                      backgroundColor: '#FF3B30',
+                      borderRadius: 6,
+                      width: 10,
+                      height: 10
+                    }} />
+                  )}
                 </Pressable>
               );
             })}
           </View>
 
           {/* Footer controls */}
-          <View style={[styles.sidebarFooter, { borderTopWidth: 1, borderColor: colors.border }]}>
-            {/* User Brief Panel moved above language and logout */}
-            <Pressable 
-              onPress={() => setActiveTab('profile')} 
-              style={({ pressed }) => [
-                styles.userBrief, 
-                { 
-                  backgroundColor: activeTab === 'profile' ? colors.primaryLight : colors.background, 
-                  borderColor: activeTab === 'profile' ? colors.primary : colors.border, 
+          <View style={[styles.sidebarFooter, { borderTopWidth: 1, borderColor: colors.border }, isMainSidebarCollapsed && { alignItems: 'center' }]}>
+            {/* User Brief Panel */}
+            {!isMainSidebarCollapsed ? (
+              <Pressable 
+                onPress={() => setActiveTab('profile')} 
+                style={({ pressed }) => [
+                  styles.userBrief, 
+                  { 
+                    backgroundColor: activeTab === 'profile' ? colors.primaryLight : colors.background, 
+                    borderColor: activeTab === 'profile' ? colors.primary : colors.border, 
+                    marginBottom: Spacing.two,
+                    opacity: pressed ? 0.9 : 1
+                  }
+                ]}
+              >
+                <ThemedText style={[styles.briefName, activeTab === 'profile' && { color: colors.primary, fontWeight: '700' }]}>{user?.fullName}</ThemedText>
+                <View style={[styles.roleBadge, { backgroundColor: activeTab === 'profile' ? colors.primary : colors.primaryLight }]}>
+                  <ThemedText style={[styles.roleBadgeText, { color: activeTab === 'profile' ? '#FFF' : colors.primary }]}>
+                    {t(`roles.${user?.role}`)}
+                  </ThemedText>
+                </View>
+              </Pressable>
+            ) : (
+              <Pressable 
+                onPress={() => setActiveTab('profile')}
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 18,
+                  backgroundColor: activeTab === 'profile' ? colors.primary : colors.primaryLight,
+                  justifyContent: 'center',
+                  alignItems: 'center',
                   marginBottom: Spacing.two,
-                  opacity: pressed ? 0.9 : 1
-                }
-              ]}
-            >
-              <ThemedText style={[styles.briefName, activeTab === 'profile' && { color: colors.primary, fontWeight: '700' }]}>{user?.fullName}</ThemedText>
-              <View style={[styles.roleBadge, { backgroundColor: activeTab === 'profile' ? colors.primary : colors.primaryLight }]}>
-                <ThemedText style={[styles.roleBadgeText, { color: activeTab === 'profile' ? '#FFF' : colors.primary }]}>
-                  {t(`roles.${user?.role}`)}
-                </ThemedText>
-              </View>
-            </Pressable>
+                  alignSelf: 'center'
+                }}
+              >
+                <UserIcon size={16} color={activeTab === 'profile' ? '#FFF' : colors.primary} />
+              </Pressable>
+            )}
 
-            <Pressable onPress={toggleLanguage} style={styles.footerAction}>
+            <Pressable onPress={toggleLanguage} style={[styles.footerAction, isMainSidebarCollapsed && { justifyContent: 'center' }]}>
               <Languages size={16} color={colors.textSecondary} />
-              <ThemedText style={styles.footerActionText}>
-                {i18n.language === 'ta' ? 'English' : 'தமிழ் பதிப்பு'}
-              </ThemedText>
+              {!isMainSidebarCollapsed && (
+                <ThemedText style={styles.footerActionText}>
+                  {i18n.language === 'ta' ? 'English' : 'தமிழ் பதிப்பு'}
+                </ThemedText>
+              )}
             </Pressable>
 
-            {canSwitchRole && alternateRole && (
+            {canSwitchRole && alternateRole && !isMainSidebarCollapsed && (
               <Pressable
                 onPress={() => {
                   switchRole(alternateRole);
@@ -2781,11 +2843,13 @@ export default function HomeScreen() {
               </Pressable>
             )}
 
-            <Pressable onPress={logout} style={styles.footerAction}>
+            <Pressable onPress={logout} style={[styles.footerAction, isMainSidebarCollapsed && { justifyContent: 'center' }]}>
               <LogOut size={16} color={colors.danger} />
-              <ThemedText style={[styles.footerActionText, { color: colors.danger }]}>
-                {i18n.language === 'ta' ? 'வெளியேறு' : 'Sign Out'}
-              </ThemedText>
+              {!isMainSidebarCollapsed && (
+                <ThemedText style={[styles.footerActionText, { color: colors.danger }]}>
+                  {i18n.language === 'ta' ? 'வெளியேறு' : 'Sign Out'}
+                </ThemedText>
+              )}
             </Pressable>
 
             {/* Pallithozhan desktop footer brand */}
