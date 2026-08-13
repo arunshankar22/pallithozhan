@@ -2573,15 +2573,21 @@ export default function HomeScreen() {
 
     if (collapsed) {
       return (
-        <Image 
-          source={require('../../assets/images/favicon.png')} 
-          style={{ 
-            width: 28, 
-            height: 28, 
-            resizeMode: 'contain',
-            alignSelf: 'center'
-          }} 
-        />
+        <View style={{ width: 28, height: 28, overflow: 'hidden', position: 'relative' }}>
+          <Image 
+            source={scheme === 'dark' 
+              ? require('../../assets/images/balarmalar_logo_dark.png') 
+              : require('../../assets/images/balarmalar_logo.png')} 
+            style={{ 
+              width: 28 * 3.6, 
+              height: 28, 
+              position: 'absolute',
+              left: 0,
+              top: 0,
+              resizeMode: 'contain'
+            }} 
+          />
+        </View>
       );
     }
 
