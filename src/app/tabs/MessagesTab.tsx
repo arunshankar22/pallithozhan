@@ -20,6 +20,12 @@ export function MessagesTab({ user, colors, t, showToast, i18n, insets }: TabPro
   const isTa = i18n.language === 'ta';
   const [showMobileChat, setShowMobileChat] = useState(false);
 
+  const getFullName = (u: any) => u?.fullName || u?.email || 'Unknown User';
+  const getInitials = (u: any) => {
+    const name = getFullName(u);
+    return name.split(' ').filter(Boolean).map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() || 'U';
+  };
+
   const [availableUsers, setAvailableUsers] = useState<any[]>([]);
   const [selectedPartner, setSelectedPartner] = useState<any | null>(null);
   const [messages, setMessages] = useState<any[]>([]);
@@ -127,7 +133,7 @@ export function MessagesTab({ user, colors, t, showToast, i18n, insets }: TabPro
       <ScrollView style={{ flex: 1 }}>
         {sortedContacts.map((u) => {
           const isSelected = selectedPartner?.uid === u.uid;
-          const initials = u.fullName.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase();
+          const initials = getInitials(u);
           const chatId = [user?.uid, u.uid].sort().join('_');
           const unreadCount = unreadCounts[chatId] || 0;
           return (
@@ -174,10 +180,10 @@ export function MessagesTab({ user, colors, t, showToast, i18n, insets }: TabPro
               </View>
               <View style={{ flex: 1 }}>
                 <ThemedText style={{ fontSize: 12, fontWeight: '700', color: isSelected ? colors.primary : colors.text }} numberOfLines={1}>
-                  {u.fullName}
+                  {getFullName(u)}
                 </ThemedText>
                 <ThemedText style={{ fontSize: 9, color: colors.textSecondary }}>
-                  {u.role.charAt(0).toUpperCase() + u.role.slice(1)}
+                  {(u?.role || 'user').charAt(0).toUpperCase() + (u?.role || 'user').slice(1)}
                 </ThemedText>
               </View>
             </Pressable>
@@ -196,7 +202,7 @@ export function MessagesTab({ user, colors, t, showToast, i18n, insets }: TabPro
       <ScrollView style={{ flex: 1 }}>
         {sortedContacts.map((u) => {
           const isSelected = selectedPartner?.uid === u.uid;
-          const initials = u.fullName.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase();
+          const initials = getInitials(u);
           const chatId = [user?.uid, u.uid].sort().join('_');
           const unreadCount = unreadCounts[chatId] || 0;
           return (
@@ -240,10 +246,10 @@ export function MessagesTab({ user, colors, t, showToast, i18n, insets }: TabPro
               </View>
               <View style={{ flex: 1 }}>
                 <ThemedText style={{ fontSize: 12, fontWeight: '700', color: isSelected ? colors.primary : colors.text }} numberOfLines={1}>
-                  {u.fullName}
+                  {getFullName(u)}
                 </ThemedText>
                 <ThemedText style={{ fontSize: 9, color: colors.textSecondary }}>
-                  {u.role.charAt(0).toUpperCase() + u.role.slice(1)}
+                  {(u?.role || 'user').charAt(0).toUpperCase() + (u?.role || 'user').slice(1)}
                 </ThemedText>
               </View>
             </Pressable>
@@ -299,15 +305,15 @@ export function MessagesTab({ user, colors, t, showToast, i18n, insets }: TabPro
                   )}
                   <View style={[styles.chatAvatar, { backgroundColor: colors.primaryLight }]}>
                     <ThemedText style={{ color: colors.primary, fontWeight: '700' }}>
-                      {selectedPartner.fullName.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()}
+                      {getInitials(selectedPartner)}
                     </ThemedText>
                   </View>
                   <View>
-                    <ThemedText style={styles.chatHeaderTitle}>{selectedPartner.fullName}</ThemedText>
+                    <ThemedText style={styles.chatHeaderTitle}>{getFullName(selectedPartner)}</ThemedText>
                     <View style={styles.onlineIndicatorRow}>
                       <View style={[styles.onlineDot, { backgroundColor: colors.secondary }]} />
                       <ThemedText style={[styles.onlineText, { color: colors.textSecondary }]}>
-                        {selectedPartner.role.toUpperCase()} • Active Now
+                        {(selectedPartner?.role || 'user').toUpperCase()} • Active Now
                       </ThemedText>
                     </View>
                   </View>

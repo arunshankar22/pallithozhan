@@ -9,9 +9,10 @@ import {
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
-  useWindowDimensions
+  useWindowDimensions,
+  Modal
 } from 'react-native';
-import { Bot, Send, Trash2, Sparkles, MessageSquare, Plus, Menu, X } from 'lucide-react-native';
+import { Bot, Send, Trash2, Sparkles, MessageSquare, Plus, Menu, X, Mic, Copy, ExternalLink, FileCode } from 'lucide-react-native';
 import { aiService, ChatSession, ChatMessage } from '@/services/aiService';
 
 interface AIAssistantTabProps {
@@ -22,6 +23,47 @@ interface AIAssistantTabProps {
   insets: any;
   i18n: any;
 }
+
+interface TextSegment {
+  type: 'text' | 'code';
+  content: string;
+  language?: string;
+  codeBlockId?: string;
+}
+
+const parseMarkdown = (text: string): TextSegment[] => {
+  const segments: TextSegment[] = [];
+  const regex = /```(\w*)\n([\s\S]*?)```/g;
+  let lastIndex = 0;
+  let match;
+  let blockCount = 0;
+
+  while ((match = regex.exec(text)) !== null) {
+    const matchIndex = match.index;
+    if (matchIndex > lastIndex) {
+      segments.push({
+        type: 'text',
+        content: text.substring(lastIndex, matchIndex)
+      });
+    }
+    segments.push({
+      type: 'code',
+      language: match[1] || 'plaintext',
+      content: match[2],
+      codeBlockId: `block_${blockCount++}`
+    });
+    lastIndex = regex.lastIndex;
+  }
+
+  if (lastIndex < text.length) {
+    segments.push({
+      type: 'text',
+      content: text.substring(lastIndex)
+    });
+  }
+
+  return segments;
+};
 
 export function AIAssistantTab({ user, colors, t, showToast, insets, i18n }: AIAssistantTabProps) {
   const { width: windowWidth } = useWindowDimensions();
@@ -34,6 +76,107 @@ export function AIAssistantTab({ user, colors, t, showToast, insets, i18n }: AIA
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const scrollViewRef = useRef<ScrollView>(null);
+
+  // Voice Input Speech-to-Text states
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef<any>(null);
+
+  // Active Code Sandbox / Claude Artifact state
+  const [activeArtifact, setActiveArtifact] = useState<{
+    title: string;
+    code: string;
+    language: string;
+    codeBlockId: string;
+  } | null>(null);
+
+  // Active tab in the Artifact Panel ('code' | 'preview')
+  const [artifactTab, setArtifactTab] = useState<'code' | 'preview'>('preview');
+
+  // Clipboard copy helper
+  const copyToClipboard = async (text: string) => {
+    if (Platform.OS === 'web') {
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(text);
+        showToast(i18n.language === 'ta' ? 'நகலெடுக்கப்பட்டது!' : 'Copied to clipboard!', 'success');
+      } else {
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        showToast(i18n.language === 'ta' ? 'நகலெடுக்கப்பட்டது!' : 'Copied to clipboard!', 'success');
+      }
+    } else {
+      try {
+        const { Clipboard } = require('react-native');
+        Clipboard.setString(text);
+        showToast(i18n.language === 'ta' ? 'நகலெடுக்கப்பட்டது!' : 'Copied to clipboard!', 'success');
+      } catch (e) {
+        console.warn('Native clipboard copy failed', e);
+      }
+    }
+  };
+
+  // Speech Recognition Initialization
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        const rec = new SpeechRecognition();
+        rec.continuous = true;
+        rec.interimResults = true;
+        rec.lang = i18n.language === 'ta' ? 'ta-IN' : 'en-US';
+
+        rec.onresult = (event: any) => {
+          let transcript = '';
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            transcript += event.results[i][0].transcript;
+          }
+          if (transcript) {
+            setInputText(transcript);
+          }
+        };
+
+        rec.onerror = (e: any) => {
+          console.warn('Speech recognition error:', e);
+          setIsListening(false);
+        };
+
+        rec.onend = () => {
+          setIsListening(false);
+        };
+
+        recognitionRef.current = rec;
+      }
+    }
+  }, [i18n.language]);
+
+  const toggleSpeechInput = () => {
+    if (!recognitionRef.current) {
+      showToast(
+        i18n.language === 'ta' 
+          ? 'உங்கள் உலாவி குரல் உள்ளீட்டை ஆதரிக்கவில்லை.' 
+          : 'Speech recognition is not supported on this browser/platform.', 
+        'error'
+      );
+      return;
+    }
+
+    if (isListening) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+      showToast(i18n.language === 'ta' ? 'குரல் பதிவு நிறுத்தப்பட்டது.' : 'Voice listening stopped.', 'success');
+    } else {
+      try {
+        recognitionRef.current.start();
+        setIsListening(true);
+        showToast(i18n.language === 'ta' ? 'பேசவும்...' : 'Listening... Speak now.', 'success');
+      } catch (e) {
+        console.warn('Speech recognition start failed:', e);
+      }
+    }
+  };
 
   // 1. Initial Load of Sessions
   useEffect(() => {
@@ -127,6 +270,10 @@ export function AIAssistantTab({ user, colors, t, showToast, insets, i18n }: AIA
 
   // 4. Send Message inside Active Session
   const handleSendMessage = async (textToSend: string) => {
+    if (isListening && recognitionRef.current) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+    }
     if (!textToSend.trim() || isLoading) return;
 
     setErrorMsg('');
@@ -275,6 +422,164 @@ export function AIAssistantTab({ user, colors, t, showToast, insets, i18n }: AIA
     </View>
   );
 
+  const renderHTMLPreview = (htmlCode: string) => {
+    if (Platform.OS === 'web') {
+      return (
+        <iframe
+          srcDoc={htmlCode}
+          style={{ width: '100%', height: '100%', border: 'none' }}
+          sandbox="allow-scripts"
+        />
+      );
+    } else {
+      try {
+        const { WebView } = require('react-native-webview');
+        if (WebView) {
+          return (
+            <WebView
+              originWhitelist={['*']}
+              source={{ html: htmlCode }}
+              style={{ flex: 1 }}
+              javaScriptEnabled={true}
+              domStorageEnabled={true}
+            />
+          );
+        }
+      } catch (e) {
+        // Fallback
+      }
+      return (
+        <View style={{ padding: 16, alignItems: 'center' }}>
+          <Text style={{ color: colors.textSecondary }}>Live preview is only supported in web browser.</Text>
+        </View>
+      );
+    }
+  };
+
+  const renderArtifactPanel = () => {
+    if (!activeArtifact) return null;
+
+    const isHTML = activeArtifact.language === 'html' || activeArtifact.code.includes('<html') || activeArtifact.code.includes('<!DOCTYPE html');
+
+    return (
+      <View style={{ flex: 1, display: 'flex', flexDirection: 'column', backgroundColor: colors.cardBg }}>
+        {/* Panel Header */}
+        <View style={{
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: 16,
+          borderBottomWidth: 1,
+          borderColor: colors.border,
+          backgroundColor: colors.cardBg
+        }}>
+          <View style={{ flex: 1, marginRight: 12 }}>
+            <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text }} numberOfLines={1}>
+              {activeArtifact.title}
+            </Text>
+            <Text style={{ fontSize: 10, color: colors.textSecondary }}>
+              Interactive Code Sandbox
+            </Text>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <TouchableOpacity
+              onPress={() => copyToClipboard(activeArtifact.code)}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 4,
+                paddingVertical: 6,
+                paddingHorizontal: 10,
+                borderRadius: 8,
+                borderWidth: 1,
+                borderColor: colors.border,
+                backgroundColor: colors.background
+              }}
+            >
+              <Copy size={12} color={colors.text} />
+              <Text style={{ fontSize: 11, fontWeight: '600', color: colors.text }}>Copy</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setActiveArtifact(null)}
+              style={{
+                padding: 6,
+                borderRadius: 8,
+                backgroundColor: colors.border + '33'
+              }}
+            >
+              <X size={15} color={colors.text} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Tabs Bar */}
+        <View style={{
+          flexDirection: 'row',
+          borderBottomWidth: 1,
+          borderColor: colors.border,
+          backgroundColor: colors.background,
+          paddingHorizontal: 8
+        }}>
+          <TouchableOpacity
+            onPress={() => setArtifactTab('code')}
+            style={{
+              paddingVertical: 10,
+              paddingHorizontal: 16,
+              borderBottomWidth: 2,
+              borderColor: artifactTab === 'code' ? '#D97706' : 'transparent'
+            }}
+          >
+            <Text style={{
+              fontSize: 12,
+              fontWeight: '700',
+              color: artifactTab === 'code' ? '#D97706' : colors.textSecondary
+            }}>
+              Code
+            </Text>
+          </TouchableOpacity>
+          {isHTML && (
+            <TouchableOpacity
+              onPress={() => setArtifactTab('preview')}
+              style={{
+                paddingVertical: 10,
+                paddingHorizontal: 16,
+                borderBottomWidth: 2,
+                borderColor: artifactTab === 'preview' ? '#D97706' : 'transparent'
+              }}
+            >
+              <Text style={{
+                fontSize: 12,
+                fontWeight: '700',
+                color: artifactTab === 'preview' ? '#D97706' : colors.textSecondary
+              }}>
+                Preview
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Panel Content */}
+        <View style={{ flex: 1, backgroundColor: colors.background }}>
+          {artifactTab === 'code' ? (
+            <ScrollView contentContainerStyle={{ padding: 16 }}>
+              <Text style={{
+                fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+                fontSize: 12,
+                color: colors.text
+              }}>
+                {activeArtifact.code}
+              </Text>
+            </ScrollView>
+          ) : (
+            <View style={{ flex: 1 }}>
+              {renderHTMLPreview(activeArtifact.code)}
+            </View>
+          )}
+        </View>
+      </View>
+    );
+  };
+
   return (
     <View style={[styles.mainLayout, { backgroundColor: colors.background }]}>
       {/* A. Sidebar Column for Desktop */}
@@ -301,151 +606,284 @@ export function AIAssistantTab({ user, colors, t, showToast, insets, i18n }: AIA
       )}
 
       {/* C. Chat Panel Window */}
-      <View style={styles.chatPanel}>
-        {/* Header Bar */}
-        <View style={[styles.header, { borderBottomColor: colors.border, backgroundColor: colors.cardBg }]}>
-          <View style={styles.headerInfo}>
-            {!isLargeScreen && (
-              <TouchableOpacity style={styles.menuBtn} onPress={() => setShowSidebar(true)}>
-                <Menu size={20} color={colors.text} />
-              </TouchableOpacity>
-            )}
-            <View style={styles.avatar}>
-              <Bot size={20} color="#FFF" />
-            </View>
-            <View>
-              <Text style={[styles.headerTitle, { color: colors.text }]}>{headerTitle}</Text>
-              <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
-                {messages.length > 1 ? 'Active Chat Session' : 'Start a conversation'}
-              </Text>
-            </View>
-          </View>
-
-          <TouchableOpacity 
-            style={[styles.clearBtn, { borderColor: colors.border }]} 
-            onPress={handleStartNewChat}
-            activeOpacity={0.7}
-          >
-            <Plus size={14} color={colors.textSecondary} />
-            <Text style={[styles.clearBtnText, { color: colors.textSecondary }]}>New Session</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Messages List */}
-        <ScrollView
-          ref={scrollViewRef}
-          style={styles.scrollContainer}
-          contentContainerStyle={[
-            styles.scrollContent, 
-            { maxWidth: 720, alignSelf: 'center', width: '100%' }
-          ]}
-          onContentSizeChange={scrollToBottom}
-        >
-          {/* Welcome Onboarding */}
-          {messages.length <= 1 && (
-            <View style={styles.welcomeContainer}>
-              <View style={styles.welcomeIconContainer}>
-                <Bot size={44} color="#D97706" />
-              </View>
-              <Text style={[styles.welcomeTitle, { color: colors.text }]}>How can I help you today?</Text>
-              <Text style={[styles.welcomeDesc, { color: colors.textSecondary }]}>
-                Ask questions about the Tamil language, explore moral lessons, or request database metrics like class attendance and weekly expenses.
-              </Text>
-            </View>
-          )}
-
-          {messages.map((msg, index) => {
-            const textPart = msg.parts.find(p => p.text)?.text;
-            if (!textPart) return null;
-
-            const isUser = msg.role === 'user';
-            return (
-              <View 
-                key={index} 
-                style={[
-                  styles.messageRow, 
-                  isUser ? styles.userRow : styles.modelRow
-                ]}
-              >
-                <View 
-                  style={[
-                    styles.bubble,
-                    isUser 
-                      ? [styles.userBubble, { backgroundColor: '#FCD34D' }]
-                      : [styles.modelBubble, { backgroundColor: colors.cardBg, borderColor: colors.border }]
-                  ]}
-                >
-                  <Text style={[styles.messageText, { color: isUser ? '#1E293B' : colors.text }]}>
-                    {textPart}
-                  </Text>
-                </View>
-              </View>
-            );
-          })}
-
-          {errorMsg ? (
-            <View style={styles.errorContainer}>
-              <Text style={styles.errorText}>{errorMsg}</Text>
-            </View>
-          ) : null}
-
-          {isLoading && (
-            <View style={[styles.messageRow, styles.modelRow]}>
-              <View style={[styles.bubble, styles.modelBubble, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
-                <ActivityIndicator size="small" color="#D97706" />
-              </View>
-            </View>
-          )}
-        </ScrollView>
-
-        {/* Suggestions Box */}
-        {messages.length <= 1 && !isLoading && (
-          <View style={[styles.suggestionsBox, { maxWidth: 720, alignSelf: 'center', width: '100%' }]}>
-            <Text style={[styles.suggestionTitleText, { color: colors.textSecondary }]}>Suggested Questions:</Text>
-            <View style={styles.suggestionsWrapper}>
-              {getSuggestions().map((sug, i) => (
-                <TouchableOpacity
-                  key={i}
-                  style={[styles.suggestionPill, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
-                  onPress={() => handleSendMessage(sug)}
-                  activeOpacity={0.7}
-                >
-                  <Sparkles size={12} color="#D97706" style={{ marginRight: 6 }} />
-                  <Text style={[styles.suggestionText, { color: colors.text }]}>{sug}</Text>
+      <View style={[styles.chatPanel, activeArtifact && isLargeScreen && { flexDirection: 'row', flex: 1 }]}>
+        <View style={{ flex: 1, flexDirection: 'column', height: '100%' }}>
+          {/* Header Bar */}
+          <View style={[styles.header, { borderBottomColor: colors.border, backgroundColor: colors.cardBg }]}>
+            <View style={styles.headerInfo}>
+              {!isLargeScreen && (
+                <TouchableOpacity style={styles.menuBtn} onPress={() => setShowSidebar(true)}>
+                  <Menu size={20} color={colors.text} />
                 </TouchableOpacity>
-              ))}
+              )}
+              <View style={styles.avatar}>
+                <Bot size={20} color="#FFF" />
+              </View>
+              <View>
+                <Text style={[styles.headerTitle, { color: colors.text }]}>{headerTitle}</Text>
+                <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
+                  {messages.length > 1 ? 'Active Chat Session' : 'Start a conversation'}
+                </Text>
+              </View>
             </View>
-          </View>
-        )}
 
-        {/* Input Bar */}
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
-          style={[styles.inputContainer, { borderTopColor: colors.border, backgroundColor: colors.background }]}
-        >
-          <View style={[styles.inputWrapper, { maxWidth: 720, alignSelf: 'center', width: '100%' }]}>
-            <TextInput
-              style={[styles.input, { backgroundColor: colors.cardBg, color: colors.text, borderColor: colors.border }]}
-              placeholder="Type a message..."
-              placeholderTextColor={colors.textSecondary}
-              value={inputText}
-              onChangeText={setInputText}
-              onSubmitEditing={() => handleSendMessage(inputText)}
-              returnKeyType="send"
-              editable={!isLoading}
-            />
-            <TouchableOpacity
-              style={[styles.sendBtn, { backgroundColor: '#D97706', opacity: inputText.trim() && !isLoading ? 1 : 0.6 }]}
-              disabled={!inputText.trim() || isLoading}
-              onPress={() => handleSendMessage(inputText)}
-              activeOpacity={0.8}
+            <TouchableOpacity 
+              style={[styles.clearBtn, { borderColor: colors.border }]} 
+              onPress={handleStartNewChat}
+              activeOpacity={0.7}
             >
-              <Send size={15} color="#FFF" />
+              <Plus size={14} color={colors.textSecondary} />
+              <Text style={[styles.clearBtnText, { color: colors.textSecondary }]}>New Session</Text>
             </TouchableOpacity>
           </View>
-        </KeyboardAvoidingView>
+
+          {/* Messages List */}
+          <ScrollView
+            ref={scrollViewRef}
+            style={styles.scrollContainer}
+            contentContainerStyle={[
+              styles.scrollContent, 
+              { maxWidth: 720, alignSelf: 'center', width: '100%' }
+            ]}
+            onContentSizeChange={scrollToBottom}
+          >
+            {/* Welcome Onboarding */}
+            {messages.length <= 1 && (
+              <View style={styles.welcomeContainer}>
+                <View style={styles.welcomeIconContainer}>
+                  <Bot size={44} color="#D97706" />
+                </View>
+                <Text style={[styles.welcomeTitle, { color: colors.text }]}>How can I help you today?</Text>
+                <Text style={[styles.welcomeDesc, { color: colors.textSecondary }]}>
+                  Ask questions about the Tamil language, explore moral lessons, or request database metrics like class attendance and weekly expenses.
+                </Text>
+              </View>
+            )}
+
+            {messages.map((msg, index) => {
+              const textPart = msg.parts.find(p => p.text)?.text;
+              if (!textPart) return null;
+
+              const isUser = msg.role === 'user';
+              return (
+                <View 
+                  key={index} 
+                  style={[
+                    styles.messageRow, 
+                    isUser ? styles.userRow : styles.modelRow
+                  ]}
+                >
+                  <View 
+                    style={[
+                      styles.bubble,
+                      isUser 
+                        ? [styles.userBubble, { backgroundColor: '#FCD34D' }]
+                        : [styles.modelBubble, { backgroundColor: colors.cardBg, borderColor: colors.border, width: '100%' }]
+                    ]}
+                  >
+                    {parseMarkdown(textPart).map((seg, sIdx) => {
+                      if (seg.type === 'text') {
+                        return (
+                          <Text key={sIdx} style={[styles.messageText, { color: isUser ? '#1E293B' : colors.text }]}>
+                            {seg.content}
+                          </Text>
+                        );
+                      } else {
+                        const isHTML = seg.language === 'html' || seg.content.includes('<html') || seg.content.includes('<!DOCTYPE html');
+                        return (
+                          <View key={sIdx} style={{
+                            marginVertical: 8,
+                            borderRadius: 12,
+                            borderWidth: 1,
+                            borderColor: colors.border,
+                            backgroundColor: colors.background,
+                            overflow: 'hidden',
+                            width: '100%',
+                            minWidth: isLargeScreen ? 320 : 250
+                          }}>
+                            {/* Code Header */}
+                            <View style={{
+                              flexDirection: 'row',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              paddingHorizontal: 12,
+                              paddingVertical: 8,
+                              backgroundColor: colors.border + '22',
+                              borderBottomWidth: 1,
+                              borderColor: colors.border
+                            }}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <FileCode size={14} color="#D97706" />
+                                <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text }}>
+                                  {(seg.language || 'code').toUpperCase()} Block
+                                </Text>
+                              </View>
+                              <TouchableOpacity
+                                onPress={() => copyToClipboard(seg.content)}
+                                style={{ padding: 4 }}
+                              >
+                                <Copy size={13} color={colors.textSecondary} />
+                              </TouchableOpacity>
+                            </View>
+
+                            {/* Code Snippet Preview */}
+                            <View style={{ padding: 12 }}>
+                              <Text 
+                                numberOfLines={4}
+                                style={{
+                                  fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+                                  fontSize: 11,
+                                  color: colors.textSecondary
+                                }}
+                              >
+                                {seg.content}
+                              </Text>
+                            </View>
+
+                            {/* View Sandbox Button */}
+                            <TouchableOpacity
+                              onPress={() => {
+                                setActiveArtifact({
+                                  title: `${(seg.language || 'code').toUpperCase()} Block`,
+                                  code: seg.content,
+                                  language: seg.language || 'plaintext',
+                                  codeBlockId: seg.codeBlockId || 'block_0'
+                                });
+                                setArtifactTab(isHTML ? 'preview' : 'code');
+                              }}
+                              style={{
+                                flexDirection: 'row',
+                                justifyContent: 'center',
+                                alignItems: 'center',
+                                gap: 6,
+                                paddingVertical: 10,
+                                borderTopWidth: 1,
+                                borderColor: colors.border,
+                                backgroundColor: colors.border + '11'
+                              }}
+                            >
+                              <ExternalLink size={12} color="#D97706" />
+                              <Text style={{ fontSize: 12, fontWeight: '700', color: '#D97706' }}>
+                                {isHTML ? 'Open Interactive Sandbox' : 'View Code Block'}
+                              </Text>
+                            </TouchableOpacity>
+                          </View>
+                        );
+                      }
+                    })}
+                  </View>
+                </View>
+              );
+            })}
+
+            {errorMsg ? (
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorText}>{errorMsg}</Text>
+              </View>
+            ) : null}
+
+            {isLoading && (
+              <View style={[styles.messageRow, styles.modelRow]}>
+                <View style={[styles.bubble, styles.modelBubble, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+                  <ActivityIndicator size="small" color="#D97706" />
+                </View>
+              </View>
+            )}
+          </ScrollView>
+
+          {/* Suggestions Box */}
+          {messages.length <= 1 && !isLoading && (
+            <View style={[styles.suggestionsBox, { maxWidth: 720, alignSelf: 'center', width: '100%' }]}>
+              <Text style={[styles.suggestionTitleText, { color: colors.textSecondary }]}>Suggested Questions:</Text>
+              <View style={styles.suggestionsWrapper}>
+                {getSuggestions().map((sug, i) => (
+                  <TouchableOpacity
+                    key={i}
+                    style={[styles.suggestionPill, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
+                    onPress={() => handleSendMessage(sug)}
+                    activeOpacity={0.7}
+                  >
+                    <Sparkles size={12} color="#D97706" style={{ marginRight: 6 }} />
+                    <Text style={[styles.suggestionText, { color: colors.text }]}>{sug}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          )}
+
+          {/* Input Bar */}
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
+            style={[styles.inputContainer, { borderTopColor: colors.border, backgroundColor: colors.background }]}
+          >
+            <View style={[styles.inputWrapper, { maxWidth: 720, alignSelf: 'center', width: '100%' }]}>
+              <TextInput
+                style={[styles.input, { backgroundColor: colors.cardBg, color: colors.text, borderColor: colors.border }]}
+                placeholder="Type a message..."
+                placeholderTextColor={colors.textSecondary}
+                value={inputText}
+                onChangeText={setInputText}
+                onSubmitEditing={() => handleSendMessage(inputText)}
+                returnKeyType="send"
+                editable={!isLoading}
+              />
+              
+              {/* Voice Microphone Button */}
+              <TouchableOpacity
+                style={[
+                  styles.sendBtn, 
+                  { 
+                    backgroundColor: isListening ? '#EF4444' : colors.primaryLight, 
+                    marginRight: 6,
+                    borderColor: isListening ? '#DC2626' : 'transparent',
+                    borderWidth: isListening ? 1 : 0
+                  }
+                ]}
+                onPress={toggleSpeechInput}
+                activeOpacity={0.8}
+              >
+                <Mic size={15} color={isListening ? '#FFF' : colors.primary} />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.sendBtn, { backgroundColor: '#D97706', opacity: inputText.trim() && !isLoading ? 1 : 0.6 }]}
+                disabled={!inputText.trim() || isLoading}
+                onPress={() => handleSendMessage(inputText)}
+                activeOpacity={0.8}
+              >
+                <Send size={15} color="#FFF" />
+              </TouchableOpacity>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+
+        {/* Desktop Side-by-Side Sandbox panel */}
+        {activeArtifact && isLargeScreen && (
+          <View style={{
+            width: '45%',
+            borderLeftWidth: 1,
+            borderColor: colors.border,
+            backgroundColor: colors.cardBg,
+            height: '100%'
+          }}>
+            {renderArtifactPanel()}
+          </View>
+        )}
       </View>
+
+      {/* Mobile bottom sheet modal code viewer */}
+      {activeArtifact && !isLargeScreen && (
+        <Modal
+          visible={true}
+          animationType="slide"
+          onRequestClose={() => setActiveArtifact(null)}
+        >
+          <View style={{ flex: 1, backgroundColor: colors.background, paddingTop: insets.top }}>
+            {renderArtifactPanel()}
+          </View>
+        </Modal>
+      )}
     </View>
   );
 }
