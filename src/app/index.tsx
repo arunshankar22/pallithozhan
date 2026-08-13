@@ -2562,7 +2562,7 @@ export default function HomeScreen() {
   }, [user]);
 
   // Sidebar Logo using the official brand blossomed-flower logo and showing active branch next to parramatta in english and tamil
-  const BalarMalarBranchLogo = ({ size = 26, showBranch = true }: { size?: number; showBranch?: boolean }) => {
+  const BalarMalarBranchLogo = ({ size = 26, showBranch = true, collapsed = false }: { size?: number; showBranch?: boolean; collapsed?: boolean }) => {
     const activeBranch = typeof window !== 'undefined' && typeof window.localStorage !== 'undefined' ? window.localStorage.getItem('pallithozhan_active_branch') || 'parramatta' : 'parramatta';
     const branchNames: Record<string, { en: string, ta: string }> = {
       parramatta: { en: 'Parramatta Branch', ta: 'பரமட்டா கிளை' },
@@ -2570,6 +2570,20 @@ export default function HomeScreen() {
       blacktown: { en: 'Blacktown Branch', ta: 'பிளாக்டவுன் கிளை' }
     };
     const currentBranch = branchNames[activeBranch] || branchNames.parramatta;
+
+    if (collapsed) {
+      return (
+        <Image 
+          source={require('../../assets/images/favicon.png')} 
+          style={{ 
+            width: 28, 
+            height: 28, 
+            resizeMode: 'contain',
+            alignSelf: 'center'
+          }} 
+        />
+      );
+    }
 
     const displayWidth = size * 3.6;
     const displayHeight = size;
@@ -2637,7 +2651,7 @@ export default function HomeScreen() {
       {isLargeScreen ? (
         <View style={[styles.sidebar, getGlassStyle(colors.cardBg, 0.75, 20), { borderRightWidth: 1, borderColor: colors.border }, isMainSidebarCollapsed && { width: 76, paddingHorizontal: Spacing.two, alignItems: 'center' }]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: isMainSidebarCollapsed ? 'center' : 'space-between', width: '100%', marginBottom: Spacing.one }}>
-            <BalarMalarBranchLogo size={isMainSidebarCollapsed ? 18 : 32} showBranch={!isMainSidebarCollapsed} />
+            <BalarMalarBranchLogo size={isMainSidebarCollapsed ? 18 : 32} showBranch={!isMainSidebarCollapsed} collapsed={isMainSidebarCollapsed} />
             <Pressable 
               onPress={() => setIsMainSidebarCollapsed(!isMainSidebarCollapsed)}
               style={{ padding: 6, borderRadius: 8, backgroundColor: colors.border + '11' }}
@@ -2680,7 +2694,7 @@ export default function HomeScreen() {
                       paddingVertical: 10,
                       paddingHorizontal: 12,
                     },
-                    isMainSidebarCollapsed && { paddingHorizontal: 0, justifyContent: 'center', width: 44, height: 44, borderRadius: 12 }
+                    isMainSidebarCollapsed && { paddingHorizontal: 0, justifyContent: 'center', gap: 0, width: 44, height: 44, borderRadius: 12 }
                   ]}
                 >
                   <Icon size={18} color={isActive ? '#FFFFFF' : colors.textSecondary} />
@@ -2806,41 +2820,69 @@ export default function HomeScreen() {
               )}
             </Pressable>
 
-            {canSwitchRole && alternateRole && !isMainSidebarCollapsed && (
-              <Pressable
-                onPress={() => {
-                  switchRole(alternateRole);
-                  showToast(
-                    i18n.language === 'ta'
-                      ? `காட்சிப் பொறுப்பு ${alternateRole.toUpperCase()} ஆக மாற்றப்பட்டது!`
-                      : `Switched view context to ${alternateRole.toUpperCase()}!`,
-                    'success'
-                  );
-                }}
-                style={[styles.footerAction, { 
-                  backgroundColor: colors.primaryLight + '20', 
-                  borderRadius: 8, 
-                  paddingHorizontal: 8, 
-                  paddingVertical: 6,
-                  borderWidth: 1,
-                  borderColor: colors.primary + '30',
-                  marginBottom: Spacing.one
-                }]}
-              >
-                <Shield size={16} color={colors.primary} />
-                <View style={{ flex: 1 }}>
-                  <ThemedText style={[styles.footerActionText, { color: colors.primary, fontWeight: '700', fontSize: 11 }]}>
-                    {user?.role === 'parent' 
-                      ? (i18n.language === 'ta' ? `${user?.originalRole?.toUpperCase()} பொறுப்பிற்கு மாற்றவும்` : `Switch to ${user?.originalRole?.toUpperCase()}`)
-                      : (i18n.language === 'ta' ? 'பார்வை பொறுப்பை மாற்று' : 'Switch View Role / பொறுப்பை மாற்று')}
-                  </ThemedText>
-                  <ThemedText style={{ fontSize: 9, color: colors.textSecondary, marginTop: 1 }}>
-                    {user?.role === 'parent' 
-                      ? (i18n.language === 'ta' ? 'பெற்றோராக பார்க்கப்படுகிறது' : 'Viewing as Parent') 
-                      : (i18n.language === 'ta' ? `${user?.role?.toUpperCase()} ஆக பார்க்கப்படுகிறது (பெற்றோர் பார்வைக்கு மாற்றவும்)` : `Viewing as ${user?.role?.toUpperCase()} (Switch to Parent View)`)}
-                  </ThemedText>
-                </View>
-              </Pressable>
+            {canSwitchRole && alternateRole && (
+              isMainSidebarCollapsed ? (
+                <Pressable
+                  onPress={() => {
+                    switchRole(alternateRole);
+                    showToast(
+                      i18n.language === 'ta'
+                        ? `காட்சிப் பொறுப்பு ${alternateRole.toUpperCase()} ஆக மாற்றப்பட்டது!`
+                        : `Switched view context to ${alternateRole.toUpperCase()}!`,
+                      'success'
+                    );
+                  }}
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 18,
+                    backgroundColor: colors.primaryLight + '40',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    marginBottom: Spacing.two,
+                    alignSelf: 'center',
+                    borderWidth: 1,
+                    borderColor: colors.primary + '30',
+                  }}
+                >
+                  <Shield size={16} color={colors.primary} />
+                </Pressable>
+              ) : (
+                <Pressable
+                  onPress={() => {
+                    switchRole(alternateRole);
+                    showToast(
+                      i18n.language === 'ta'
+                        ? `காட்சிப் பொறுப்பு ${alternateRole.toUpperCase()} ஆக மாற்றப்பட்டது!`
+                        : `Switched view context to ${alternateRole.toUpperCase()}!`,
+                      'success'
+                    );
+                  }}
+                  style={[styles.footerAction, { 
+                    backgroundColor: colors.primaryLight + '20', 
+                    borderRadius: 8, 
+                    paddingHorizontal: 8, 
+                    paddingVertical: 6,
+                    borderWidth: 1,
+                    borderColor: colors.primary + '30',
+                    marginBottom: Spacing.one
+                  }]}
+                >
+                  <Shield size={16} color={colors.primary} />
+                  <View style={{ flex: 1 }}>
+                    <ThemedText style={[styles.footerActionText, { color: colors.primary, fontWeight: '700', fontSize: 11 }]}>
+                      {user?.role === 'parent' 
+                        ? (i18n.language === 'ta' ? `${user?.originalRole?.toUpperCase()} பொறுப்பிற்கு மாற்றவும்` : `Switch to ${user?.originalRole?.toUpperCase()}`)
+                        : (i18n.language === 'ta' ? 'பார்வை பொறுப்பை மாற்று' : 'Switch View Role / பொறுப்பை மாற்று')}
+                    </ThemedText>
+                    <ThemedText style={{ fontSize: 9, color: colors.textSecondary, marginTop: 1 }}>
+                      {user?.role === 'parent' 
+                        ? (i18n.language === 'ta' ? 'பெற்றோராக பார்க்கப்படுகிறது' : 'Viewing as Parent') 
+                        : (i18n.language === 'ta' ? `${user?.role?.toUpperCase()} ஆக பார்க்கப்படுகிறது (பெற்றோர் பார்வைக்கு மாற்றவும்)` : `Viewing as ${user?.role?.toUpperCase()} (Switch to Parent View)`)}
+                    </ThemedText>
+                  </View>
+                </Pressable>
+              )
             )}
 
             <Pressable onPress={logout} style={[styles.footerAction, isMainSidebarCollapsed && { justifyContent: 'center' }]}>
@@ -2857,20 +2899,23 @@ export default function HomeScreen() {
               flexDirection: 'row', 
               alignItems: 'center', 
               justifyContent: 'center', 
-              gap: 8, 
+              gap: isMainSidebarCollapsed ? 0 : 8, 
               marginTop: Spacing.four,
               paddingTop: Spacing.two,
               borderTopWidth: 1,
               borderTopColor: colors.border + '40',
-              opacity: 0.8
+              opacity: 0.8,
+              width: '100%'
             }}>
               <Image 
                 source={require('../../assets/images/pallithozhan_logo.png')} 
                 style={{ width: 18, height: 18, borderRadius: 4 }} 
               />
-              <ThemedText style={{ fontSize: 10, fontWeight: '700', color: colors.textSecondary, letterSpacing: 0.5 }}>
-                Pallithozhan
-              </ThemedText>
+              {!isMainSidebarCollapsed && (
+                <ThemedText style={{ fontSize: 10, fontWeight: '700', color: colors.textSecondary, letterSpacing: 0.5 }}>
+                  Pallithozhan
+                </ThemedText>
+              )}
             </View>
           </View>
         </View>
