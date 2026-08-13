@@ -423,10 +423,23 @@ export function AIAssistantTab({ user, colors, t, showToast, insets, i18n }: AIA
   );
 
   const renderHTMLPreview = (htmlCode: string) => {
+    // Inject standard responsive styles to ensure that any content fits the viewport width nicely
+    let processedCode = htmlCode;
+    const defaultStyles = '<style>body { margin: 0; padding: 16px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: transparent; } table { width: 100% !important; max-width: 100%; border-collapse: collapse; margin-top: 8px; } th, td { padding: 8px; border: 1px solid #e2e8f0; word-break: break-word; text-align: left; } th { background-color: #f8fafc; } img { max-width: 100%; height: auto; }</style>';
+    
+    if (htmlCode.includes('<head>')) {
+      processedCode = htmlCode.replace(
+        '<head>',
+        `<head><meta name="viewport" content="width=device-width, initial-scale=1.0">${defaultStyles}`
+      );
+    } else {
+      processedCode = `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1.0">${defaultStyles}</head><body>${htmlCode}</body></html>`;
+    }
+
     if (Platform.OS === 'web') {
       return (
         <iframe
-          srcDoc={htmlCode}
+          srcDoc={processedCode}
           style={{ width: '100%', height: '100%', border: 'none' }}
           sandbox="allow-scripts"
         />
@@ -438,7 +451,7 @@ export function AIAssistantTab({ user, colors, t, showToast, insets, i18n }: AIA
           return (
             <WebView
               originWhitelist={['*']}
-              source={{ html: htmlCode }}
+              source={{ html: processedCode }}
               style={{ flex: 1 }}
               javaScriptEnabled={true}
               domStorageEnabled={true}
@@ -698,8 +711,7 @@ export function AIAssistantTab({ user, colors, t, showToast, insets, i18n }: AIA
                             borderColor: colors.border,
                             backgroundColor: colors.background,
                             overflow: 'hidden',
-                            width: '100%',
-                            minWidth: isLargeScreen ? 320 : 250
+                            width: '100%'
                           }}>
                             {/* Code Header */}
                             <View style={{
@@ -1099,6 +1111,14 @@ const styles = StyleSheet.create({
   messageText: {
     fontSize: 13.5,
     lineHeight: 19,
+    flexWrap: 'wrap',
+    ...Platform.select({
+      web: {
+        wordBreak: 'break-word',
+        overflowWrap: 'anywhere'
+      } as any,
+      default: {}
+    })
   },
   errorContainer: {
     padding: 10,

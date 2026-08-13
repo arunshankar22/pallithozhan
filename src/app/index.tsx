@@ -2955,7 +2955,7 @@ export default function HomeScreen() {
           const tabBarPaddingBottom = bottomInset > 0 ? bottomInset : Spacing.two;
           const tabBarHeight = 72 + tabBarPaddingBottom;
 
-          return (isLargeScreen ? ['attendance', 'management', 'messages'] : ['attendance', 'messages']).includes(activeTab) ? (
+          return (isLargeScreen ? ['attendance', 'management', 'messages', 'ai-assistant'] : ['attendance', 'messages', 'ai-assistant']).includes(activeTab) ? (
             <View style={[
               { flex: 1, paddingHorizontal: isLargeScreen ? Spacing.five : Spacing.three, paddingTop: Spacing.three },
               !isLargeScreen && { paddingBottom: tabBarHeight }
