@@ -134,6 +134,12 @@ export function AIAssistantTab({ user, colors, t, showToast, insets, i18n }: AIA
         input.onchange = async (e: any) => {
           const file = e.target.files?.[0];
           if (file) {
+            if (file.size > 2.5 * 1024 * 1024) {
+              showToast(i18n.language === 'ta' 
+                ? 'கோப்பு 2.5MB ஐ விட அதிகமாக உள்ளது. சிறிய கோப்பைத் தேர்ந்தெடுக்கவும்.' 
+                : 'File size exceeds 2.5MB. Please select a smaller file.', 'error');
+              return;
+            }
             const reader = new FileReader();
             reader.onloadend = () => {
               const base64 = (reader.result as string).split(',')[1];
@@ -168,6 +174,12 @@ export function AIAssistantTab({ user, colors, t, showToast, insets, i18n }: AIA
       
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const asset = result.assets[0];
+        if (asset.size && asset.size > 2.5 * 1024 * 1024) {
+          showToast(i18n.language === 'ta' 
+            ? 'கோப்பு 2.5MB ஐ விட அதிகமாக உள்ளது. சிறிய கோப்பைத் தேர்ந்தெடுக்கவும்.' 
+            : 'File size exceeds 2.5MB. Please select a smaller file.', 'error');
+          return;
+        }
         const base64 = await getBase64(asset.uri);
         
         setAttachedFiles(prev => [
@@ -204,6 +216,12 @@ export function AIAssistantTab({ user, colors, t, showToast, insets, i18n }: AIA
       
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const asset = result.assets[0];
+        if (asset.fileSize && asset.fileSize > 2.5 * 1024 * 1024) {
+          showToast(i18n.language === 'ta' 
+            ? 'கோப்பு 2.5MB ஐ விட அதிகமாக உள்ளது. சிறிய கோப்பைத் தேர்ந்தெடுக்கவும்.' 
+            : 'File size exceeds 2.5MB. Please select a smaller file.', 'error');
+          return;
+        }
         const base64 = await getBase64(asset.uri);
         const fileName = asset.fileName || asset.uri.split('/').pop() || 'photo.jpg';
         const mimeType = asset.mimeType || (fileName.endsWith('.mp4') ? 'video/mp4' : 'image/jpeg');
