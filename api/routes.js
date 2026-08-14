@@ -1249,8 +1249,33 @@ Guidelines for SQL generation:
           msg.parts?.some(p => p.inlineData)
         );
 
+        // Strip custom properties like 'attachments' from history objects before sending to Gemini API
+        const cleanContents = contentsList.map(msg => ({
+          role: msg.role === 'model' ? 'model' : 'user',
+          parts: msg.parts.map(part => {
+            if (part.text) {
+              return { text: part.text };
+            }
+            if (part.inlineData) {
+              return {
+                inlineData: {
+                  mimeType: part.inlineData.mimeType,
+                  data: part.inlineData.data
+                }
+              };
+            }
+            if (part.functionCall) {
+              return { functionCall: part.functionCall };
+            }
+            if (part.functionResponse) {
+              return { functionResponse: part.functionResponse };
+            }
+            return part;
+          })
+        }));
+
         const requestBody = {
-          contents: contentsList,
+          contents: cleanContents,
           systemInstruction: systemInstruction
         };
 
