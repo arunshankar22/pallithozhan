@@ -1144,7 +1144,7 @@ Response Schema:
       if (body.attachments && Array.isArray(body.attachments)) {
         for (const file of body.attachments) {
           if (file.base64 && file.mimeType) {
-            if (file.mimeType.startsWith('image/')) {
+            if (file.mimeType.startsWith('image/') || file.mimeType.startsWith('video/') || file.mimeType.startsWith('audio/')) {
               const exists = userMessageItem.parts.some(p => p.inlineData && p.inlineData.mimeType === file.mimeType && p.inlineData.data === file.base64);
               if (!exists) {
                 userMessageItem.parts.push({
