@@ -126,6 +126,40 @@ export function AIAssistantTab({ user, colors, t, showToast, insets, i18n }: AIA
   };
 
   const pickDocument = async () => {
+    if (Platform.OS === 'web') {
+      try {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '*/*';
+        input.onchange = async (e: any) => {
+          const file = e.target.files?.[0];
+          if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              const base64 = (reader.result as string).split(',')[1];
+              setAttachedFiles(prev => [
+                ...prev,
+                {
+                  uri: URL.createObjectURL(file),
+                  name: file.name,
+                  type: file.type.startsWith('image/') ? 'image' : file.type.startsWith('video/') ? 'video' : 'document',
+                  size: file.size,
+                  mimeType: file.type || 'application/octet-stream',
+                  base64
+                }
+              ]);
+            };
+            reader.readAsDataURL(file);
+          }
+        };
+        input.click();
+      } catch (error) {
+        console.error('Failed to pick web document:', error);
+        showToast('Failed to select file.', 'error');
+      }
+      return;
+    }
+
     try {
       const result = await DocumentPicker.getDocumentAsync({
         type: '*/*',
