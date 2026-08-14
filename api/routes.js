@@ -1127,10 +1127,49 @@ Response Schema:
       }
       
       const contents = [...(body.history || [])];
-      const lastItem = contents[contents.length - 1];
-      const lastItemText = lastItem?.parts?.find(p => p.text)?.text;
-      if (lastItemText !== body.message) {
-        contents.push({ role: 'user', parts: [{ text: body.message }] });
+      let userMessageItem = contents[contents.length - 1];
+      
+      if (!userMessageItem || userMessageItem.role !== 'user') {
+        userMessageItem = { role: 'user', parts: [{ text: body.message || '' }] };
+        contents.push(userMessageItem);
+      } else {
+        const textPart = userMessageItem.parts.find(p => p.text);
+        if (textPart) {
+          textPart.text = body.message || textPart.text;
+        } else {
+          userMessageItem.parts.unshift({ text: body.message || '' });
+        }
+      }
+      
+      if (body.attachments && Array.isArray(body.attachments)) {
+        for (const file of body.attachments) {
+          if (file.base64 && file.mimeType) {
+            if (file.mimeType.startsWith('image/')) {
+              const exists = userMessageItem.parts.some(p => p.inlineData && p.inlineData.mimeType === file.mimeType && p.inlineData.data === file.base64);
+              if (!exists) {
+                userMessageItem.parts.push({
+                  inlineData: {
+                    mimeType: file.mimeType,
+                    data: file.base64
+                  }
+                });
+              }
+            } else {
+              const textPart = userMessageItem.parts.find(p => p.text);
+              if (textPart && !textPart.text.includes(file.fileName)) {
+                textPart.text += `\n\n[Attached Document: ${file.fileName || 'document'} (${file.mimeType})]`;
+                if (file.mimeType.startsWith('text/') || file.mimeType === 'application/json' || file.mimeType.includes('csv')) {
+                  try {
+                    const textContent = Buffer.from(file.base64, 'base64').toString('utf8');
+                    textPart.text += `\n--- Document Content ---\n${textContent}\n-----------------------\n`;
+                  } catch (e) {
+                    // ignore
+                  }
+                }
+              }
+            }
+          }
+        }
       }
       
       // Determine allowed tools based on role

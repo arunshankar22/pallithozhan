@@ -15,6 +15,12 @@ export interface ChatMessage {
       response: any;
     };
   }[];
+  attachments?: {
+    name: string;
+    type: string;
+    uri: string;
+    mimeType?: string;
+  }[];
 }
 
 export interface ChatSession {
@@ -136,7 +142,8 @@ export const aiService = {
     messageText: string,
     history: ChatMessage[],
     userRole: string,
-    branch: string = 'main'
+    branch: string = 'main',
+    attachments?: { uri: string; base64?: string; mimeType: string; fileName: string }[]
   ): Promise<{ response: string; history: ChatMessage[] }> => {
     const url = `${API_URL}/ai/chat?branch=${branch}`;
     
@@ -149,7 +156,8 @@ export const aiService = {
       body: JSON.stringify({
         message: messageText,
         history: cleanHistory,
-        userRole: userRole
+        userRole: userRole,
+        attachments: attachments
       })
     });
 

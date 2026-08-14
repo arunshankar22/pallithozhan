@@ -12,7 +12,11 @@ import {
   useWindowDimensions,
   Modal
 } from 'react-native';
-import { Bot, Send, Trash2, Sparkles, MessageSquare, Plus, Menu, X, Mic, Copy, ExternalLink, FileCode, PanelLeftClose, PanelLeft } from 'lucide-react-native';
+import { Bot, Send, Trash2, Sparkles, MessageSquare, Plus, Menu, X, Mic, Copy, ExternalLink, FileCode, PanelLeftClose, PanelLeft, Paperclip, Download } from 'lucide-react-native';
+import * as DocumentPicker from 'expo-document-picker';
+import * as ImagePicker from 'expo-image-picker';
+import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system/legacy';
 import { aiService, ChatSession, ChatMessage } from '@/services/aiService';
 
 interface AIAssistantTabProps {
@@ -92,6 +96,131 @@ export function AIAssistantTab({ user, colors, t, showToast, insets, i18n }: AIA
 
   // Active tab in the Artifact Panel ('code' | 'preview')
   const [artifactTab, setArtifactTab] = useState<'code' | 'preview'>('preview');
+
+  // Attachment states
+  const [attachedFiles, setAttachedFiles] = useState<{
+    uri: string;
+    name: string;
+    type: string;
+    size?: number;
+    base64?: string;
+    mimeType: string;
+  }[]>([]);
+
+  const getBase64 = async (uri: string): Promise<string> => {
+    if (Platform.OS === 'web') {
+      const res = await fetch(uri);
+      const blob = await res.blob();
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const base64data = (reader.result as string).split(',')[1];
+          resolve(base64data);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    } else {
+      return await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
+    }
+  };
+
+  const pickDocument = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: '*/*',
+        copyToCacheDirectory: true
+      });
+      
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        const base64 = await getBase64(asset.uri);
+        
+        setAttachedFiles(prev => [
+          ...prev,
+          {
+            uri: asset.uri,
+            name: asset.name,
+            type: asset.mimeType?.startsWith('image/') ? 'image' : asset.mimeType?.startsWith('video/') ? 'video' : 'document',
+            size: asset.size,
+            mimeType: asset.mimeType || 'application/octet-stream',
+            base64
+          }
+        ]);
+      }
+    } catch (error) {
+      console.error('Failed to pick document:', error);
+      showToast('Failed to select file.', 'error');
+    }
+  };
+
+  const pickImage = async () => {
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        showToast('Storage permission is required to select photos.', 'error');
+        return;
+      }
+      
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images', 'videos'],
+        allowsEditing: false,
+        quality: 0.8
+      });
+      
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        const base64 = await getBase64(asset.uri);
+        const fileName = asset.fileName || asset.uri.split('/').pop() || 'photo.jpg';
+        const mimeType = asset.mimeType || (fileName.endsWith('.mp4') ? 'video/mp4' : 'image/jpeg');
+        
+        setAttachedFiles(prev => [
+          ...prev,
+          {
+            uri: asset.uri,
+            name: fileName,
+            type: asset.type || 'image',
+            size: asset.fileSize,
+            mimeType,
+            base64
+          }
+        ]);
+      }
+    } catch (error) {
+      console.error('Failed to pick image:', error);
+      showToast('Failed to select image.', 'error');
+    }
+  };
+
+  const downloadArtifact = async (code: string, fileName: string = 'code_block.txt') => {
+    try {
+      if (Platform.OS === 'web') {
+        const blob = new Blob([code], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast('File download started.', 'success');
+      } else {
+        const fileUri = FileSystem.cacheDirectory + fileName;
+        await FileSystem.writeAsStringAsync(fileUri, code, { encoding: FileSystem.EncodingType.UTF8 });
+        
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(fileUri);
+          showToast('Share sheet opened successfully.', 'success');
+        } else {
+          showToast('Sharing is not supported on this device.', 'error');
+        }
+      }
+    } catch (error) {
+      console.error('Failed to download/share artifact:', error);
+      showToast('Failed to download/share code file.', 'error');
+    }
+  };
 
   // Clipboard copy helper
   const copyToClipboard = async (text: string) => {
@@ -308,9 +437,16 @@ export function AIAssistantTab({ user, colors, t, showToast, insets, i18n }: AIA
       activeSess.title = userMessage.substring(0, 24) + (userMessage.length > 24 ? '...' : '');
     }
 
+    const currentAttachments = [...attachedFiles];
+    setAttachedFiles([]); // Clear attachment inputs immediately
+
     const updatedMessages = [
       ...activeSess.messages,
-      { role: 'user' as const, parts: [{ text: userMessage }] }
+      { 
+        role: 'user' as const, 
+        parts: [{ text: userMessage }],
+        attachments: currentAttachments.map(f => ({ name: f.name, type: f.type, uri: f.uri, mimeType: f.mimeType }))
+      }
     ];
 
     activeSess.messages = updatedMessages;
@@ -324,7 +460,8 @@ export function AIAssistantTab({ user, colors, t, showToast, insets, i18n }: AIA
         userMessage,
         updatedMessages,
         user.role,
-        'parramatta'
+        'parramatta',
+        currentAttachments.map(f => ({ uri: f.uri, base64: f.base64, mimeType: f.mimeType, fileName: f.name }))
       );
 
       activeSess.messages = result.history;
@@ -512,6 +649,26 @@ export function AIAssistantTab({ user, colors, t, showToast, insets, i18n }: AIA
             >
               <Copy size={12} color={colors.text} />
               <Text style={{ fontSize: 11, fontWeight: '600', color: colors.text }}>Copy</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => {
+                const ext = activeArtifact.language === 'html' ? 'html' : activeArtifact.language === 'javascript' ? 'js' : 'txt';
+                downloadArtifact(activeArtifact.code, `code_artifact_${activeArtifact.codeBlockId || '1'}.${ext}`);
+              }}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 4,
+                paddingVertical: 6,
+                paddingHorizontal: 10,
+                borderRadius: 8,
+                borderWidth: 1,
+                borderColor: colors.border,
+                backgroundColor: colors.background
+              }}
+            >
+              <Download size={12} color={colors.text} />
+              <Text style={{ fontSize: 11, fontWeight: '600', color: colors.text }}>Download</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => setActiveArtifact(null)}
@@ -790,13 +947,47 @@ export function AIAssistantTab({ user, colors, t, showToast, insets, i18n }: AIA
                             >
                               <ExternalLink size={12} color="#D97706" />
                               <Text style={{ fontSize: 12, fontWeight: '700', color: '#D97706' }}>
-                                {isHTML ? 'Open Interactive Sandbox' : 'View Code Block'}
+                                Open
                               </Text>
                             </TouchableOpacity>
                           </View>
                         );
                       }
                     })}
+
+                    {/* Render message attachments */}
+                    {isUser && msg.attachments && msg.attachments.length > 0 && (
+                      <View style={{
+                        flexDirection: 'row',
+                        flexWrap: 'wrap',
+                        gap: 8,
+                        marginTop: 6,
+                        borderTopWidth: 1,
+                        borderTopColor: 'rgba(30, 41, 59, 0.1)',
+                        paddingTop: 6
+                      }}>
+                        {msg.attachments.map((file, fIdx) => (
+                          <View key={fIdx} style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            backgroundColor: 'rgba(30, 41, 59, 0.05)',
+                            paddingVertical: 4,
+                            paddingHorizontal: 8,
+                            borderRadius: 8,
+                            gap: 4
+                          }}>
+                            <Paperclip size={10} color="#1E293B" />
+                            <Text style={{
+                              fontSize: 10,
+                              color: '#1E293B',
+                              fontWeight: '600'
+                            }} numberOfLines={1}>
+                              {file.name}
+                            </Text>
+                          </View>
+                        ))}
+                      </View>
+                    )}
                   </View>
                 </View>
               );
@@ -843,7 +1034,94 @@ export function AIAssistantTab({ user, colors, t, showToast, insets, i18n }: AIA
             keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
             style={[styles.inputContainer, { borderTopColor: colors.border, backgroundColor: colors.background }]}
           >
+            {/* Attachment Preview Row */}
+            {attachedFiles.length > 0 && (
+              <View style={{
+                flexDirection: 'row',
+                flexWrap: 'wrap',
+                gap: 8,
+                paddingHorizontal: 16,
+                paddingBottom: 10,
+                maxWidth: 720,
+                alignSelf: 'center',
+                width: '100%'
+              }}>
+                {attachedFiles.map((file, fIdx) => (
+                  <View key={fIdx} style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    backgroundColor: colors.cardBg,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                    borderRadius: 12,
+                    paddingVertical: 6,
+                    paddingHorizontal: 10,
+                    gap: 6
+                  }}>
+                    <Paperclip size={12} color="#D97706" />
+                    <Text style={{ fontSize: 11, color: colors.text, maxWidth: 150 }} numberOfLines={1}>
+                      {file.name}
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() => setAttachedFiles(prev => prev.filter((_, idx) => idx !== fIdx))}
+                      style={{
+                        backgroundColor: colors.border + '33',
+                        borderRadius: 8,
+                        padding: 2
+                      }}
+                    >
+                      <X size={10} color={colors.textSecondary} />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            )}
+
             <View style={[styles.inputWrapper, { maxWidth: 720, alignSelf: 'center', width: '100%' }]}>
+              {/* Media Picker Plus Button */}
+              <TouchableOpacity
+                style={[
+                  styles.sendBtn, 
+                  { 
+                    backgroundColor: colors.primaryLight, 
+                    marginRight: 6,
+                    width: 36,
+                    height: 36,
+                    borderRadius: 18
+                  }
+                ]}
+                onPress={() => {
+                  if (Platform.OS === 'web') {
+                    pickDocument();
+                  } else {
+                    const { Alert } = require('react-native');
+                    Alert.alert(
+                      i18n.language === 'ta' ? 'கோப்பை இணைக்கவும்' : 'Attach File',
+                      i18n.language === 'ta' 
+                        ? 'நீங்கள் பதிவேற்ற விரும்பும் கோப்பு வகையைத் தேர்ந்தெடுக்கவும்:' 
+                        : 'Select the file type you wish to upload:',
+                      [
+                        {
+                          text: i18n.language === 'ta' ? 'புகைப்படம் / வீடியோ' : 'Photo / Video',
+                          onPress: pickImage
+                        },
+                        {
+                          text: i18n.language === 'ta' ? 'ஆவணம்' : 'Document',
+                          onPress: pickDocument
+                        },
+                        {
+                          text: i18n.language === 'ta' ? 'ரத்துசெய்' : 'Cancel',
+                          style: 'cancel'
+                        }
+                      ]
+                    );
+                  }
+                }}
+                activeOpacity={0.8}
+              >
+                <Plus size={15} color={colors.primary} />
+              </TouchableOpacity>
+
               <TextInput
                 style={[styles.input, { backgroundColor: colors.cardBg, color: colors.text, borderColor: colors.border }]}
                 placeholder="Type a message..."
