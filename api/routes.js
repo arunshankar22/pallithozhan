@@ -1245,16 +1245,25 @@ Guidelines for SQL generation:
       };
 
       async function callGemini(contentsList) {
+        const hasMultimodal = contentsList.some(msg => 
+          msg.parts?.some(p => p.inlineData)
+        );
+
+        const requestBody = {
+          contents: contentsList,
+          systemInstruction: systemInstruction
+        };
+
+        if (!hasMultimodal && tools && tools.length > 0) {
+          requestBody.tools = tools;
+        }
+
         const response = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${apiKey}`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: contentsList,
-              tools: tools,
-              systemInstruction: systemInstruction
-            })
+            body: JSON.stringify(requestBody)
           }
         );
         if (!response.ok) {
