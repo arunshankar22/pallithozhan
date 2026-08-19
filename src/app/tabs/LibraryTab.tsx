@@ -67,7 +67,7 @@ export function LibraryTab({ user, colors, t, showToast, i18n, insets }: TabProp
   const [submittingBook, setSubmittingBook] = useState(false);
 
   // Grade lists
-  const gradeLevels = ['All', 'KG', 'Year 1', 'Year 2', 'Year 3', 'Year 4', 'Year 5', 'Year 6', 'Year 7', 'Year 8', 'Year 9'];
+  const gradeLevels = ['All', 'General', 'KG', 'Year 1', 'Year 2', 'Year 3', 'Year 4', 'Year 5', 'Year 6', 'Year 7', 'Year 8', 'Year 9'];
   const categories = ['All', 'textbook', 'workbook', 'storybook', 'audio'];
 
   useEffect(() => {
