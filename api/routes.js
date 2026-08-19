@@ -653,7 +653,7 @@ async function handleApiRoutes(req, res, pathname, method, dbData, writeDb, urlO
 
       // Query Gemini Developer API using the standard REST endpoint
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
         {
           method: 'POST',
           headers: {

@@ -94,7 +94,7 @@ export function ExpensesTab({ user, colors, t, showToast, i18n, insets }: TabPro
   };
 
   const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
-  const hasAccess = isAdmin || isApprover(user?.uid) || (config?.allowedSubmitRoles || []).includes(user?.role || '');
+  const hasAccess = isAdmin || isApprover(user?.uid) || (config?.allowedSubmitRoles || []).includes(user?.role || '') || user?.role === 'teacher';
 
   // Determines who can see what:
   // Treasurer, Secretary, President, and Admins can see all. Regular submitters only see their own.

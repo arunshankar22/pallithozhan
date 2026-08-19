@@ -60,7 +60,7 @@ let localApproverConfig: ExpenseApproverConfig = {
   secretaryNames: ['Chandra'],
   presidentUids: ['volunteer_1'],
   presidentNames: ['Chandra'],
-  allowedSubmitRoles: ['volunteer', 'admin', 'superadmin']
+  allowedSubmitRoles: ['teacher', 'volunteer', 'admin', 'superadmin']
 };
 
 export const expenseService = {
@@ -79,7 +79,7 @@ export const expenseService = {
           secretaryNames: data.secretaryNames || (data.secretaryName ? [data.secretaryName] : []),
           presidentUids: data.presidentUids || (data.presidentUid ? [data.presidentUid] : []),
           presidentNames: data.presidentNames || (data.presidentName ? [data.presidentName] : []),
-          allowedSubmitRoles: data.allowedSubmitRoles || ['volunteer', 'admin', 'superadmin']
+          allowedSubmitRoles: data.allowedSubmitRoles || ['teacher', 'volunteer', 'admin', 'superadmin']
         } as ExpenseApproverConfig;
       }
     } catch (e) {

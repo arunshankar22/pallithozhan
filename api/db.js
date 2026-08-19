@@ -444,6 +444,73 @@ const DEFAULT_BOOKS = [
     readingPoints: 150,
     pagesCount: 80,
     createdDate: new Date().toISOString()
+  },
+  {
+    bookId: 'song_tamil_thai',
+    title: { en: 'Tamil Thai Vaazhthu (தமிழ் தாய் வாழ்த்து)', ta: 'தமிழ் தாய் வாழ்த்து' },
+    author: 'Manonmaniam Sundaram Pillai',
+    gradeLevel: 'General',
+    category: 'audio',
+    description: { 
+      en: 'The state song of Tamil Nadu, praising the Tamil language.', 
+      ta: 'தமிழ்நாட்டின் மாநில வாழ்த்துப் பாடல். தமிழ் மொழியின் பெருமையைப் போற்றிப் பாடுவது.' 
+    },
+    coverUrl: 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&q=80&w=300',
+    pdfUrl: 'https://www.tamilvu.org/library/libhome.htm',
+    audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
+    readingPoints: 30,
+    pagesCount: 2,
+    createdDate: new Date().toISOString()
+  },
+  {
+    bookId: 'song_vande_mataram',
+    title: { en: 'Vande Mataram (வந்தே மாதரம்)', ta: 'வந்தே மாதரம்' },
+    author: 'Bankim Chandra Chatterjee',
+    gradeLevel: 'General',
+    category: 'audio',
+    description: { 
+      en: 'The national song of India, expressing devotion to the motherland.', 
+      ta: 'இந்தியாவின் தேசியப் பாடல். தாய்நாட்டின் மீதான பற்றையும் பக்தியையும் வெளிப்படுத்துவது.' 
+    },
+    coverUrl: 'https://images.unsplash.com/photo-1590073844006-33379778ae09?auto=format&fit=crop&q=80&w=300',
+    pdfUrl: 'https://www.tamilvu.org/library/libhome.htm',
+    audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
+    readingPoints: 30,
+    pagesCount: 2,
+    createdDate: new Date().toISOString()
+  },
+  {
+    bookId: 'song_bharathiyar',
+    title: { en: 'Mahakavi Bharathiyar Songs (பாரதியார் கவிதைகள்)', ta: 'மகாகவி பாரதியார் பாடல்கள்' },
+    author: 'Subramania Bharati',
+    gradeLevel: 'General',
+    category: 'storybook',
+    description: { 
+      en: 'A compilation of patriotic, devotional, and social reform poems by Mahakavi Bharathiyar.', 
+      ta: 'மகாகவி சுப்பிரமணிய பாரதியாரின் தேசபக்தி, பக்தி மற்றும் சமூக சீர்திருத்தப் பாடல்களின் தொகுப்பு.' 
+    },
+    coverUrl: 'https://images.unsplash.com/photo-1476275466078-4007374efbbe?auto=format&fit=crop&q=80&w=300',
+    pdfUrl: 'https://archive.org/download/mahakavi-bharathiyar-songs/mahakavi-bharathiyar-songs.pdf',
+    readingPoints: 100,
+    pagesCount: 150,
+    createdDate: new Date().toISOString()
+  },
+  {
+    bookId: 'song_national_anthem',
+    title: { en: 'National Anthem of India (தேசிய கீதம்)', ta: 'இந்திய தேசிய கீதம்' },
+    author: 'Rabindranath Tagore',
+    gradeLevel: 'General',
+    category: 'audio',
+    description: { 
+      en: 'Jana Gana Mana, the national anthem of India, celebrating unity in diversity.', 
+      ta: 'ஜன கண மண - இந்தியாவின் தேசிய கீதம். வேற்றுமையில் ஒற்றுமையைப் போற்றும் பாடல்.' 
+    },
+    coverUrl: 'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?auto=format&fit=crop&q=80&w=300',
+    pdfUrl: 'https://www.tamilvu.org/library/libhome.htm',
+    audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3',
+    readingPoints: 30,
+    pagesCount: 2,
+    createdDate: new Date().toISOString()
   }
 ];
 

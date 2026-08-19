@@ -54,11 +54,43 @@ export interface ProgressReport {
   updatedAt: string;
 }
 
+export const DEFAULT_REPORTS: ProgressReport[] = [
+  {
+    reportId: 'rep_student_1_term2_2026',
+    studentId: 'student_1',
+    classId: 'class_1',
+    academicYear: 2026,
+    term: 2,
+    attendance: '95%',
+    skills: {
+      speaking: { bodyLanguage: 'A', vocabulary: 'A', conversation: 'A' },
+      listening: { visualComprehension: 'A', oralUnderstanding: 'A', responseAccuracy: 'A' },
+      reading: { fluency: 'B', vocabularyComprehension: 'A', grammarConventions: 'B' },
+      writing: { wordAccuracy: 'A', sentenceArrangement: 'A', grammarAccuracy: 'B' }
+    },
+    attitudes: {
+      punctuality: 'A',
+      enthusiasm: 'A',
+      peerInteraction: 'A',
+      kindLanguage: 'A',
+      expressingConfidence: 'A',
+      homeworkCompletion: 'A'
+    },
+    teacherComments: 'Great progress this term. Very enthusiastic learner!',
+    teacherCommentsTamil: 'இந்த பருவத்தில் சிறந்த முன்னேற்றம். மிகவும் ஆர்வமுள்ள கற்பவர்!',
+    teacherSignature: 'Suresh Kumar',
+    principalSignature: 'Principal',
+    parentSigned: false,
+    parentSignatureDate: '',
+    updatedAt: new Date().toISOString()
+  }
+];
+
 export const progressReportService = {
   getProgressReports: async (studentId: string): Promise<ProgressReport[]> => {
     if (!db) {
-      console.warn('Firestore database is not initialized');
-      return [];
+      console.warn('Firestore database is not initialized - returning default reports');
+      return DEFAULT_REPORTS.filter(r => r.studentId === studentId);
     }
     try {
       const q = query(collection(db, 'progressReports'), where('studentId', '==', studentId));
@@ -75,7 +107,21 @@ export const progressReportService = {
   },
 
   saveProgressReport: async (report: Omit<ProgressReport, 'reportId'> & { reportId?: string }): Promise<ProgressReport> => {
-    if (!db) throw new Error('Firestore database is not initialized');
+    if (!db) {
+      const reportId = report.reportId || `rep_${report.studentId}_term${report.term}_${report.academicYear}`;
+      const finalReport = {
+        ...report,
+        reportId,
+        updatedAt: new Date().toISOString()
+      } as ProgressReport;
+      const idx = DEFAULT_REPORTS.findIndex(r => r.reportId === reportId);
+      if (idx !== -1) {
+        DEFAULT_REPORTS[idx] = finalReport;
+      } else {
+        DEFAULT_REPORTS.push(finalReport);
+      }
+      return finalReport;
+    }
     
     const term = report.term;
     const studentId = report.studentId;
@@ -96,7 +142,10 @@ export const progressReportService = {
   },
 
   getProgressReport: async (studentId: string, term: number, academicYear: number): Promise<ProgressReport | null> => {
-    if (!db) throw new Error('Firestore database is not initialized');
+    if (!db) {
+      const report = DEFAULT_REPORTS.find(r => r.studentId === studentId && r.term === term && r.academicYear === academicYear);
+      return report || null;
+    }
     const reportId = `rep_${studentId}_term${term}_${academicYear}`;
     const docRef = doc(db, 'progressReports', reportId);
     const docSnap = await getDoc(docRef);
