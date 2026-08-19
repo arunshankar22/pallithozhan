@@ -558,6 +558,20 @@ export function LibraryTab({ user, colors, t, showToast, i18n, insets }: TabProp
                   {i18n.language === 'ta' ? selectedBook.description.ta : selectedBook.description.en}
                 </ThemedText>
 
+                {selectedBook.audioUrl && (
+                  Platform.OS === 'web' ? (
+                    <audio
+                      src={selectedBook.audioUrl}
+                      controls
+                      style={{ width: '100%', marginTop: 4, marginBottom: 12 }}
+                    />
+                  ) : (
+                    <ThemedText style={{ fontSize: 11, color: colors.secondary, fontStyle: 'italic', marginBottom: 12 }}>
+                      {i18n.language === 'ta' ? 'ஆடியோ கேட்க "உடனே படி" அழுத்தவும்.' : 'Press "Read Online" to open the lyrics and audio.'}
+                    </ThemedText>
+                  )
+                )}
+
                 <View style={{ flexDirection: 'row', gap: 12, borderTopWidth: 0.5, borderColor: colors.border, paddingTop: 10 }}>
                   <View style={{ flex: 1 }}>
                     <ThemedText style={{ fontSize: 9, color: colors.textSecondary }}>Pages</ThemedText>
