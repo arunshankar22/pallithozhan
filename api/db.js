@@ -464,13 +464,13 @@ const DEFAULT_BOOKS = [
   },
   {
     bookId: 'song_vande_mataram',
-    title: { en: 'Vande Mataram (வந்தே மாதரம்)', ta: 'வந்தே மாதரம்' },
-    author: 'Bankim Chandra Chatterjee',
+    title: { en: 'Thai Mannae Vanakkam (Vande Mataram)', ta: 'தாய் மண்ணே வணக்கம் (வந்தே மாதரம்)' },
+    author: 'A. R. Rahman',
     gradeLevel: 'General',
     category: 'audio',
     description: { 
-      en: 'The national song of India, expressing devotion to the motherland.', 
-      ta: 'இந்தியாவின் தேசியப் பாடல். தாய்நாட்டின் மீதான பற்றையும் பக்தியையும் வெளிப்படுத்துவது.' 
+      en: 'A. R. Rahman\'s modern vocal rendition of Vande Mataram, expressing deep love and devotion to the motherland.', 
+      ta: 'ஏ. ஆர். ரஹ்மானின் தாய் மண்ணே வணக்கம் பாடல். தாய்நாட்டின் மீதான பற்றையும் அன்பையும் வெளிப்படுத்தும் நவீனப் பாடல்.' 
     },
     coverUrl: 'https://images.unsplash.com/photo-1590073844006-33379778ae09?auto=format&fit=crop&q=80&w=300',
     pdfUrl: '/lyrics_vande_mataram.html',
