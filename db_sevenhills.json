@@ -6,65 +6,121 @@
       "fullName": "Arun Pandian",
       "role": "admin",
       "phone": "+91 98765 43210",
-      "schoolId": "school_parramatta",
+      "schoolId": "school_sevenhills",
       "languagePreference": "ta"
     },
     {
       "uid": "teacher_1",
       "email": "teacher@example.com",
-      "fullName": "Suresh Kumar (Parramatta)",
+      "fullName": "Suresh Kumar (Sevenhills)",
       "role": "teacher",
       "phone": "+91 87654 32109",
-      "schoolId": "school_parramatta",
-      "languagePreference": "ta"
+      "schoolId": "school_sevenhills",
+      "languagePreference": "ta",
+      "stage": "Year 1",
+      "wwcNumber": "WWC3171639E",
+      "dob": "1986-08-28",
+      "wwcVerified": true,
+      "wwcVerifiedDate": "2026-03-28",
+      "wwcExpiryDate": "2031-03-28",
+      "effectiveFrom": "2026-03-28 05:15:55",
+      "effectiveTo": ""
     },
     {
       "uid": "volunteer_1",
       "email": "volunteer@example.com",
-      "fullName": "Meena Ramasamy (Parramatta)",
+      "fullName": "Meena Ramasamy (Sevenhills)",
       "role": "volunteer",
       "phone": "+91 76543 21098",
-      "schoolId": "school_parramatta",
-      "languagePreference": "en"
+      "schoolId": "school_sevenhills",
+      "languagePreference": "en",
+      "stage": "Year 2",
+      "wwcNumber": "WWC3213370V",
+      "dob": "1991-11-26",
+      "wwcVerified": true,
+      "wwcVerifiedDate": "2026-03-28",
+      "wwcExpiryDate": "2031-11-26",
+      "effectiveFrom": "2026-03-28 08:39:08",
+      "effectiveTo": ""
     },
     {
       "uid": "parent_1",
       "email": "parent@example.com",
-      "fullName": "Karthik Raja (Parramatta)",
+      "fullName": "Karthik Raja (Sevenhills)",
       "role": "parent",
       "phone": "+91 65432 10987",
-      "schoolId": "school_parramatta",
+      "schoolId": "school_sevenhills",
       "languagePreference": "ta",
       "associatedStudents": [
         "student_1"
-      ]
+      ],
+      "parentVolunteer": true
     },
     {
       "uid": "student_1",
       "email": "student@example.com",
-      "fullName": "Deepak Karthik (Parramatta)",
+      "fullName": "Deepak Karthik (Sevenhills)",
       "role": "student",
       "phone": "",
-      "schoolId": "school_parramatta",
-      "languagePreference": "ta"
+      "schoolId": "school_sevenhills",
+      "languagePreference": "ta",
+      "fullNameTamil": "தீபக் கார்த்திக்",
+      "gender": "Male",
+      "dateOfBirth": "2015-08-28",
+      "mainstreamSchoolName": "Parramatta Public School",
+      "mainstreamSchoolClass": "Year 5",
+      "className": "Year 1",
+      "prevBmSchoolClass": "Kindergarten",
+      "studentCreated": "2026-03-28 05:15:55",
+      "okToIssueBooks": "YES",
+      "stationaryIssued": "YES",
+      "booksIssued": "YES",
+      "effectiveFrom": "2026-03-28 05:15:55",
+      "effectiveTo": ""
     },
     {
       "uid": "student_2",
       "email": "student2@example.com",
-      "fullName": "Abinaya Sundar (Parramatta)",
+      "fullName": "Abinaya Sundar (Sevenhills)",
       "role": "student",
       "phone": "",
-      "schoolId": "school_parramatta",
-      "languagePreference": "ta"
+      "schoolId": "school_sevenhills",
+      "languagePreference": "ta",
+      "fullNameTamil": "அபிநயா சுந்தர்",
+      "gender": "Female",
+      "dateOfBirth": "2014-04-01",
+      "mainstreamSchoolName": "Westmead Public School",
+      "mainstreamSchoolClass": "Year 6",
+      "className": "Year 1",
+      "prevBmSchoolClass": "Kindergarten",
+      "studentCreated": "2026-03-28 05:20:40",
+      "okToIssueBooks": "YES",
+      "stationaryIssued": "NO",
+      "booksIssued": "YES",
+      "effectiveFrom": "2026-03-28 05:20:40",
+      "effectiveTo": ""
     },
     {
       "uid": "student_3",
       "email": "student3@example.com",
-      "fullName": "Ganesh Mani (Parramatta)",
+      "fullName": "Ganesh Mani (Sevenhills)",
       "role": "student",
       "phone": "",
-      "schoolId": "school_parramatta",
-      "languagePreference": "en"
+      "schoolId": "school_sevenhills",
+      "languagePreference": "en",
+      "fullNameTamil": "கணேஷ் மணி",
+      "gender": "Male",
+      "dateOfBirth": "2013-09-29",
+      "mainstreamSchoolName": "Mays Hill Public School",
+      "mainstreamSchoolClass": "Year 7",
+      "className": "Year 2",
+      "prevBmSchoolClass": "Year 1",
+      "studentCreated": "2026-03-28 05:31:35",
+      "okToIssueBooks": "NO",
+      "stationaryIssued": "NO",
+      "booksIssued": "NO",
+      "effectiveFrom": "2026-03-28 05:31:35",
+      "effectiveTo": ""
     }
   ],
   "classes": [
@@ -110,7 +166,7 @@
       "mediaUrl": "https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&q=80&w=800",
       "mediaType": "image",
       "authorName": "Arun Pandian (Admin)",
-      "createdAt": "2026-05-31T04:01:14.878Z"
+      "createdAt": "2026-08-13T23:47:55.295Z"
     }
   ],
   "homework": [
@@ -125,23 +181,8 @@
         "en": "Practice reading and writing first 5 Thirukkurals.",
         "ta": "முதல் 5 திருக்குறள்களை எளிய பொருளுடன் படித்து எழுதி பழகி வரவும்."
       },
-      "dueDate": "2026-06-03T06:01:14.880Z",
+      "dueDate": "2026-08-17T01:47:55.296Z",
       "createdByName": "Suresh Kumar",
-      "submissions": {}
-    },
-    {
-      "homeworkId": "hw_1780207964574",
-      "classId": "class_2",
-      "title": {
-        "en": "Write Uyir Ezhuthukal",
-        "ta": "தமிழ் உயிர் எழுத்துக்கள்"
-      },
-      "description": {
-        "en": "Write Uyir Ezhuthukal 3 times",
-        "ta": "எழுதுக தமிழ் உயிர் எழுத்துக்கள் 3 tஇமெஸ்"
-      },
-      "dueDate": "2026-06-01T06:12:44.567Z",
-      "createdByName": "Arun Pandian",
       "submissions": {}
     }
   ],
@@ -160,8 +201,24 @@
         "en": "Traditional cultural performances and sweet distribution.",
         "ta": "பாரம்பரிய கலை நிகழ்ச்சிகள் மற்றும் இனிப்புகள் வழங்குதல்."
       },
-      "startDate": "2026-06-05T06:01:14.880Z",
-      "endDate": "2026-06-05T10:01:14.880Z"
+      "startDate": "2026-08-19T01:47:55.296Z",
+      "endDate": "2026-08-19T05:47:55.296Z"
+    },
+    {
+      "eventId": "sess_1",
+      "type": "session",
+      "title": {
+        "en": "Level 3",
+        "ta": "நிலை 3"
+      },
+      "description": {
+        "en": "Topic: Nature & Elements in Tamil Literature",
+        "ta": "தலைப்பு: தமிழ் இலக்கியத்தில் இயற்கையும் ஐம்பூதங்களும்"
+      },
+      "timeEn": "Saturday @ 2:00 PM",
+      "timeTa": "சனிக்கிழமை @ 2:00 PM",
+      "startDate": "2026-08-14T01:47:55.296Z",
+      "endDate": "2026-08-14T01:47:55.296Z"
     }
   ],
   "schooldates": [

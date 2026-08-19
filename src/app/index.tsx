@@ -982,10 +982,6 @@ export default function HomeScreen() {
       items.push({ key: 'messages', label: i18n.language === 'ta' ? 'செய்திகள்' : 'Messages', labelTa: 'செய்திகள்', icon: MessageSquare });
     }
 
-    if (featureFlags.enableDigitalLibrary !== false) {
-      items.push({ key: 'library', label: t('nav.library') || 'Library', labelTa: 'நூலகம்', icon: BookOpen });
-    }
-
     if (featureFlags.enableAIAssistant !== false) {
       items.push({ key: 'ai-assistant', label: 'AI Assistant', labelTa: 'உற்ற தோழன்', icon: MessageSquare });
     }
