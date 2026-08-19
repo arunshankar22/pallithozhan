@@ -613,7 +613,7 @@
       "pdfUrl": "https://archive.org/download/THETREASURETAMIL/THE%20TREASURE%20-%20TAMIL.pdf",
       "readingPoints": 50,
       "pagesCount": 12,
-      "createdDate": "2026-08-19T11:24:41.321Z"
+      "createdDate": "2026-08-19T11:57:10.274Z"
     },
     {
       "bookId": "book_y1",
@@ -632,7 +632,7 @@
       "pdfUrl": "https://archive.org/download/blind-men-and-the-elephant-tamil/BLIND%20MEN%20AND%20THE%20ELEPHANT-TAMIL.pdf",
       "readingPoints": 60,
       "pagesCount": 16,
-      "createdDate": "2026-08-19T11:24:41.321Z"
+      "createdDate": "2026-08-19T11:57:10.274Z"
     },
     {
       "bookId": "book_y2",
@@ -651,7 +651,7 @@
       "pdfUrl": "https://archive.org/download/old-house-tamil/OLD%20HOUSE-Tamil.pdf",
       "readingPoints": 70,
       "pagesCount": 24,
-      "createdDate": "2026-08-19T11:24:41.321Z"
+      "createdDate": "2026-08-19T11:57:10.274Z"
     },
     {
       "bookId": "book_y3",
@@ -670,7 +670,7 @@
       "pdfUrl": "https://archive.org/download/MyBrotherMatthew-Tamil/MyBrotherMatthew-tamil.pdf",
       "readingPoints": 80,
       "pagesCount": 32,
-      "createdDate": "2026-08-19T11:24:41.321Z"
+      "createdDate": "2026-08-19T11:57:10.274Z"
     },
     {
       "bookId": "book_y4",
@@ -689,7 +689,7 @@
       "pdfUrl": "https://archive.org/download/hillwholovedalittlebirdtamil/HILL%20WHO%20LOVED%20A%20LITTLE%20BIRD%20-%20TAMIL.pdf",
       "readingPoints": 90,
       "pagesCount": 20,
-      "createdDate": "2026-08-19T11:24:41.321Z"
+      "createdDate": "2026-08-19T11:57:10.274Z"
     },
     {
       "bookId": "book_y5",
@@ -708,7 +708,7 @@
       "pdfUrl": "https://archive.org/download/malala-tamil/Malala-Tamil.pdf",
       "readingPoints": 100,
       "pagesCount": 48,
-      "createdDate": "2026-08-19T11:24:41.321Z"
+      "createdDate": "2026-08-19T11:57:10.274Z"
     },
     {
       "bookId": "book_y6",
@@ -727,7 +727,7 @@
       "pdfUrl": "https://archive.org/download/TheGeneral-Tamil/Tamil-General-Tamil.pdf",
       "readingPoints": 110,
       "pagesCount": 40,
-      "createdDate": "2026-08-19T11:24:41.321Z"
+      "createdDate": "2026-08-19T11:57:10.274Z"
     },
     {
       "bookId": "book_y7",
@@ -746,7 +746,7 @@
       "pdfUrl": "https://archive.org/download/soccer-star-tamil/SOCCER%20STAR%20Tamil.pdf",
       "readingPoints": 120,
       "pagesCount": 56,
-      "createdDate": "2026-08-19T11:24:41.321Z"
+      "createdDate": "2026-08-19T11:57:10.274Z"
     },
     {
       "bookId": "book_y8",
@@ -765,7 +765,7 @@
       "pdfUrl": "https://archive.org/download/monster-and-the-tailor-tamil/MONSTER%20AND%20THE%20TAILOR%20Tamil.pdf",
       "readingPoints": 130,
       "pagesCount": 72,
-      "createdDate": "2026-08-19T11:24:41.321Z"
+      "createdDate": "2026-08-19T11:57:10.274Z"
     },
     {
       "bookId": "book_y9",
@@ -784,7 +784,7 @@
       "pdfUrl": "https://archive.org/download/rachel-s-library-tamil/RACHEL-S%20LIBRARY%20Tamil.pdf",
       "readingPoints": 150,
       "pagesCount": 80,
-      "createdDate": "2026-08-19T11:24:41.321Z"
+      "createdDate": "2026-08-19T11:57:10.274Z"
     },
     {
       "bookId": "song_tamil_thai",
@@ -801,10 +801,10 @@
       },
       "coverUrl": "https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&q=80&w=300",
       "pdfUrl": "/lyrics_tamil_thai.html",
-      "audioUrl": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
+      "audioUrl": "/audio_tamil_thai.mp3",
       "readingPoints": 30,
       "pagesCount": 2,
-      "createdDate": "2026-08-19T11:24:41.321Z"
+      "createdDate": "2026-08-19T11:57:10.274Z"
     },
     {
       "bookId": "song_vande_mataram",
@@ -821,10 +821,10 @@
       },
       "coverUrl": "https://images.unsplash.com/photo-1590073844006-33379778ae09?auto=format&fit=crop&q=80&w=300",
       "pdfUrl": "/lyrics_vande_mataram.html",
-      "audioUrl": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
+      "audioUrl": "/audio_vande_mataram.mp3",
       "readingPoints": 30,
       "pagesCount": 2,
-      "createdDate": "2026-08-19T11:24:41.321Z"
+      "createdDate": "2026-08-19T11:57:10.274Z"
     },
     {
       "bookId": "song_bharathiyar",
@@ -843,7 +843,7 @@
       "pdfUrl": "/lyrics_bharathiyar.html",
       "readingPoints": 100,
       "pagesCount": 150,
-      "createdDate": "2026-08-19T11:24:41.321Z"
+      "createdDate": "2026-08-19T11:57:10.274Z"
     },
     {
       "bookId": "song_national_anthem",
@@ -860,10 +860,10 @@
       },
       "coverUrl": "https://images.unsplash.com/photo-1497633762265-9d179a990aa6?auto=format&fit=crop&q=80&w=300",
       "pdfUrl": "/lyrics_national_anthem.html",
-      "audioUrl": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",
+      "audioUrl": "/audio_national_anthem.mp3",
       "readingPoints": 30,
       "pagesCount": 2,
-      "createdDate": "2026-08-19T11:24:41.321Z"
+      "createdDate": "2026-08-19T11:57:10.274Z"
     }
   ]
 }

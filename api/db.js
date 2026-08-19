@@ -457,7 +457,7 @@ const DEFAULT_BOOKS = [
     },
     coverUrl: 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?auto=format&fit=crop&q=80&w=300',
     pdfUrl: '/lyrics_tamil_thai.html',
-    audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
+    audioUrl: '/audio_tamil_thai.mp3',
     readingPoints: 30,
     pagesCount: 2,
     createdDate: new Date().toISOString()
@@ -474,7 +474,7 @@ const DEFAULT_BOOKS = [
     },
     coverUrl: 'https://images.unsplash.com/photo-1590073844006-33379778ae09?auto=format&fit=crop&q=80&w=300',
     pdfUrl: '/lyrics_vande_mataram.html',
-    audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
+    audioUrl: '/audio_vande_mataram.mp3',
     readingPoints: 30,
     pagesCount: 2,
     createdDate: new Date().toISOString()
@@ -507,7 +507,7 @@ const DEFAULT_BOOKS = [
     },
     coverUrl: 'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?auto=format&fit=crop&q=80&w=300',
     pdfUrl: '/lyrics_national_anthem.html',
-    audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3',
+    audioUrl: '/audio_national_anthem.mp3',
     readingPoints: 30,
     pagesCount: 2,
     createdDate: new Date().toISOString()
