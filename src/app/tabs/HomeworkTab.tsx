@@ -1560,8 +1560,13 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
                     
                     let assignedKurals: number[] = [];
                     if (isThirukkuralTask) {
-                      const matchEn = item.title?.en?.match(/kurals?\s*:?\s*([\d\s,]+)/i) || item.description?.en?.match(/kurals?\s*:?\s*([\d\s,]+)/i);
-                      const matchTa = item.title?.ta?.match(/குறள்கள?்?\s*:?\s*([\d\s,]+)/) || item.description?.ta?.match(/குறள்கள?்?\s*:?\s*([\d\s,]+)/);
+                      const titleEnStr = typeof item.title === 'string' ? item.title : (item.title?.en || '');
+                      const titleTaStr = typeof item.title === 'string' ? item.title : (item.title?.ta || '');
+                      const descEnStr = typeof item.description === 'string' ? item.description : (item.description?.en || '');
+                      const descTaStr = typeof item.description === 'string' ? item.description : (item.description?.ta || '');
+
+                      const matchEn = titleEnStr.match(/\bkurals?\b\s*:?\s*([\d\s,]+)/i) || descEnStr.match(/\bkurals?\b\s*:?\s*([\d\s,]+)/i);
+                      const matchTa = titleTaStr.match(/(?:^|[^அ-ஹா-ூெ-்])குறள?்?க?ள?்?\s*:?\s*([\d\s,]+)/) || descTaStr.match(/(?:^|[^அ-ஹா-ூெ-்])குறள?்?க?ள?்?\s*:?\s*([\d\s,]+)/);
                       
                       const rawString = matchEn ? matchEn[1] : (matchTa ? matchTa[1] : '');
                       if (rawString) {
