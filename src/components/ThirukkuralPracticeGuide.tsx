@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Pressable, StyleSheet, TextInput, Platform, ScrollView } from 'react-native';
 import { BookOpen, Volume2, Edit3, CheckCircle, RotateCcw, Award, ChevronLeft, ChevronRight, Search } from 'lucide-react-native';
+import * as Speech from 'expo-speech';
 import { ThemedText } from './themed-text';
 import { Spacing } from '@/constants/theme';
 
@@ -130,13 +131,30 @@ export function ThirukkuralPracticeGuide({ colors, i18n, showToast, assignedKura
     setActiveIdx(0);
   }, [assignedKuralNumbers]);
 
-  // Pronounce voice guidance (Web Speech TTS)
+  // Pronounce voice guidance (Web Speech TTS & Expo Speech)
   const handleHearKural = () => {
+    if (isSpeaking) {
+      if (Platform.OS === 'web' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      } else {
+        Speech.stop();
+      }
+      setIsSpeaking(false);
+      return;
+    }
+
     if (Platform.OS === 'web' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(currentKural.speechText);
       utterance.lang = 'ta-IN';
       utterance.rate = 0.8;
+
+      // Robust voice matching on Web
+      const voices = window.speechSynthesis.getVoices();
+      const tamilVoice = voices.find(v => v.lang.startsWith('ta'));
+      if (tamilVoice) {
+        utterance.voice = tamilVoice;
+      }
 
       utterance.onstart = () => setIsSpeaking(true);
       utterance.onend = () => setIsSpeaking(false);
@@ -145,10 +163,16 @@ export function ThirukkuralPracticeGuide({ colors, i18n, showToast, assignedKura
       window.speechSynthesis.speak(utterance);
     } else {
       setIsSpeaking(true);
-      showToast(i18n.language === 'ta' ? 'குறளின் ஒலிவடிவம் ஒலிக்கிறது...' : 'Playing Kural pronunciation audio guide...', 'success');
-      setTimeout(() => {
-        setIsSpeaking(false);
-      }, 3500);
+      Speech.speak(currentKural.speechText, {
+        language: 'ta-IN',
+        rate: 0.8,
+        onStart: () => setIsSpeaking(true),
+        onDone: () => setIsSpeaking(false),
+        onError: () => {
+          setIsSpeaking(false);
+          showToast(i18n.language === 'ta' ? 'ஒலிவடிவம் ஒலிக்க இயலவில்லை' : 'Pronunciation audio guide error', 'error');
+        }
+      });
     }
   };
 
@@ -342,7 +366,7 @@ export function ThirukkuralPracticeGuide({ colors, i18n, showToast, assignedKura
             )}
           </View>
           <ThemedText style={{ fontSize: 11, color: colors.textSecondary }}>
-            Kural {currentKural.number} of 1330
+            Kural {currentKural.number} {assignedKuralNumbers && assignedKuralNumbers.length > 0 ? `(${activeIdx + 1} of ${displayedKurals.length} assigned)` : 'of 1330'}
           </ThemedText>
         </View>
 
