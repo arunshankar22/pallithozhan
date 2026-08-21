@@ -98,13 +98,15 @@ export function ThirukkuralPracticeGuide({ colors, i18n, showToast, assignedKura
     }));
   }, []);
 
+  const assignedKeys = assignedKuralNumbers?.join(',') || '';
+
   // Filter displayed kurals based on assigned numbers
   const displayedKurals = React.useMemo(() => {
     if (assignedKuralNumbers && assignedKuralNumbers.length > 0) {
       return mappedKurals.filter((k: any) => assignedKuralNumbers.includes(k.number));
     }
     return mappedKurals;
-  }, [assignedKuralNumbers, mappedKurals]);
+  }, [assignedKeys, mappedKurals]);
 
   const [activeIdx, setActiveIdx] = useState<number>(0);
   const [searchQuery, setSearchQuery] = useState('');
@@ -124,12 +126,12 @@ export function ThirukkuralPracticeGuide({ colors, i18n, showToast, assignedKura
     }
     // Show the 10 kurals of the active chapter
     return displayedKurals.filter((k: any) => k.chapter === currentKural.chapter);
-  }, [assignedKuralNumbers, displayedKurals, currentKural.chapter]);
+  }, [assignedKeys, displayedKurals, currentKural.chapter]);
 
   // Auto-reset active index if assignedKuralNumbers changes
   useEffect(() => {
     setActiveIdx(0);
-  }, [assignedKuralNumbers]);
+  }, [assignedKeys]);
 
   // Pronounce voice guidance (Web Speech TTS & Expo Speech)
   const handleHearKural = () => {
