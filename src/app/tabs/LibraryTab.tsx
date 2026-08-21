@@ -29,6 +29,7 @@ import { styles } from '@/app/styles';
 import { Spacing } from '@/constants/theme';
 import { libraryService, Book as BookType, ReadingProgress } from '@/services/libraryService';
 import { ThirukkuralPracticeGuide } from '@/components/ThirukkuralPracticeGuide';
+import { AathichoodiPracticeGuide } from '@/components/AathichoodiPracticeGuide';
 
 export function LibraryTab({ user, colors, t, showToast, i18n, insets }: TabProps) {
   const { width: windowWidth } = useWindowDimensions();
@@ -50,6 +51,7 @@ export function LibraryTab({ user, colors, t, showToast, i18n, insets }: TabProp
   // Online PDF Reader state
   const [pdfReaderVisible, setPdfReaderVisible] = useState(false);
   const [thirukuralVisible, setThirukuralVisible] = useState(false);
+  const [aathichoodiVisible, setAathichoodiVisible] = useState(false);
 
   // Add Book Modal state (Teachers/Admins)
   const [uploadModalVisible, setUploadModalVisible] = useState(false);
@@ -267,6 +269,11 @@ export function LibraryTab({ user, colors, t, showToast, i18n, insets }: TabProp
 
     if (selectedBook.pdfUrl === 'interactive_thirukkural') {
       setThirukuralVisible(true);
+      return;
+    }
+
+    if (selectedBook.pdfUrl === 'interactive_aathichoodi') {
+      setAathichoodiVisible(true);
       return;
     }
 
@@ -716,6 +723,36 @@ export function LibraryTab({ user, colors, t, showToast, i18n, insets }: TabProp
             {/* Main Interactive Guide Component */}
             <ScrollView contentContainerStyle={{ padding: 16 }}>
               <ThirukkuralPracticeGuide 
+                colors={colors} 
+                i18n={i18n} 
+                showToast={showToast} 
+              />
+            </ScrollView>
+          </View>
+        </Modal>
+      )}
+
+      {/* Interactive Aathichoodi Explorer Modal */}
+      {selectedBook && selectedBook.pdfUrl === 'interactive_aathichoodi' && (
+        <Modal
+          visible={aathichoodiVisible}
+          animationType="slide"
+          onRequestClose={() => setAathichoodiVisible(false)}
+        >
+          <View style={{ flex: 1, backgroundColor: colors.background }}>
+            {/* Header bar */}
+            <View style={{ height: 48, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, borderBottomWidth: 1, borderColor: colors.border, backgroundColor: colors.cardBg }}>
+              <ThemedText style={{ color: colors.text, fontWeight: '800', fontSize: 13 }}>
+                Aathichoodi Explorer / ஆத்திசூடி அறநெறி
+              </ThemedText>
+              <Pressable onPress={() => setAathichoodiVisible(false)} style={{ padding: 6 }}>
+                <X size={18} color={colors.text} />
+              </Pressable>
+            </View>
+
+            {/* Main Interactive Guide Component */}
+            <ScrollView contentContainerStyle={{ padding: 16 }}>
+              <AathichoodiPracticeGuide 
                 colors={colors} 
                 i18n={i18n} 
                 showToast={showToast} 

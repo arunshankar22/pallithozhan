@@ -349,9 +349,9 @@ const DEFAULT_BOOKS = [
     category: 'textbook',
     description: { en: 'Alphabetical moral verses composed by the legendary Tamil poet Avvaiyar.', ta: 'ஔவையார் அருளிய ஆத்திசூடி மற்றும் அதற்கான எளிய உரை விளக்கம்.' },
     coverUrl: 'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?auto=format&fit=crop&q=80&w=300',
-    pdfUrl: 'https://archive.org/download/old-house-tamil/OLD%20HOUSE-Tamil.pdf',
+    pdfUrl: 'interactive_aathichoodi',
     readingPoints: 70,
-    pagesCount: 24,
+    pagesCount: 109,
     createdDate: new Date().toISOString()
   },
   {
