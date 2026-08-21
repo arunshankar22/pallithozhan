@@ -511,6 +511,22 @@ const DEFAULT_BOOKS = [
     readingPoints: 30,
     pagesCount: 2,
     createdDate: new Date().toISOString()
+  },
+  {
+    bookId: 'book_thirukkural',
+    title: { en: 'Thirukkural (திருக்குறள்)', ta: 'திருக்குறள்' },
+    author: 'Thiruvalluvar',
+    gradeLevel: 'General',
+    category: 'textbook',
+    description: { 
+      en: 'The classic Tamil sangam literature text consisting of 1,330 couplets (kurals) dealing with virtue, wealth, and love.',
+      ta: 'அறம், பொருள், இன்பம் ஆகிய முப்பால்களைக் கொண்ட உலகப் பொதுமறையான திருக்குறள்.'
+    },
+    coverUrl: 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&q=80&w=300',
+    pdfUrl: 'interactive_thirukkural',
+    readingPoints: 50,
+    pagesCount: 1330,
+    createdDate: new Date().toISOString()
   }
 ];
 

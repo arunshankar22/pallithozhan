@@ -1,83 +1,139 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Pressable, StyleSheet, TextInput, Platform, ScrollView } from 'react-native';
-import { BookOpen, Volume2, Edit3, CheckCircle, RotateCcw, Award } from 'lucide-react-native';
+import { BookOpen, Volume2, Edit3, CheckCircle, RotateCcw, Award, ChevronLeft, ChevronRight, Search } from 'lucide-react-native';
 import { ThemedText } from './themed-text';
 import { Spacing } from '@/constants/theme';
+
+// Load the full 1330 Thirukkural dataset
+const thirukuralData = require('../../assets/thirukural.json');
+
+// Simple Tamil to English Phonetic Translitteration Helper
+function transliterateTamil(text: string): string {
+  const vowels: Record<string, string> = {
+    'அ': 'a', 'ஆ': 'aa', 'இ': 'i', 'ஈ': 'ee', 'உ': 'u', 'ஊ': 'oo',
+    'எ': 'e', 'ஏ': 'ae', 'ஐ': 'ai', 'ஒ': 'o', 'ஓ': 'oe', 'ஔ': 'au'
+  };
+  const consonants: Record<string, string> = {
+    'க': 'k', 'ங': 'ng', 'ச': 'ch', 'ஞ': 'gn', 'ட': 't', 'ண': 'n',
+    'த': 'th', 'ந': 'n', 'ப': 'p', 'ம': 'm', 'ய': 'y', 'ர': 'r',
+    'ல': 'l', 'வ': 'v', 'ழ': 'zh', 'ள': 'l', 'ற': 'r', 'ன': 'n'
+  };
+  const pulli = '்';
+  const markers: Record<string, string> = {
+    'ா': 'aa', 'ி': 'i', 'ீ': 'ee', 'ு': 'u', 'ூ': 'oo',
+    'ெ': 'e', 'ே': 'ae', 'ை': 'ai', 'ொ': 'o', 'ோ': 'oe', 'ௌ': 'au'
+  };
+  
+  let result = '';
+  let i = 0;
+  while (i < text.length) {
+    const char = text[i];
+    
+    if (char === ' ' || char === '\n') {
+      result += char;
+      i++;
+      continue;
+    }
+    
+    if (vowels[char]) {
+      result += vowels[char];
+      i++;
+      continue;
+    }
+    
+    if (consonants[char]) {
+      let base = consonants[char];
+      let nextChar = text[i + 1];
+      
+      if (nextChar === pulli) {
+        result += base;
+        i += 2;
+      } else if (markers[nextChar]) {
+        // Soften dental t/d sounds phonetically for readability
+        if (base === 'th' && (nextChar === 'ி' || nextChar === 'ீ')) {
+          base = 'th';
+        }
+        result += base + markers[nextChar];
+        i += 2;
+      } else {
+        result += base + 'a';
+        i++;
+      }
+      continue;
+    }
+    
+    result += char;
+    i++;
+  }
+  
+  // Clean up double combinations
+  return result
+    .replace(/kka/g, 'kka')
+    .replace(/ntha/g, 'ntha')
+    .replace(/lla/g, 'lla')
+    .replace(/nna/g, 'nna')
+    .replace(/tha/g, 'tha');
+}
 
 interface ThirukkuralPracticeGuideProps {
   colors: any;
   i18n: any;
   showToast: (message: string, type?: 'success' | 'error' | 'warning') => void;
+  assignedKuralNumber?: number;
 }
 
-const THIRUKKURAL_DATA = [
-  {
-    number: 1,
-    tamil: "அகர முதல எழுத்தெல்லாம் ஆதி\nபகவன் முதற்றே உலகு.",
-    transliteration: "Akara mudhala ezhuthellam aadhi\nbagavan mudhatre ulagu.",
-    tamilMeaning: "எழுத்துக்கள் எல்லாம் அகரத்தை அடிப்படையாகக் கொண்டிருக்கின்றன; அதுபோல உலகம் ஆதி பகவனை அடிப்படையாகக் கொண்டிருக்கிறது.",
-    englishMeaning: "As all letters have the letter 'A' as their starting point, so the world has the Eternal God as its starting point.",
-    speechText: "அகர முதல எழுத்தெல்லாம் ஆதி பகவன் முதற்றே உலகு."
-  },
-  {
-    number: 2,
-    tamil: "கற்றதனா லாய பயனென்கொல் வாலறிவன்\nநற்றாள் தொழாஅர் எனின்.",
-    transliteration: "Katradhanaal aaya payanenkol vaalarivan\nnatraal thozhaar enin.",
-    tamilMeaning: "தூய அறிவு வடிவமாக விளங்கும் இறைவனுடைய நல்ல திருவடிகளை தொழாமல் இருப்பாரானால், அவர் கற்ற கல்வியினால் என்ன பயன்?",
-    englishMeaning: "What is the use of all your learning if you do not worship the sacred feet of the Lord who is the embodiment of pure wisdom?",
-    speechText: "கற்றதனா லாய பயனென்கொல் வாலறிவன் நற்றாள் தொழாஅர் எனின்."
-  },
-  {
-    number: 3,
-    tamil: "மலர்மிசை ஏகினான் மாணடி சேர்ந்தார்\nநிலமிசை நீடுவாழ் வார்.",
-    transliteration: "Malarmisai aeginaan maanadi serndhaar\nnilamisai needuvaazh vaar.",
-    tamilMeaning: "அன்பர்களின் மனமாகிய மலரில் வீற்றிருக்கும் இறைவனின் சிறந்த திருவடிகளைப் பற்றி நிற்பவர்கள், இந்த உலகில் என்றும் நிலைத்து வாழ்வார்கள்.",
-    englishMeaning: "Those who take refuge in the glorious feet of the Lord who resides in the flower-like hearts of His devotees will live forever in the highest realm.",
-    speechText: "மலர்மிசை ஏகினான் மாணடி சேர்ந்தார் நிலமிசை நீடுவாழ் வார்."
-  },
-  {
-    number: 4,
-    tamil: "வேண்டுதல் வேண்டாமை இலானடி சேர்ந்தார்க்கு\nயாண்டும் இடும்பை இல.",
-    transliteration: "Vaendudhal vaendaamai ilaanadi serndhaarkku\nyaandum idumbai ila.",
-    tamilMeaning: "விருப்பு வெறுப்பு இல்லாத இறைவனுடைய திருவடிகளைப் பொருந்தி நினைக்கின்றவருக்கு, எப்போதும் எவ்விடத்திலும் துன்பம் இல்லை.",
-    englishMeaning: "To those who meditate on the feet of Him who has neither desire nor aversion, suffering will never come at any time.",
-    speechText: "வேண்டுதல் வேண்டாமை இலானடி சேர்ந்தார்க்கு யாண்டும் இடும்பை இல."
-  },
-  {
-    number: 5,
-    tamil: "இருள்சேர் இருவினையும் சேரா இறைவன்\nபொருள்சேர் புகழ்ப்புரிந்தார் மாட்டு.",
-    transliteration: "Irulsear iruvinaiyum searaa iraivan\nporulsear pukazhpurindhaar maattu.",
-    tamilMeaning: "இறைவனின் உண்மைப் புகழை விரும்பிப் போற்றுகிறவர்களிடம் அறியாமையால் விளையும் நல்வினை தீவினை ஆகிய இருவகை வினைகளும் சேராது.",
-    englishMeaning: "The two-fold deeds of darkness (both good and bad actions born of ignorance) will not cling to those who praise the true glory of God.",
-    speechText: "இருள்சேர் இருவினையும் சேரா இறைவன் பொருள்சேர் புகழ்புரிந்தார் மாட்டு."
-  }
-];
+export function ThirukkuralPracticeGuide({ colors, i18n, showToast, assignedKuralNumber }: ThirukkuralPracticeGuideProps) {
+  // Map raw JSON to mapped array
+  const mappedKurals = React.useMemo(() => {
+    return thirukuralData.kurals.map((k: any) => ({
+      number: k.number,
+      tamil: k.kural.join('\n'),
+      transliteration: transliterateTamil(k.kural.join(' ')),
+      tamilMeaning: k.meaning.ta_salamon || k.meaning.ta_mu_va,
+      englishMeaning: k.meaning.en,
+      speechText: k.kural.join(' '),
+      chapter: k.chapter,
+      section: k.section
+    }));
+  }, []);
 
-export function ThirukkuralPracticeGuide({ colors, i18n, showToast }: ThirukkuralPracticeGuideProps) {
-  const [activeIdx, setActiveIdx] = useState(0);
+  // Determine starting index based on assigned kural or default
+  const startIdx = React.useMemo(() => {
+    if (assignedKuralNumber && assignedKuralNumber >= 1 && assignedKuralNumber <= 1330) {
+      return mappedKurals.findIndex((k: any) => k.number === assignedKuralNumber);
+    }
+    return 0;
+  }, [assignedKuralNumber, mappedKurals]);
+
+  const [activeIdx, setActiveIdx] = useState<number>(startIdx !== -1 ? startIdx : 0);
+  const [searchQuery, setSearchQuery] = useState('');
   const [typingInput, setTypingInput] = useState('');
-  const [isReadingMode, setIsReadingMode] = useState(true); // true = Read/Hear, false = Practice Writing/Typing
+  const [isReadingMode, setIsReadingMode] = useState(true);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [completedList, setCompletedList] = useState<Record<number, { read: boolean; write: boolean }>>({
-    1: { read: false, write: false },
-    2: { read: false, write: false },
-    3: { read: false, write: false },
-    4: { read: false, write: false },
-    5: { read: false, write: false }
-  });
+  const [completedList, setCompletedList] = useState<Record<number, { read: boolean; write: boolean }>>({});
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const drawingStateRef = useRef({ isDrawing: false, lastX: 0, lastY: 0 });
 
-  const currentKural = THIRUKKURAL_DATA[activeIdx];
+  const currentKural = mappedKurals[activeIdx];
 
-  // Speech synthesis functionality for pronunciation practice
+  // Auto-jump if assignedKuralNumber changes
+  useEffect(() => {
+    if (assignedKuralNumber && assignedKuralNumber >= 1 && assignedKuralNumber <= 1330) {
+      const idx = mappedKurals.findIndex((k: any) => k.number === assignedKuralNumber);
+      if (idx !== -1) {
+        setActiveIdx(idx);
+      }
+    }
+  }, [assignedKuralNumber, mappedKurals]);
+
+  // Pronounce voice guidance (Web Speech TTS)
   const handleHearKural = () => {
     if (Platform.OS === 'web' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(currentKural.speechText);
-      utterance.lang = 'ta-IN'; // Tamil language
-      utterance.rate = 0.85; // slightly slower for clarity
+      utterance.lang = 'ta-IN';
+      utterance.rate = 0.8;
 
       utterance.onstart = () => setIsSpeaking(true);
       utterance.onend = () => setIsSpeaking(false);
@@ -85,7 +141,6 @@ export function ThirukkuralPracticeGuide({ colors, i18n, showToast }: Thirukkura
 
       window.speechSynthesis.speak(utterance);
     } else {
-      // Mobile or unsupported fallback: simulated speaking state
       setIsSpeaking(true);
       showToast(i18n.language === 'ta' ? 'குறளின் ஒலிவடிவம் ஒலிக்கிறது...' : 'Playing Kural pronunciation audio guide...', 'success');
       setTimeout(() => {
@@ -94,7 +149,6 @@ export function ThirukkuralPracticeGuide({ colors, i18n, showToast }: Thirukkura
     }
   };
 
-  // Typing practice accuracy check
   const getTypingAccuracy = () => {
     if (!typingInput) return 0;
     const cleanTarget = currentKural.tamil.replace(/[\s\n\.\,\!\?]/g, '');
@@ -105,20 +159,20 @@ export function ThirukkuralPracticeGuide({ colors, i18n, showToast }: Thirukkura
     for (let i = 0; i < len; i++) {
       if (cleanTarget[i] === cleanInput[i]) matches++;
     }
-    
     return Math.round((matches / cleanTarget.length) * 100);
   };
+
+  const accuracy = getTypingAccuracy();
 
   const handleCompleteTask = (type: 'read' | 'write') => {
     const kNum = currentKural.number;
     const currentStatus = completedList[kNum] || { read: false, write: false };
     const updatedStatus = { ...currentStatus, [type]: !currentStatus[type] };
 
-    const newCompleted = {
-      ...completedList,
+    setCompletedList(prev => ({
+      ...prev,
       [kNum]: updatedStatus
-    };
-    setCompletedList(newCompleted);
+    }));
 
     if (updatedStatus[type]) {
       showToast(
@@ -130,7 +184,6 @@ export function ThirukkuralPracticeGuide({ colors, i18n, showToast }: Thirukkura
     }
   };
 
-  // Canvas init and clear for tracing helper
   const drawGuideOnCanvas = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -141,7 +194,6 @@ export function ThirukkuralPracticeGuide({ colors, i18n, showToast }: Thirukkura
     const height = canvas.height;
     ctx.clearRect(0, 0, width, height);
 
-    // Draw grid lines
     ctx.strokeStyle = colors.border + '33';
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -149,20 +201,18 @@ export function ThirukkuralPracticeGuide({ colors, i18n, showToast }: Thirukkura
     ctx.lineTo(width, height / 2);
     ctx.stroke();
 
-    // Draw Kural Tamil trace lines
-    ctx.font = 'bold 22px "Courier New", sans-serif';
-    ctx.fillStyle = colors.textSecondary + '20'; // ~12% opacity
+    ctx.font = 'bold 18px "Courier New", sans-serif';
+    ctx.fillStyle = colors.textSecondary + '20';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
     const lines = currentKural.tamil.split('\n');
-    if (lines[0]) ctx.fillText(lines[0], width / 2, height / 2 - 22);
-    if (lines[1]) ctx.fillText(lines[1], width / 2, height / 2 + 22);
+    if (lines[0]) ctx.fillText(lines[0], width / 2, height / 2 - 20);
+    if (lines[1]) ctx.fillText(lines[1], width / 2, height / 2 + 20);
   };
 
   useEffect(() => {
     if (!isReadingMode && Platform.OS === 'web') {
-      // Delay slightly to allow the canvas ref to bind
       setTimeout(() => {
         const canvas = canvasRef.current;
         if (canvas) {
@@ -171,18 +221,40 @@ export function ThirukkuralPracticeGuide({ colors, i18n, showToast }: Thirukkura
           canvas.height = rect.height;
           drawGuideOnCanvas();
         }
-      }, 100);
+      }, 150);
     }
   }, [isReadingMode, activeIdx]);
 
-  // Web mouse/touch canvas drawing handlers
+  // Navigation callbacks
+  const handlePrevKural = () => {
+    setActiveIdx(prev => (prev > 0 ? prev - 1 : mappedKurals.length - 1));
+    setTypingInput('');
+  };
+
+  const handleNextKural = () => {
+    setActiveIdx(prev => (prev < mappedKurals.length - 1 ? prev + 1 : 0));
+    setTypingInput('');
+  };
+
+  const handleSearchKural = (text: string) => {
+    setSearchQuery(text);
+    const num = parseInt(text.trim(), 10);
+    if (!isNaN(num) && num >= 1 && num <= 1330) {
+      const idx = mappedKurals.findIndex((k: any) => k.number === num);
+      if (idx !== -1) {
+        setActiveIdx(idx);
+        setTypingInput('');
+      }
+    }
+  };
+
+  // Web canvas drawing handlers
   const handleMouseDown = (e: any) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    
     drawingStateRef.current = { isDrawing: true, lastX: x, lastY: y };
   };
 
@@ -202,7 +274,7 @@ export function ThirukkuralPracticeGuide({ colors, i18n, showToast }: Thirukkura
     ctx.moveTo(state.lastX, state.lastY);
     ctx.lineTo(x, y);
     ctx.strokeStyle = colors.primary;
-    ctx.lineWidth = 3.5;
+    ctx.lineWidth = 3;
     ctx.lineCap = 'round';
     ctx.stroke();
 
@@ -221,7 +293,6 @@ export function ThirukkuralPracticeGuide({ colors, i18n, showToast }: Thirukkura
     const rect = canvas.getBoundingClientRect();
     const x = e.touches[0].clientX - rect.left;
     const y = e.touches[0].clientY - rect.top;
-
     drawingStateRef.current = { isDrawing: true, lastX: x, lastY: y };
   };
 
@@ -241,7 +312,7 @@ export function ThirukkuralPracticeGuide({ colors, i18n, showToast }: Thirukkura
     ctx.moveTo(state.lastX, state.lastY);
     ctx.lineTo(x, y);
     ctx.strokeStyle = colors.primary;
-    ctx.lineWidth = 3.5;
+    ctx.lineWidth = 3;
     ctx.lineCap = 'round';
     ctx.stroke();
 
@@ -249,69 +320,62 @@ export function ThirukkuralPracticeGuide({ colors, i18n, showToast }: Thirukkura
     drawingStateRef.current.lastY = y;
   };
 
-  // Reset typing practice
-  useEffect(() => {
-    setTypingInput('');
-  }, [activeIdx]);
-
-  const accuracy = getTypingAccuracy();
-  const progressPercent = Math.round(
-    (Object.values(completedList).filter(k => k.read).length + 
-     Object.values(completedList).filter(k => k.write).length) / 10 * 100
-  );
+  const totalCompleted = Object.values(completedList).filter(x => x.read && x.write).length;
 
   return (
     <View style={[styles.kuralContainer, { borderColor: colors.border }]}>
-      {/* Header and overall progress indicator */}
+      {/* Header controls */}
       <View style={styles.kuralHeaderRow}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.two, flex: 1, marginRight: 8 }}>
-          <BookOpen size={16} color={colors.primary} style={{ flexShrink: 0 }} />
-          <ThemedText style={{ fontSize: 12, fontWeight: '800', color: colors.text, flex: 1 }}>
-            Thirukkural Guide / திருக்குறள் வழிகாட்டி (1 - 5)
+        <View style={{ gap: 2, flex: 1 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <BookOpen size={16} color={colors.primary} />
+            <ThemedText style={{ fontSize: 13, fontWeight: '900', color: colors.text }}>
+              {currentKural.section} • {currentKural.chapter}
+            </ThemedText>
+            {assignedKuralNumber === currentKural.number && (
+              <View style={{ backgroundColor: colors.secondary, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4 }}>
+                <ThemedText style={{ color: '#FFF', fontSize: 9, fontWeight: '800' }}>ASSIGNED</ThemedText>
+              </View>
+            )}
+          </View>
+          <ThemedText style={{ fontSize: 11, color: colors.textSecondary }}>
+            Kural {currentKural.number} of 1330
           </ThemedText>
         </View>
 
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-          <Award size={14} color={progressPercent === 100 ? colors.secondary : colors.textSecondary} />
-          <ThemedText style={{ fontSize: 11, fontWeight: '700', color: progressPercent === 100 ? colors.secondary : colors.textSecondary }}>
-            {progressPercent}% Done
-          </ThemedText>
+        <View style={styles.searchBox}>
+          <Search size={12} color={colors.textSecondary} />
+          <TextInput
+            style={[styles.searchInput, { color: colors.text }]}
+            placeholder="Go to Kural # (1-1330)"
+            placeholderTextColor={colors.textSecondary}
+            value={searchQuery}
+            onChangeText={handleSearchKural}
+            keyboardType="number-pad"
+          />
         </View>
       </View>
 
-      {/* Selectors for 5 Kurals */}
-      <View style={styles.tabRow}>
-        {THIRUKKURAL_DATA.map((k, idx) => {
-          const isSel = idx === activeIdx;
-          const kStatus = completedList[k.number] || { read: false, write: false };
-          const fullyPracticed = kStatus.read && kStatus.write;
-          
-          return (
-            <Pressable
-              key={k.number}
-              onPress={() => {
-                setActiveIdx(idx);
-                if (!isReadingMode && Platform.OS === 'web') {
-                  setTimeout(drawGuideOnCanvas, 50);
-                }
-              }}
-              style={[
-                styles.kuralTab,
-                { 
-                  backgroundColor: isSel ? colors.primary : colors.background, 
-                  borderColor: isSel ? colors.primary : colors.border
-                }
-              ]}
-            >
-              <ThemedText style={[styles.kuralTabText, { color: isSel ? '#FFF' : colors.text }]}>
-                {k.number} {fullyPracticed ? '✓' : ''}
-              </ThemedText>
-            </Pressable>
-          );
-        })}
+      {/* Navigation Buttons Row */}
+      <View style={styles.navRow}>
+        <Pressable onPress={handlePrevKural} style={[styles.navBtn, { borderColor: colors.border }]}>
+          <ChevronLeft size={16} color={colors.text} />
+          <ThemedText style={{ fontSize: 11, color: colors.text }}>Prev</ThemedText>
+        </Pressable>
+
+        <View style={{ flex: 1, alignItems: 'center' }}>
+          <ThemedText style={{ fontSize: 11, fontWeight: '700', color: colors.textSecondary }}>
+            Completed: {totalCompleted} Kurals
+          </ThemedText>
+        </View>
+
+        <Pressable onPress={handleNextKural} style={[styles.navBtn, { borderColor: colors.border }]}>
+          <ThemedText style={{ fontSize: 11, color: colors.text }}>Next</ThemedText>
+          <ChevronRight size={16} color={colors.text} />
+        </Pressable>
       </View>
 
-      {/* Mode Switcher: Read vs Write */}
+      {/* Mode Switcher */}
       <View style={styles.modeRow}>
         <Pressable
           onPress={() => setIsReadingMode(true)}
@@ -320,7 +384,7 @@ export function ThirukkuralPracticeGuide({ colors, i18n, showToast }: Thirukkura
             isReadingMode ? { borderBottomColor: colors.primary, borderBottomWidth: 2 } : {}
           ]}
         >
-          <ThemedText style={{ fontSize: 12, fontWeight: '700', color: isReadingMode ? colors.primary : colors.textSecondary }}>
+          <ThemedText style={{ fontSize: 11, fontWeight: '700', color: isReadingMode ? colors.primary : colors.textSecondary }}>
             📖 Read & Listen / வாசித்தல்
           </ThemedText>
         </Pressable>
@@ -331,7 +395,7 @@ export function ThirukkuralPracticeGuide({ colors, i18n, showToast }: Thirukkura
             !isReadingMode ? { borderBottomColor: colors.primary, borderBottomWidth: 2 } : {}
           ]}
         >
-          <ThemedText style={{ fontSize: 12, fontWeight: '700', color: !isReadingMode ? colors.primary : colors.textSecondary }}>
+          <ThemedText style={{ fontSize: 11, fontWeight: '700', color: !isReadingMode ? colors.primary : colors.textSecondary }}>
             ✍️ Practice Writing / எழுதுதல்
           </ThemedText>
         </Pressable>
@@ -340,7 +404,6 @@ export function ThirukkuralPracticeGuide({ colors, i18n, showToast }: Thirukkura
       {/* Content Renderers */}
       {isReadingMode ? (
         <View style={styles.kuralContentBox}>
-          {/* Main Couplet text */}
           <View style={[styles.tamilCoupletBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
             <ThemedText style={[styles.tamilCoupletText, { color: colors.text }]}>
               {currentKural.tamil}
@@ -353,19 +416,18 @@ export function ThirukkuralPracticeGuide({ colors, i18n, showToast }: Thirukkura
                 { backgroundColor: isSpeaking ? colors.secondaryLight : colors.primaryLight, opacity: pressed ? 0.8 : 1 }
               ]}
             >
-              <Volume2 size={15} color={isSpeaking ? colors.secondary : colors.primary} />
+              <Volume2 size={14} color={isSpeaking ? colors.secondary : colors.primary} />
               <ThemedText style={{ fontSize: 10, fontWeight: '700', color: isSpeaking ? colors.secondary : colors.primary }}>
                 {isSpeaking ? (i18n.language === 'ta' ? 'ஒலிக்கிறது...' : 'Speaking...') : (i18n.language === 'ta' ? 'உச்சரிப்பு' : 'Pronounce')}
               </ThemedText>
             </Pressable>
           </View>
 
-          {/* Transliteration and meanings */}
-          <ScrollView style={{ maxHeight: 160 }} nestedScrollEnabled>
+          <ScrollView style={{ maxHeight: 150 }} nestedScrollEnabled>
             <View style={{ gap: 8 }}>
               <View>
-                <ThemedText style={{ fontSize: 10, fontWeight: '700', color: colors.textSecondary }}>
-                  ENGLISH TRANSLITERATION / உச்சரிப்பு உதவி:
+                <ThemedText style={{ fontSize: 9, fontWeight: '700', color: colors.textSecondary }}>
+                  PHONETIC ENGLISH / உச்சரிப்பு உதவி:
                 </ThemedText>
                 <ThemedText style={{ fontSize: 11, fontStyle: 'italic', color: colors.text, marginTop: 2 }}>
                   {currentKural.transliteration}
@@ -373,7 +435,7 @@ export function ThirukkuralPracticeGuide({ colors, i18n, showToast }: Thirukkura
               </View>
 
               <View>
-                <ThemedText style={{ fontSize: 10, fontWeight: '700', color: colors.secondary }}>
+                <ThemedText style={{ fontSize: 9, fontWeight: '700', color: colors.secondary }}>
                   TAMIL MEANING / எளிய பொருள் உரை:
                 </ThemedText>
                 <ThemedText style={{ fontSize: 11, color: colors.text, marginTop: 2, lineHeight: 15 }}>
@@ -382,7 +444,7 @@ export function ThirukkuralPracticeGuide({ colors, i18n, showToast }: Thirukkura
               </View>
 
               <View>
-                <ThemedText style={{ fontSize: 10, fontWeight: '700', color: colors.textSecondary }}>
+                <ThemedText style={{ fontSize: 9, fontWeight: '700', color: colors.textSecondary }}>
                   ENGLISH MEANING / ஆங்கில உரை:
                 </ThemedText>
                 <ThemedText style={{ fontSize: 11, color: colors.text, marginTop: 2, lineHeight: 15 }}>
@@ -392,7 +454,6 @@ export function ThirukkuralPracticeGuide({ colors, i18n, showToast }: Thirukkura
             </View>
           </ScrollView>
 
-          {/* Action to complete reading task */}
           <Pressable
             onPress={() => handleCompleteTask('read')}
             style={{
@@ -404,7 +465,7 @@ export function ThirukkuralPracticeGuide({ colors, i18n, showToast }: Thirukkura
               borderWidth: 1,
               borderRadius: 10,
               paddingVertical: 8,
-              marginTop: Spacing.two,
+              marginTop: Spacing.one,
               gap: 6
             }}
           >
@@ -418,9 +479,8 @@ export function ThirukkuralPracticeGuide({ colors, i18n, showToast }: Thirukkura
         </View>
       ) : (
         <View style={styles.kuralContentBox}>
-          {/* Tracing Canvas for Web, Typing for both */}
           {Platform.OS === 'web' ? (
-            <View style={{ gap: Spacing.two }}>
+            <View style={{ gap: Spacing.one }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <ThemedText style={{ fontSize: 11, fontWeight: '700', color: colors.textSecondary }}>
                   ✍️ Draw & Trace on Canvas / தொடுதிரை எழுத்துப் பயிற்சி:
@@ -431,14 +491,14 @@ export function ThirukkuralPracticeGuide({ colors, i18n, showToast }: Thirukkura
                   style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, borderWidth: 0.5, borderColor: colors.border }}
                 >
                   <RotateCcw size={10} color={colors.textSecondary} />
-                  <ThemedText style={{ fontSize: 9, color: colors.textSecondary }}>Clear Drawing</ThemedText>
+                  <ThemedText style={{ fontSize: 9, color: colors.textSecondary }}>Clear</ThemedText>
                 </Pressable>
               </View>
 
               <div 
                 style={{ 
                   width: '100%', 
-                  height: '140px', 
+                  height: '130px', 
                   border: `1px dashed ${colors.border}`, 
                   borderRadius: '12px',
                   backgroundColor: colors.background,
@@ -469,7 +529,7 @@ export function ThirukkuralPracticeGuide({ colors, i18n, showToast }: Thirukkura
           ) : (
             <View style={{ padding: 12, borderRadius: 12, backgroundColor: colors.background, borderWidth: 0.5, borderColor: colors.border, alignItems: 'center' }}>
               <ThemedText style={{ fontSize: 11, fontWeight: '700', color: colors.textSecondary, textAlign: 'center' }}>
-                📝 Tracing helper is optimized for touch screen in our Web browser version.
+                📝 Tracing helper is optimized for web touch screens.
               </ThemedText>
               <ThemedText style={{ fontSize: 10, color: colors.textSecondary, fontStyle: 'italic', marginTop: 4 }}>
                 Please use the Typing Practice field below to write and verify spelling!
@@ -477,10 +537,9 @@ export function ThirukkuralPracticeGuide({ colors, i18n, showToast }: Thirukkura
             </View>
           )}
 
-          {/* Typing match spelling check */}
-          <View style={{ gap: Spacing.one, marginTop: Spacing.two }}>
+          <View style={{ gap: 4, marginTop: Spacing.one }}>
             <ThemedText style={{ fontSize: 11, fontWeight: '700', color: colors.textSecondary }}>
-              ⌨️ Tamil Spelling Keyboard Practice / தமிழ் தட்டச்சுப் பயிற்சி:
+              ⌨️ Tamil Spelling Practice / தமிழ் தட்டச்சுப் பயிற்சி:
             </ThemedText>
             
             <TextInput
@@ -496,7 +555,7 @@ export function ThirukkuralPracticeGuide({ colors, i18n, showToast }: Thirukkura
             {typingInput ? (
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 2 }}>
                 <ThemedText style={{ fontSize: 11, fontWeight: '700', color: accuracy > 85 ? colors.secondary : colors.textSecondary }}>
-                  🎯 Spelling Match Accuracy: {accuracy}%
+                  🎯 Accuracy: {accuracy}%
                 </ThemedText>
                 {accuracy === 100 && (
                   <ThemedText style={{ fontSize: 10, fontWeight: '800', color: colors.secondary }}>
@@ -507,7 +566,6 @@ export function ThirukkuralPracticeGuide({ colors, i18n, showToast }: Thirukkura
             ) : null}
           </View>
 
-          {/* Action to complete writing task */}
           <Pressable
             onPress={() => handleCompleteTask('write')}
             style={{
@@ -519,7 +577,7 @@ export function ThirukkuralPracticeGuide({ colors, i18n, showToast }: Thirukkura
               borderWidth: 1,
               borderRadius: 10,
               paddingVertical: 8,
-              marginTop: Spacing.two,
+              marginTop: Spacing.one,
               gap: 6
             }}
           >
@@ -548,24 +606,40 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: Spacing.two
+    marginBottom: Spacing.two,
+    gap: 8
   },
-  tabRow: {
+  searchBox: {
     flexDirection: 'row',
-    gap: 8,
+    alignItems: 'center',
+    gap: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.1)',
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    width: 140
+  },
+  searchInput: {
+    fontSize: 9,
+    padding: 0,
+    flex: 1,
+    height: 20
+  },
+  navRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: Spacing.two
   },
-  kuralTab: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
+  navBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
     borderWidth: 1,
-    justifyContent: 'center',
-    alignItems: 'center'
-  },
-  kuralTabText: {
-    fontSize: 12,
-    fontWeight: '700'
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4
   },
   modeRow: {
     flexDirection: 'row',
