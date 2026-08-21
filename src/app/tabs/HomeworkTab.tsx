@@ -186,17 +186,57 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
   // Thirukkural picker states
   const [thirukuralPickerVisible, setThirukuralPickerVisible] = useState(false);
   const [kuralSearchQuery, setKuralSearchQuery] = useState('');
+  const [selectedKuralNumbers, setSelectedKuralNumbers] = useState<number[]>([]);
 
-  const handleSelectKural = (k: any) => {
-    setTitleEn(`Thirukkural Practice - Kural ${k.number}`);
-    setTitleTa(`திருக்குறள் பயிற்சி - குறள் ${k.number}`);
-    setDescEn(`Memorize and practice writing Kural ${k.number} from Chapter "${k.chapter}":\n\n"${k.meaning.en}"`);
-    setDescTa(`அதிகாரம்: "${k.chapter}" - குறள் ${k.number} மனப்பாடம் செய்து தட்டச்சு செய்து பழகவும்:\n\n"${k.kural.join('\n')}"\n\nவிளக்கம்: ${k.meaning.ta_salamon || k.meaning.ta_mu_va}`);
+  const handleToggleKuralSelection = (kNum: number) => {
+    setSelectedKuralNumbers(prev => {
+      if (prev.includes(kNum)) {
+        return prev.filter(n => n !== kNum);
+      }
+      if (prev.length >= 20) {
+        showToast('You can select up to 20 kurals maximum.', 'warning');
+        return prev;
+      }
+      return [...prev, kNum];
+    });
+  };
+
+  const handleConfirmSelectedKurals = () => {
+    if (selectedKuralNumbers.length === 0) {
+      showToast('Please select at least one kural.', 'warning');
+      return;
+    }
+
+    const sorted = [...selectedKuralNumbers].sort((a, b) => a - b);
+    const allKurals = thirukuralData.kurals;
+
+    if (sorted.length === 1) {
+      const k = allKurals.find((x: any) => x.number === sorted[0]);
+      setTitleEn(`Thirukkural Practice - Kural ${k.number}`);
+      setTitleTa(`திருக்குறள் பயிற்சி - குறள் ${k.number}`);
+      setDescEn(`Memorize and practice writing Kural ${k.number} from Chapter "${k.chapter}":\n\n"${k.meaning.en}"`);
+      setDescTa(`அதிகாரம்: "${k.chapter}" - குறள் ${k.number} மனப்பாடம் செய்து தட்டச்சு செய்து பழகவும்:\n\n"${k.kural.join('\n')}"\n\nவிளக்கம்: ${k.meaning.ta_salamon || k.meaning.ta_mu_va}`);
+    } else {
+      setTitleEn(`Thirukkural Practice - Kurals ${sorted.join(', ')}`);
+      setTitleTa(`திருக்குறள் பயிற்சி - குறள்கள் ${sorted.join(', ')}`);
+      
+      const enLines = sorted.map(num => {
+        const k = allKurals.find((x: any) => x.number === num);
+        return `* Kural ${k.number} ("${k.chapter}"): ${k.meaning.en}`;
+      }).join('\n\n');
+
+      const taLines = sorted.map(num => {
+        const k = allKurals.find((x: any) => x.number === num);
+        return `* குறள் ${k.number} ("${k.chapter}"):\n${k.kural.join('\n')}\nவிளக்கம்: ${k.meaning.ta_salamon || k.meaning.ta_mu_va}`;
+      }).join('\n\n');
+
+      setDescEn(`Memorize and practice writing the assigned Kurals:\n\n${enLines}`);
+      setDescTa(`அதிகாரங்கள் மற்றும் குறள்கள் மனப்பாடம் செய்து தட்டச்சு செய்து பழகவும்:\n\n${taLines}`);
+    }
     
     setTitleTaDirty(true);
     setDescTaDirty(true);
-    setOriginalTitleEn(`Thirukkural Practice - Kural ${k.number}`);
-    setOriginalDescEn(`Memorize and practice writing Kural ${k.number} from Chapter "${k.chapter}":\n\n"${k.meaning.en}"`);
+    setOriginalTitleEn(sorted.length === 1 ? `Thirukkural Practice - Kural ${sorted[0]}` : `Thirukkural Practice - Kurals ${sorted.join(', ')}`);
     
     setThirukuralPickerVisible(false);
     setKuralSearchQuery('');
@@ -1058,9 +1098,14 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
             display: 'flex'
           }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <ThemedText style={{ fontSize: 16, fontWeight: '900', color: colors.text }}>
-                Select Thirukkural / திருக்குறள் தேர்வு
-              </ThemedText>
+              <View>
+                <ThemedText style={{ fontSize: 16, fontWeight: '900', color: colors.text }}>
+                  Select Thirukkural / திருக்குறள் தேர்வு
+                </ThemedText>
+                <ThemedText style={{ fontSize: 10, color: colors.textSecondary, marginTop: 2 }}>
+                  Selected: {selectedKuralNumbers.length} / 20 kurals
+                </ThemedText>
+              </View>
               <Pressable onPress={() => setThirukuralPickerVisible(false)} style={{ padding: 4 }}>
                 <X size={18} color={colors.text} />
               </Pressable>
@@ -1089,7 +1134,7 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
               />
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
+            <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1, marginBottom: 12 }}>
               {(() => {
                 const query = kuralSearchQuery.toLowerCase().trim();
                 const matched = thirukuralData.kurals.filter((k: any) => {
@@ -1100,7 +1145,7 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
                                     (k.meaning.ta_salamon && k.meaning.ta_salamon.toLowerCase().includes(query)) ||
                                     (k.meaning.ta_mu_va && k.meaning.ta_mu_va.toLowerCase().includes(query));
                   return !query || numMatch || textMatch;
-                }).slice(0, 50);
+                });
 
                 if (matched.length === 0) {
                   return (
@@ -1110,40 +1155,85 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
                   );
                 }
 
-                return matched.map((k: any) => (
-                  <Pressable
-                    key={k.number}
-                    onPress={() => handleSelectKural(k)}
-                    style={({ pressed }) => [
-                      {
-                        padding: 12,
-                        borderRadius: 10,
-                        borderWidth: 0.5,
-                        borderColor: colors.border,
-                        backgroundColor: colors.background,
-                        marginBottom: 8,
-                        opacity: pressed ? 0.7 : 1
-                      }
-                    ]}
-                  >
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                      <ThemedText style={{ fontSize: 11, fontWeight: '900', color: colors.primary }}>
-                        Kural {k.number} • {k.chapter}
+                return matched.map((k: any) => {
+                  const isSelected = selectedKuralNumbers.includes(k.number);
+                  return (
+                    <Pressable
+                      key={k.number}
+                      onPress={() => handleToggleKuralSelection(k.number)}
+                      style={({ pressed }) => [
+                        {
+                          padding: 12,
+                          borderRadius: 10,
+                          borderWidth: 1,
+                          borderColor: isSelected ? colors.primary : colors.border,
+                          backgroundColor: isSelected ? colors.primaryLight : colors.background,
+                          marginBottom: 8,
+                          opacity: pressed ? 0.7 : 1
+                        }
+                      ]}
+                    >
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <CheckCircle size={14} color={isSelected ? colors.primary : colors.border} style={{ opacity: isSelected ? 1 : 0.4 }} />
+                          <ThemedText style={{ fontSize: 11, fontWeight: '900', color: isSelected ? colors.primary : colors.text }}>
+                            Kural {k.number} • {k.chapter}
+                          </ThemedText>
+                        </View>
+                        <ThemedText style={{ fontSize: 10, color: colors.textSecondary }}>
+                          {k.section}
+                        </ThemedText>
+                      </View>
+                      <ThemedText style={{ fontSize: 12, fontWeight: '700', color: colors.text, lineHeight: 18, marginLeft: 20 }}>
+                        {k.kural.join('\n')}
                       </ThemedText>
-                      <ThemedText style={{ fontSize: 10, color: colors.textSecondary }}>
-                        {k.section}
+                      <ThemedText style={{ fontSize: 10, color: colors.textSecondary, marginTop: 4, marginLeft: 20 }} numberOfLines={1}>
+                        {k.meaning.en}
                       </ThemedText>
-                    </View>
-                    <ThemedText style={{ fontSize: 12, fontWeight: '700', color: colors.text, lineHeight: 18 }}>
-                      {k.kural.join('\n')}
-                    </ThemedText>
-                    <ThemedText style={{ fontSize: 10, color: colors.textSecondary, marginTop: 4 }} numberOfLines={1}>
-                      {k.meaning.en}
-                    </ThemedText>
-                  </Pressable>
-                ));
+                    </Pressable>
+                  );
+                });
               })()}
             </ScrollView>
+
+            {/* Confirm Selector Actions Footer */}
+            <View style={{ flexDirection: 'row', gap: 8, borderTopWidth: 1, borderColor: colors.border, paddingTop: 10 }}>
+              <Pressable
+                onPress={() => {
+                  setSelectedKuralNumbers([]);
+                  setThirukuralPickerVisible(false);
+                }}
+                style={{
+                  flex: 1,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  borderRadius: 10,
+                  paddingVertical: 10,
+                  alignItems: 'center'
+                }}
+              >
+                <ThemedText style={{ fontSize: 12, fontWeight: '700', color: colors.textSecondary }}>
+                  Cancel
+                </ThemedText>
+              </Pressable>
+
+              <Pressable
+                onPress={handleConfirmSelectedKurals}
+                disabled={selectedKuralNumbers.length === 0}
+                style={{
+                  flex: 2,
+                  backgroundColor: selectedKuralNumbers.length > 0 ? colors.primary : colors.border,
+                  borderRadius: 10,
+                  paddingVertical: 10,
+                  alignItems: 'center',
+                  opacity: selectedKuralNumbers.length > 0 ? 1 : 0.6
+                }}
+              >
+                <ThemedText style={{ fontSize: 12, fontWeight: '800', color: '#FFF' }}>
+                  Confirm Selection ({selectedKuralNumbers.length})
+                </ThemedText>
+              </Pressable>
+            </View>
           </View>
         </View>
       </Modal>
@@ -1468,15 +1558,17 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
                       item.title?.en?.toLowerCase().includes('thirukkural') || 
                       item.title?.ta?.includes('திருக்குறள்');
                     
-                    let assignedKural: number | undefined = undefined;
+                    let assignedKurals: number[] = [];
                     if (isThirukkuralTask) {
-                      const matchEn = item.title?.en?.match(/kural\s*:?\s*(\d+)/i) || item.description?.en?.match(/kural\s*:?\s*(\d+)/i);
-                      const matchTa = item.title?.ta?.match(/குறள்\s*:?\s*(\d+)/) || item.description?.ta?.match(/குறள்\s*:?\s*(\d+)/);
+                      const matchEn = item.title?.en?.match(/kurals?\s*:?\s*([\d\s,]+)/i) || item.description?.en?.match(/kurals?\s*:?\s*([\d\s,]+)/i);
+                      const matchTa = item.title?.ta?.match(/குறள்கள?்?\s*:?\s*([\d\s,]+)/) || item.description?.ta?.match(/குறள்கள?்?\s*:?\s*([\d\s,]+)/);
                       
-                      if (matchEn && matchEn[1]) {
-                        assignedKural = parseInt(matchEn[1], 10);
-                      } else if (matchTa && matchTa[1]) {
-                        assignedKural = parseInt(matchTa[1], 10);
+                      const rawString = matchEn ? matchEn[1] : (matchTa ? matchTa[1] : '');
+                      if (rawString) {
+                        assignedKurals = rawString
+                          .split(',')
+                          .map((s: string) => parseInt(s.trim(), 10))
+                          .filter((n: number) => !isNaN(n) && n >= 1 && n <= 1330);
                       }
                     }
                     
@@ -1485,7 +1577,7 @@ export function HomeworkTab({ user, colors, t, showToast, i18n, activeStudentId 
                         colors={colors} 
                         i18n={i18n} 
                         showToast={showToast} 
-                        assignedKuralNumber={assignedKural}
+                        assignedKuralNumbers={assignedKurals}
                       />
                     ) : null;
                   })()}

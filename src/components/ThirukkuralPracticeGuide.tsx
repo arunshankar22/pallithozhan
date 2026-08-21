@@ -79,10 +79,10 @@ interface ThirukkuralPracticeGuideProps {
   colors: any;
   i18n: any;
   showToast: (message: string, type?: 'success' | 'error' | 'warning') => void;
-  assignedKuralNumber?: number;
+  assignedKuralNumbers?: number[];
 }
 
-export function ThirukkuralPracticeGuide({ colors, i18n, showToast, assignedKuralNumber }: ThirukkuralPracticeGuideProps) {
+export function ThirukkuralPracticeGuide({ colors, i18n, showToast, assignedKuralNumbers }: ThirukkuralPracticeGuideProps) {
   // Map raw JSON to mapped array
   const mappedKurals = React.useMemo(() => {
     return thirukuralData.kurals.map((k: any) => ({
@@ -97,15 +97,15 @@ export function ThirukkuralPracticeGuide({ colors, i18n, showToast, assignedKura
     }));
   }, []);
 
-  // Determine starting index based on assigned kural or default
-  const startIdx = React.useMemo(() => {
-    if (assignedKuralNumber && assignedKuralNumber >= 1 && assignedKuralNumber <= 1330) {
-      return mappedKurals.findIndex((k: any) => k.number === assignedKuralNumber);
+  // Filter displayed kurals based on assigned numbers
+  const displayedKurals = React.useMemo(() => {
+    if (assignedKuralNumbers && assignedKuralNumbers.length > 0) {
+      return mappedKurals.filter((k: any) => assignedKuralNumbers.includes(k.number));
     }
-    return 0;
-  }, [assignedKuralNumber, mappedKurals]);
+    return mappedKurals;
+  }, [assignedKuralNumbers, mappedKurals]);
 
-  const [activeIdx, setActiveIdx] = useState<number>(startIdx !== -1 ? startIdx : 0);
+  const [activeIdx, setActiveIdx] = useState<number>(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [typingInput, setTypingInput] = useState('');
   const [isReadingMode, setIsReadingMode] = useState(true);
@@ -115,17 +115,20 @@ export function ThirukkuralPracticeGuide({ colors, i18n, showToast, assignedKura
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const drawingStateRef = useRef({ isDrawing: false, lastX: 0, lastY: 0 });
 
-  const currentKural = mappedKurals[activeIdx];
+  const currentKural = displayedKurals[activeIdx] || displayedKurals[0];
 
-  // Auto-jump if assignedKuralNumber changes
-  useEffect(() => {
-    if (assignedKuralNumber && assignedKuralNumber >= 1 && assignedKuralNumber <= 1330) {
-      const idx = mappedKurals.findIndex((k: any) => k.number === assignedKuralNumber);
-      if (idx !== -1) {
-        setActiveIdx(idx);
-      }
+  const kuralTabs = React.useMemo(() => {
+    if (assignedKuralNumbers && assignedKuralNumbers.length > 0) {
+      return displayedKurals;
     }
-  }, [assignedKuralNumber, mappedKurals]);
+    // Show the 10 kurals of the active chapter
+    return displayedKurals.filter((k: any) => k.chapter === currentKural.chapter);
+  }, [assignedKuralNumbers, displayedKurals, currentKural.chapter]);
+
+  // Auto-reset active index if assignedKuralNumbers changes
+  useEffect(() => {
+    setActiveIdx(0);
+  }, [assignedKuralNumbers]);
 
   // Pronounce voice guidance (Web Speech TTS)
   const handleHearKural = () => {
@@ -227,12 +230,12 @@ export function ThirukkuralPracticeGuide({ colors, i18n, showToast, assignedKura
 
   // Navigation callbacks
   const handlePrevKural = () => {
-    setActiveIdx(prev => (prev > 0 ? prev - 1 : mappedKurals.length - 1));
+    setActiveIdx(prev => (prev > 0 ? prev - 1 : displayedKurals.length - 1));
     setTypingInput('');
   };
 
   const handleNextKural = () => {
-    setActiveIdx(prev => (prev < mappedKurals.length - 1 ? prev + 1 : 0));
+    setActiveIdx(prev => (prev < displayedKurals.length - 1 ? prev + 1 : 0));
     setTypingInput('');
   };
 
@@ -240,7 +243,7 @@ export function ThirukkuralPracticeGuide({ colors, i18n, showToast, assignedKura
     setSearchQuery(text);
     const num = parseInt(text.trim(), 10);
     if (!isNaN(num) && num >= 1 && num <= 1330) {
-      const idx = mappedKurals.findIndex((k: any) => k.number === num);
+      const idx = displayedKurals.findIndex((k: any) => k.number === num);
       if (idx !== -1) {
         setActiveIdx(idx);
         setTypingInput('');
@@ -332,7 +335,7 @@ export function ThirukkuralPracticeGuide({ colors, i18n, showToast, assignedKura
             <ThemedText style={{ fontSize: 13, fontWeight: '900', color: colors.text }}>
               {currentKural.section} • {currentKural.chapter}
             </ThemedText>
-            {assignedKuralNumber === currentKural.number && (
+            {assignedKuralNumbers?.includes(currentKural.number) && (
               <View style={{ backgroundColor: colors.secondary, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4 }}>
                 <ThemedText style={{ color: '#FFF', fontSize: 9, fontWeight: '800' }}>ASSIGNED</ThemedText>
               </View>
@@ -373,6 +376,39 @@ export function ThirukkuralPracticeGuide({ colors, i18n, showToast, assignedKura
           <ThemedText style={{ fontSize: 11, color: colors.text }}>Next</ThemedText>
           <ChevronRight size={16} color={colors.text} />
         </Pressable>
+      </View>
+
+      {/* Selectors for Kurals */}
+      <View style={styles.tabRow}>
+        {kuralTabs.map((k: any) => {
+          const idx = displayedKurals.findIndex((x: any) => x.number === k.number);
+          const isSel = idx === activeIdx;
+          const kStatus = completedList[k.number] || { read: false, write: false };
+          const fullyPracticed = kStatus.read && kStatus.write;
+          
+          return (
+            <Pressable
+              key={k.number}
+              onPress={() => {
+                setActiveIdx(idx);
+                if (!isReadingMode && Platform.OS === 'web') {
+                  setTimeout(drawGuideOnCanvas, 50);
+                }
+              }}
+              style={[
+                styles.kuralTab,
+                { 
+                  backgroundColor: isSel ? colors.primary : colors.background, 
+                  borderColor: isSel ? colors.primary : colors.border
+                }
+              ]}
+            >
+              <ThemedText style={[styles.kuralTabText, { color: isSel ? '#FFF' : colors.text }]}>
+                {k.number} {fullyPracticed ? '✓' : ''}
+              </ThemedText>
+            </Pressable>
+          );
+        })}
       </View>
 
       {/* Mode Switcher */}
@@ -640,6 +676,24 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 4
+  },
+  tabRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: Spacing.two
+  },
+  kuralTab: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  kuralTabText: {
+    fontSize: 10,
+    fontWeight: '700'
   },
   modeRow: {
     flexDirection: 'row',
