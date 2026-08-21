@@ -973,7 +973,7 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
           {/* Footer Bottom copyright */}
           <View style={[styles.footerBottom, { borderTopColor: 'rgba(255,255,255,0.1)', flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 12 }]}>
             <ThemedText style={styles.footerCopyrightText}>
-              © 2026 Balar Malar Tamil School (NSW) Inc. All Rights Reserved.
+              © 2026 Balar Malar Tamil School (NSW) Inc. Powered by 3S Tech. All Rights Reserved.
             </ThemedText>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
               <Pressable onPress={() => router.replace('/support')}>
