@@ -4,7 +4,18 @@ import { collection, doc, getDoc, getDocs, setDoc, query, where } from 'firebase
 import { userService } from './userService';
 import { classService } from './classService';
 
-const DEFAULT_ATTENDANCE = [
+interface AttendanceRecord {
+  recordId: string;
+  classId: string;
+  date: string;
+  markedBy: string;
+  markedByName: string;
+  rolls: Record<string, 'present' | 'absent' | 'late' | 'excused'>;
+  approved: boolean;
+  createdAt?: string;
+}
+
+const DEFAULT_ATTENDANCE: AttendanceRecord[] = [
   {
     recordId: 'rec_1',
     classId: 'class_1',
@@ -16,7 +27,7 @@ const DEFAULT_ATTENDANCE = [
   }
 ];
 
-let localAttendance = [...DEFAULT_ATTENDANCE];
+let localAttendance: AttendanceRecord[] = [...DEFAULT_ATTENDANCE];
 let localPendingApprovals: any[] = [];
 let localPushedAlerts: any[] = [];
 
@@ -62,6 +73,11 @@ export const attendanceService = {
 
   saveAttendance: async (record: any): Promise<any> => {
     const docId = `${record.classId}_${record.date}`;
+    let wasApproved = false;
+    if (!db) {
+      const existing = localAttendance.find(a => a.recordId === docId);
+      if (existing) wasApproved = existing.approved || false;
+    }
     const isAdmin = record.markedByRole === 'admin';
     const cleanRecord = {
       classId: record.classId,
@@ -69,7 +85,7 @@ export const attendanceService = {
       markedBy: record.markedBy || 'teacher_1',
       markedByName: record.markedByName || 'Suresh Kumar',
       rolls: record.rolls,
-      approved: isAdmin ? true : false
+      approved: isAdmin ? true : wasApproved
     };
 
     if (!db) {
@@ -194,7 +210,22 @@ export const attendanceService = {
         app.status = 'approved';
         const attDocId = `${app.classId}_${app.date}`;
         const att = localAttendance.find(a => a.recordId === attDocId);
-        if (att) att.approved = true;
+        if (att) {
+          att.approved = true;
+          if (!att.rolls) att.rolls = {};
+          (att.rolls as any)[app.studentId] = 'excused';
+        } else {
+          localAttendance.push({
+            recordId: attDocId,
+            classId: app.classId,
+            date: app.date,
+            rolls: { [app.studentId]: 'excused' },
+            approved: true,
+            markedBy: app.markedBy || '',
+            markedByName: app.markedByName || '',
+            createdAt: new Date().toISOString()
+          });
+        }
         return app;
       }
       return null;
@@ -207,7 +238,30 @@ export const attendanceService = {
       await setDoc(appRef, { status: 'approved' }, { merge: true });
 
       const attDocId = `${appData.classId}_${appData.date}`;
-      await setDoc(doc(db, 'attendance', attDocId), { approved: true }, { merge: true });
+      const attRef = doc(db, 'attendance', attDocId);
+      const attSnap = await getDoc(attRef);
+      
+      let currentRolls = {};
+      let markedBy = appData.markedBy || '';
+      let markedByName = appData.markedByName || '';
+      
+      if (attSnap.exists()) {
+        const attData = attSnap.data();
+        currentRolls = attData.rolls || {};
+        markedBy = attData.markedBy || markedBy;
+        markedByName = attData.markedByName || markedByName;
+      }
+      
+      const updatedRolls = { ...currentRolls, [appData.studentId]: 'excused' };
+      await setDoc(attRef, {
+        classId: appData.classId,
+        date: appData.date,
+        rolls: updatedRolls,
+        approved: true,
+        markedBy,
+        markedByName,
+        createdAt: new Date().toISOString()
+      }, { merge: true });
 
       if (appData.parentUid) {
         const alertDocId = `alert_${Date.now()}`;
@@ -767,16 +821,23 @@ export const attendanceService = {
           };
 
           const isAdmin = saveRecord.markedByRole === 'admin';
+          const attRef = doc(db, 'attendance', docId);
+          const attSnap = await getDoc(attRef);
+          let wasApproved = false;
+          if (attSnap.exists()) {
+            wasApproved = attSnap.data().approved || false;
+          }
+
           const cleanRecord = {
             classId: saveRecord.classId,
             date: saveRecord.date,
             markedBy: saveRecord.markedBy,
             markedByName: saveRecord.markedByName,
             rolls: saveRecord.rolls,
-            approved: isAdmin ? true : false
+            approved: isAdmin ? true : wasApproved
           };
 
-          await setDoc(doc(db, 'attendance', docId), cleanRecord);
+          await setDoc(attRef, cleanRecord);
 
           const classObj = classesList.find(c => c.classId === saveRecord.classId);
           const className = classObj ? classObj.className : 'Unknown';

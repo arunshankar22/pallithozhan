@@ -39,7 +39,7 @@ export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentI
   };
   const [selectedClassId, setSelectedClassId] = useState('');
   const [studentList, setStudentList] = useState<any[]>([]);
-  const [rolls, setRolls] = useState<Record<string, 'present' | 'absent' | 'late'>>({});
+  const [rolls, setRolls] = useState<Record<string, 'present' | 'absent' | 'late' | 'excused'>>({});
   const [saving, setSaving] = useState(false);
   const [pendingApprovals, setPendingApprovals] = useState<any[]>([]);
   const [assignedTeachers, setAssignedTeachers] = useState<any[]>([]);
@@ -980,16 +980,19 @@ export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentI
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.one }}>
                               <View style={[
                                 styles.statusDotChip,
-                                log.status === 'present' ? { backgroundColor: colors.secondaryLight } : log.status === 'late' ? { backgroundColor: colors.accentLight } : { backgroundColor: colors.primaryLight }
+                                log.status === 'present' ? { backgroundColor: colors.secondaryLight } : 
+                                log.status === 'excused' ? { backgroundColor: colors.secondaryLight } :
+                                log.status === 'late' ? { backgroundColor: colors.accentLight } : 
+                                { backgroundColor: colors.primaryLight }
                               ]}>
-                                <ThemedText style={{ fontSize: 11, fontWeight: '700', color: log.status === 'present' ? colors.secondary : log.status === 'late' ? colors.accent : colors.primary }}>
-                                  {log.status.toUpperCase()}
+                                <ThemedText style={{ fontSize: 11, fontWeight: '700', color: log.status === 'present' || log.status === 'excused' ? colors.secondary : log.status === 'late' ? colors.accent : colors.primary }}>
+                                  {log.status === 'excused' ? (i18n.language === 'ta' ? 'விடுப்பு' : 'EXCUSED') : log.status.toUpperCase()}
                                 </ThemedText>
                               </View>
-                              {log.status === 'absent' && (
-                                <View style={[styles.authBadge, log.approved ? { backgroundColor: colors.secondaryLight } : { backgroundColor: colors.accentLight }]}>
-                                  <ThemedText style={{ fontSize: 10, fontWeight: '700', color: log.approved ? colors.secondary : colors.accent }}>
-                                    {log.approved ? 'EXCUSED' : 'UNAUTHORIZED'}
+                              {(log.status === 'absent' || log.status === 'excused') && (
+                                <View style={[styles.authBadge, (log.status === 'excused' || log.approved) ? { backgroundColor: colors.secondaryLight } : { backgroundColor: colors.accentLight }]}>
+                                  <ThemedText style={{ fontSize: 10, fontWeight: '700', color: (log.status === 'excused' || log.approved) ? colors.secondary : colors.accent }}>
+                                    {(log.status === 'excused' || log.approved) ? 'EXCUSED' : 'UNAUTHORIZED'}
                                   </ThemedText>
                                 </View>
                               )}
@@ -1459,6 +1462,19 @@ export function AttendanceTab({ user, colors, t, showToast, i18n, activeStudentI
                             {t('attendance.absent')}
                           </ThemedText>
                         </Pressable>
+
+                        {status === 'excused' && (
+                          <View
+                            style={[
+                              styles.rollButton,
+                              { backgroundColor: colors.secondaryLight, borderColor: colors.secondary, minWidth: 70 }
+                            ]}
+                          >
+                            <ThemedText style={[styles.rollBtnText, { color: colors.secondary, fontSize: 10, fontWeight: '700' }]}>
+                              {i18n.language === 'ta' ? 'விடுப்பு' : 'EXCUSED'}
+                            </ThemedText>
+                          </View>
+                        )}
                       </View>
                     </View>
                   );
