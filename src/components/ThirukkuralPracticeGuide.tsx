@@ -147,33 +147,64 @@ export function ThirukkuralPracticeGuide({ colors, i18n, showToast, assignedKura
 
     if (Platform.OS === 'web' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(currentKural.speechText);
-      utterance.lang = 'ta-IN';
-      utterance.rate = 0.8;
 
-      // Robust voice matching on Web
-      const voices = window.speechSynthesis.getVoices();
-      const tamilVoice = voices.find(v => v.lang.startsWith('ta'));
-      if (tamilVoice) {
-        utterance.voice = tamilVoice;
+      let voices = window.speechSynthesis.getVoices();
+
+      const speakWeb = () => {
+        const utterance = new SpeechSynthesisUtterance(currentKural.speechText);
+        utterance.lang = 'ta-IN';
+        utterance.rate = 0.8;
+
+        // Prioritize South Indian / Tamil female voice
+        const tamilVoice = voices.find(v => v.lang.startsWith('ta') && v.name.includes('Google')) ||
+                           voices.find(v => v.lang.startsWith('ta') && (v.name.toLowerCase().includes('female') || v.name.toLowerCase().includes('girl') || v.name.toLowerCase().includes('siri') || v.name.toLowerCase().includes('microsoft') || v.name.toLowerCase().includes('pallavi'))) ||
+                           voices.find(v => v.lang.startsWith('ta'));
+
+        if (tamilVoice) {
+          utterance.voice = tamilVoice;
+        }
+
+        utterance.onstart = () => setIsSpeaking(true);
+        utterance.onend = () => setIsSpeaking(false);
+        utterance.onerror = () => setIsSpeaking(false);
+
+        window.speechSynthesis.speak(utterance);
+      };
+
+      if (voices.length === 0) {
+        window.speechSynthesis.onvoiceschanged = () => {
+          voices = window.speechSynthesis.getVoices();
+          speakWeb();
+        };
+      } else {
+        speakWeb();
       }
-
-      utterance.onstart = () => setIsSpeaking(true);
-      utterance.onend = () => setIsSpeaking(false);
-      utterance.onerror = () => setIsSpeaking(false);
-
-      window.speechSynthesis.speak(utterance);
     } else {
       setIsSpeaking(true);
-      Speech.speak(currentKural.speechText, {
-        language: 'ta-IN',
-        rate: 0.8,
-        onStart: () => setIsSpeaking(true),
-        onDone: () => setIsSpeaking(false),
-        onError: () => {
-          setIsSpeaking(false);
-          showToast(i18n.language === 'ta' ? 'ஒலிவடிவம் ஒலிக்க இயலவில்லை' : 'Pronunciation audio guide error', 'error');
-        }
+      Speech.getAvailableVoicesAsync().then(voices => {
+        const tamilVoice = voices.find(v => v.language.startsWith('ta') && (v.name.toLowerCase().includes('female') || v.name.toLowerCase().includes('girl') || v.name.toLowerCase().includes('siri') || v.name.toLowerCase().includes('google')));
+        Speech.speak(currentKural.speechText, {
+          language: 'ta-IN',
+          rate: 0.8,
+          voice: tamilVoice?.identifier,
+          onStart: () => setIsSpeaking(true),
+          onDone: () => setIsSpeaking(false),
+          onError: () => {
+            setIsSpeaking(false);
+            showToast(i18n.language === 'ta' ? 'ஒலிவடிவம் ஒலிக்க இயலவில்லை' : 'Pronunciation audio guide error', 'error');
+          }
+        });
+      }).catch(() => {
+        Speech.speak(currentKural.speechText, {
+          language: 'ta-IN',
+          rate: 0.8,
+          onStart: () => setIsSpeaking(true),
+          onDone: () => setIsSpeaking(false),
+          onError: () => {
+            setIsSpeaking(false);
+            showToast(i18n.language === 'ta' ? 'ஒலிவடிவம் ஒலிக்க இயலவில்லை' : 'Pronunciation audio guide error', 'error');
+          }
+        });
       });
     }
   };
