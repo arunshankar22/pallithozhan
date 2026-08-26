@@ -28,7 +28,8 @@ import {
   CheckSquare,
   ClipboardList,
   HardDrive,
-  MessageSquare
+  MessageSquare,
+  Wallet
 } from 'lucide-react-native';
 import LoginScreen from './login';
 import RegisterScreen from './register';
@@ -184,12 +185,12 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
       color: '#3B82F6'
     },
     {
-      title: i18n.language === 'ta' ? 'வீட்டுப்பாடம் & உச்சரிப்பு ஒலி வழிகாட்டி' : 'Digital Homework & Audio Guides',
+      title: i18n.language === 'ta' ? 'ஏஐ உதவி "உற்ற தோழன்"' : 'AI Assistant "Utra Thozhan"',
       desc: i18n.language === 'ta'
-        ? 'ஆசிரியர்களால் வழங்கப்படும் வாராந்திர வீட்டுப்பாடங்கள். முறையான உச்சரிப்பைப் பயிற்சி செய்ய குரல் பதிவு வழிகாட்டி வசதி.'
-        : 'Weekly homework uploads with teacher-recorded audio pronunciation guides to help students practice correct Tamil speech.',
-      icon: Headphones,
-      color: '#8B5CF6'
+        ? 'தமிழ் சொற்களஞ்சியம், சொற்பொருள், வாக்கிய அமைப்பு மற்றும் மாணவர் சந்தேகங்களுக்கு உதவும் ஜெமினி ஏஐ தளம்.'
+        : 'AI-powered personal companion for Tamil vocabulary, definitions, sentence building, and student query resolution.',
+      icon: Sparkles,
+      color: '#EC4899'
     },
     {
       title: i18n.language === 'ta' ? 'தானியங்கி வருகைப் பதிவு' : 'Automated Attendance Logs',
@@ -200,6 +201,14 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
       color: '#10B981'
     },
     {
+      title: i18n.language === 'ta' ? 'டிஜிட்டல் பள்ளி நூலகம்' : 'Digital School Library',
+      desc: i18n.language === 'ta'
+        ? 'வகுப்புப் பாடப்புத்தகங்கள், தமிழ் ஆடியோக்கள் மற்றும் திருக்குறள்/ஆத்திசூடி பயிற்சி வழிகாட்டிகள் அடங்கிய சிறந்த நூலகம்.'
+        : 'Access school curriculum books, audio tracks, and interactive Thirukkural / Aathichoodi guides with completion status tracking.',
+      icon: BookOpen,
+      color: '#8B5CF6'
+    },
+    {
       title: i18n.language === 'ta' ? 'அறிவார்ந்த சேர்க்கை & காத்திருப்புப் பட்டியல்' : 'Smart Waiting List & Admission',
       desc: i18n.language === 'ta'
         ? 'புதிய சேர்க்கைகளுக்கான எளிய படிவம், முன்னுரிமை வரிசைப்படுத்தல், சீருடை/புத்தகங்கள் விநியோகக் கண்காணிப்பு மற்றும் சேர்க்கை வாரியக் கட்டுப்பாடுகள்.'
@@ -208,19 +217,11 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
       color: '#F59E0B'
     },
     {
-      title: i18n.language === 'ta' ? 'ஜெமினி தமிழ் மொழிபெயர்ப்பு' : 'Gemini Translation Engine',
+      title: i18n.language === 'ta' ? 'கட்டணங்கள் மற்றும் செலவுக் கணக்கு' : 'Expense Tracking & Ledger',
       desc: i18n.language === 'ta'
-        ? 'கூகுள் ஜெமினி செயற்கை நுண்ணறிவின் மூலம் அறிவிப்புகள், பள்ளி நாட்காட்டி மற்றும் வீட்டுப்பாட விளக்கங்களை உடனுக்குடன் மொழிபெயர்க்கும் வசதி.'
-        : 'Instantly translate announcements, calendar entries, and homework descriptions between English and Tamil with Google Gemini AI.',
-      icon: Sparkles,
-      color: '#EC4899'
-    },
-    {
-      title: i18n.language === 'ta' ? 'கூகுள் டிரைவ் ஆதார மையம்' : 'Google Drive Resource Hub',
-      desc: i18n.language === 'ta'
-        ? 'வகுப்பறைப் பாடங்கள், பயிற்சித் தாள்கள் மற்றும் கற்றல் வளங்களை மாணவர்களுடன் எளிதாகப் பகிர கூகுள் டிரைவ் இணைப்பு.'
-        : 'Keep course worksheets, syllabus files, and classroom slides organized and synced directly with Google Drive.',
-      icon: HardDrive,
+        ? 'பள்ளிக் கட்டணங்கள் செலுத்துதல், ஆசிரியர்களின் செலவுக் கோரிக்கைகள் மற்றும் நிர்வாக ஒப்புதல்களைக் கண்காணிக்கும் தளம்.'
+        : 'Track student tuition fees, log teacher expense claims, ledger records, and manage super-admin approval workflows.',
+      icon: Wallet,
       color: '#14B8A6'
     }
   ];
