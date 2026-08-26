@@ -54,7 +54,9 @@
     "web": "expo start --web",
     "api": "node api/server.js",
     "build": "node scripts/build-web.js",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "db:seed:prod": "node scripts/seed-prod-books.js production",
+    "db:seed:staging": "node scripts/seed-prod-books.js staging"
   },
   "private": true
 }
