@@ -1,20 +1,19 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, ScrollView, Pressable, Image, TextInput, Platform, Alert, useColorScheme } from 'react-native';
+import { StyleSheet, View, ScrollView, Pressable, Image, TextInput, Platform, useColorScheme } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import { Colors, Spacing } from '@/constants/theme';
 import { ThemedText } from '@/components/themed-text';
-import { Mail, ArrowLeft, Send, CheckCircle, Sparkles, BookOpen, Users, Info } from 'lucide-react-native';
+import { Mail, ArrowLeft, Send, CheckCircle, Sparkles } from 'lucide-react-native';
 import { interestService } from '@/services/interestService';
 
 const GRADES = ['KG', 'Year 1', 'Year 2', 'Year 3', 'Year 4', 'Year 5', 'Year 6', 'Year 7', 'Year 8', 'Year 9', 'Year 10'];
 
 const VOLUNTEER_AREAS = [
   { id: 'teaching', labelEn: 'Teaching & Classroom Support', labelTa: 'கற்பித்தல் மற்றும் வகுப்பு உதவி' },
-  { id: 'admin', labelEn: 'Administrative & operational support', labelTa: 'நிர்வாக மற்றும் செயல்பாட்டு உதவி' },
-  { id: 'library', labelEn: 'Library management & cataloging', labelTa: 'நூலக மேலாண்மை மற்றும் புத்தக வரிசைப்படுத்துதல்' },
-  { id: 'events', labelEn: 'Events & Cultural activities organizing', labelTa: 'நிகழ்ச்சிகள் மற்றும் கலை விழா ஒருங்கிணைப்பு' },
-  { id: 'it', labelEn: 'Technical, IT & Software testing assistance', labelTa: 'தொழில்நுட்பம், கணினி மற்றும் மென்பொருள் சோதனை உதவி' }
+  { id: 'admin', labelEn: 'Administrative & Operational Support', labelTa: 'நிர்வாக மற்றும் செயல்பாட்டு உதவி' },
+  { id: 'library', labelEn: 'Library Management & Cataloging', labelTa: 'நூலக மேலாண்மை மற்றும் புத்தக உதவி' },
+  { id: 'events', labelEn: 'Events & Cultural Activities Organizing', labelTa: 'நிகழ்ச்சிகள் மற்றும் கலை விழா ஒருங்கிணைப்பு' }
 ];
 
 export default function InterestScreen() {
@@ -29,11 +28,20 @@ export default function InterestScreen() {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [role, setRole] = useState<'parent' | 'student' | 'volunteer' | 'other'>('parent');
-  const [mainstreamGrade, setMainstreamGrade] = useState('');
-  const [selectedVolunteerAreas, setSelectedVolunteerAreas] = useState<string[]>([]);
-  const [comments, setComments] = useState('');
+  
+  // Interest Type Checkboxes
+  const [interestTestApp, setInterestTestApp] = useState(false);
+  const [interestBuildApp, setInterestBuildApp] = useState(false);
+  const [interestGeneralVolunteer, setInterestGeneralVolunteer] = useState(false);
 
+  // Parent/Student specific info (visible if interestTestApp is true)
+  const [role, setRole] = useState<'parent' | 'student' | 'other'>('parent');
+  const [mainstreamGrade, setMainstreamGrade] = useState('');
+
+  // General Volunteer specific info (visible if interestGeneralVolunteer is true)
+  const [selectedVolunteerAreas, setSelectedVolunteerAreas] = useState<string[]>([]);
+  
+  const [comments, setComments] = useState('');
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -47,8 +55,13 @@ export default function InterestScreen() {
   };
 
   const handleSubmit = async () => {
-    if (!fullName.trim() || !email.trim() || !phone.trim() || !role) {
-      setErrorMsg(isTa ? 'தயவுசெய்து தேவையான அனைத்து விவரங்களையும் நிரப்பவும்.' : 'Please fill in all required fields.');
+    if (!fullName.trim() || !email.trim() || !phone.trim()) {
+      setErrorMsg(isTa ? 'தயவுசெய்து தேவையான அனைத்து விவரங்களையும் நிரப்பவும்.' : 'Please fill in all contact details.');
+      return;
+    }
+
+    if (!interestTestApp && !interestBuildApp && !interestGeneralVolunteer) {
+      setErrorMsg(isTa ? 'தயவுசெய்து குறைந்தது ஒரு ஆர்வப் பிரிவைத் தேர்ந்தெடுக்கவும்.' : 'Please select at least one area of interest.');
       return;
     }
 
@@ -56,14 +69,20 @@ export default function InterestScreen() {
     setLoading(true);
 
     try {
+      // Map roles/interests to a clean payload format
+      const selectedRoles: string[] = [];
+      if (interestTestApp) selectedRoles.push(`test_app_${role}`);
+      if (interestBuildApp) selectedRoles.push('build_maintain_app');
+      if (interestGeneralVolunteer) selectedRoles.push('general_volunteer');
+
       await interestService.submitInterest({
         fullName: fullName.trim(),
         email: email.trim().toLowerCase(),
         phone: phone.trim(),
-        role,
-        mainstreamGrade: role === 'parent' || role === 'student' ? mainstreamGrade : '',
-        volunteerAreas: role === 'volunteer' ? selectedVolunteerAreas : [],
-        comments: comments.trim()
+        role: role, // main role context
+        mainstreamGrade: interestTestApp ? mainstreamGrade : '',
+        volunteerAreas: interestGeneralVolunteer ? selectedVolunteerAreas : [],
+        comments: `[Interests: ${selectedRoles.join(', ')}] ${comments.trim()}`
       });
       setSubmitted(true);
     } catch (err: any) {
@@ -92,12 +111,12 @@ export default function InterestScreen() {
         <View style={[styles.successCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
           <CheckCircle size={64} color="#10B981" style={{ alignSelf: 'center', marginBottom: Spacing.four }} />
           <ThemedText style={[styles.successTitle, { color: colors.text }]}>
-            {isTa ? 'ஆர்வப் பதிவு வெற்றிகரமாகச் சமர்ப்பிக்கப்பட்டது!' : 'Interest Registered Successfully!'}
+            {isTa ? 'பதிவு வெற்றிகரமாகச் சமர்ப்பிக்கப்பட்டது!' : 'Registration Submitted!'}
           </ThemedText>
           <ThemedText style={[styles.successText, { color: colors.textSecondary }]}>
             {isTa
-              ? 'பள்ளித்தோழன் செயலியைச் சோதித்துப் பார்ப்பதில் உங்கள் ஆர்வத்திற்கு நன்றி. ஆப் டெமோ மற்றும் டெஸ்டிங் குறித்து விரைவில் நாங்கள் தங்களைத் தொடர்புகொள்வோம்.'
-              : 'Thank you for registering your interest to test the Pallithozhan app! We will reach out to you soon with details on testing roles and app access.'}
+              ? 'பாலர் மலர் தமிழ் பள்ளி ஆப் டெஸ்டிங் மற்றும் தன்னார்வப் பணிகளில் உங்கள் ஆர்வத்திற்கு நன்றி. டெமோ மற்றும் பங்களிப்புகள் குறித்து விரைவில் நாங்கள் தங்களைத் தொடர்புகொள்வோம்.'
+              : 'Thank you for registering your interest! We will reach out to you soon with details on app testing, development collaboration, or general school volunteering.'}
           </ThemedText>
           <Pressable onPress={() => router.replace('/')} style={[styles.button, { backgroundColor: colors.primary, marginTop: Spacing.four }]}>
             <ThemedText style={{ color: '#FFF', fontWeight: '800' }}>
@@ -126,12 +145,12 @@ export default function InterestScreen() {
           style={styles.logo}
         />
         <ThemedText style={[styles.title, { color: colors.text }]}>
-          {isTa ? 'ஆப் டெஸ்டிங் ஆர்வப் பதிவு' : 'App Testing Interest Registration'}
+          {isTa ? 'பயனர் சோதனை மற்றும் தன்னார்வ ஆர்வப் பதிவு' : 'App Testing & Volunteer Registration'}
         </ThemedText>
         <ThemedText style={[styles.subtitle, { color: colors.textSecondary }]}>
           {isTa
-            ? 'பெற்றோர், மாணவர்கள் அல்லது தன்னார்வலர் கோணத்தில் பள்ளித்தோழன் செயலியைப் பயனர் சோதனை (User Testing) செய்ய பதிவு செய்யவும்.'
-            : 'Register your interest to test the Pallithozhan app from a parent, student, or volunteer perspective.'}
+            ? 'பாலர் மலர் தமிழ் பள்ளி ஆப் சோதனை, ஆப் உருவாக்கம்/பராமரிப்பு அல்லது இதர தன்னார்வப் பணிகளில் பங்களிக்க பதிவு செய்யவும்.'
+            : 'Register your interest to test the app, help build/maintain the platform, or volunteer for general school operations.'}
         </ThemedText>
       </View>
 
@@ -187,79 +206,157 @@ export default function InterestScreen() {
           />
         </View>
 
-        {/* Role Selector */}
+        {/* Interest Categories Section */}
         <View style={styles.inputGroup}>
-          <ThemedText style={[styles.label, { color: colors.text }]}>
-            {isTa ? 'உங்களது பங்கு / கோணம் *' : 'Role / Testing Perspective *'}
+          <ThemedText style={[styles.label, { color: colors.text, marginBottom: 4 }]}>
+            {isTa ? 'ஆர்வமுள்ள பிரிவுகள் * (ஒன்றுக்கு மேற்பட்டவற்றைத் தேர்ந்தெடுக்கலாம்)' : 'Areas of Interest * (Select all that apply)'}
           </ThemedText>
-          <View style={styles.roleGrid}>
-            {(['parent', 'student', 'volunteer', 'other'] as const).map((r) => {
-              const isActive = role === r;
-              let roleLabel = '';
-              if (r === 'parent') roleLabel = isTa ? 'பெற்றோர் (Parent)' : 'Parent';
-              if (r === 'student') roleLabel = isTa ? 'மாணவர் (Student)' : 'Student';
-              if (r === 'volunteer') roleLabel = isTa ? 'தன்னார்வலர் (Volunteer)' : 'Volunteer';
-              if (r === 'other') roleLabel = isTa ? 'இதர (Other)' : 'Other';
+          <View style={{ gap: 8 }}>
+            
+            {/* Interest: Test the App */}
+            <Pressable
+              onPress={() => setInterestTestApp(!interestTestApp)}
+              style={[
+                styles.checkboxRow,
+                {
+                  backgroundColor: interestTestApp ? colors.primary + '10' : 'transparent',
+                  borderColor: interestTestApp ? colors.primary : colors.border
+                }
+              ]}
+            >
+              <View style={[styles.checkbox, { borderColor: interestTestApp ? colors.primary : colors.textSecondary, backgroundColor: interestTestApp ? colors.primary : 'transparent' }]}>
+                {interestTestApp && <CheckCircle size={10} color="#FFF" />}
+              </View>
+              <View style={{ flex: 1 }}>
+                <ThemedText style={[styles.checkboxLabel, { color: colors.text }]}>
+                  {isTa ? 'செயலியைச் சோதித்துப் பார்க்க விருப்பம் (பெற்றோர்/மாணவர்)' : 'Test the App (Parent/Student perspective)'}
+                </ThemedText>
+              </View>
+            </Pressable>
 
-              return (
-                <Pressable
-                  key={r}
-                  onPress={() => setRole(r)}
-                  style={[
-                    styles.roleBadge,
-                    {
-                      backgroundColor: isActive ? colors.primary + '15' : colors.cardBg,
-                      borderColor: isActive ? colors.primary : colors.border
-                    }
-                  ]}
-                >
-                  <ThemedText style={[styles.roleBadgeText, { color: isActive ? colors.primary : colors.text }]}>
-                    {roleLabel}
-                  </ThemedText>
-                </Pressable>
-              );
-            })}
+            {/* Interest: Help Build & Maintain App */}
+            <Pressable
+              onPress={() => setInterestBuildApp(!interestBuildApp)}
+              style={[
+                styles.checkboxRow,
+                {
+                  backgroundColor: interestBuildApp ? colors.primary + '10' : 'transparent',
+                  borderColor: interestBuildApp ? colors.primary : colors.border
+                }
+              ]}
+            >
+              <View style={[styles.checkbox, { borderColor: interestBuildApp ? colors.primary : colors.textSecondary, backgroundColor: interestBuildApp ? colors.primary : 'transparent' }]}>
+                {interestBuildApp && <CheckCircle size={10} color="#FFF" />}
+              </View>
+              <View style={{ flex: 1 }}>
+                <ThemedText style={[styles.checkboxLabel, { color: colors.text }]}>
+                  {isTa ? 'செயலியை உருவாக்க / பராமரிக்க விருப்பம் (தொழில்நுட்ப தன்னார்வப் பணி)' : 'Help Build & Maintain the App (Technical / IT Volunteer)'}
+                </ThemedText>
+              </View>
+            </Pressable>
+
+            {/* Interest: General School Volunteer */}
+            <Pressable
+              onPress={() => setInterestGeneralVolunteer(!interestGeneralVolunteer)}
+              style={[
+                styles.checkboxRow,
+                {
+                  backgroundColor: interestGeneralVolunteer ? colors.primary + '10' : 'transparent',
+                  borderColor: interestGeneralVolunteer ? colors.primary : colors.border
+                }
+              ]}
+            >
+              <View style={[styles.checkbox, { borderColor: interestGeneralVolunteer ? colors.primary : colors.textSecondary, backgroundColor: interestGeneralVolunteer ? colors.primary : 'transparent' }]}>
+                {interestGeneralVolunteer && <CheckCircle size={10} color="#FFF" />}
+              </View>
+              <View style={{ flex: 1 }}>
+                <ThemedText style={[styles.checkboxLabel, { color: colors.text }]}>
+                  {isTa ? 'பொதுவான பள்ளி தன்னார்வப் பணிகள் (கற்பித்தல், நிர்வாகம், விழாக்கள்)' : 'General School Volunteering (Teaching, Admin, Events)'}
+                </ThemedText>
+              </View>
+            </Pressable>
           </View>
         </View>
 
-        {/* Conditional Input: Grade Level */}
-        {(role === 'parent' || role === 'student') && (
-          <View style={styles.inputGroup}>
-            <ThemedText style={[styles.label, { color: colors.text }]}>
-              {role === 'parent' 
-                ? (isTa ? 'குழந்தையின் வகுப்பு நிலை (மெயின்ஸ்ட்ரீம்)' : 'Child\'s School Grade (Mainstream)')
-                : (isTa ? 'உங்கள் வகுப்பு நிலை (மெயின்ஸ்ட்ரீம்)' : 'Your School Grade (Mainstream)')}
+        {/* Conditional Field: Parent/Student Testing Perspective */}
+        {interestTestApp && (
+          <View style={[styles.formSubSection, { borderColor: colors.border }]}>
+            <ThemedText style={[styles.label, { color: colors.text, marginBottom: 8 }]}>
+              {isTa ? 'பயனர் சோதனை விருப்ப விவரங்கள் (ஆப் டெஸ்டிங்)' : 'App Testing Perspective Details'}
             </ThemedText>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 4 }}>
-              {GRADES.map((g) => {
-                const isSelected = mainstreamGrade === g;
-                return (
-                  <Pressable
-                    key={g}
-                    onPress={() => setMainstreamGrade(g)}
-                    style={[
-                      styles.gradeBadge,
-                      {
-                        backgroundColor: isSelected ? colors.secondary + '15' : colors.cardBg,
-                        borderColor: isSelected ? colors.secondary : colors.border
-                      }
-                    ]}
-                  >
-                    <ThemedText style={{ color: isSelected ? colors.secondary : colors.text, fontSize: 12, fontWeight: '700' }}>
-                      {g}
-                    </ThemedText>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
+            
+            {/* Testing Role Selector */}
+            <View style={{ marginBottom: 12 }}>
+              <ThemedText style={[styles.subLabel, { color: colors.textSecondary, marginBottom: 6 }]}>
+                {isTa ? 'உங்களது கோணம் *' : 'Testing Role *'}
+              </ThemedText>
+              <View style={styles.roleGrid}>
+                {(['parent', 'student', 'other'] as const).map((r) => {
+                  const isActive = role === r;
+                  let label = '';
+                  if (r === 'parent') label = isTa ? 'பெற்றோர் (Parent)' : 'Parent';
+                  if (r === 'student') label = isTa ? 'மாணவர் (Student)' : 'Student';
+                  if (r === 'other') label = isTa ? 'இதர (Other)' : 'Other';
+
+                  return (
+                    <Pressable
+                      key={r}
+                      onPress={() => setRole(r)}
+                      style={[
+                        styles.roleBadge,
+                        {
+                          backgroundColor: isActive ? colors.primary + '15' : colors.cardBg,
+                          borderColor: isActive ? colors.primary : colors.border
+                        }
+                      ]}
+                    >
+                      <ThemedText style={[styles.roleBadgeText, { color: isActive ? colors.primary : colors.text }]}>
+                        {label}
+                      </ThemedText>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* School Grade */}
+            <View>
+              <ThemedText style={[styles.subLabel, { color: colors.textSecondary, marginBottom: 6 }]}>
+                {role === 'parent' 
+                  ? (isTa ? 'குழந்தையின் வகுப்பு நிலை (மெயின்ஸ்ட்ரீம்)' : 'Child\'s School Grade (Mainstream)')
+                  : (isTa ? 'உங்கள் வகுப்பு நிலை (மெயின்ஸ்ட்ரீம்)' : 'Your School Grade (Mainstream)')}
+              </ThemedText>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 4 }}>
+                {GRADES.map((g) => {
+                  const isSelected = mainstreamGrade === g;
+                  return (
+                    <Pressable
+                      key={g}
+                      onPress={() => setMainstreamGrade(g)}
+                      style={[
+                        styles.gradeBadge,
+                        {
+                          backgroundColor: isSelected ? colors.secondary + '15' : colors.cardBg,
+                          borderColor: isSelected ? colors.secondary : colors.border
+                        }
+                      ]}
+                    >
+                      <ThemedText style={{ color: isSelected ? colors.secondary : colors.text, fontSize: 12, fontWeight: '700' }}>
+                        {g}
+                      </ThemedText>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </View>
           </View>
         )}
 
-        {/* Conditional Input: Volunteer Interests */}
-        {role === 'volunteer' && (
-          <View style={styles.inputGroup}>
+        {/* Conditional Field: General Volunteer Areas */}
+        {interestGeneralVolunteer && (
+          <View style={[styles.formSubSection, { borderColor: colors.border }]}>
             <ThemedText style={[styles.label, { color: colors.text, marginBottom: 8 }]}>
-              {isTa ? 'ஆர்வமுள்ள தன்னார்வத் துறைகள்' : 'Preferred Volunteer & Testing Areas'}
+              {isTa ? 'ஆர்வமுள்ள தன்னார்வத் துறைகள்' : 'Preferred General Volunteer Areas'}
             </ThemedText>
             <View style={{ gap: 8 }}>
               {VOLUNTEER_AREAS.map((area) => {
@@ -292,14 +389,14 @@ export default function InterestScreen() {
         {/* Input: Comments */}
         <View style={styles.inputGroup}>
           <ThemedText style={[styles.label, { color: colors.text }]}>
-            {isTa ? 'கருத்துக்கள் / சோதனைக்குரிய குறிப்புகள்' : 'Comments / Testing Notes / Suggestions'}
+            {isTa ? 'குறிப்புகள் / ஆலோசனைகள் / கருத்துக்கள்' : 'Additional Notes / Skills / Comments'}
           </ThemedText>
           <TextInput
             value={comments}
             onChangeText={setComments}
             multiline
             numberOfLines={4}
-            placeholder={isTa ? 'ஏதேனும் கேள்விகள், குறிப்புகள் அல்லது ஆலோசனைகளை இங்கே உள்ளிடவும்' : 'Enter any questions, suggestions, or notes here'}
+            placeholder={isTa ? 'தங்கள் திறமைகள், தொழில்நுட்ப அனுபவம் அல்லது ஆலோசனைகளை இங்கே உள்ளிடவும்' : 'Enter details about your background, tech stack if helping build app, or notes'}
             placeholderTextColor={colors.textSecondary + '80'}
             style={[textInputStyle, { height: 100, textAlignVertical: 'top', paddingTop: 10 }]}
           />
@@ -319,12 +416,12 @@ export default function InterestScreen() {
           ]}
         >
           {loading ? (
-            <Send size={16} color="#FFF" />
+            <CheckCircle size={16} color="#FFF" />
           ) : (
             <>
               <Send size={16} color="#FFF" style={{ marginRight: 6 }} />
               <ThemedText style={{ color: '#FFF', fontWeight: '800' }}>
-                {isTa ? 'ஆர்வத்தைப் பதிவு செய்' : 'Register Interest'}
+                {isTa ? 'ஆர்வத்தைப் பதிவு செய்' : 'Submit Registration'}
               </ThemedText>
             </>
           )}
@@ -383,12 +480,24 @@ const styles = StyleSheet.create({
       }
     })
   },
+  formSubSection: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: Spacing.three,
+    marginVertical: Spacing.one,
+    borderStyle: 'dashed',
+    gap: Spacing.two,
+  },
   inputGroup: {
     gap: 6,
   },
   label: {
     fontSize: 13,
     fontWeight: '800',
+  },
+  subLabel: {
+    fontSize: 12,
+    fontWeight: '700',
   },
   input: {
     borderWidth: 1,
