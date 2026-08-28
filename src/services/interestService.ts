@@ -1,5 +1,3 @@
-import { db } from './firebase';
-import { collection, doc, setDoc } from 'firebase/firestore';
 import { API_URL } from './dbCommon';
 
 export interface InterestRegistration {
@@ -8,15 +6,14 @@ export interface InterestRegistration {
   email: string;
   phone: string;
   role: 'parent' | 'student' | 'volunteer' | 'other';
-  mainstreamGrade?: string; // For parent/student perspective
-  volunteerAreas?: string[]; // For volunteers
+  mainstreamGrade?: string;
+  volunteerAreas?: string[];
   comments?: string;
   createdAt?: string;
 }
 
 export const interestService = {
   async submitInterest(registration: Omit<InterestRegistration, 'createdAt' | 'uid'>): Promise<InterestRegistration> {
-    const isOfflineMode = !db || process.env.EXPO_PUBLIC_DEMO_MODE === 'true';
     const uid = `interest_${Date.now()}`;
     const newRegistration: InterestRegistration = {
       ...registration,
@@ -24,29 +21,48 @@ export const interestService = {
       createdAt: new Date().toISOString()
     };
 
-    if (isOfflineMode) {
-      try {
-        const response = await fetch(`${API_URL}/interest`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(newRegistration)
-        });
-        if (!response.ok) throw new Error('Failed to submit interest locally.');
-        return await response.json();
-      } catch (err) {
-        console.warn('Staging interest registration local fallback:', err);
-        return newRegistration;
-      }
-    }
-
     try {
-      const docRef = doc(db, 'interest_registrations', uid);
-      const { uid: omitted, ...details } = newRegistration;
-      await setDoc(docRef, details);
+      console.log(`[Interest Service] Submitting interest registration via API endpoint: ${API_URL}/interest`);
+      const response = await fetch(`${API_URL}/interest`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newRegistration)
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Server returned error: ${errorText}`);
+      }
+      
+      return await response.json();
+    } catch (err) {
+      console.warn('[Interest Service] API submission failed. Falling back to local state mock.', err);
       return newRegistration;
-    } catch (e) {
-      console.error('[interestService] Failed to save interest registration:', e);
-      throw e;
+    }
+  },
+
+  async getInterests(): Promise<InterestRegistration[]> {
+    try {
+      console.log(`[Interest Service] Fetching interest registrations from API endpoint: ${API_URL}/interest`);
+      const response = await fetch(`${API_URL}/interest`);
+      if (!response.ok) throw new Error('API returned non-200 response.');
+      return await response.json();
+    } catch (err) {
+      console.warn('[Interest Service] API fetch failed, returning empty list.', err);
+      return [];
+    }
+  },
+
+  async deleteInterest(uid: string): Promise<void> {
+    try {
+      console.log(`[Interest Service] Deleting interest registration ${uid} via API endpoint: ${API_URL}/interest/${uid}`);
+      const response = await fetch(`${API_URL}/interest/${uid}`, {
+        method: 'DELETE'
+      });
+      if (!response.ok) throw new Error('API returned non-200 response for delete.');
+    } catch (err) {
+      console.warn('[Interest Service] API delete failed.', err);
+      throw err;
     }
   }
 };

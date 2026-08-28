@@ -586,8 +586,40 @@ async function handleApiRoutes(req, res, pathname, method, dbData, writeDb, urlO
 
   // GET /api/interest
   if (pathname === '/api/interest' && method === 'GET') {
-    const list = dbData.interest_registrations || [];
-    const sorted = [...list].sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
+    let list = [];
+    if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+      try {
+        const admin = require('firebase-admin');
+        if (!admin.apps.length) {
+          let serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
+          if (typeof serviceAccount === 'string') {
+            serviceAccount = JSON.parse(serviceAccount);
+          }
+          if (serviceAccount && serviceAccount.private_key) {
+            serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+          }
+          admin.initializeApp({
+            credential: admin.credential.cert(serviceAccount)
+          });
+        }
+        const firestore = admin.firestore();
+        const snap = await firestore.collection('interest_registrations').get();
+        snap.forEach(doc => {
+          list.push({ uid: doc.id, ...doc.data() });
+        });
+      } catch (dbErr) {
+        console.error('[Backend API] Failed to fetch from Firestore via admin SDK:', dbErr);
+      }
+    }
+
+    const localList = dbData.interest_registrations || [];
+    localList.forEach(item => {
+      if (!list.some(x => x.uid === item.uid)) {
+        list.push(item);
+      }
+    });
+
+    const sorted = [...list].sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
     sendJson(res, 200, sorted);
     return true;
   }
@@ -596,8 +628,8 @@ async function handleApiRoutes(req, res, pathname, method, dbData, writeDb, urlO
   if (pathname === '/api/interest' && method === 'POST') {
     try {
       const body = await parseBody(req);
-      if (!body.fullName || !body.email || !body.phone || !body.role) {
-        sendJson(res, 400, { error: 'Full name, email, phone, and role are required.' });
+      if (!body.fullName || !body.email || !body.phone) {
+        sendJson(res, 400, { error: 'Full name, email, and phone are required.' });
         return true;
       }
       const newRecord = {
@@ -605,12 +637,45 @@ async function handleApiRoutes(req, res, pathname, method, dbData, writeDb, urlO
         fullName: body.fullName.trim(),
         email: body.email.trim().toLowerCase(),
         phone: body.phone.trim(),
-        role: body.role,
+        role: body.role || 'other',
         mainstreamGrade: body.mainstreamGrade || '',
         volunteerAreas: body.volunteerAreas || [],
         comments: body.comments || '',
         createdAt: new Date().toISOString()
       };
+
+      if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+        try {
+          const admin = require('firebase-admin');
+          if (!admin.apps.length) {
+            let serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
+            if (typeof serviceAccount === 'string') {
+              serviceAccount = JSON.parse(serviceAccount);
+            }
+            if (serviceAccount && serviceAccount.private_key) {
+              serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+            }
+            admin.initializeApp({
+              credential: admin.credential.cert(serviceAccount)
+            });
+          }
+          const firestore = admin.firestore();
+          await firestore.collection('interest_registrations').doc(newRecord.uid).set({
+            fullName: newRecord.fullName,
+            email: newRecord.email,
+            phone: newRecord.phone,
+            role: newRecord.role,
+            mainstreamGrade: newRecord.mainstreamGrade,
+            volunteerAreas: newRecord.volunteerAreas,
+            comments: newRecord.comments,
+            createdAt: newRecord.createdAt
+          });
+          console.log(`[Backend API] Successfully persisted interest registration ${newRecord.uid} to Firestore.`);
+        } catch (dbErr) {
+          console.error('[Backend API] Failed to save to Firestore via admin SDK:', dbErr);
+        }
+      }
+
       dbData.interest_registrations = dbData.interest_registrations || [];
       dbData.interest_registrations.push(newRecord);
       writeDb(dbData);
@@ -618,6 +683,38 @@ async function handleApiRoutes(req, res, pathname, method, dbData, writeDb, urlO
     } catch (err) {
       sendJson(res, 500, { error: 'Failed to submit interest registration.', message: err.message });
     }
+    return true;
+  }
+
+  // DELETE /api/interest/:uid
+  if (pathname.startsWith('/api/interest/') && method === 'DELETE') {
+    const uid = pathname.split('/').pop();
+    if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+      try {
+        const admin = require('firebase-admin');
+        if (!admin.apps.length) {
+          let serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
+          if (typeof serviceAccount === 'string') {
+            serviceAccount = JSON.parse(serviceAccount);
+          }
+          if (serviceAccount && serviceAccount.private_key) {
+            serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+          }
+          admin.initializeApp({
+            credential: admin.credential.cert(serviceAccount)
+          });
+        }
+        const firestore = admin.firestore();
+        await firestore.collection('interest_registrations').doc(uid).delete();
+        console.log(`[Backend API] Successfully deleted interest registration ${uid} from Firestore.`);
+      } catch (dbErr) {
+        console.error('[Backend API] Failed to delete from Firestore via admin SDK:', dbErr);
+      }
+    }
+
+    dbData.interest_registrations = (dbData.interest_registrations || []).filter(w => w.uid !== uid);
+    writeDb(dbData);
+    sendJson(res, 200, { message: 'Interest registration deleted successfully.' });
     return true;
   }
 

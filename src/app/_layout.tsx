@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { useColorScheme, View, ActivityIndicator, SafeAreaView } from 'react-native';
+import { useColorScheme, View, ActivityIndicator, SafeAreaView, Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 // Import i18n initialization
@@ -22,8 +22,14 @@ function AppContent() {
   const theme = scheme === 'dark' ? 'dark' : 'light';
   const colors = Colors[theme];
   const pathname = usePathname();
+  let resolvedPath = pathname || '';
+  if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location) {
+    resolvedPath = window.location.pathname || '';
+  }
+  const cleanPath = resolvedPath ? resolvedPath.replace(/\/$/, '') : '';
+  console.log('[Routing] Resolved clean path:', cleanPath);
 
-  if (pathname === '/privacy') {
+  if (cleanPath === '/privacy') {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
         <PrivacyScreen />
@@ -31,7 +37,7 @@ function AppContent() {
     );
   }
 
-  if (pathname === '/terms') {
+  if (cleanPath === '/terms') {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
         <TermsScreen />
@@ -39,7 +45,7 @@ function AppContent() {
     );
   }
 
-  if (pathname === '/support') {
+  if (cleanPath === '/support') {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
         <SupportScreen />
@@ -47,7 +53,7 @@ function AppContent() {
     );
   }
 
-  if (pathname === '/interest') {
+  if (cleanPath === '/interest') {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
         <InterestScreen />

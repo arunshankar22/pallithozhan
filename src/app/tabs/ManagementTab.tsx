@@ -21,6 +21,7 @@ import { spreadsheetService } from '@/services/spreadsheetService';
 import { waitlistService } from '@/services/waitlistService';
 import { expenseService } from '@/services/expenseService';
 import { featureFlagsService } from '@/services/featureFlagsService';
+import { interestService } from '@/services/interestService';
 import { UserModal } from '@/components/UserModal';
 import { UserBulkBar } from '@/components/UserBulkBar';
 import { DateTimePicker } from '@/components/DateTimePicker';
@@ -55,7 +56,7 @@ const FlatScrollContainer = ({
 export function ManagementTab({ user, colors, t, showToast, i18n, insets, onFeatureFlagsUpdated }: TabProps) {
   const { width: windowWidth } = useWindowDimensions();
   const isLargeScreen = windowWidth >= 768;
-  const [subTab, setSubTab] = useState<'users' | 'classes' | 'calendar' | 'import_export' | 'waitlist' | 'expense_config' | 'feature_flags'>('users');
+  const [subTab, setSubTab] = useState<'users' | 'classes' | 'calendar' | 'import_export' | 'waitlist' | 'expense_config' | 'feature_flags' | 'interest'>('users');
   
   // Expense config states
   const [treasurerUids, setTreasurerUids] = useState<string[]>([]);
@@ -89,6 +90,9 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets, onFeat
   const [users, setUsers] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
   const [waitlist, setWaitlist] = useState<any[]>([]);
+  const [interests, setInterests] = useState<any[]>([]);
+  const [interestSearchQuery, setInterestSearchQuery] = useState('');
+  const [loadingInterests, setLoadingInterests] = useState(false);
   const [waitlistSearchQuery, setWaitlistSearchQuery] = useState('');
   const [editingWaitlist, setEditingWaitlist] = useState<any | null>(null);
   const [waitlistModalVisible, setWaitlistModalVisible] = useState(false);
@@ -825,6 +829,12 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets, onFeat
       setClasses(cList);
       setSchoolDates(dList);
       setWaitlist(wList);
+      try {
+        const intList = await interestService.getInterests();
+        setInterests(intList);
+      } catch (err) {
+        console.warn('Failed to load interest registrations in refreshData:', err);
+      }
 
       const expConfig = await expenseService.getApproverConfig();
       const filterValidUids = (uids: string[]) => uids.filter(id => uList.some(usr => usr.uid === id));
@@ -1375,6 +1385,19 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets, onFeat
             >
               <ThemedText style={{ color: subTab === 'waitlist' ? '#FFF' : colors.text, fontWeight: '700', fontSize: 13 }}>
                 📝 Waitlist Directory
+              </ThemedText>
+            </Pressable>
+            <Pressable
+              onPress={() => setSubTab('interest')}
+              style={[
+                { paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20, borderWidth: 1 },
+                subTab === 'interest' 
+                  ? { backgroundColor: colors.primary, borderColor: colors.primary } 
+                  : { backgroundColor: 'transparent', borderColor: colors.border }
+              ]}
+            >
+              <ThemedText style={{ color: subTab === 'interest' ? '#FFF' : colors.text, fontWeight: '700', fontSize: 13 }}>
+                🤝 Interest Registrations
               </ThemedText>
             </Pressable>
             <Pressable
@@ -3294,7 +3317,7 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets, onFeat
             </View>
           </View>
         </FlatScrollContainer>
-      ) : (
+      ) : subTab === 'feature_flags' ? (
         /* PORTAL FEATURES / FEATURE FLAGS SUB-TAB */
         <FlatScrollContainer style={{ flex: 1 }} contentContainerStyle={{ gap: Spacing.three, paddingBottom: isLargeScreen ? Spacing.three : 0 }}>
           <View style={{ flexDirection: 'row', gap: Spacing.two, borderBottomWidth: 1, borderColor: colors.border, paddingBottom: 10 }}>
@@ -3432,6 +3455,152 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets, onFeat
               )}
             </Pressable>
           </View>
+        </FlatScrollContainer>
+      ) : (
+        /* INTEREST REGISTRATIONS SUB-TAB */
+        <FlatScrollContainer style={{ flex: 1 }} contentContainerStyle={{ gap: Spacing.three, paddingBottom: isLargeScreen ? Spacing.three : 0 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderColor: colors.border, paddingBottom: 10 }}>
+            <ThemedText style={{ fontSize: 16, fontWeight: '800', color: colors.primary }}>🤝 App Testing & Volunteer Interest Registrations</ThemedText>
+            <Pressable onPress={refreshData} style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: colors.border }}>
+              <ThemedText style={{ fontSize: 12, fontWeight: '700' }}>🔄 Refresh</ThemedText>
+            </Pressable>
+          </View>
+
+          {/* Search Bar */}
+          <View style={{ flexDirection: 'row', gap: 8, marginVertical: 4 }}>
+            <TextInput
+              style={{
+                flex: 1,
+                borderWidth: 1,
+                borderColor: colors.border,
+                borderRadius: 8,
+                paddingHorizontal: 12,
+                paddingVertical: 8,
+                fontSize: 13,
+                color: colors.text,
+                backgroundColor: colors.cardBg
+              }}
+              value={interestSearchQuery}
+              onChangeText={setInterestSearchQuery}
+              placeholder="Search by name, email, or role..."
+              placeholderTextColor={colors.textSecondary + '80'}
+            />
+          </View>
+
+          {/* Interest Cards List */}
+          {(() => {
+            const filtered = interests.filter(item => {
+              const query = interestSearchQuery.toLowerCase();
+              return (
+                (item.fullName || '').toLowerCase().includes(query) ||
+                (item.email || '').toLowerCase().includes(query) ||
+                (item.phone || '').toLowerCase().includes(query) ||
+                (item.role || '').toLowerCase().includes(query) ||
+                (item.comments || '').toLowerCase().includes(query)
+              );
+            });
+
+            if (filtered.length === 0) {
+              return (
+                <View style={{ padding: 40, alignItems: 'center', justifyContent: 'center' }}>
+                  <ThemedText style={{ color: colors.textSecondary, fontStyle: 'italic' }}>
+                    No interest registrations found.
+                  </ThemedText>
+                </View>
+              );
+            }
+
+            return (
+              <View style={{ gap: 12 }}>
+                {filtered.map(item => {
+                  return (
+                    <View
+                      key={item.uid}
+                      style={{
+                        padding: 16,
+                        borderRadius: 12,
+                        borderWidth: 1,
+                        borderColor: colors.border,
+                        backgroundColor: colors.cardBg,
+                        gap: 8
+                      }}
+                    >
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <View style={{ flex: 1, gap: 2 }}>
+                          <ThemedText style={{ fontSize: 15, fontWeight: '800', color: colors.text }}>
+                            {item.fullName}
+                          </ThemedText>
+                          <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>
+                            📧 {item.email}  •  📱 {item.phone}
+                          </ThemedText>
+                        </View>
+                        
+                        {/* Delete Button */}
+                        <Pressable
+                          onPress={async () => {
+                            if (Platform.OS === 'web' && !window.confirm(`Are you sure you want to delete registration for ${item.fullName}?`)) {
+                              return;
+                            }
+                            try {
+                              await interestService.deleteInterest(item.uid);
+                              showToast('Registration deleted successfully.', 'success');
+                              await refreshData();
+                            } catch (e) {
+                              showToast('Failed to delete registration.', 'error');
+                            }
+                          }}
+                          style={{ padding: 6, borderRadius: 6, borderWidth: 1, borderColor: colors.danger + '40', backgroundColor: colors.danger + '08' }}
+                        >
+                          <Trash2 size={14} color={colors.danger} />
+                        </Pressable>
+                      </View>
+
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+                        {/* Role tag */}
+                        <View style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, backgroundColor: colors.primary + '15', borderWidth: 0.5, borderColor: colors.primary + '40' }}>
+                          <ThemedText style={{ fontSize: 11, fontWeight: '700', color: colors.primary, textTransform: 'capitalize' }}>
+                            👤 Perspective: {item.role}
+                          </ThemedText>
+                        </View>
+
+                        {/* Grade Level Tag */}
+                        {item.mainstreamGrade ? (
+                          <View style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, backgroundColor: colors.secondary + '15', borderWidth: 0.5, borderColor: colors.secondary + '40' }}>
+                            <ThemedText style={{ fontSize: 11, fontWeight: '700', color: colors.secondary }}>
+                              🎓 Grade: {item.mainstreamGrade}
+                            </ThemedText>
+                          </View>
+                        ) : null}
+
+                        {/* Volunteer Areas tags */}
+                        {item.volunteerAreas && item.volunteerAreas.length > 0 ? (
+                          item.volunteerAreas.map((area: string) => (
+                            <View key={area} style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, backgroundColor: '#E0F2FE', borderWidth: 0.5, borderColor: '#bae6fd' }}>
+                              <ThemedText style={{ fontSize: 11, fontWeight: '700', color: '#0369a1', textTransform: 'capitalize' }}>
+                                🛠️ {area}
+                              </ThemedText>
+                            </View>
+                          ))
+                        ) : null}
+                      </View>
+
+                      {item.comments ? (
+                        <View style={{ marginTop: 6, padding: 10, borderRadius: 8, backgroundColor: colors.background, borderWidth: 0.5, borderColor: colors.border }}>
+                          <ThemedText style={{ fontSize: 12, fontStyle: 'italic', color: colors.textSecondary }}>
+                            "{item.comments}"
+                          </ThemedText>
+                        </View>
+                      ) : null}
+
+                      <ThemedText style={{ fontSize: 10, color: colors.textSecondary + '80', alignSelf: 'flex-end', marginTop: 4 }}>
+                        Submitted: {item.createdAt ? new Date(item.createdAt).toLocaleString() : 'N/A'}
+                      </ThemedText>
+                    </View>
+                  );
+                })}
+              </View>
+            );
+          })()}
         </FlatScrollContainer>
       )}
 
