@@ -15,6 +15,21 @@ function forceExit() {
   if (completed) return;
   completed = true;
   console.log('\n[Build Wrapper] Detected build completion signal (Exported: dist). Forcing process exit to prevent CI hang...');
+  
+  if (process.env.VERCEL) {
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      const target = path.join(__dirname, '../public/index.html');
+      if (fs.existsSync(target)) {
+        fs.unlinkSync(target);
+        console.log('[Build Wrapper] Successfully deleted public/index.html to prevent rewrite conflicts on Vercel.');
+      }
+    } catch (e) {
+      console.warn('[Build Wrapper] Failed to clean up public/index.html:', e);
+    }
+  }
+
   setTimeout(() => {
     console.log('[Build Wrapper] Exiting successfully.');
     process.exit(0);
@@ -41,6 +56,21 @@ child.on('close', (code) => {
   console.log(`\n[Build Wrapper] Child process exited with code ${code}`);
   if (!completed) {
     completed = true;
+    
+    if (process.env.VERCEL) {
+      try {
+        const fs = require('fs');
+        const path = require('path');
+        const target = path.join(__dirname, '../public/index.html');
+        if (fs.existsSync(target)) {
+          fs.unlinkSync(target);
+          console.log('[Build Wrapper] Successfully deleted public/index.html to prevent rewrite conflicts on Vercel.');
+        }
+      } catch (e) {
+        console.warn('[Build Wrapper] Failed to clean up public/index.html:', e);
+      }
+    }
+
     process.exit(code || 0);
   }
 });
