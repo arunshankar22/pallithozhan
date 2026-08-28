@@ -584,6 +584,43 @@ async function handleApiRoutes(req, res, pathname, method, dbData, writeDb, urlO
     return true;
   }
 
+  // GET /api/interest
+  if (pathname === '/api/interest' && method === 'GET') {
+    const list = dbData.interest_registrations || [];
+    const sorted = [...list].sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
+    sendJson(res, 200, sorted);
+    return true;
+  }
+
+  // POST /api/interest
+  if (pathname === '/api/interest' && method === 'POST') {
+    try {
+      const body = await parseBody(req);
+      if (!body.fullName || !body.email || !body.phone || !body.role) {
+        sendJson(res, 400, { error: 'Full name, email, phone, and role are required.' });
+        return true;
+      }
+      const newRecord = {
+        uid: body.uid || `interest_${Date.now()}`,
+        fullName: body.fullName.trim(),
+        email: body.email.trim().toLowerCase(),
+        phone: body.phone.trim(),
+        role: body.role,
+        mainstreamGrade: body.mainstreamGrade || '',
+        volunteerAreas: body.volunteerAreas || [],
+        comments: body.comments || '',
+        createdAt: new Date().toISOString()
+      };
+      dbData.interest_registrations = dbData.interest_registrations || [];
+      dbData.interest_registrations.push(newRecord);
+      writeDb(dbData);
+      sendJson(res, 201, newRecord);
+    } catch (err) {
+      sendJson(res, 500, { error: 'Failed to submit interest registration.', message: err.message });
+    }
+    return true;
+  }
+
   // POST /api/waitlist/reset
   if (pathname === '/api/waitlist/reset' && method === 'POST') {
     const { DEFAULT_WAITLIST } = require('./db');

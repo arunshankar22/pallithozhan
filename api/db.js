@@ -543,7 +543,8 @@ const INITIAL_DB = {
   schooldates: DEFAULT_SCHOOL_DATES,
   waitlist: DEFAULT_WAITLIST,
   books: DEFAULT_BOOKS,
-  reading_progress: []
+  reading_progress: [],
+  interest_registrations: []
 };
 
 // Ensure database file exists
@@ -622,6 +623,10 @@ function readDb(branch = 'main') {
     }
     if (!parsed.reading_progress) {
       parsed.reading_progress = [];
+      upgraded = true;
+    }
+    if (!parsed.interest_registrations) {
+      parsed.interest_registrations = [];
       upgraded = true;
     }
     if (upgraded) {

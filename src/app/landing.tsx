@@ -356,6 +356,28 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
 
           {isLargeScreen && (
             <Pressable
+              onPress={() => router.replace('/interest' as any)}
+              style={({ pressed }) => [
+                styles.langBadge,
+                { 
+                  backgroundColor: 'transparent',
+                  borderColor: colors.border,
+                  opacity: pressed ? 0.8 : 1,
+                  borderRadius: 20,
+                  paddingHorizontal: 14,
+                  paddingVertical: 6,
+                  marginRight: 4
+                }
+              ]}
+            >
+              <ThemedText style={[styles.langText, { marginLeft: 0, color: colors.textSecondary }]}>
+                {i18n.language === 'ta' ? 'ஆப் டெஸ்டிங் ஆர்வப்பதிவு' : 'Test App'}
+              </ThemedText>
+            </Pressable>
+          )}
+
+          {isLargeScreen && (
+            <Pressable
               onPress={() => { setAuthMode('waitlist'); setPortalVisible(true); }}
               style={({ pressed }) => [
                 styles.langBadge,
