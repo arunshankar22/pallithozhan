@@ -371,7 +371,7 @@ export default function LandingScreen({ onLoginSuccess }: LandingScreenProps) {
               ]}
             >
               <ThemedText style={[styles.langText, { marginLeft: 0, color: colors.textSecondary }]}>
-                {i18n.language === 'ta' ? 'ஆப் டெஸ்டிங் ஆர்வப்பதிவு' : 'Test App'}
+                {i18n.language === 'ta' ? 'முன்கூட்டியே சோதி & உதவு' : 'Early Access / Contribute'}
               </ThemedText>
             </Pressable>
           )}
