@@ -20,13 +20,14 @@ function forceExit() {
     try {
       const fs = require('fs');
       const path = require('path');
+      const source = path.join(__dirname, '../dist/index.html');
       const target = path.join(__dirname, '../public/index.html');
-      if (fs.existsSync(target)) {
-        fs.unlinkSync(target);
-        console.log('[Build Wrapper] Successfully deleted public/index.html to prevent rewrite conflicts on Vercel.');
+      if (fs.existsSync(source)) {
+        fs.copyFileSync(source, target);
+        console.log('[Build Wrapper] Successfully copied dist/index.html to public/index.html to prevent rewrite conflicts on Vercel.');
       }
     } catch (e) {
-      console.warn('[Build Wrapper] Failed to clean up public/index.html:', e);
+      console.warn('[Build Wrapper] Failed to sync index.html template on Vercel:', e);
     }
   }
 
@@ -61,13 +62,14 @@ child.on('close', (code) => {
       try {
         const fs = require('fs');
         const path = require('path');
+        const source = path.join(__dirname, '../dist/index.html');
         const target = path.join(__dirname, '../public/index.html');
-        if (fs.existsSync(target)) {
-          fs.unlinkSync(target);
-          console.log('[Build Wrapper] Successfully deleted public/index.html to prevent rewrite conflicts on Vercel.');
+        if (fs.existsSync(source)) {
+          fs.copyFileSync(source, target);
+          console.log('[Build Wrapper] Successfully copied dist/index.html to public/index.html to prevent rewrite conflicts on Vercel.');
         }
       } catch (e) {
-        console.warn('[Build Wrapper] Failed to clean up public/index.html:', e);
+        console.warn('[Build Wrapper] Failed to sync index.html template on Vercel:', e);
       }
     }
 
