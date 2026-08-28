@@ -21,7 +21,12 @@ function AppContent() {
   const scheme = useColorScheme();
   const theme = scheme === 'dark' ? 'dark' : 'light';
   const colors = Colors[theme];
-  const pathname = usePathname();
+  let pathname = '';
+  try {
+    pathname = usePathname();
+  } catch (e) {
+    // Expected during initial static/server load before router is fully ready
+  }
   let resolvedPath = pathname || '';
   if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location) {
     resolvedPath = window.location.pathname || '';

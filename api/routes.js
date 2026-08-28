@@ -1,6 +1,51 @@
 const { parseBody, sendJson, INITIAL_DB } = require('./db');
 const aiHelper = require('./aiHelper');
 
+let firebaseAppInstance = null;
+let firestoreInstance = null;
+
+async function getAuthenticatedDb(dbId) {
+  if (firestoreInstance) return firestoreInstance;
+  
+  const { initializeApp } = require('firebase/app');
+  const { getAuth, signInWithEmailAndPassword } = require('firebase/auth');
+  const { initializeFirestore } = require('firebase/firestore');
+  
+  const firebaseConfig = {
+    apiKey: "AIzaSyBjdndDGmh4ZQt_SJRf8_aL0QtBgidGMUw",
+    authDomain: "pallithozhan.firebaseapp.com",
+    projectId: "pallithozhan",
+    storageBucket: "pallithozhan.firebasestorage.app",
+    messagingSenderId: "278118172684",
+    appId: "1:278118172684:web:fd50511d1a859ebc578629"
+  };
+  
+  firebaseAppInstance = initializeApp(firebaseConfig);
+  const auth = getAuth(firebaseAppInstance);
+  
+  console.log('[Backend API] Authenticating client Firebase connection as admin...');
+  await signInWithEmailAndPassword(auth, "admin@example.com", "password");
+  
+  firestoreInstance = initializeFirestore(firebaseAppInstance, {}, dbId);
+  return firestoreInstance;
+}
+
+function getDbIdForRequest(req) {
+  const referer = req.headers.referer || '';
+  const host = req.headers.host || '';
+  if (
+    referer.includes('pallithozhan.vercel.app') || 
+    referer.includes('pallithozhan.3stech.com.au') || 
+    referer.includes('pallithozhan.3stech.ai') ||
+    host.includes('pallithozhan.vercel.app') || 
+    host.includes('pallithozhan.3stech.com.au') || 
+    host.includes('pallithozhan.3stech.ai')
+  ) {
+    return 'pallithozhan-prod-db';
+  }
+  return 'pallithozhandb';
+}
+
 async function handleApiRoutes(req, res, pathname, method, dbData, writeDb, urlObj) {
   // GET /api/health
   if (pathname === '/api/health' && method === 'GET') {
@@ -587,29 +632,17 @@ async function handleApiRoutes(req, res, pathname, method, dbData, writeDb, urlO
   // GET /api/interest
   if (pathname === '/api/interest' && method === 'GET') {
     let list = [];
-    if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-      try {
-        const admin = require('firebase-admin');
-        if (!admin.apps.length) {
-          let serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
-          if (typeof serviceAccount === 'string') {
-            serviceAccount = JSON.parse(serviceAccount);
-          }
-          if (serviceAccount && serviceAccount.private_key) {
-            serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
-          }
-          admin.initializeApp({
-            credential: admin.credential.cert(serviceAccount)
-          });
-        }
-        const firestore = admin.firestore();
-        const snap = await firestore.collection('interest_registrations').get();
-        snap.forEach(doc => {
-          list.push({ uid: doc.id, ...doc.data() });
-        });
-      } catch (dbErr) {
-        console.error('[Backend API] Failed to fetch from Firestore via admin SDK:', dbErr);
-      }
+    const dbId = getDbIdForRequest(req);
+    try {
+      const { collection, getDocs } = require('firebase/firestore');
+      const db = await getAuthenticatedDb(dbId);
+      const snap = await getDocs(collection(db, 'interest_registrations'));
+      snap.forEach(doc => {
+        list.push({ uid: doc.id, ...doc.data() });
+      });
+      console.log(`[Backend API] Successfully loaded ${list.length} interest registrations from Firestore (${dbId}).`);
+    } catch (dbErr) {
+      console.error(`[Backend API] Failed to fetch from Firestore (${dbId}) via client SDK:`, dbErr.message);
     }
 
     const localList = dbData.interest_registrations || [];
@@ -644,36 +677,23 @@ async function handleApiRoutes(req, res, pathname, method, dbData, writeDb, urlO
         createdAt: new Date().toISOString()
       };
 
-      if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-        try {
-          const admin = require('firebase-admin');
-          if (!admin.apps.length) {
-            let serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
-            if (typeof serviceAccount === 'string') {
-              serviceAccount = JSON.parse(serviceAccount);
-            }
-            if (serviceAccount && serviceAccount.private_key) {
-              serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
-            }
-            admin.initializeApp({
-              credential: admin.credential.cert(serviceAccount)
-            });
-          }
-          const firestore = admin.firestore();
-          await firestore.collection('interest_registrations').doc(newRecord.uid).set({
-            fullName: newRecord.fullName,
-            email: newRecord.email,
-            phone: newRecord.phone,
-            role: newRecord.role,
-            mainstreamGrade: newRecord.mainstreamGrade,
-            volunteerAreas: newRecord.volunteerAreas,
-            comments: newRecord.comments,
-            createdAt: newRecord.createdAt
-          });
-          console.log(`[Backend API] Successfully persisted interest registration ${newRecord.uid} to Firestore.`);
-        } catch (dbErr) {
-          console.error('[Backend API] Failed to save to Firestore via admin SDK:', dbErr);
-        }
+      const dbId = getDbIdForRequest(req);
+      try {
+        const { doc, setDoc } = require('firebase/firestore');
+        const db = await getAuthenticatedDb(dbId);
+        await setDoc(doc(db, 'interest_registrations', newRecord.uid), {
+          fullName: newRecord.fullName,
+          email: newRecord.email,
+          phone: newRecord.phone,
+          role: newRecord.role,
+          mainstreamGrade: newRecord.mainstreamGrade,
+          volunteerAreas: newRecord.volunteerAreas,
+          comments: newRecord.comments,
+          createdAt: newRecord.createdAt
+        });
+        console.log(`[Backend API] Successfully persisted interest registration ${newRecord.uid} to Firestore (${dbId}).`);
+      } catch (dbErr) {
+        console.error(`[Backend API] Failed to save to Firestore (${dbId}) via client SDK:`, dbErr.message);
       }
 
       dbData.interest_registrations = dbData.interest_registrations || [];
@@ -689,27 +709,14 @@ async function handleApiRoutes(req, res, pathname, method, dbData, writeDb, urlO
   // DELETE /api/interest/:uid
   if (pathname.startsWith('/api/interest/') && method === 'DELETE') {
     const uid = pathname.split('/').pop();
-    if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-      try {
-        const admin = require('firebase-admin');
-        if (!admin.apps.length) {
-          let serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
-          if (typeof serviceAccount === 'string') {
-            serviceAccount = JSON.parse(serviceAccount);
-          }
-          if (serviceAccount && serviceAccount.private_key) {
-            serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
-          }
-          admin.initializeApp({
-            credential: admin.credential.cert(serviceAccount)
-          });
-        }
-        const firestore = admin.firestore();
-        await firestore.collection('interest_registrations').doc(uid).delete();
-        console.log(`[Backend API] Successfully deleted interest registration ${uid} from Firestore.`);
-      } catch (dbErr) {
-        console.error('[Backend API] Failed to delete from Firestore via admin SDK:', dbErr);
-      }
+    const dbId = getDbIdForRequest(req);
+    try {
+      const { doc, deleteDoc } = require('firebase/firestore');
+      const db = await getAuthenticatedDb(dbId);
+      await deleteDoc(doc(db, 'interest_registrations', uid));
+      console.log(`[Backend API] Successfully deleted interest registration ${uid} from Firestore (${dbId}).`);
+    } catch (dbErr) {
+      console.error(`[Backend API] Failed to delete from Firestore (${dbId}) via client SDK:`, dbErr.message);
     }
 
     dbData.interest_registrations = (dbData.interest_registrations || []).filter(w => w.uid !== uid);
