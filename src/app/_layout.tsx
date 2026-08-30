@@ -31,13 +31,43 @@ function AppContent() {
 
   const [currentPath, setCurrentPath] = useState('');
 
-  // Synchronize location path on client side after component mounts and on subsequent route changes
+  // Synchronize location path on client side and listen to all history transitions
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.location) {
+    if (typeof window === 'undefined' || !window.location) return;
+
+    const handleLocationChange = () => {
       const path = window.location.pathname.replace(/\/$/, '') || '/';
       setCurrentPath(path);
-      console.log('[Routing] Synchronized client-side path:', path);
-    }
+      console.log('[Routing Listener] Path updated:', path);
+    };
+
+    // Listen to browser back/forward popstate events
+    window.addEventListener('popstate', handleLocationChange);
+
+    // Intercept client-side pushState and replaceState calls (which Expo Router uses)
+    const originalPushState = window.history.pushState;
+    const originalReplaceState = window.history.replaceState;
+
+    window.history.pushState = function (data: any, unused: string, url?: string | URL | null) {
+      const result = originalPushState.call(this, data, unused, url);
+      handleLocationChange();
+      return result;
+    };
+
+    window.history.replaceState = function (data: any, unused: string, url?: string | URL | null) {
+      const result = originalReplaceState.call(this, data, unused, url);
+      handleLocationChange();
+      return result;
+    };
+
+    // Run immediately on client mount
+    handleLocationChange();
+
+    return () => {
+      window.removeEventListener('popstate', handleLocationChange);
+      window.history.pushState = originalPushState;
+      window.history.replaceState = originalReplaceState;
+    };
   }, [initialPathname]);
 
   if (currentPath === '/privacy') {
