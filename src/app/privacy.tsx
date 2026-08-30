@@ -120,7 +120,8 @@ export default function PrivacyScreen() {
 
         <ThemedText style={styles.sectionTitle}>12. Storage, security, and retention</ThemedText>
         <ThemedText style={styles.paragraph}>
-          We store information electronically using secure cloud systems (including Google Cloud and Firebase). We use reasonable administrative, technical, and physical safeguards like role-based access, encryption, and secure disposal when data is no longer required.
+          We store information electronically using secure cloud systems (including Google Cloud and Firebase). We use reasonable administrative, technical, and physical safeguards like role-based access, encryption, and secure disposal when data is no longer required.{"\n\n"}
+          <ThemedText style={styles.bold}>Production Hosting & Pilot Cohort Notice:</ThemedText> The Services are currently operating in a live production environment with a selected pilot cohort of users. During this initial launch phase, the production database (hosted on Google Cloud / Firebase) is securely provisioned under a temporary technical account, and will be migrated to Balar Malar Tamil School's dedicated institutional tenancy in due course. All collected data is protected in full compliance with this Privacy Policy.
         </ThemedText>
 
         <ThemedText style={styles.sectionTitle}>13. Cookies, analytics, and push notifications</ThemedText>
