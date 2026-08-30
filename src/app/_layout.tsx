@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { useColorScheme, View, ActivityIndicator, SafeAreaView, Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -21,20 +21,26 @@ function AppContent() {
   const scheme = useColorScheme();
   const theme = scheme === 'dark' ? 'dark' : 'light';
   const colors = Colors[theme];
-  let pathname = '';
+
+  let initialPathname = '';
   try {
-    pathname = usePathname();
+    initialPathname = usePathname();
   } catch (e) {
     // Expected during initial static/server load before router is fully ready
   }
-  let resolvedPath = pathname || '';
-  if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location) {
-    resolvedPath = window.location.pathname || '';
-  }
-  const cleanPath = resolvedPath ? resolvedPath.replace(/\/$/, '') : '';
-  console.log('[Routing] Resolved clean path:', cleanPath);
 
-  if (cleanPath === '/privacy') {
+  const [currentPath, setCurrentPath] = useState('');
+
+  // Synchronize location path on client side after component mounts and on subsequent route changes
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.location) {
+      const path = window.location.pathname.replace(/\/$/, '') || '/';
+      setCurrentPath(path);
+      console.log('[Routing] Synchronized client-side path:', path);
+    }
+  }, [initialPathname]);
+
+  if (currentPath === '/privacy') {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
         <PrivacyScreen />
@@ -42,7 +48,7 @@ function AppContent() {
     );
   }
 
-  if (cleanPath === '/terms') {
+  if (currentPath === '/terms') {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
         <TermsScreen />
@@ -50,7 +56,7 @@ function AppContent() {
     );
   }
 
-  if (cleanPath === '/support') {
+  if (currentPath === '/support') {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
         <SupportScreen />
@@ -58,7 +64,7 @@ function AppContent() {
     );
   }
 
-  if (cleanPath === '/interest') {
+  if (currentPath === '/interest') {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
         <InterestScreen />
