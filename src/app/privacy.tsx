@@ -31,66 +31,121 @@ export default function PrivacyScreen() {
           {isTa ? 'தனியுரிமைக் கொள்கை' : 'Privacy Policy'}
         </ThemedText>
         <ThemedText style={styles.subtitle}>
-          {isTa ? 'பள்ளித் தோழன் (pallithozhan) செயலி - பாலர்மலர் தமிழ்ப் பள்ளி - பரமட்டா' : 'pallithozhan (Pallithozhan) App - Balar Malar Tamil School - Parramatta'}
+          Balar Malar Tamil School - Parramatta
         </ThemedText>
         <ThemedText style={styles.date}>
-          {isTa ? 'கடைசியாக புதுப்பிக்கப்பட்டது: ஜூலை 17, 2026' : 'Last Updated: July 17, 2026'}
+          Last updated: 30 August 2026
         </ThemedText>
       </View>
  
       <View style={styles.card}>
-        <ThemedText style={styles.sectionTitle}>
-          1. {isTa ? 'நாங்கள் சேகரிக்கும் தகவல்கள்' : 'Information We Collect'}
-        </ThemedText>
+        <ThemedText style={styles.sectionTitle}>Privacy Information</ThemedText>
         <ThemedText style={styles.paragraph}>
-          {isTa 
-            ? 'வகுப்புகள் மற்றும் பள்ளி சேர்க்கைகளை பாதுகாப்பாக நிர்வகிக்க தேவையான தனிப்பட்ட விவரங்களை நாங்கள் சேகரிக்கிறோம்: மாணவர் விவரங்கள் (பெயர், பிறந்த தேதி, பாலினம், பள்ளி வகுப்பு விவரங்கள்); பெற்றோர் விவரங்கள் (பெயர், மின்னஞ்சல் முகவரிகள், தொலைபேசி எண்கள், தன்னார்வ விருப்பங்கள்); பள்ளி ஊழியர் விவரங்கள் (பெயர், தொடர்பு விவரங்கள், Working With Children (WWC) சரிபார்ப்பு எண்கள், கையொப்பங்கள்); மற்றும் வருகைப் பதிவுகள்/கல்வி அறிக்கைகள்.' 
-            : 'We collect personal details necessary to safely run school classes and manage enrollments: Student Details (Names, Date of Birth, Gender, Mainstream School/Grade, Class Enrollment); Parent Details (Names, Emails, Phone Numbers, Volunteer preferences); Staff details (Names, Contact details, Working With Children (WWC) check numbers, verification status, and signatures); and Attendance/Academic Reports.'}
-        </ThemedText>
- 
-        <ThemedText style={styles.sectionTitle}>
-          2. {isTa ? 'தகவல்களை எவ்வாறு பயன்படுத்துகிறோம்' : 'How We Use Information'}
-        </ThemedText>
-        <ThemedText style={styles.paragraph}>
-          {isTa 
-            ? 'சேகரிக்கப்பட்ட தகவல்கள் வகுப்புகள், வருகைப் பதிவுகள், பள்ளி அறிவிப்புகள், கல்வி அறிக்கைகள் வழங்குதல் மற்றும் புத்தகங்கள்/புள்ளி விவரங்களை நிர்வகிக்க மட்டுமே பயன்படுத்தப்படுகின்றன.' 
-            : 'We use the collected information solely for classroom administration, attendance tracking, school announcements, issuing academic report cards, and student points/book management.'}
-        </ThemedText>
- 
-        <View style={styles.divider} />
- 
-        <ThemedText style={styles.sectionTitle}>
-          3. {isTa ? 'கூகுள் உள்நுழைவு & தரவு பயன்பாடு' : 'Google OAuth Sign-In & Data Scope Usage'}
-        </ThemedText>
-        <ThemedText style={styles.paragraph}>
-          {isTa 
-            ? 'பெற்றோர்கள், ஆசிரியர்கள் மற்றும் தன்னார்வலர்களின் கணக்குகளை பாதுகாப்பாக உள்நுழைய கூகுள் உள்நுழைவு முறையை பள்ளித்தோழன் (pallithozhan) செயலி பயன்படுத்துகிறது. நீங்கள் கூகுள் மூலம் உள்நுழையும்போது, இச்செயலி உங்களின் கூகுள் மின்னஞ்சல் (email), பெயர் (name) மற்றும் சுயவிவரப் படம் (profile picture) ஆகிய அடிப்படை விவரங்களை மட்டுமே கோருகிறது. உங்களின் கூகுள் விவரங்கள் எக்காரணம் கொண்டும் மூன்றாம் தரப்பினருடன் பகிரப்படவோ அல்லது விளம்பர நோக்கங்களுக்காகப் பயன்படுத்தப்படவோ மாட்டாது.' 
-            : 'The pallithozhan app utilizes Google OAuth Sign-In to allow secure identity verification for parents, teachers, and volunteers. When authenticating, the app requests access to your basic Google profile scope (specifically your email address, full name, and avatar picture URL). This data is used solely to verify your identity, secure your credentials, and map your account to your corresponding profile role (Teacher, Parent, Student) in our portal. We do not access other Google data, nor do we share or sell your information to any third parties.'}
+          <ThemedText style={styles.bold}>Effective date:</ThemedText> 30 August 2026{"\n"}
+          <ThemedText style={styles.bold}>Organisation:</ThemedText> Balar Malar Tamil School{"\n"}
+          <ThemedText style={styles.bold}>ABN:</ThemedText> 89 423 605 733{"\n"}
+          <ThemedText style={styles.bold}>App and website:</ThemedText> pallithozhan / https://balarmalar.nsw.edu.au{"\n"}
+          <ThemedText style={styles.bold}>Privacy Officer:</ThemedText> School Administrator{"\n"}
+          <ThemedText style={styles.bold}>Email:</ThemedText> admin@balarmalar.nsw.edu.au{"\n"}
+          <ThemedText style={styles.bold}>Postal address:</ThemedText> Parramatta, NSW 2150
         </ThemedText>
 
-        <ThemedText style={styles.sectionTitle}>
-          4. {isTa ? 'தகவல் பாதுகாப்பு & சேமிப்பு' : 'Data Protection & Storage'}
-        </ThemedText>
+        <View style={styles.divider} />
+
+        <ThemedText style={styles.sectionTitle}>1. Purpose and scope</ThemedText>
         <ThemedText style={styles.paragraph}>
-          {isTa 
-            ? 'உங்கள் தரவு Firebase பாதுகாப்பான கிளவுட் தரவுத்தளத்தில் வைக்கப்படுகிறது. அனைத்து தரவுகளும் Google Cloud Firestore-இல் குறியாக்க முறையில் பாதுகாக்கப்படுகின்றன. எக்காரணம் கொண்டும் உங்கள் விவரங்கள் மூன்றாம் தரப்பினருடன் பகிரப்படாது.' 
-            : 'Your data is securely stored using Firebase Cloud hosting. All information is secured in Google Cloud Firestore with token-based encryption. We do not share, sell, or rent your personal information to third parties.'}
+          Balar Malar Tamil School is a Sydney-based not-for-profit organisation that provides community language and cultural learning services.{"\n\n"}
+          This Privacy Policy explains how we collect, hold, use, disclose, protect, and otherwise handle personal information through the pallithozhan mobile app, website, parent/carer portal, student portal, staff/volunteer portal, online forms, events, communications, and related services (together, the Services).{"\n\n"}
+          This Policy applies to personal information about students, parents, guardians, carers, authorised contacts, staff, volunteers, contractors, donors, applicants, visitors, and other users of the Services.
         </ThemedText>
- 
-        <ThemedText style={styles.sectionTitle}>
-          5. {isTa ? 'தொடர்புகொள்ள' : 'Contact Us'}
+
+        <ThemedText style={styles.sectionTitle}>2. Privacy Act status</ThemedText>
+        <ThemedText style={styles.paragraph}>
+          Our annual turnover is currently less than $3 million. Accordingly, we may be exempt from some requirements of the Privacy Act 1988 (Cth) and the Australian Privacy Principles.{"\n\n"}
+          However, we aim to handle personal information in a manner consistent with the APPs and good privacy practice. This Policy is intended to explain our commitments and procedures regardless of whether the Privacy Act applies to us in a particular circumstance.
         </ThemedText>
-        <View style={styles.contactRow}>
-          <Mail size={16} color={colors.textSecondary} style={{ marginRight: 8 }} />
-          <ThemedText style={styles.paragraph}>
-            Email: admin@balarmalar.nsw.edu.au
-          </ThemedText>
-        </View>
+
+        <ThemedText style={styles.sectionTitle}>3. Meaning of personal information</ThemedText>
+        <ThemedText style={styles.paragraph}>
+          Personal information is information or an opinion about an identified individual, or an individual who is reasonably identifiable.{"\n\n"}
+          Sensitive information includes health information and may include information about disability, racial or ethnic origin, religious beliefs, criminal-record information, biometric information, or other legally protected information.
+        </ThemedText>
+
+        <ThemedText style={styles.sectionTitle}>4. Information we collect</ThemedText>
+        <ThemedText style={styles.paragraph}>
+          We collect only information reasonably necessary for our educational, school-administration, safeguarding, community, charitable, legal, operational, and service-delivery purposes. Depending on how you interact with us, we may collect:{"\n"}
+          • Names, preferred names, date of birth, gender, language, addresses, email addresses, telephone numbers, emergency contact details, and relationships to students.{"\n"}
+          • Student enrolment, class/year level, attendance, learning records, and school communication preferences.{"\n"}
+          • Parent/carer, staff, contractor, volunteer, and applicant details.{"\n"}
+          • Account credentials, login records, and security events.{"\n"}
+          • Communications with us, including forms, emails, and feed/messages uploads.{"\n"}
+          • Photos, videos, and student work media only where permitted by consent.
+        </ThemedText>
+
+        <ThemedText style={styles.sectionTitle}>5. Health and sensitive information</ThemedText>
+        <ThemedText style={styles.paragraph}>
+          We may collect health and other sensitive information only where it is reasonably necessary for our functions or activities and where we have consent, or collection is otherwise permitted or required by law. Health information may include allergies, asthma, medication, medical action plans, disabilities, learning-support needs, and accessibility requirements.
+        </ThemedText>
+
+        <ThemedText style={styles.sectionTitle}>6. How we collect information</ThemedText>
+        <ThemedText style={styles.paragraph}>
+          We collect information directly from you when you register, enrol, use the app/website, submit a form, or update details. Where practical, we collect personal information directly from the person concerned or, for a child, from their parent, guardian, carer, or authorised representative.
+        </ThemedText>
+
+        <ThemedText style={styles.sectionTitle}>7. Collection notice</ThemedText>
+        <ThemedText style={styles.paragraph}>
+          At or before the time we collect personal information, we will take reasonable steps to notify you of our identity, the purposes of collection, the types of organisations we disclose to, and how to access/correct information or make a complaint.
+        </ThemedText>
+
+        <ThemedText style={styles.sectionTitle}>8. How we use information</ThemedText>
+        <ThemedText style={styles.paragraph}>
+          We use personal information to provide and administer educational and community language services, manage enrolment/attendance/homework, verify identity and protect security, and comply with record-keeping and duty-of-care obligations.
+        </ThemedText>
+
+        <ThemedText style={styles.sectionTitle}>9. Automated decision-making and AI</ThemedText>
+        <ThemedText style={styles.paragraph}>
+          We may use Google Gemini AI tools to assist staff in drafting general communications or translating educational resources. We do not enter identifiable student health, safeguarding, or confidential case information into public AI tools.
+        </ThemedText>
+
+        <ThemedText style={styles.sectionTitle}>10. When we disclose information</ThemedText>
+        <ThemedText style={styles.paragraph}>
+          We may disclose personal information to authorised staff, educators, volunteers, cloud hosting providers (e.g. Firebase), and government language education bodies where required by law. We do not sell, rent, or trade your personal information to third parties.
+        </ThemedText>
+
+        <ThemedText style={styles.sectionTitle}>11. Overseas data transfers</ThemedText>
+        <ThemedText style={styles.paragraph}>
+          We do not ordinarily disclose personal information to recipients outside Australia. If this changes, we will update this Policy.
+        </ThemedText>
+
+        <ThemedText style={styles.sectionTitle}>12. Storage, security, and retention</ThemedText>
+        <ThemedText style={styles.paragraph}>
+          We store information electronically using secure cloud systems (including Google Cloud and Firebase). We use reasonable administrative, technical, and physical safeguards like role-based access, encryption, and secure disposal when data is no longer required.
+        </ThemedText>
+
+        <ThemedText style={styles.sectionTitle}>13. Cookies, analytics, and push notifications</ThemedText>
+        <ThemedText style={styles.paragraph}>
+          We may use cookies and analytics tools (like Firebase Analytics) to operate and protect the Services. You can control push notifications through your device settings.
+        </ThemedText>
+
+        <ThemedText style={styles.sectionTitle}>14. Photos, videos, and media</ThemedText>
+        <ThemedText style={styles.paragraph}>
+          We may collect or publish photos and student work only in accordance with our school media-consent process.
+        </ThemedText>
+
+        <ThemedText style={styles.sectionTitle}>15. Access and Correction</ThemedText>
+        <ThemedText style={styles.paragraph}>
+          You may request access to or correction of personal information we hold about you by contacting the Privacy Officer at admin@balarmalar.nsw.edu.au. We aim to respond within 30 days.
+        </ThemedText>
+
+        <ThemedText style={styles.sectionTitle}>16. Complaints and Data Breaches</ThemedText>
+        <ThemedText style={styles.paragraph}>
+          If you have a privacy complaint, contact our Privacy Officer. We maintain a data-breach response process to contain, investigate, and notify affected individuals when required.
+        </ThemedText>
       </View>
  
       <View style={styles.footer}>
         <ThemedText style={styles.footerText}>
-          © 2026 pallithozhan (Pallithozhan) Balar Malar Tamil School - Parramatta. All rights reserved.
+          © 2026 pallithozhan Balar Malar Tamil School. All rights reserved.
         </ThemedText>
       </View>
     </ScrollView>
@@ -110,7 +165,7 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 14, fontWeight: '800', color: '#EA5330', marginTop: 18, marginBottom: 6 },
   paragraph: { fontSize: 13, color: '#44473F', lineHeight: 20 },
   divider: { height: 1, backgroundColor: '#EAE2D5', marginVertical: 18 },
-  contactRow: { flexDirection: 'row', alignItems: 'center', marginTop: 6 },
+  bold: { fontWeight: '700' },
   footer: { marginTop: Spacing.four, alignItems: 'center', paddingBottom: Spacing.four },
   footerText: { fontSize: 10, color: '#8F9288', textAlign: 'center' }
 });

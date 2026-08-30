@@ -28,60 +28,83 @@ export default function TermsScreen() {
           style={styles.logo}
         />
         <ThemedText style={styles.title}>
-          {isTa ? 'பயன்பாட்டு விதிமுறைகள்' : 'Terms of Service'}
+          {isTa ? 'பயன்பாட்டு விதிமுறைகள்' : 'Terms of Use'}
         </ThemedText>
         <ThemedText style={styles.subtitle}>
-          {isTa ? 'பள்ளித் தோழன் (pallithozhan) செயலி - பாலர்மலர் தமிழ்ப் பள்ளி - பரமட்டா' : 'pallithozhan (Pallithozhan) App - Balar Malar Tamil School - Parramatta'}
+          Balar Malar Tamil School - Parramatta
         </ThemedText>
         <ThemedText style={styles.date}>
-          {isTa ? 'கடைசியாக புதுப்பிக்கப்பட்டது: ஜூலை 17, 2026' : 'Last Updated: July 17, 2026'}
+          Effective date: 30 August 2026
         </ThemedText>
       </View>
 
       <View style={styles.card}>
-        <ThemedText style={styles.sectionTitle}>
-          1. {isTa ? 'விதிமுறைகளின் ஏற்பு' : 'Acceptance of Terms'}
-        </ThemedText>
+        <ThemedText style={styles.sectionTitle}>Terms Information</ThemedText>
         <ThemedText style={styles.paragraph}>
-          {isTa 
-            ? 'பள்ளித் தோழன் (pallithozhan) செயலியைப் பயன்படுத்துவதன் மூலம், இந்த விதிமுறைகளுக்கு நீங்கள் ஒப்புக்கொள்கிறீர்கள்.' 
-            : 'By accessing or using the pallithozhan (Pallithozhan) App, you agree to comply with and be bound by these terms.'}
-        </ThemedText>
-
-        <ThemedText style={styles.sectionTitle}>
-          2. {isTa ? 'பயனர் கணக்கு' : 'User Account'}
-        </ThemedText>
-        <ThemedText style={styles.paragraph}>
-          {isTa 
-            ? 'உங்கள் கணக்கின் கடவுச்சொல் மற்றும் உள்நுழைவு விவரங்களின் பாதுகாப்பிற்கு நீங்களே பொறுப்பாவீர்கள்.' 
-            : 'You are responsible for maintaining the confidentiality of your account credentials and login parameters.'}
+          <ThemedText style={styles.bold}>Organisation:</ThemedText> Balar Malar Tamil School{"\n"}
+          <ThemedText style={styles.bold}>App/website:</ThemedText> pallithozhan / https://balarmalar.nsw.edu.au{"\n"}
+          <ThemedText style={styles.bold}>Support contact:</ThemedText> parramatta@balarmalar.nsw.edu.au{"\n"}
+          <ThemedText style={styles.bold}>Privacy contact:</ThemedText> admin@balarmalar.nsw.edu.au
         </ThemedText>
 
         <View style={styles.divider} />
 
-        <ThemedText style={styles.sectionTitle}>
-          3. {isTa ? 'பள்ளி ஒழுங்குமுறைகள்' : 'School Administration Policy'}
-        </ThemedText>
+        <ThemedText style={styles.sectionTitle}>1. Agreement to these Terms</ThemedText>
         <ThemedText style={styles.paragraph}>
-          {isTa 
-            ? 'வருகைப் பதிவு, மதிப்பெண்கள் மற்றும் அறிவிப்புகளைத் தவறாகப் பயன்படுத்தக் கூடாது. பள்ளி நிர்வாகத்தின் முடிவே இறுதியானது.' 
-            : 'All attendance records, test points, and student progress metrics are for verified educational tracking. Abuse of portal data will result in immediate account suspension.'}
+          These Terms of Use govern your access to and use of Balar Malar Tamil School’s website, mobile app, parent/carer portal, student portal, staff/volunteer portal, forms, communications, and related digital services (the Services).{"\n\n"}
+          By accessing or using the Services, you agree to these Terms and our Privacy Policy. If you use the Services on behalf of a student, child, school, organisation, or another person, you confirm that you have authority to do so. If you do not agree, do not use the Services.
         </ThemedText>
 
-        <ThemedText style={styles.sectionTitle}>
-          4. {isTa ? 'தொடர்புகொள்ள' : 'Contact Us'}
+        <ThemedText style={styles.sectionTitle}>2. Purpose of the Services</ThemedText>
+        <ThemedText style={styles.paragraph}>
+          The Services support school communications, attendance rolls, learning updates, events, excursions, consent forms, volunteering schedules, donations, parent portal communications, and administrative services.{"\n\n"}
+          The Services do not replace emergency services, professional medical advice, child-protection reporting obligations, counselling, or other professional services. In an emergency, call 000.
         </ThemedText>
-        <View style={styles.contactRow}>
-          <Mail size={16} color={colors.textSecondary} style={{ marginRight: 8 }} />
-          <ThemedText style={styles.paragraph}>
-            Email: admin@balarmalar.nsw.edu.au
-          </ThemedText>
-        </View>
+
+        <ThemedText style={styles.sectionTitle}>3. Student accounts and parental authority</ThemedText>
+        <ThemedText style={styles.paragraph}>
+          Accounts for students under 18 must be created, approved, or supervised by a parent, guardian, carer, school administrator, or other authorised adult. Parents/carers are responsible for keeping contact, emergency, permission, and authorised-collection information current.
+        </ThemedText>
+
+        <ThemedText style={styles.sectionTitle}>4. Accounts and security</ThemedText>
+        <ThemedText style={styles.paragraph}>
+          You must provide accurate, complete account information and keep your credentials secure. You must not share account access with unauthorised people, and you must notify us at parramatta@balarmalar.nsw.edu.au immediately if you suspect account compromise.
+        </ThemedText>
+
+        <ThemedText style={styles.sectionTitle}>5. Acceptable use</ThemedText>
+        <ThemedText style={styles.paragraph}>
+          You must use the Services lawfully, respectfully, safely, and only for their intended purpose. You must not attempt to bypass security controls, send inappropriate content, upload viruses/malware, scrape data, or record/distribute student personal details without permission.
+        </ThemedText>
+
+        <ThemedText style={styles.sectionTitle}>6. User content</ThemedText>
+        <ThemedText style={styles.paragraph}>
+          You grant Balar Malar Tamil School a non-exclusive, royalty-free, worldwide licence to copy, store, process, and display material you submit through the app (e.g. homework sheets, event RSVPs) as necessary to provide, secure, and improve the Services.
+        </ThemedText>
+
+        <ThemedText style={styles.sectionTitle}>7. Child safety</ThemedText>
+        <ThemedText style={styles.paragraph}>
+          Balar Malar Tamil School is committed to child safety. Adults must not use the Services for inappropriate communication with students. We may monitor, restrict, or remove accounts to safeguard students and comply with child protection laws.
+        </ThemedText>
+
+        <ThemedText style={styles.sectionTitle}>8. Intellectual property</ThemedText>
+        <ThemedText style={styles.paragraph}>
+          Balar Malar Tamil School owns or licenses the app design, branding, logos, educational resources, and documents. You may use them for personal, educational, or school purposes only.
+        </ThemedText>
+
+        <ThemedText style={styles.sectionTitle}>9. Disclaimer and liability</ThemedText>
+        <ThemedText style={styles.paragraph}>
+          To the maximum extent permitted by law, the Services are provided on an “as available” basis. Balar Malar Tamil School is not liable for indirect, incidental, or consequential loss arising from system outages, internet failures, or unauthorised access due to a user’s failure to safeguard credentials.
+        </ThemedText>
+
+        <ThemedText style={styles.sectionTitle}>10. Governing law</ThemedText>
+        <ThemedText style={styles.paragraph}>
+          These Terms are governed by the laws of New South Wales, Australia.
+        </ThemedText>
       </View>
 
       <View style={styles.footer}>
         <ThemedText style={styles.footerText}>
-          © 2026 pallithozhan (Pallithozhan) Balar Malar Tamil School - Parramatta. All rights reserved.
+          © 2026 pallithozhan Balar Malar Tamil School. All rights reserved.
         </ThemedText>
       </View>
     </ScrollView>
@@ -101,7 +124,7 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 14, fontWeight: '800', color: '#EA5330', marginTop: 18, marginBottom: 6 },
   paragraph: { fontSize: 13, color: '#44473F', lineHeight: 20 },
   divider: { height: 1, backgroundColor: '#EAE2D5', marginVertical: 18 },
-  contactRow: { flexDirection: 'row', alignItems: 'center', marginTop: 6 },
+  bold: { fontWeight: '700' },
   footer: { marginTop: Spacing.four, alignItems: 'center', paddingBottom: Spacing.four },
   footerText: { fontSize: 10, color: '#8F9288', textAlign: 'center' }
 });

@@ -6,6 +6,7 @@ import { Colors, Spacing } from '@/constants/theme';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { User, Mail, Lock, Phone, Languages, UserCircle2, ArrowRight, Check } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
 
 interface RegisterScreenProps {
   onNavigateToLogin: () => void;
@@ -15,6 +16,7 @@ interface RegisterScreenProps {
 export default function RegisterScreen({ onNavigateToLogin, onNavigateToWaitlist }: RegisterScreenProps) {
   const { t, i18n } = useTranslation();
   const { register, updateLanguage } = useAuth();
+  const router = useRouter();
   const scheme = useColorScheme();
   const theme = scheme === 'dark' ? 'dark' : 'light';
   const colors = Colors[theme];
@@ -315,9 +317,55 @@ export default function RegisterScreen({ onNavigateToLogin, onNavigateToWaitlist
           </View>
           <View style={{ flex: 1 }}>
             <ThemedText style={{ fontSize: 12, lineHeight: 18, color: colors.text }}>
-              {i18n.language === 'ta'
-                ? 'பாலர்மலர் தமிழ்ப் பள்ளி பரமட்டாவுடன் எனது தனிப்பட்ட தரவைப் பகிர்வதையும், அவற்றைப் பள்ளி நிர்வாகக் கொள்கைகளின்படி சேமிப்பதையும் நான் முழுமையாக ஒப்புக்கொள்கிறேன்.'
-                : 'I consent to sharing my personal details with Balar Malar Tamil School Parramatta and agree to the storage and management of my data under school administration guidelines.'}
+              {i18n.language === 'ta' ? (
+                <>
+                  பாலர்மலர் தமிழ்ப் பள்ளி பரமட்டாவுடன் எனது தனிப்பட்ட தரவைப் பகிர்வதையும், அவற்றைப் பள்ளி நிர்வாகக் கொள்கைகளின்படி சேமிப்பதையும் நான் ஒப்புக்கொள்கிறேன். மேலும் இச்சேவையின்{' '}
+                  <ThemedText
+                    style={{ color: colors.primary, textDecorationLine: 'underline', fontWeight: 'bold' }}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      router.push('/terms');
+                    }}
+                  >
+                    பயன்பாட்டு விதிமுறைகள்
+                  </ThemedText>{' '}
+                  மற்றும்{' '}
+                  <ThemedText
+                    style={{ color: colors.primary, textDecorationLine: 'underline', fontWeight: 'bold' }}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      router.push('/privacy');
+                    }}
+                  >
+                    தனியுரிமைக் கொள்கையை
+                  </ThemedText>{' '}
+                  நான் ஏற்கிறேன்.
+                </>
+              ) : (
+                <>
+                  I consent to sharing my personal details with Balar Malar Tamil School Parramatta and agree to the{' '}
+                  <ThemedText
+                    style={{ color: colors.primary, textDecorationLine: 'underline', fontWeight: 'bold' }}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      router.push('/terms');
+                    }}
+                  >
+                    Terms of Use
+                  </ThemedText>{' '}
+                  and{' '}
+                  <ThemedText
+                    style={{ color: colors.primary, textDecorationLine: 'underline', fontWeight: 'bold' }}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      router.push('/privacy');
+                    }}
+                  >
+                    Privacy Policy
+                  </ThemedText>{' '}
+                  under school administration guidelines.
+                </>
+              )}
             </ThemedText>
           </View>
         </Pressable>
