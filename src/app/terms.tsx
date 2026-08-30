@@ -42,9 +42,10 @@ export default function TermsScreen() {
         <ThemedText style={styles.sectionTitle}>Terms Information</ThemedText>
         <ThemedText style={styles.paragraph}>
           <ThemedText style={styles.bold}>Organisation:</ThemedText> Balar Malar Tamil School{"\n"}
-          <ThemedText style={styles.bold}>App/website:</ThemedText> pallithozhan / https://balarmalar.nsw.edu.au{"\n"}
+          <ThemedText style={styles.bold}>Branch:</ThemedText> Parramatta{"\n"}
+          <ThemedText style={styles.bold}>App/website:</ThemedText> pallithozhan / https://pallithozhan.3stech.com.au/{"\n"}
           <ThemedText style={styles.bold}>Support contact:</ThemedText> parramatta@balarmalar.nsw.edu.au{"\n"}
-          <ThemedText style={styles.bold}>Privacy contact:</ThemedText> admin@balarmalar.nsw.edu.au
+          <ThemedText style={styles.bold}>Privacy contact:</ThemedText> parramatta@balarmalar.nsw.edu.au
         </ThemedText>
 
         <View style={styles.divider} />

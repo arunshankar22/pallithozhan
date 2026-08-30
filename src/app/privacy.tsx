@@ -43,10 +43,11 @@ export default function PrivacyScreen() {
         <ThemedText style={styles.paragraph}>
           <ThemedText style={styles.bold}>Effective date:</ThemedText> 30 August 2026{"\n"}
           <ThemedText style={styles.bold}>Organisation:</ThemedText> Balar Malar Tamil School{"\n"}
+          <ThemedText style={styles.bold}>Branch:</ThemedText> Parramatta{"\n"}
           <ThemedText style={styles.bold}>ABN:</ThemedText> 89 423 605 733{"\n"}
-          <ThemedText style={styles.bold}>App and website:</ThemedText> pallithozhan / https://balarmalar.nsw.edu.au{"\n"}
+          <ThemedText style={styles.bold}>App and website:</ThemedText> pallithozhan / https://pallithozhan.3stech.com.au/{"\n"}
           <ThemedText style={styles.bold}>Privacy Officer:</ThemedText> School Administrator{"\n"}
-          <ThemedText style={styles.bold}>Email:</ThemedText> admin@balarmalar.nsw.edu.au{"\n"}
+          <ThemedText style={styles.bold}>Email:</ThemedText> parramatta@balarmalar.nsw.edu.au{"\n"}
           <ThemedText style={styles.bold}>Postal address:</ThemedText> Parramatta, NSW 2150
         </ThemedText>
 
@@ -134,7 +135,7 @@ export default function PrivacyScreen() {
 
         <ThemedText style={styles.sectionTitle}>15. Access and Correction</ThemedText>
         <ThemedText style={styles.paragraph}>
-          You may request access to or correction of personal information we hold about you by contacting the Privacy Officer at admin@balarmalar.nsw.edu.au. We aim to respond within 30 days.
+          You may request access to or correction of personal information we hold about you by contacting the Privacy Officer at parramatta@balarmalar.nsw.edu.au. We aim to respond within 30 days.
         </ThemedText>
 
         <ThemedText style={styles.sectionTitle}>16. Complaints and Data Breaches</ThemedText>
