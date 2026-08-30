@@ -34,7 +34,7 @@ export default function TermsScreen() {
           Balar Malar Tamil School - Parramatta
         </ThemedText>
         <ThemedText style={styles.date}>
-          Effective date: 30 August 2026
+          Effective date: 25 August 2026
         </ThemedText>
       </View>
 

@@ -34,14 +34,14 @@ export default function PrivacyScreen() {
           Balar Malar Tamil School - Parramatta
         </ThemedText>
         <ThemedText style={styles.date}>
-          Last updated: 30 August 2026
+          Last updated: 25 August 2026
         </ThemedText>
       </View>
  
       <View style={styles.card}>
         <ThemedText style={styles.sectionTitle}>Privacy Information</ThemedText>
         <ThemedText style={styles.paragraph}>
-          <ThemedText style={styles.bold}>Effective date:</ThemedText> 30 August 2026{"\n"}
+          <ThemedText style={styles.bold}>Effective date:</ThemedText> 25 August 2026{"\n"}
           <ThemedText style={styles.bold}>Organisation:</ThemedText> Balar Malar Tamil School{"\n"}
           <ThemedText style={styles.bold}>Branch:</ThemedText> Parramatta{"\n"}
           <ThemedText style={styles.bold}>ABN:</ThemedText> 89 423 605 733{"\n"}
