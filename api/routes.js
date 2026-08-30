@@ -674,7 +674,9 @@ async function handleApiRoutes(req, res, pathname, method, dbData, writeDb, urlO
         mainstreamGrade: body.mainstreamGrade || '',
         volunteerAreas: body.volunteerAreas || [],
         comments: body.comments || '',
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        consentAccepted: body.consentAccepted || false,
+        consentAcceptedAt: body.consentAcceptedAt || null
       };
 
       const dbId = getDbIdForRequest(req);
@@ -689,7 +691,9 @@ async function handleApiRoutes(req, res, pathname, method, dbData, writeDb, urlO
           mainstreamGrade: newRecord.mainstreamGrade,
           volunteerAreas: newRecord.volunteerAreas,
           comments: newRecord.comments,
-          createdAt: newRecord.createdAt
+          createdAt: newRecord.createdAt,
+          consentAccepted: newRecord.consentAccepted,
+          consentAcceptedAt: newRecord.consentAcceptedAt
         });
         console.log(`[Backend API] Successfully persisted interest registration ${newRecord.uid} to Firestore (${dbId}).`);
       } catch (dbErr) {

@@ -5,7 +5,7 @@ import { useAuth } from '@/services/auth';
 import { Colors, Spacing } from '@/constants/theme';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { User, Mail, Lock, Phone, Languages, UserCircle2, ArrowRight } from 'lucide-react-native';
+import { User, Mail, Lock, Phone, Languages, UserCircle2, ArrowRight, Check } from 'lucide-react-native';
 
 interface RegisterScreenProps {
   onNavigateToLogin: () => void;
@@ -24,12 +24,19 @@ export default function RegisterScreen({ onNavigateToLogin, onNavigateToWaitlist
   const [password, setPassword] = useState('');
   const [phone, setPhone] = useState('');
   const [role, setRole] = useState<'parent' | 'teacher' | 'volunteer'>('parent');
+  const [consentAccepted, setConsentAccepted] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleRegister = async () => {
     if (!fullName || !email || !password) {
       setErrorMsg('Please fill in Name, Email, and Password');
+      return;
+    }
+    if (!consentAccepted) {
+      setErrorMsg(i18n.language === 'ta'
+        ? 'தயவுசெய்து தரவு பகிர்வு தனியுரிமை ஒப்புதலை ஏற்கவும்.'
+        : 'Please accept the data sharing consent terms.');
       return;
     }
     setErrorMsg('');
@@ -40,8 +47,10 @@ export default function RegisterScreen({ onNavigateToLogin, onNavigateToWaitlist
         fullName,
         role,
         phone,
-        languagePreference: i18n.language || 'ta'
-      }, password);
+        languagePreference: i18n.language || 'ta',
+        consentAccepted: true,
+        consentAcceptedAt: new Date().toISOString()
+      } as any, password);
     } catch (e: any) {
       setErrorMsg(e.message || 'Registration failed');
     } finally {
@@ -272,6 +281,46 @@ export default function RegisterScreen({ onNavigateToLogin, onNavigateToWaitlist
             })}
           </View>
         </View>
+
+        {/* Consent Checkbox */}
+        <Pressable
+          onPress={() => setConsentAccepted(!consentAccepted)}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'flex-start',
+            gap: 10,
+            marginTop: Spacing.one,
+            marginBottom: Spacing.three,
+            padding: 10,
+            borderRadius: 10,
+            borderWidth: 1,
+            borderColor: consentAccepted ? colors.primary + '30' : colors.border,
+            backgroundColor: consentAccepted ? colors.primary + '05' : 'transparent',
+          }}
+        >
+          <View
+            style={{
+              width: 18,
+              height: 18,
+              borderRadius: 4,
+              borderWidth: 1.5,
+              borderColor: consentAccepted ? colors.primary : colors.textSecondary,
+              backgroundColor: consentAccepted ? colors.primary : 'transparent',
+              justifyContent: 'center',
+              alignItems: 'center',
+              marginTop: 1
+            }}
+          >
+            {consentAccepted && <Check size={11} color="#FFF" strokeWidth={3} />}
+          </View>
+          <View style={{ flex: 1 }}>
+            <ThemedText style={{ fontSize: 12, lineHeight: 18, color: colors.text }}>
+              {i18n.language === 'ta'
+                ? 'பாலர்மலர் தமிழ்ப் பள்ளி பரமட்டாவுடன் எனது தனிப்பட்ட தரவைப் பகிர்வதையும், அவற்றைப் பள்ளி நிர்வாகக் கொள்கைகளின்படி சேமிப்பதையும் நான் முழுமையாக ஒப்புக்கொள்கிறேன்.'
+                : 'I consent to sharing my personal details with Balar Malar Tamil School Parramatta and agree to the storage and management of my data under school administration guidelines.'}
+            </ThemedText>
+          </View>
+        </Pressable>
 
         {/* Submit */}
         <Pressable 

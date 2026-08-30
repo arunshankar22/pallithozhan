@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import { Colors, Spacing } from '@/constants/theme';
 import { ThemedText } from '@/components/themed-text';
-import { Mail, ArrowLeft, Send, CheckCircle, Sparkles } from 'lucide-react-native';
+import { Mail, ArrowLeft, Send, CheckCircle, Sparkles, Check } from 'lucide-react-native';
 import { interestService } from '@/services/interestService';
 
 const GRADES = ['KG', 'Year 1', 'Year 2', 'Year 3', 'Year 4', 'Year 5', 'Year 6', 'Year 7', 'Year 8', 'Year 9', 'Year 10'];
@@ -45,6 +45,7 @@ export default function InterestScreen() {
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [consentAccepted, setConsentAccepted] = useState(false);
 
   const toggleVolunteerArea = (id: string) => {
     if (selectedVolunteerAreas.includes(id)) {
@@ -65,6 +66,11 @@ export default function InterestScreen() {
       return;
     }
 
+    if (!consentAccepted) {
+      setErrorMsg(isTa ? 'தயவுசெய்து தரவு பகிர்வு தனியுரிமை ஒப்புதலை ஏற்கவும்.' : 'Please accept the data sharing consent terms.');
+      return;
+    }
+
     setErrorMsg('');
     setLoading(true);
 
@@ -82,7 +88,9 @@ export default function InterestScreen() {
         role: role, // main role context
         mainstreamGrade: interestTestApp ? mainstreamGrade : '',
         volunteerAreas: interestGeneralVolunteer ? selectedVolunteerAreas : [],
-        comments: `[Interests: ${selectedRoles.join(', ')}] ${comments.trim()}`
+        comments: `[Interests: ${selectedRoles.join(', ')}] ${comments.trim()}`,
+        consentAccepted: true,
+        consentAcceptedAt: new Date().toISOString()
       });
       setSubmitted(true);
     } catch (err: any) {
@@ -401,6 +409,46 @@ export default function InterestScreen() {
             style={[textInputStyle, { height: 100, textAlignVertical: 'top', paddingTop: 10 }]}
           />
         </View>
+
+        {/* Consent Checkbox */}
+        <Pressable
+          onPress={() => setConsentAccepted(!consentAccepted)}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'flex-start',
+            gap: 10,
+            marginTop: Spacing.one,
+            marginBottom: Spacing.three,
+            padding: 10,
+            borderRadius: 10,
+            borderWidth: 1,
+            borderColor: consentAccepted ? colors.primary + '30' : colors.border,
+            backgroundColor: consentAccepted ? colors.primary + '05' : 'transparent',
+          }}
+        >
+          <View
+            style={{
+              width: 18,
+              height: 18,
+              borderRadius: 4,
+              borderWidth: 1.5,
+              borderColor: consentAccepted ? colors.primary : colors.textSecondary,
+              backgroundColor: consentAccepted ? colors.primary : 'transparent',
+              justifyContent: 'center',
+              alignItems: 'center',
+              marginTop: 2
+            }}
+          >
+            {consentAccepted && <Check size={11} color="#FFF" strokeWidth={3} />}
+          </View>
+          <View style={{ flex: 1 }}>
+            <ThemedText style={{ fontSize: 12, lineHeight: 18, color: colors.text }}>
+              {isTa
+                ? 'பாலர்மலர் தமிழ்ப் பள்ளி பரமட்டாவுடன் எனது தனிப்பட்ட தரவைப் பகிர்வதையும், அவற்றைப் பள்ளி நிர்வாகக் கொள்கைகளின்படி சேமிப்பதையும் நான் முழுமையாக ஒப்புக்கொள்கிறேன்.'
+                : 'I consent to sharing my personal details with Balar Malar Tamil School Parramatta and agree to the storage and management of my data under school administration guidelines.'}
+            </ThemedText>
+          </View>
+        </Pressable>
 
         {/* Submit Button */}
         <Pressable

@@ -10,6 +10,8 @@ export interface InterestRegistration {
   volunteerAreas?: string[];
   comments?: string;
   createdAt?: string;
+  consentAccepted?: boolean;
+  consentAcceptedAt?: string;
 }
 
 export const interestService = {
