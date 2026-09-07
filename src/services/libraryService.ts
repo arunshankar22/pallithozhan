@@ -56,14 +56,14 @@ export const libraryService = {
   },
 
   async uploadBook(
-    bookData: Omit<Book, 'bookId' | 'coverUrl' | 'pdfUrl' | 'createdDate'>,
+    bookData: Omit<Book, 'bookId' | 'coverUrl' | 'pdfUrl' | 'createdDate'> & { coverUrl?: string; pdfUrl?: string },
     pdfBase64?: { name: string; base64: string },
     coverBase64?: { name: string; base64: string }
   ): Promise<Book> {
     const isOfflineMode = !db || process.env.EXPO_PUBLIC_DEMO_MODE === 'true';
     
-    let coverUrl = coverBase64?.base64 || 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&q=80&w=300';
-    let pdfUrl = pdfBase64?.base64 || 'https://www.tamilvu.org/library/libhome.htm';
+    let coverUrl = bookData.coverUrl || coverBase64?.base64 || 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&q=80&w=300';
+    let pdfUrl = bookData.pdfUrl || pdfBase64?.base64 || 'https://www.tamilvu.org/library/libhome.htm';
 
     // Upload files to Firebase Storage if online
     if (!isOfflineMode && storage) {

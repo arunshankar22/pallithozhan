@@ -20,7 +20,8 @@ import {
   ExternalLink,
   X,
   Award,
-  Book
+  Book,
+  Globe
 } from 'lucide-react-native';
 
 import { ThemedText } from '@/components/themed-text';
@@ -53,13 +54,25 @@ export function LibraryTab({ user, colors, t, showToast, i18n, insets }: TabProp
   const [thirukuralVisible, setThirukuralVisible] = useState(false);
   const [aathichoodiVisible, setAathichoodiVisible] = useState(false);
 
+  // StoryWeaver Hub state
+  const [swSelectedLevel, setSwSelectedLevel] = useState<'all' | '1' | '2' | '3' | '4'>('all');
+  const [swSearchQuery, setSwSearchQuery] = useState('');
+  const [swReaderModalVisible, setSwReaderModalVisible] = useState(false);
+  const [swActiveUrl, setSwActiveUrl] = useState('');
+  const [swActiveTitle, setSwActiveTitle] = useState('');
+
+  // Add Book: online story URL vs file
+  const [bookSourceType, setBookSourceType] = useState<'pdf' | 'url'>('url');
+  const [bookOnlineUrl, setBookOnlineUrl] = useState('');
+  const [bookCoverUrl, setBookCoverUrl] = useState('');
+
   // Add Book Modal state (Teachers/Admins)
   const [uploadModalVisible, setUploadModalVisible] = useState(false);
   const [bookTitleEn, setBookTitleEn] = useState('');
   const [bookTitleTa, setBookTitleTa] = useState('');
   const [bookAuthor, setBookAuthor] = useState('');
   const [bookGrade, setBookGrade] = useState('KG');
-  const [bookCategory, setBookCategory] = useState<'textbook' | 'workbook' | 'storybook' | 'audio'>('textbook');
+  const [bookCategory, setBookCategory] = useState<'textbook' | 'workbook' | 'storybook' | 'audio'>('storybook');
   const [bookPages, setBookPages] = useState('');
   const [bookPoints, setBookPoints] = useState('50');
   const [bookDescEn, setBookDescEn] = useState('');
@@ -69,6 +82,38 @@ export function LibraryTab({ user, colors, t, showToast, i18n, insets }: TabProp
   const [coverFile, setCoverFile] = useState<{ name: string; base64: string } | null>(null);
   const [pdfFile, setPdfFile] = useState<{ name: string; base64: string } | null>(null);
   const [submittingBook, setSubmittingBook] = useState(false);
+
+  // StoryWeaver Hub Helpers
+  const getStoryWeaverUrl = (level?: string, query?: string) => {
+    let url = 'https://storyweaver.org.in/en/stories?language=Tamil';
+    const targetLevel = level !== undefined ? level : swSelectedLevel;
+    if (targetLevel && targetLevel !== 'all') {
+      url += `&level=${targetLevel}`;
+    }
+    const targetQuery = (query !== undefined ? query : swSearchQuery).trim();
+    if (targetQuery) {
+      url += `&query=${encodeURIComponent(targetQuery)}`;
+    }
+    url += '&sort=Ratings';
+    return url;
+  };
+
+  const handleOpenStoryWeaver = (level?: string, query?: string) => {
+    const url = getStoryWeaverUrl(level, query);
+    const targetLevel = level !== undefined ? level : swSelectedLevel;
+    const title = targetLevel === 'all'
+      ? (i18n.language === 'ta' ? 'அனைத்து தமிழ்க் கதைகள் (StoryWeaver)' : 'All Tamil Stories (StoryWeaver)')
+      : (i18n.language === 'ta' ? `நிலை ${targetLevel} தமிழ்க் கதைகள் (StoryWeaver)` : `Level ${targetLevel} Tamil Stories (StoryWeaver)`);
+
+    if (Platform.OS === 'web') {
+      setSwActiveUrl(url);
+      setSwActiveTitle(title);
+      setSwReaderModalVisible(true);
+    } else {
+      const WebBrowser = require('expo-web-browser');
+      WebBrowser.openBrowserAsync(url);
+    }
+  };
 
   // Grade lists
   const gradeLevels = ['All', 'General', 'KG', 'Year 1', 'Year 2', 'Year 3', 'Year 4', 'Year 5', 'Year 6', 'Year 7', 'Year 8', 'Year 9'];
@@ -209,9 +254,23 @@ export function LibraryTab({ user, colors, t, showToast, i18n, insets }: TabProp
       return;
     }
 
+    if (bookSourceType === 'url' && !bookOnlineUrl.trim()) {
+      showToast('Please enter the online story URL.', 'warning');
+      return;
+    }
+
     setSubmittingBook(true);
     try {
-      const metadata = {
+      let formattedPdfUrl: string | undefined = undefined;
+      if (bookSourceType === 'url') {
+        let trimmedUrl = bookOnlineUrl.trim();
+        if (trimmedUrl.includes('storyweaver.org.in') && trimmedUrl.includes('/stories/') && !trimmedUrl.endsWith('/read')) {
+          trimmedUrl = trimmedUrl.replace(/\/$/, '') + '/read';
+        }
+        formattedPdfUrl = trimmedUrl;
+      }
+
+      const metadata: any = {
         title: { en: bookTitleEn, ta: bookTitleTa },
         author: bookAuthor,
         gradeLevel: bookGrade,
@@ -221,9 +280,16 @@ export function LibraryTab({ user, colors, t, showToast, i18n, insets }: TabProp
         pagesCount: Number(bookPages) || 10
       };
 
+      if (formattedPdfUrl) {
+        metadata.pdfUrl = formattedPdfUrl;
+      }
+      if (bookCoverUrl.trim()) {
+        metadata.coverUrl = bookCoverUrl.trim();
+      }
+
       const added = await libraryService.uploadBook(
         metadata,
-        pdfFile || undefined,
+        bookSourceType === 'pdf' ? (pdfFile || undefined) : undefined,
         coverFile || undefined
       );
 
@@ -243,11 +309,14 @@ export function LibraryTab({ user, colors, t, showToast, i18n, insets }: TabProp
     setBookTitleTa('');
     setBookAuthor('');
     setBookGrade('KG');
-    setBookCategory('textbook');
+    setBookCategory('storybook');
     setBookPages('');
     setBookPoints('50');
     setBookDescEn('');
     setBookDescTa('');
+    setBookSourceType('url');
+    setBookOnlineUrl('');
+    setBookCoverUrl('');
     setCoverFile(null);
     setPdfFile(null);
   };
@@ -442,6 +511,165 @@ export function LibraryTab({ user, colors, t, showToast, i18n, insets }: TabProp
         </View>
       ) : (
         <ScrollView showsVerticalScrollIndicator={false}>
+          {/* 🌐 StoryWeaver Tamil Stories Hub Card */}
+          <View style={{
+            backgroundColor: colors.cardBg,
+            borderRadius: 16,
+            borderWidth: 1,
+            borderColor: '#F59E0B',
+            padding: 16,
+            marginBottom: Spacing.four,
+            gap: 12,
+            width: '100%'
+          }}>
+            {/* Hub Header */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center' }}>
+                  <Globe size={20} color="#D97706" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <ThemedText style={{ fontSize: 15, fontWeight: '800', color: colors.text }}>
+                    {i18n.language === 'ta' ? 'StoryWeaver கதைக்களஞ்சியம் (2,000+ தமிழ்க் கதைகள்)' : 'StoryWeaver Tamil Stories (2,000+ Books)'}
+                  </ThemedText>
+                  <ThemedText style={{ fontSize: 11, color: colors.textSecondary }}>
+                    {i18n.language === 'ta'
+                      ? 'பிரதம் புக்ஸ் வழங்கும் திறந்தநிலை தமிழ்ச் சிறார் கதைகள் (CC BY 4.0)'
+                      : 'Free open-access Tamil children stories by Pratham Books (CC BY 4.0)'}
+                  </ThemedText>
+                </View>
+              </View>
+            </View>
+
+            {/* Level Filters Pills */}
+            <View style={{ gap: 6 }}>
+              <ThemedText style={{ fontSize: 11, fontWeight: '700', color: colors.textSecondary }}>
+                {i18n.language === 'ta' ? 'வாசிப்பு நிலை (Reading Levels):' : 'Select Reading Level:'}
+              </ThemedText>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+                {[
+                  { id: 'all', labelEn: 'All Tamil Stories', labelTa: 'அனைத்து கதைகள்' },
+                  { id: '1', labelEn: 'Level 1 (KG - Yr 1)', labelTa: 'நிலை 1 (KG - Yr 1)' },
+                  { id: '2', labelEn: 'Level 2 (Yr 2 - Yr 3)', labelTa: 'நிலை 2 (Yr 2 - Yr 3)' },
+                  { id: '3', labelEn: 'Level 3 (Yr 4 - Yr 5)', labelTa: 'நிலை 3 (Yr 4 - Yr 5)' },
+                  { id: '4', labelEn: 'Level 4 (Yr 6 - Yr 9)', labelTa: 'நிலை 4 (Yr 6 - Yr 9)' }
+                ].map(lvl => {
+                  const isSelected = swSelectedLevel === lvl.id;
+                  return (
+                    <Pressable
+                      key={lvl.id}
+                      onPress={() => setSwSelectedLevel(lvl.id as any)}
+                      style={{
+                        paddingHorizontal: 12,
+                        paddingVertical: 6,
+                        borderRadius: 8,
+                        borderWidth: 1,
+                        backgroundColor: isSelected ? '#F59E0B' : colors.background,
+                        borderColor: isSelected ? '#D97706' : colors.border
+                      }}
+                    >
+                      <ThemedText style={{
+                        fontSize: 11,
+                        fontWeight: '700',
+                        color: isSelected ? '#FFF' : colors.text
+                      }}>
+                        {i18n.language === 'ta' ? lvl.labelTa : lvl.labelEn}
+                      </ThemedText>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </View>
+
+            {/* Search & Action Row */}
+            <View style={{ flexDirection: isLargeScreen ? 'row' : 'column', gap: 8, alignItems: 'center' }}>
+              <View style={{
+                flex: 1,
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: colors.background,
+                borderWidth: 1,
+                borderColor: colors.border,
+                borderRadius: 10,
+                paddingHorizontal: 12,
+                height: 40,
+                width: isLargeScreen ? undefined : '100%'
+              }}>
+                <Search size={15} color={colors.textSecondary} style={{ marginRight: 6 }} />
+                <TextInput
+                  placeholder={i18n.language === 'ta' ? 'கதை அல்லது தலைப்பைத் தேடுங்கள் (e.g. விலங்குகள், நிலா)...' : 'Search story by keyword (e.g. animal, moon)...'}
+                  placeholderTextColor={colors.textSecondary}
+                  value={swSearchQuery}
+                  onChangeText={setSwSearchQuery}
+                  onSubmitEditing={() => handleOpenStoryWeaver()}
+                  style={{ flex: 1, color: colors.text, fontSize: 12 }}
+                />
+                {swSearchQuery.length > 0 && (
+                  <Pressable onPress={() => setSwSearchQuery('')}>
+                    <X size={14} color={colors.textSecondary} />
+                  </Pressable>
+                )}
+              </View>
+
+              <View style={{ flexDirection: 'row', gap: 8, width: isLargeScreen ? undefined : '100%' }}>
+                <Pressable
+                  onPress={() => handleOpenStoryWeaver()}
+                  style={({ pressed }) => [
+                    {
+                      flex: isLargeScreen ? undefined : 1,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 6,
+                      backgroundColor: '#D97706',
+                      paddingHorizontal: 16,
+                      paddingVertical: 10,
+                      borderRadius: 10,
+                      opacity: pressed ? 0.9 : 1
+                    }
+                  ]}
+                >
+                  <BookOpen size={14} color="#FFF" />
+                  <ThemedText style={{ color: '#FFF', fontSize: 12, fontWeight: '800' }}>
+                    {i18n.language === 'ta' ? 'உடனே படி (Read Online)' : 'Read Online'}
+                  </ThemedText>
+                </Pressable>
+
+                <Pressable
+                  onPress={() => {
+                    const url = getStoryWeaverUrl();
+                    if (Platform.OS === 'web') {
+                      window.open(url, '_blank');
+                    } else {
+                      const WebBrowser = require('expo-web-browser');
+                      WebBrowser.openBrowserAsync(url);
+                    }
+                  }}
+                  style={({ pressed }) => [
+                    {
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 4,
+                      backgroundColor: colors.background,
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                      paddingHorizontal: 12,
+                      paddingVertical: 10,
+                      borderRadius: 10,
+                      opacity: pressed ? 0.8 : 1
+                    }
+                  ]}
+                >
+                  <ExternalLink size={14} color={colors.text} />
+                  <ThemedText style={{ color: colors.text, fontSize: 11, fontWeight: '700' }}>
+                    {i18n.language === 'ta' ? 'StoryWeaver தளம்' : 'StoryWeaver Web'}
+                  </ThemedText>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
             {filteredBooks.map((book) => {
               const bookProg = progress.find(p => p.bookId === book.bookId);
@@ -683,12 +911,23 @@ export function LibraryTab({ user, colors, t, showToast, i18n, insets }: TabProp
           <View style={{ flex: 1, backgroundColor: '#1A202C' }}>
             {/* Header bar */}
             <View style={{ height: 48, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, borderBottomWidth: 1, borderColor: '#2D3748', backgroundColor: '#2D3748' }}>
-              <ThemedText style={{ color: '#FFF', fontWeight: '800', fontSize: 13 }}>
+              <ThemedText style={{ color: '#FFF', fontWeight: '800', fontSize: 13, flex: 1, marginRight: 12 }} numberOfLines={1}>
                 {i18n.language === 'ta' ? selectedBook.title.ta : selectedBook.title.en}
               </ThemedText>
-              <Pressable onPress={() => setPdfReaderVisible(false)} style={{ padding: 6 }}>
-                <X size={18} color="#FFF" />
-              </Pressable>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <Pressable
+                  onPress={() => window.open(selectedBook.pdfUrl, '_blank')}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 4, paddingHorizontal: 8, backgroundColor: '#4A5568', borderRadius: 6 }}
+                >
+                  <ExternalLink size={14} color="#FFF" />
+                  <ThemedText style={{ color: '#FFF', fontSize: 11, fontWeight: '700' }}>
+                    {i18n.language === 'ta' ? 'முழுத்திரை' : 'Fullscreen'}
+                  </ThemedText>
+                </Pressable>
+                <Pressable onPress={() => setPdfReaderVisible(false)} style={{ padding: 6 }}>
+                  <X size={18} color="#FFF" />
+                </Pressable>
+              </View>
             </View>
 
             {/* Document Frame */}
@@ -697,6 +936,51 @@ export function LibraryTab({ user, colors, t, showToast, i18n, insets }: TabProp
                 src={selectedBook.pdfUrl}
                 style={{ width: '100%', height: '100%', border: 'none' }}
               />
+            </View>
+          </View>
+        </Modal>
+      )}
+
+      {/* Inline StoryWeaver Catalog Web Reader Modal */}
+      {Platform.OS === 'web' && (
+        <Modal
+          visible={swReaderModalVisible}
+          animationType="fade"
+          onRequestClose={() => setSwReaderModalVisible(false)}
+        >
+          <View style={{ flex: 1, backgroundColor: '#1A202C' }}>
+            {/* Header bar */}
+            <View style={{ height: 48, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, borderBottomWidth: 1, borderColor: '#2D3748', backgroundColor: '#2D3748' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, marginRight: 12 }}>
+                <Globe size={16} color="#F59E0B" />
+                <ThemedText style={{ color: '#FFF', fontWeight: '800', fontSize: 13 }} numberOfLines={1}>
+                  {swActiveTitle || 'StoryWeaver Tamil Stories'}
+                </ThemedText>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <Pressable
+                  onPress={() => window.open(swActiveUrl, '_blank')}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 4, paddingHorizontal: 8, backgroundColor: '#4A5568', borderRadius: 6 }}
+                >
+                  <ExternalLink size={14} color="#FFF" />
+                  <ThemedText style={{ color: '#FFF', fontSize: 11, fontWeight: '700' }}>
+                    {i18n.language === 'ta' ? 'முழுத்திரை / புதிய தாவல்' : 'Fullscreen / New Tab'}
+                  </ThemedText>
+                </Pressable>
+                <Pressable onPress={() => setSwReaderModalVisible(false)} style={{ padding: 6 }}>
+                  <X size={18} color="#FFF" />
+                </Pressable>
+              </View>
+            </View>
+
+            {/* Document Frame */}
+            <View style={{ flex: 1 }}>
+              {swActiveUrl ? (
+                <iframe
+                  src={swActiveUrl}
+                  style={{ width: '100%', height: '100%', border: 'none' }}
+                />
+              ) : null}
             </View>
           </View>
         </Modal>
@@ -919,44 +1203,142 @@ export function LibraryTab({ user, colors, t, showToast, i18n, insets }: TabProp
                   />
                 </View>
 
-                {/* File Pickers */}
-                <View style={{ flexDirection: 'row', gap: 12, marginTop: 4 }}>
-                  <Pressable
-                    onPress={handlePickCover}
-                    style={{
-                      flex: 1,
-                      borderWidth: 1,
-                      borderStyle: 'dashed',
-                      borderColor: coverFile ? colors.secondary : colors.border,
-                      padding: 10,
-                      borderRadius: 10,
-                      justifyContent: 'center',
-                      alignItems: 'center'
-                    }}
-                  >
-                    <ThemedText style={{ fontSize: 10, fontWeight: '800', color: coverFile ? colors.secondary : colors.textSecondary }}>
-                      {coverFile ? `Cover: ${coverFile.name.substring(0, 12)}...` : '📷 Pick Cover Image'}
-                    </ThemedText>
-                  </Pressable>
+                {/* Book Content Source Type Toggle */}
+                <View style={styles.formGroup}>
+                  <ThemedText style={styles.formLabel}>Book Content Source*</ThemedText>
+                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
+                    <Pressable
+                      onPress={() => setBookSourceType('url')}
+                      style={{
+                        flex: 1,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 6,
+                        paddingVertical: 8,
+                        borderRadius: 8,
+                        borderWidth: 1,
+                        borderColor: bookSourceType === 'url' ? colors.primary : colors.border,
+                        backgroundColor: bookSourceType === 'url' ? (colors.primary + '15') : colors.background
+                      }}
+                    >
+                      <Globe size={14} color={bookSourceType === 'url' ? colors.primary : colors.textSecondary} />
+                      <ThemedText style={{ fontSize: 11, fontWeight: '700', color: bookSourceType === 'url' ? colors.primary : colors.textSecondary }}>
+                        Online Story URL
+                      </ThemedText>
+                    </Pressable>
 
-                  <Pressable
-                    onPress={handlePickPdf}
-                    style={{
-                      flex: 1,
-                      borderWidth: 1,
-                      borderStyle: 'dashed',
-                      borderColor: pdfFile ? colors.primary : colors.border,
-                      padding: 10,
-                      borderRadius: 10,
-                      justifyContent: 'center',
-                      alignItems: 'center'
-                    }}
-                  >
-                    <ThemedText style={{ fontSize: 10, fontWeight: '800', color: pdfFile ? colors.primary : colors.textSecondary }}>
-                      {pdfFile ? `PDF: ${pdfFile.name.substring(0, 12)}...` : '📄 Pick PDF Book'}
-                    </ThemedText>
-                  </Pressable>
+                    <Pressable
+                      onPress={() => setBookSourceType('pdf')}
+                      style={{
+                        flex: 1,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 6,
+                        paddingVertical: 8,
+                        borderRadius: 8,
+                        borderWidth: 1,
+                        borderColor: bookSourceType === 'pdf' ? colors.primary : colors.border,
+                        backgroundColor: bookSourceType === 'pdf' ? (colors.primary + '15') : colors.background
+                      }}
+                    >
+                      <BookOpen size={14} color={bookSourceType === 'pdf' ? colors.primary : colors.textSecondary} />
+                      <ThemedText style={{ fontSize: 11, fontWeight: '700', color: bookSourceType === 'pdf' ? colors.primary : colors.textSecondary }}>
+                        Upload PDF File
+                      </ThemedText>
+                    </Pressable>
+                  </View>
                 </View>
+
+                {bookSourceType === 'url' ? (
+                  <View style={{ gap: Spacing.three }}>
+                    <View style={styles.formGroup}>
+                      <ThemedText style={styles.formLabel}>Story / Reader URL*</ThemedText>
+                      <TextInput
+                        style={[styles.formInput, { color: colors.text, borderColor: colors.border }]}
+                        value={bookOnlineUrl}
+                        onChangeText={setBookOnlineUrl}
+                        placeholder="https://storyweaver.org.in/en/stories/..."
+                        placeholderTextColor={colors.textSecondary}
+                        autoCapitalize="none"
+                      />
+                      <ThemedText style={{ fontSize: 10, color: colors.textSecondary, marginTop: 4 }}>
+                        {i18n.language === 'ta'
+                          ? 'StoryWeaver கதை இணைப்பு (கதை பக்கம் அல்லது /read இணைப்பு)'
+                          : 'Paste any StoryWeaver story link (e.g. .../read or story link)'}
+                      </ThemedText>
+                    </View>
+
+                    <View style={styles.formGroup}>
+                      <ThemedText style={styles.formLabel}>Cover Image (URL or Pick File)</ThemedText>
+                      <TextInput
+                        style={[styles.formInput, { color: colors.text, borderColor: colors.border }]}
+                        value={bookCoverUrl}
+                        onChangeText={setBookCoverUrl}
+                        placeholder="https://storage.googleapis.com/... (optional cover image URL)"
+                        placeholderTextColor={colors.textSecondary}
+                        autoCapitalize="none"
+                      />
+                    </View>
+
+                    <Pressable
+                      onPress={handlePickCover}
+                      style={{
+                        borderWidth: 1,
+                        borderStyle: 'dashed',
+                        borderColor: coverFile ? colors.secondary : colors.border,
+                        padding: 10,
+                        borderRadius: 10,
+                        justifyContent: 'center',
+                        alignItems: 'center'
+                      }}
+                    >
+                      <ThemedText style={{ fontSize: 10, fontWeight: '800', color: coverFile ? colors.secondary : colors.textSecondary }}>
+                        {coverFile ? `Cover: ${coverFile.name.substring(0, 15)}...` : '📷 Or Pick Cover Image File'}
+                      </ThemedText>
+                    </Pressable>
+                  </View>
+                ) : (
+                  /* File Pickers */
+                  <View style={{ flexDirection: 'row', gap: 12, marginTop: 4 }}>
+                    <Pressable
+                      onPress={handlePickCover}
+                      style={{
+                        flex: 1,
+                        borderWidth: 1,
+                        borderStyle: 'dashed',
+                        borderColor: coverFile ? colors.secondary : colors.border,
+                        padding: 10,
+                        borderRadius: 10,
+                        justifyContent: 'center',
+                        alignItems: 'center'
+                      }}
+                    >
+                      <ThemedText style={{ fontSize: 10, fontWeight: '800', color: coverFile ? colors.secondary : colors.textSecondary }}>
+                        {coverFile ? `Cover: ${coverFile.name.substring(0, 12)}...` : '📷 Pick Cover Image'}
+                      </ThemedText>
+                    </Pressable>
+
+                    <Pressable
+                      onPress={handlePickPdf}
+                      style={{
+                        flex: 1,
+                        borderWidth: 1,
+                        borderStyle: 'dashed',
+                        borderColor: pdfFile ? colors.primary : colors.border,
+                        padding: 10,
+                        borderRadius: 10,
+                        justifyContent: 'center',
+                        alignItems: 'center'
+                      }}
+                    >
+                      <ThemedText style={{ fontSize: 10, fontWeight: '800', color: pdfFile ? colors.primary : colors.textSecondary }}>
+                        {pdfFile ? `PDF: ${pdfFile.name.substring(0, 12)}...` : '📄 Pick PDF Book'}
+                      </ThemedText>
+                    </Pressable>
+                  </View>
+                )}
 
               </View>
             </ScrollView>

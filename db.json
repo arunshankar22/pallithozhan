@@ -597,6 +597,82 @@
   ],
   "books": [
     {
+      "bookId": "book_sw_enakku_vaasikka_pidikkum",
+      "title": {
+        "en": "I Like to Read (எனக்கு வாசிக்கப் பிடிக்கும்)",
+        "ta": "எனக்கு வாசிக்கப் பிடிக்கும்"
+      },
+      "author": "Mala Kumar, Manisha Chaudhry & Priya Kuriyan (Pratham Books)",
+      "gradeLevel": "KG",
+      "category": "storybook",
+      "description": {
+        "en": "A delightful illustrated story from StoryWeaver about the joy of reading books anywhere and everywhere.",
+        "ta": "புத்தகங்களை எங்கு வேண்டுமானாலும் வாசிக்கலாம். வீட்டில், நூலகத்தில், மரத்தின் அடியில், ஏன் உணவகத்திலும்கூட! வாசிப்பின் சுவையை விளக்கும் வண்ணமயமான கதை."
+      },
+      "coverUrl": "https://storage.googleapis.com/static.storyweaver.org.in/illustration_crops/794781/size7/e01d22f7490d4578f8b738e941627610.jpg",
+      "pdfUrl": "https://storyweaver.org.in/en/stories/699005-enakku-vaasikka-pidikkum/read",
+      "readingPoints": 50,
+      "pagesCount": 12,
+      "createdDate": "2026-09-07T06:50:00.000Z"
+    },
+    {
+      "bookId": "book_sw_enge_en_thoppi",
+      "title": {
+        "en": "Where is My Cap? (எங்கே என் தொப்பி?)",
+        "ta": "எங்கே என் தொப்பி?"
+      },
+      "author": "Pratham Books (StoryWeaver)",
+      "gradeLevel": "Year 1",
+      "category": "storybook",
+      "description": {
+        "en": "An amusing story about a little boy searching high and low for his missing cap.",
+        "ta": "காணாமல் போன தொப்பியைத் தேடி அலைந்து இறுதியில் கண்டறியும் ஒரு சிறுவனின் நகைச்சுவைக் கதை."
+      },
+      "coverUrl": "https://storage.googleapis.com/static.storyweaver.org.in/illustration_crops/3400/size7/72e61a687fc5f573c004245598d975a5.jpg",
+      "pdfUrl": "https://storyweaver.org.in/en/stories/1483-enge-en-thoppi/read",
+      "readingPoints": 50,
+      "pagesCount": 14,
+      "createdDate": "2026-09-07T06:50:00.000Z"
+    },
+    {
+      "bookId": "book_sw_poonaikutti",
+      "title": {
+        "en": "The Little Kitten (பூனைக் குட்டி)",
+        "ta": "பூனைக் குட்டி"
+      },
+      "author": "Pratham Books (StoryWeaver)",
+      "gradeLevel": "Year 2",
+      "category": "storybook",
+      "description": {
+        "en": "A heartwarming tale of a playful kitten and its daily adventures.",
+        "ta": "துறுதுறுவென விளையாடும் ஒரு சிறிய பூனைக்குட்டியின் அன்பான அன்றாட சாகசக் கதை."
+      },
+      "coverUrl": "https://storage.googleapis.com/static.storyweaver.org.in/illustration_crops/14389/size7/1e938da64c7e2b8146747b678c187be7.jpg",
+      "pdfUrl": "https://storyweaver.org.in/en/stories/12678-poonaikutti/read",
+      "readingPoints": 60,
+      "pagesCount": 16,
+      "createdDate": "2026-09-07T06:50:00.000Z"
+    },
+    {
+      "bookId": "book_sw_vaanavillin_kadhai",
+      "title": {
+        "en": "Story of the Rainbow (வானவில்லின் கதை)",
+        "ta": "வானவில்லின் கதை"
+      },
+      "author": "Pratham Books (StoryWeaver)",
+      "gradeLevel": "Year 3",
+      "category": "storybook",
+      "description": {
+        "en": "Discover how vibrant colors come together in nature to form the magnificent rainbow.",
+        "ta": "வானில் வர்ணஜாலம் காட்டும் வானவில்லின் தோற்றம் மற்றும் இயற்கையின் அழகை விவரிக்கும் கதை."
+      },
+      "coverUrl": "https://storage.googleapis.com/static.storyweaver.org.in/illustration_crops/20124/size7/3ffbe8a0ce73a5a54452077e6bdf255c.jpg",
+      "pdfUrl": "https://storyweaver.org.in/en/stories/17498-vaanavillin-kadhai/read",
+      "readingPoints": 70,
+      "pagesCount": 20,
+      "createdDate": "2026-09-07T06:50:00.000Z"
+    },
+    {
       "bookId": "book_kg",
       "title": {
         "en": "Tamil Vowels (உயிரெழுத்துக்கள்)",
