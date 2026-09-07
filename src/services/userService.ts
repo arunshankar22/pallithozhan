@@ -351,5 +351,76 @@ export const userService = {
       return;
     }
     await deleteDoc(doc(db, 'users', uid));
+  },
+
+  sanitizeAllUsersSensitiveData: async (): Promise<{ total: number; modified: number; errorCount: number; details: string[] }> => {
+    let total = 0;
+    let modified = 0;
+    let errorCount = 0;
+    const details: string[] = [];
+
+    const SENSITIVE_KEYS = [
+      'phone',
+      'phoneNumber',
+      'emergencyContactPhone',
+      'parentPhone',
+      'mobile',
+      'wwcNumber',
+      'wwcVerified',
+      'wwcVerifiedDate',
+      'wwcExpiryDate',
+      'wwcStatus',
+      'dob',
+      'dateOfBirth'
+    ];
+
+    try {
+      if (db) {
+        const querySnapshot = await getDocs(collection(db, 'users'));
+        total = querySnapshot.size;
+
+        for (const docSnap of querySnapshot.docs) {
+          try {
+            const data = docSnap.data();
+            let hasSensitiveField = false;
+
+            for (const key of SENSITIVE_KEYS) {
+              if (key in data) {
+                hasSensitiveField = true;
+                break;
+              }
+            }
+
+            if (hasSensitiveField) {
+              const sanitized = { ...data };
+              for (const key of SENSITIVE_KEYS) {
+                delete sanitized[key];
+              }
+
+              await setDoc(doc(db, 'users', docSnap.id), sanitized);
+              modified++;
+              details.push(`Sanitized user: ${data.fullName || docSnap.id} (${data.email || 'no email'})`);
+            }
+          } catch (itemErr: any) {
+            errorCount++;
+            console.error(`Failed to sanitize user ${docSnap.id}:`, itemErr);
+          }
+        }
+      }
+
+      // Also sanitize in-memory local fallback
+      localUsers = localUsers.map((u: any) => {
+        const sanitized = { ...u };
+        for (const key of SENSITIVE_KEYS) {
+          delete sanitized[key];
+        }
+        return sanitized;
+      });
+
+      return { total, modified, errorCount, details };
+    } catch (err: any) {
+      console.error('Failed to sanitize users in database:', err);
+      throw err;
+    }
   }
 };
