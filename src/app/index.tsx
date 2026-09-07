@@ -1084,10 +1084,10 @@ export default function HomeScreen() {
 
     if (role === 'superadmin') {
       items.push({ key: 'superadmin', label: 'Super Admin', labelTa: 'முதன்மை நிர்வாகி', icon: Shield });
+      items.push({ key: 'management', label: 'Admin Panel', labelTa: 'நிர்வாகம்', icon: Users });
       items.push({ key: 'reports', label: t('nav.reports'), labelTa: 'சாதனைகள்', icon: Award });
     } else if (role === 'admin') {
       items.push({ key: 'management', label: 'Admin Panel', labelTa: 'நிர்வாகம்', icon: Users });
-      items.push({ key: 'superadmin', label: 'Super Admin', labelTa: 'முதன்மை நிர்வாகி', icon: Shield });
       items.push({ key: 'reports', label: t('nav.reports'), labelTa: 'சாதனைகள்', icon: Award });
     } else if (role === 'teacher') {
       items.push({ key: 'attendance', label: 'Take Attendance', labelTa: 'வருகைப்பதிவு', icon: CheckSquare });
@@ -2687,6 +2687,21 @@ export default function HomeScreen() {
       case 'management':
         return <ManagementTab {...props} onFeatureFlagsUpdated={reloadDashboardData} />;
       case 'superadmin':
+        if (user?.role !== 'superadmin') {
+          return (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24, gap: 12 }}>
+              <Shield size={48} color="#EF4444" />
+              <ThemedText style={{ fontSize: 18, fontWeight: '800', color: colors.text }}>
+                {i18n.language === 'ta' ? 'அனுமதி மறுக்கப்பட்டது' : 'Access Denied'}
+              </ThemedText>
+              <ThemedText style={{ fontSize: 13, color: colors.textSecondary, textAlign: 'center' }}>
+                {i18n.language === 'ta'
+                  ? 'இந்த பக்கம் முதன்மை நிர்வாகிகளுக்கு (Super Admin) மட்டுமே உரியது.'
+                  : 'The Super Admin console is strictly restricted to users with the superadmin role.'}
+              </ThemedText>
+            </View>
+          );
+        }
         return <SuperAdminTab {...props} />;
       case 'points':
         return <PointsPortalTab {...props} />;
@@ -2736,7 +2751,7 @@ export default function HomeScreen() {
     { key: 'calendar', label: t('nav.calendar'), icon: CalendarIcon, roles: ['superadmin', 'admin', 'teacher', 'volunteer', 'parent', 'student'] },
     { key: 'reports', label: t('nav.reports'), icon: Award, roles: ['superadmin', 'admin', 'teacher', 'volunteer', 'parent'] },
     { key: 'management', label: t('nav.management'), icon: Users, roles: ['superadmin', 'admin'] },
-    { key: 'superadmin', label: 'Super Admin', icon: Shield, roles: ['superadmin', 'admin'] },
+    { key: 'superadmin', label: 'Super Admin', icon: Shield, roles: ['superadmin'] },
   ] as const;
 
   // Filter Nav Items based on user role and active portal feature flags

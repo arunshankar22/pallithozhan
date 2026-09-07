@@ -85,6 +85,23 @@ const getActionIcon = (action: string) => {
 
 export function SuperAdminTab({ user, colors, t, showToast, i18n }: TabProps) {
   const { width: windowWidth } = useWindowDimensions();
+
+  if (user?.role !== 'superadmin') {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24, gap: 12 }}>
+        <Shield size={48} color="#EF4444" />
+        <ThemedText style={{ fontSize: 18, fontWeight: '800', color: colors.text }}>
+          {i18n.language === 'ta' ? 'அனுமதி மறுக்கப்பட்டது' : 'Access Denied'}
+        </ThemedText>
+        <ThemedText style={{ fontSize: 13, color: colors.textSecondary, textAlign: 'center' }}>
+          {i18n.language === 'ta'
+            ? 'இந்த பக்கம் முதன்மை நிர்வாகிகளுக்கு (Super Admin) மட்டுமே உரியது.'
+            : 'The Super Admin console is strictly restricted to users with the superadmin role.'}
+        </ThemedText>
+      </View>
+    );
+  }
+
   const isMobile = windowWidth < 768;
   const [userViewMode, setUserViewMode] = useState<'card' | 'table'>(windowWidth < 768 ? 'card' : 'table');
   const [activeSubTab, setActiveSubTab] = useState<'users' | 'logs' | 'settings'>('users');
