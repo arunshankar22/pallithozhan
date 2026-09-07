@@ -21,7 +21,8 @@ import {
   X,
   Award,
   Book,
-  Globe
+  Globe,
+  Sparkles
 } from 'lucide-react-native';
 
 import { ThemedText } from '@/components/themed-text';
@@ -31,6 +32,7 @@ import { Spacing } from '@/constants/theme';
 import { libraryService, Book as BookType, ReadingProgress } from '@/services/libraryService';
 import { ThirukkuralPracticeGuide } from '@/components/ThirukkuralPracticeGuide';
 import { AathichoodiPracticeGuide } from '@/components/AathichoodiPracticeGuide';
+import { STORYWEAVER_STORIES, toStoryWeaverEmbedUrl, StoryWeaverStory } from '@/constants/storyweaverStories';
 
 export function LibraryTab({ user, colors, t, showToast, i18n, insets }: TabProps) {
   const { width: windowWidth } = useWindowDimensions();
@@ -53,6 +55,20 @@ export function LibraryTab({ user, colors, t, showToast, i18n, insets }: TabProp
   const [pdfReaderVisible, setPdfReaderVisible] = useState(false);
   const [thirukuralVisible, setThirukuralVisible] = useState(false);
   const [aathichoodiVisible, setAathichoodiVisible] = useState(false);
+
+  // Embedded In-App StoryWeaver Reader State
+  const [embeddedReaderVisible, setEmbeddedReaderVisible] = useState(false);
+  const [embeddedStory, setEmbeddedStory] = useState<{
+    storyId?: string;
+    titleEn: string;
+    titleTa: string;
+    embedUrl: string;
+    level?: string;
+    readingPoints?: number;
+    pagesCount?: number;
+  } | null>(null);
+  const [customStoryInput, setCustomStoryInput] = useState('');
+  const [showCustomInput, setShowCustomInput] = useState(false);
 
   // StoryWeaver Hub state
   const [swSelectedLevel, setSwSelectedLevel] = useState<'all' | '1' | '2' | '3' | '4'>('all');
@@ -104,6 +120,98 @@ export function LibraryTab({ user, colors, t, showToast, i18n, insets }: TabProp
       WebBrowser.openBrowserAsync(url);
     }
   };
+
+  const openEmbeddedStory = (story: {
+    storyId?: string;
+    titleEn: string;
+    titleTa: string;
+    embedUrl: string;
+    level?: string;
+    readingPoints?: number;
+    pagesCount?: number;
+  }) => {
+    setEmbeddedStory(story);
+    setEmbeddedReaderVisible(true);
+    setDetailModalVisible(false);
+
+    if (user?.uid && story.storyId) {
+      const matchBook = books.find(b => b.pdfUrl?.includes(story.storyId || ''));
+      if (matchBook) {
+        libraryService.updateReadingProgress(
+          user.uid,
+          matchBook.bookId,
+          'reading',
+          1,
+          false
+        ).then(updated => {
+          setProgress(prev => {
+            const filtered = prev.filter(p => p.bookId !== matchBook.bookId);
+            return [...filtered, updated];
+          });
+        }).catch(() => {});
+      }
+    }
+  };
+
+  const handleClaimStoryXp = async () => {
+    if (!embeddedStory || !user?.uid) return;
+    try {
+      const points = embeddedStory.readingPoints || 50;
+      const matchBook = books.find(b => embeddedStory.storyId && b.pdfUrl?.includes(embeddedStory.storyId));
+      if (matchBook) {
+        const updated = await libraryService.updateReadingProgress(
+          user.uid,
+          matchBook.bookId,
+          'completed',
+          matchBook.pagesCount || embeddedStory.pagesCount || 10,
+          true
+        );
+        setProgress(prev => {
+          const filtered = prev.filter(p => p.bookId !== matchBook.bookId);
+          return [...filtered, updated];
+        });
+      }
+      showToast(
+        i18n.language === 'ta'
+          ? `வாழ்த்துக்கள்! வாசிப்பு நிறைவுற்றது! +${points} XP பெற்றீர்கள்! 🌟`
+          : `Congratulations! Story finished! You earned +${points} XP! 🌟`,
+        'success'
+      );
+    } catch (err) {
+      showToast('Could not record XP.', 'error');
+    }
+  };
+
+  const handleOpenCustomStory = () => {
+    if (!customStoryInput.trim()) return;
+    const embedUrl = toStoryWeaverEmbedUrl(customStoryInput.trim());
+    if (!embedUrl) {
+      showToast('Please enter a valid StoryWeaver link or story ID', 'warning');
+      return;
+    }
+    openEmbeddedStory({
+      storyId: customStoryInput.trim(),
+      titleEn: 'StoryWeaver Tamil Story',
+      titleTa: 'தமிழ்க் கதை',
+      embedUrl,
+      level: '1',
+      readingPoints: 50,
+      pagesCount: 12
+    });
+    setCustomStoryInput('');
+    setShowCustomInput(false);
+  };
+
+  const filteredSwStories = STORYWEAVER_STORIES.filter(s => {
+    const levelMatch = swSelectedLevel === 'all' || s.level === swSelectedLevel;
+    const query = swSearchQuery.trim().toLowerCase();
+    if (!query) return levelMatch;
+    const textMatch = s.titleEn.toLowerCase().includes(query) ||
+                      s.titleTa.includes(query) ||
+                      s.author.toLowerCase().includes(query) ||
+                      s.tags.some(t => t.toLowerCase().includes(query));
+    return levelMatch && textMatch;
+  });
 
   // Grade lists
   const gradeLevels = ['All', 'General', 'KG', 'Year 1', 'Year 2', 'Year 3', 'Year 4', 'Year 5', 'Year 6', 'Year 7', 'Year 8', 'Year 9'];
@@ -336,8 +444,21 @@ export function LibraryTab({ user, colors, t, showToast, i18n, insets }: TabProp
       return;
     }
 
-    const isWebStory = selectedBook.pdfUrl.includes('storyweaver.org.in') ||
-      (!selectedBook.pdfUrl.endsWith('.pdf') && !selectedBook.pdfUrl.startsWith('data:application/pdf') && selectedBook.pdfUrl.startsWith('http'));
+    if (selectedBook.pdfUrl.includes('storyweaver.org.in')) {
+      const embedUrl = toStoryWeaverEmbedUrl(selectedBook.pdfUrl);
+      openEmbeddedStory({
+        storyId: selectedBook.bookId,
+        titleEn: selectedBook.title.en,
+        titleTa: selectedBook.title.ta,
+        embedUrl,
+        level: selectedBook.gradeLevel,
+        readingPoints: selectedBook.readingPoints,
+        pagesCount: selectedBook.pagesCount
+      });
+      return;
+    }
+
+    const isWebStory = !selectedBook.pdfUrl.endsWith('.pdf') && !selectedBook.pdfUrl.startsWith('data:application/pdf') && selectedBook.pdfUrl.startsWith('http');
 
     if (isWebStory) {
       if (Platform.OS === 'web') {
@@ -537,18 +658,102 @@ export function LibraryTab({ user, colors, t, showToast, i18n, insets }: TabProp
                   </ThemedText>
                   <ThemedText style={{ fontSize: 11, color: colors.textSecondary }}>
                     {i18n.language === 'ta'
-                      ? 'பிரதம் புக்ஸ் வழங்கும் திறந்தநிலை தமிழ்ச் சிறார் கதைகள் (CC BY 4.0)'
-                      : 'Free open-access Tamil children stories by Pratham Books (CC BY 4.0)'}
+                      ? 'பிரதம் புக்ஸ் வழங்கும் கதைகள் • செயலியில் நேரடியாக வாசியுங்கள்'
+                      : 'Free open-access Tamil stories by Pratham Books • Read directly in app'}
                   </ThemedText>
                 </View>
               </View>
+
+              <Pressable
+                onPress={() => setShowCustomInput(prev => !prev)}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 4,
+                  backgroundColor: showCustomInput ? '#F59E0B' : (colors.primary + '15'),
+                  paddingHorizontal: 10,
+                  paddingVertical: 6,
+                  borderRadius: 8
+                }}
+              >
+                <Plus size={13} color={showCustomInput ? '#FFF' : colors.primary} />
+                <ThemedText style={{
+                  fontSize: 11,
+                  fontWeight: '700',
+                  color: showCustomInput ? '#FFF' : colors.primary
+                }}>
+                  {showCustomInput
+                    ? (i18n.language === 'ta' ? 'மறை' : 'Hide Link Bar')
+                    : (i18n.language === 'ta' ? 'இணைப்பு மூலம் வாசி' : 'Paste Link')}
+                </ThemedText>
+              </Pressable>
             </View>
+
+            {/* Custom URL Reader input (when toggled) */}
+            {showCustomInput && (
+              <View style={{
+                backgroundColor: colors.background,
+                borderWidth: 1,
+                borderColor: '#F59E0B',
+                borderRadius: 10,
+                padding: 10,
+                gap: 8
+              }}>
+                <ThemedText style={{ fontSize: 11, fontWeight: '700', color: colors.text }}>
+                  {i18n.language === 'ta'
+                    ? 'StoryWeaver கதை இணைப்பு அல்லது ID-ஐ உள்ளிடவும்:'
+                    : 'Paste any StoryWeaver story link or story ID to read inside app:'}
+                </ThemedText>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <TextInput
+                    placeholder="e.g. 699005-enakku-vaasikka-pidikkum or https://storyweaver.org.in/..."
+                    placeholderTextColor={colors.textSecondary}
+                    value={customStoryInput}
+                    onChangeText={setCustomStoryInput}
+                    autoCapitalize="none"
+                    style={{
+                      flex: 1,
+                      backgroundColor: colors.cardBg,
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                      borderRadius: 8,
+                      paddingHorizontal: 10,
+                      height: 38,
+                      fontSize: 12,
+                      color: colors.text
+                    }}
+                  />
+                  <Pressable
+                    onPress={handleOpenCustomStory}
+                    style={{
+                      backgroundColor: '#D97706',
+                      paddingHorizontal: 14,
+                      borderRadius: 8,
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      flexDirection: 'row',
+                      gap: 4
+                    }}
+                  >
+                    <BookOpen size={14} color="#FFF" />
+                    <ThemedText style={{ color: '#FFF', fontSize: 12, fontWeight: '800' }}>
+                      {i18n.language === 'ta' ? 'வாசி' : 'Read'}
+                    </ThemedText>
+                  </Pressable>
+                </View>
+              </View>
+            )}
 
             {/* Level Filters Pills */}
             <View style={{ gap: 6 }}>
-              <ThemedText style={{ fontSize: 11, fontWeight: '700', color: colors.textSecondary }}>
-                {i18n.language === 'ta' ? 'வாசிப்பு நிலை (Reading Levels):' : 'Select Reading Level:'}
-              </ThemedText>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <ThemedText style={{ fontSize: 11, fontWeight: '700', color: colors.textSecondary }}>
+                  {i18n.language === 'ta' ? 'வாசிப்பு நிலை (Reading Levels):' : 'Select Reading Level:'}
+                </ThemedText>
+                <ThemedText style={{ fontSize: 10, color: colors.textSecondary }}>
+                  {filteredSwStories.length} {i18n.language === 'ta' ? 'கதைகள்' : 'stories'}
+                </ThemedText>
+              </View>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
                 {[
                   { id: 'all', labelEn: 'All Tamil Stories', labelTa: 'அனைத்து கதைகள்' },
@@ -584,92 +789,155 @@ export function LibraryTab({ user, colors, t, showToast, i18n, insets }: TabProp
               </ScrollView>
             </View>
 
-            {/* Search & Action Row */}
-            <View style={{ flexDirection: isLargeScreen ? 'row' : 'column', gap: 8, alignItems: 'center' }}>
-              <View style={{
-                flex: 1,
-                flexDirection: 'row',
-                alignItems: 'center',
-                backgroundColor: colors.background,
-                borderWidth: 1,
-                borderColor: colors.border,
-                borderRadius: 10,
-                paddingHorizontal: 12,
-                height: 40,
-                width: isLargeScreen ? undefined : '100%'
-              }}>
-                <Search size={15} color={colors.textSecondary} style={{ marginRight: 6 }} />
-                <TextInput
-                  placeholder={i18n.language === 'ta' ? 'கதை அல்லது தலைப்பைத் தேடுங்கள் (e.g. விலங்குகள், நிலா)...' : 'Search story by keyword (e.g. animal, moon)...'}
-                  placeholderTextColor={colors.textSecondary}
-                  value={swSearchQuery}
-                  onChangeText={setSwSearchQuery}
-                  onSubmitEditing={() => handleOpenStoryWeaver()}
-                  style={{ flex: 1, color: colors.text, fontSize: 12 }}
-                />
-                {swSearchQuery.length > 0 && (
-                  <Pressable onPress={() => setSwSearchQuery('')}>
-                    <X size={14} color={colors.textSecondary} />
-                  </Pressable>
-                )}
-              </View>
-
-              <View style={{ flexDirection: 'row', gap: 8, width: isLargeScreen ? undefined : '100%' }}>
-                <Pressable
-                  onPress={() => handleOpenStoryWeaver()}
-                  style={({ pressed }) => [
-                    {
-                      flex: isLargeScreen ? undefined : 1,
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 6,
-                      backgroundColor: '#D97706',
-                      paddingHorizontal: 16,
-                      paddingVertical: 10,
-                      borderRadius: 10,
-                      opacity: pressed ? 0.9 : 1
-                    }
-                  ]}
-                >
-                  <BookOpen size={14} color="#FFF" />
-                  <ThemedText style={{ color: '#FFF', fontSize: 12, fontWeight: '800' }}>
-                    {i18n.language === 'ta' ? 'கதைகளை வாசி (Browse Stories)' : 'Browse Stories'}
-                  </ThemedText>
+            {/* Keyword Search Input */}
+            <View style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              backgroundColor: colors.background,
+              borderWidth: 1,
+              borderColor: colors.border,
+              borderRadius: 10,
+              paddingHorizontal: 12,
+              height: 38
+            }}>
+              <Search size={14} color={colors.textSecondary} style={{ marginRight: 6 }} />
+              <TextInput
+                placeholder={i18n.language === 'ta' ? 'கதை அல்லது தலைப்பைத் தேடுங்கள் (e.g. பூனை, நிலா, விலங்குகள்)...' : 'Search stories by keyword (e.g. cat, moon, animals)...'}
+                placeholderTextColor={colors.textSecondary}
+                value={swSearchQuery}
+                onChangeText={setSwSearchQuery}
+                style={{ flex: 1, color: colors.text, fontSize: 12 }}
+              />
+              {swSearchQuery.length > 0 && (
+                <Pressable onPress={() => setSwSearchQuery('')}>
+                  <X size={14} color={colors.textSecondary} />
                 </Pressable>
+              )}
+            </View>
 
-                <Pressable
-                  onPress={() => {
-                    const url = getStoryWeaverUrl();
-                    if (Platform.OS === 'web') {
-                      window.open(url, '_blank');
-                    } else {
-                      const WebBrowser = require('expo-web-browser');
-                      WebBrowser.openBrowserAsync(url);
-                    }
-                  }}
-                  style={({ pressed }) => [
-                    {
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 4,
-                      backgroundColor: colors.background,
-                      borderWidth: 1,
-                      borderColor: colors.border,
-                      paddingHorizontal: 12,
-                      paddingVertical: 10,
-                      borderRadius: 10,
-                      opacity: pressed ? 0.8 : 1
-                    }
-                  ]}
-                >
-                  <ExternalLink size={14} color={colors.text} />
-                  <ThemedText style={{ color: colors.text, fontSize: 11, fontWeight: '700' }}>
-                    {i18n.language === 'ta' ? 'StoryWeaver தளம்' : 'StoryWeaver Web'}
+            {/* In-App Story Cards Carousel */}
+            {filteredSwStories.length === 0 ? (
+              <View style={{ padding: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background, borderRadius: 10, gap: 6 }}>
+                <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>
+                  {i18n.language === 'ta' ? 'பொருத்தமான கதைகள் இல்லை. தேடலை மாற்றவும்.' : 'No matching stories found. Try a different search.'}
+                </ThemedText>
+                <Pressable onPress={() => { setSwSearchQuery(''); setSwSelectedLevel('all'); }}>
+                  <ThemedText style={{ fontSize: 11, color: colors.primary, fontWeight: '700' }}>
+                    {i18n.language === 'ta' ? 'அனைத்துக் கதைகளையும் காட்டு' : 'Reset filters'}
                   </ThemedText>
                 </Pressable>
               </View>
+            ) : (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ gap: 10, paddingVertical: 4 }}
+              >
+                {filteredSwStories.map((story) => {
+                  return (
+                    <View
+                      key={story.id}
+                      style={{
+                        width: 170,
+                        backgroundColor: colors.background,
+                        borderRadius: 12,
+                        borderWidth: 1,
+                        borderColor: colors.border,
+                        padding: 8,
+                        gap: 6
+                      }}
+                    >
+                      {/* Story Cover */}
+                      <View style={{ width: '100%', height: 110, borderRadius: 8, overflow: 'hidden', backgroundColor: '#E2E8F0', position: 'relative' }}>
+                        <Image
+                          source={{ uri: story.coverUrl }}
+                          style={{ width: '100%', height: '100%' }}
+                          resizeMode="cover"
+                        />
+                        {/* Level badge */}
+                        <View style={{
+                          position: 'absolute',
+                          bottom: 4,
+                          left: 4,
+                          backgroundColor: '#F59E0B',
+                          paddingHorizontal: 5,
+                          paddingVertical: 2,
+                          borderRadius: 4
+                        }}>
+                          <ThemedText style={{ color: '#000', fontSize: 8, fontWeight: '900' }}>
+                            Level {story.level}
+                          </ThemedText>
+                        </View>
+                        {/* XP badge */}
+                        <View style={{
+                          position: 'absolute',
+                          top: 4,
+                          right: 4,
+                          backgroundColor: '#10B981',
+                          paddingHorizontal: 5,
+                          paddingVertical: 2,
+                          borderRadius: 4
+                        }}>
+                          <ThemedText style={{ color: '#FFF', fontSize: 8, fontWeight: '900' }}>
+                            +{story.readingPoints} XP
+                          </ThemedText>
+                        </View>
+                      </View>
+
+                      {/* Info */}
+                      <View style={{ gap: 2 }}>
+                        <ThemedText style={{ fontSize: 11, fontWeight: '800', color: colors.text }} numberOfLines={1}>
+                          {story.titleTa}
+                        </ThemedText>
+                        <ThemedText style={{ fontSize: 9, color: colors.textSecondary }} numberOfLines={1}>
+                          {story.titleEn}
+                        </ThemedText>
+                        <ThemedText style={{ fontSize: 8, color: colors.textSecondary }} numberOfLines={1}>
+                          {story.author}
+                        </ThemedText>
+                      </View>
+
+                      {/* Read in App Button */}
+                      <Pressable
+                        onPress={() => openEmbeddedStory(story)}
+                        style={({ pressed }) => [
+                          {
+                            backgroundColor: '#D97706',
+                            paddingVertical: 6,
+                            borderRadius: 6,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexDirection: 'row',
+                            gap: 4,
+                            opacity: pressed ? 0.9 : 1
+                          }
+                        ]}
+                      >
+                        <BookOpen size={12} color="#FFF" />
+                        <ThemedText style={{ color: '#FFF', fontSize: 10, fontWeight: '800' }}>
+                          {i18n.language === 'ta' ? 'உடனே படி' : 'Read in App'}
+                        </ThemedText>
+                      </Pressable>
+                    </View>
+                  );
+                })}
+              </ScrollView>
+            )}
+
+            {/* Footer with subtle Pratham link */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 4, borderTopWidth: 1, borderColor: colors.border }}>
+              <ThemedText style={{ fontSize: 10, color: colors.textSecondary }}>
+                {i18n.language === 'ta' ? 'அனைத்து கதைகளும் CC BY 4.0 உரிமம் கொண்டவை' : 'Stories licensed under CC BY 4.0'}
+              </ThemedText>
+              <Pressable
+                onPress={() => handleOpenStoryWeaver()}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}
+              >
+                <ThemedText style={{ fontSize: 10, color: '#D97706', fontWeight: '700' }}>
+                  {i18n.language === 'ta' ? 'மேலும் கதைகள் (StoryWeaver)' : 'Explore More Online'}
+                </ThemedText>
+                <ExternalLink size={10} color="#D97706" />
+              </Pressable>
             </View>
           </View>
 
@@ -850,13 +1118,13 @@ export function LibraryTab({ user, colors, t, showToast, i18n, insets }: TabProp
                   }}
                 >
                   {selectedBook.pdfUrl.includes('storyweaver.org.in') ? (
-                    <ExternalLink size={14} color="#FFF" />
+                    <BookOpen size={14} color="#FFF" />
                   ) : (
                     <Book size={14} color="#FFF" />
                   )}
                   <ThemedText style={{ color: '#FFF', fontSize: 12, fontWeight: '800' }}>
                     {selectedBook.pdfUrl.includes('storyweaver.org.in')
-                      ? (i18n.language === 'ta' ? 'கதையை வாசி (StoryWeaver)' : 'Read on StoryWeaver')
+                      ? (i18n.language === 'ta' ? 'உடனே படி (Read in App)' : 'Read in App')
                       : (i18n.language === 'ta' ? 'உடனே படி (Read Online)' : 'Read Online')}
                   </ThemedText>
                 </Pressable>
@@ -945,6 +1213,140 @@ export function LibraryTab({ user, colors, t, showToast, i18n, insets }: TabProp
                 src={selectedBook.pdfUrl}
                 style={{ width: '100%', height: '100%', border: 'none' }}
               />
+            </View>
+          </View>
+        </Modal>
+      )}
+
+      {/* 📖 In-App StoryWeaver Embedded Reader Modal */}
+      {embeddedStory && (
+        <Modal
+          visible={embeddedReaderVisible}
+          animationType="fade"
+          onRequestClose={() => setEmbeddedReaderVisible(false)}
+        >
+          <View style={{ flex: 1, backgroundColor: '#1A202C' }}>
+            {/* Header bar */}
+            <View style={{
+              minHeight: 52,
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              paddingHorizontal: 16,
+              paddingVertical: 8,
+              borderBottomWidth: 1,
+              borderColor: '#2D3748',
+              backgroundColor: '#2D3748',
+              gap: 12
+            }}>
+              {/* Back / Close button & Story info */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                <Pressable
+                  onPress={() => setEmbeddedReaderVisible(false)}
+                  style={{
+                    padding: 8,
+                    borderRadius: 8,
+                    backgroundColor: '#4A5568',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  <X size={18} color="#FFF" />
+                </Pressable>
+
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    {embeddedStory.level && (
+                      <View style={{ backgroundColor: '#F59E0B', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                        <ThemedText style={{ color: '#000', fontSize: 9, fontWeight: '900' }}>
+                          Level {embeddedStory.level}
+                        </ThemedText>
+                      </View>
+                    )}
+                    <ThemedText style={{ color: '#FFF', fontWeight: '800', fontSize: 13 }} numberOfLines={1}>
+                      {embeddedStory.titleTa}
+                    </ThemedText>
+                  </View>
+                  <ThemedText style={{ color: '#A0AEC0', fontSize: 10 }} numberOfLines={1}>
+                    {embeddedStory.titleEn}
+                  </ThemedText>
+                </View>
+              </View>
+
+              {/* Actions */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                {user?.role === 'student' && (
+                  <Pressable
+                    onPress={handleClaimStoryXp}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 4,
+                      backgroundColor: '#10B981',
+                      paddingHorizontal: 12,
+                      paddingVertical: 8,
+                      borderRadius: 8
+                    }}
+                  >
+                    <Award size={14} color="#FFF" />
+                    <ThemedText style={{ color: '#FFF', fontSize: 11, fontWeight: '800' }}>
+                      {i18n.language === 'ta' ? 'முடித்தேன் (+XP)' : 'Finished (+XP)'}
+                    </ThemedText>
+                  </Pressable>
+                )}
+
+                {Platform.OS === 'web' && (
+                  <Pressable
+                    onPress={() => window.open(embeddedStory.embedUrl, '_blank')}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 4,
+                      backgroundColor: '#4A5568',
+                      paddingHorizontal: 10,
+                      paddingVertical: 8,
+                      borderRadius: 8
+                    }}
+                  >
+                    <ExternalLink size={14} color="#FFF" />
+                    <ThemedText style={{ color: '#FFF', fontSize: 11, fontWeight: '700' }}>
+                      {i18n.language === 'ta' ? 'முழுத்திரை' : 'Fullscreen'}
+                    </ThemedText>
+                  </Pressable>
+                )}
+              </View>
+            </View>
+
+            {/* Embedded Iframe Container */}
+            <View style={{ flex: 1, backgroundColor: '#000' }}>
+              {Platform.OS === 'web' ? (
+                <iframe
+                  src={embeddedStory.embedUrl}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    border: 'none',
+                    backgroundColor: '#FFFFFF'
+                  }}
+                  allow="fullscreen; autoplay"
+                  title={embeddedStory.titleEn}
+                />
+              ) : (
+                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+                  <ThemedText style={{ color: '#FFF', textAlign: 'center', marginBottom: 12 }}>
+                    Opening story in browser reader...
+                  </ThemedText>
+                  <Pressable
+                    onPress={() => {
+                      const WebBrowser = require('expo-web-browser');
+                      WebBrowser.openBrowserAsync(embeddedStory.embedUrl);
+                    }}
+                    style={{ backgroundColor: '#F59E0B', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8 }}
+                  >
+                    <ThemedText style={{ color: '#000', fontWeight: '800' }}>Open Reader</ThemedText>
+                  </Pressable>
+                </View>
+              )}
             </View>
           </View>
         </Modal>
