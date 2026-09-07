@@ -59,6 +59,8 @@ export const emailService = {
       try {
         const requestPayload = {
           ...payload,
+          fromName: config.defaultSenderName || undefined,
+          fromEmail: config.defaultSenderEmail || undefined,
           apiKey: config.resendApiKey || undefined
         };
 

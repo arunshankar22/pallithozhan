@@ -29,10 +29,21 @@ const requestHandler = async (req, res) => {
 
   try {
     const urlObj = new url.URL(req.url, `http://${req.headers.host || 'localhost'}`);
-    const pathname = urlObj.pathname;
+    let pathname = urlObj.pathname;
     const method = req.method;
 
-    if (req.url.includes('/debug') || req.url.includes('debug')) {
+    // Resolve real API pathname if routed via Vercel rewrite (e.g. /api/server.js?path=email/send)
+    if (urlObj.searchParams.has('path')) {
+      const pathParam = urlObj.searchParams.get('path') || '';
+      pathname = '/api/' + pathParam.replace(/^\/+/, '');
+      urlObj.searchParams.delete('path');
+    } else if (pathname.startsWith('/api/server.js/')) {
+      pathname = '/api/' + pathname.slice('/api/server.js/'.length);
+    } else if (pathname.startsWith('/api/server/')) {
+      pathname = '/api/' + pathname.slice('/api/server/'.length);
+    }
+
+    if (pathname === '/api/debug' || req.url.includes('/debug') || req.url.includes('debug')) {
       sendJson(res, 200, {
         url: req.url,
         pathname,

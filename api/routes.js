@@ -1637,8 +1637,8 @@ Guidelines for SQL generation:
       }
 
       // 4. Construct Senders & Reply-To Headers
-      const senderName = body.fromName || emailConfig.defaultSenderName || 'Pallithozhan - Balar Malar';
-      const senderEmail = emailConfig.defaultSenderEmail || process.env.SENDER_EMAIL || 'noreply@3stech.com.au';
+      const senderName = body.fromName || body.senderName || emailConfig.defaultSenderName || 'Pallithozhan - Balar Malar';
+      const senderEmail = body.fromEmail || body.senderEmail || emailConfig.defaultSenderEmail || process.env.SENDER_EMAIL || 'noreply@3stech.com.au';
       const replyTo = body.replyTo || body.reply_to || undefined;
 
       // 5. Generate Branded HTML Content
