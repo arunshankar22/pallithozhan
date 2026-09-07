@@ -57,10 +57,15 @@ export const emailService = {
 
       // 2. Primary Method: Call Backend REST API
       try {
+        const requestPayload = {
+          ...payload,
+          apiKey: config.resendApiKey || undefined
+        };
+
         const response = await fetch(`${API_URL}/email/send`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
+          body: JSON.stringify(requestPayload)
         });
 
         if (response.ok) {
@@ -69,9 +74,13 @@ export const emailService = {
           return result;
         } else {
           const errText = await response.text();
-          console.warn('[emailService] Backend API returned error, attempting Firestore mail queue fallback:', errText);
+          console.warn('[emailService] Backend API returned error:', errText);
+          let parsedErr: any = null;
+          try { parsedErr = JSON.parse(errText); } catch (e) {}
+          const errorMsg = (parsedErr && (parsedErr.message || parsedErr.error)) || errText;
+          return { success: false, error: errorMsg };
         }
-      } catch (apiErr) {
+      } catch (apiErr: any) {
         console.warn('[emailService] Backend API unreachable, attempting Firestore fallback:', apiErr);
       }
 

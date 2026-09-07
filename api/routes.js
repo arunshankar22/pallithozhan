@@ -1517,7 +1517,11 @@ Guidelines for SQL generation:
   // GET /api/email/config
   if (pathname === '/api/email/config' && method === 'GET') {
     const config = dbData.email_config || getDefaultEmailConfig();
-    sendJson(res, 200, { success: true, config });
+    sendJson(res, 200, {
+      success: true,
+      config,
+      hasServerEnvKey: !!process.env.RESEND_API_KEY
+    });
     return true;
   }
 
@@ -1648,8 +1652,10 @@ Guidelines for SQL generation:
       });
 
       // 6. Dispatch via Resend API
-      if (process.env.RESEND_API_KEY) {
-        const emailPayload = {
+      const apiKey = (body && body.apiKey) || (emailConfig && emailConfig.resendApiKey) || process.env.RESEND_API_KEY;
+
+      if (apiKey) {
+        let emailPayload = {
           from: `${senderName} <${senderEmail}>`,
           to: recipients.length === 1 ? recipients[0] : senderEmail,
           bcc: recipients.length > 1 ? recipients : undefined,
@@ -1661,19 +1667,45 @@ Guidelines for SQL generation:
           emailPayload.reply_to = replyTo;
         }
 
-        const resendRes = await fetch('https://api.resend.com/emails', {
+        let resendRes = await fetch('https://api.resend.com/emails', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${process.env.RESEND_API_KEY}`
+            'Authorization': `Bearer ${apiKey}`
           },
           body: JSON.stringify(emailPayload)
         });
 
+        // If failed due to unverified custom domain, auto-retry with Resend test domain onboarding@resend.dev
         if (!resendRes.ok) {
           const resendErrText = await resendRes.text();
-          console.error('[Backend Email] Resend API Error:', resendErrText);
-          throw new Error(`Resend Error: ${resendErrText}`);
+          console.warn('[Backend Email] Primary Resend dispatch failed:', resendErrText);
+          
+          const isDomainError = resendErrText.toLowerCase().includes('domain') || 
+                                resendErrText.toLowerCase().includes('verify') || 
+                                resendRes.status === 403;
+
+          if (isDomainError && !senderEmail.includes('onboarding@resend.dev')) {
+            console.log('[Backend Email] Retrying with onboarding@resend.dev fallback sender...');
+            emailPayload.from = `${senderName} <onboarding@resend.dev>`;
+            
+            resendRes = await fetch('https://api.resend.com/emails', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+              },
+              body: JSON.stringify(emailPayload)
+            });
+
+            if (!resendRes.ok) {
+              const retryErrText = await resendRes.text();
+              console.error('[Backend Email] Fallback Resend dispatch failed:', retryErrText);
+              throw new Error(`Resend Error: ${retryErrText} (Initial: ${resendErrText})`);
+            }
+          } else {
+            throw new Error(`Resend Error: ${resendErrText}`);
+          }
         }
 
         const resendData = await resendRes.json();
@@ -1683,14 +1715,15 @@ Guidelines for SQL generation:
           status: 'sent',
           messageId: resendData.id,
           recipientCount: recipients.length,
-          recipients: recipients
+          recipients: recipients,
+          usedSender: emailPayload.from
         });
       } else {
         console.log(`[Backend Email Mock] RESEND_API_KEY not configured. Mocking email dispatch to ${recipients.join(', ')}`);
         sendJson(res, 200, {
           success: true,
           status: 'simulated',
-          message: 'Simulation: Email logged in development mode (RESEND_API_KEY not configured).',
+          message: 'Simulation mode: Resend API Key is not configured on the server or in Admin Email Settings. Email logged locally.',
           recipientCount: recipients.length,
           recipients: recipients
         });

@@ -13,6 +13,7 @@ export interface EmailSystemConfig {
   masterEnabled: boolean;
   defaultSenderName: string;
   defaultSenderEmail: string;
+  resendApiKey?: string;
   features: {
     expenses: FeatureEmailConfig;
     announcements: FeatureEmailConfig;

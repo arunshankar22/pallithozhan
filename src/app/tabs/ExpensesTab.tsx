@@ -494,13 +494,9 @@ export function ExpensesTab({ user, colors, t, showToast, i18n, insets }: TabPro
         });
         showToast('Reimbursement completed successfully!', 'success');
       } else {
-        const nextRoleMap: Record<string, 'treasurer' | 'president' | 'completed'> = {
-          secretary: 'treasurer',
-          treasurer: 'president',
-          president: 'completed'
-        };
-
-        const nextApproverRole = action === 'Approved' ? nextRoleMap[currentRole] : 'completed';
+        const nextApproverRole = action === 'Approved'
+          ? (config ? expenseService.getNextApproverRole(currentRole, config) : 'completed')
+          : 'completed';
         const finalStatus = action === 'Rejected' 
           ? 'Rejected' 
           : (nextApproverRole === 'completed' ? 'Approved' : 'Pending Approval');
@@ -676,7 +672,9 @@ export function ExpensesTab({ user, colors, t, showToast, i18n, insets }: TabPro
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ gap: 12 }}>
           {filteredExpenses.map(exp => {
             const catLabel = categories.find(c => c.value === exp.category)?.label || exp.category;
-            const waitingForRole = exp.currentApproverRole;
+            const waitingForRole = config 
+              ? expenseService.resolveEffectiveApproverRole(exp.currentApproverRole, config)
+              : exp.currentApproverRole;
             const uidsList = config ? ((config as any)[`${waitingForRole}Uids`] || []) : [];
             const namesList = config ? ((config as any)[`${waitingForRole}Names`] || []) : [];
             const waitingForName = namesList.length > 0 ? namesList.join(', ') : 'No approver configured';
@@ -804,7 +802,7 @@ export function ExpensesTab({ user, colors, t, showToast, i18n, insets }: TabPro
                   <View style={{ flexDirection: 'row', gap: 6 }}>
                     {userIsStageApprover && (
                       <Pressable
-                        onPress={() => { setSelectedExpense(exp); setActionModalVisible(true); }}
+                        onPress={() => { setSelectedExpense({ ...exp, currentApproverRole: waitingForRole }); setActionModalVisible(true); }}
                         style={{
                           backgroundColor: colors.primary,
                           paddingVertical: 6,
@@ -909,7 +907,9 @@ export function ExpensesTab({ user, colors, t, showToast, i18n, insets }: TabPro
               {filteredExpenses.map((exp, index) => {
                 const catLabel = categories.find(c => c.value === exp.category)?.label || exp.category;
                 const isPendingApproval = exp.status === 'Pending Approval';
-                const waitingForRole = exp.currentApproverRole;
+                const waitingForRole = config 
+                  ? expenseService.resolveEffectiveApproverRole(exp.currentApproverRole, config)
+                  : exp.currentApproverRole;
                 const uidsList = config ? ((config as any)[`${waitingForRole}Uids`] || []) : [];
                 const userIsStageApprover = config && uidsList.includes(user?.uid) && isPendingApproval;
                 const userIsPaidApprover = config && (config.treasurerUids || []).includes(user?.uid || '') && exp.status === 'Approved' && exp.paymentStatus === 'Pending Payment';
@@ -996,7 +996,7 @@ export function ExpensesTab({ user, colors, t, showToast, i18n, insets }: TabPro
                     <View style={{ width: 120, paddingHorizontal: 8, flexDirection: 'row', gap: 6 }}>
                       {userIsStageApprover && (
                         <Pressable
-                          onPress={() => { setSelectedExpense(exp); setActionModalVisible(true); }}
+                          onPress={() => { setSelectedExpense({ ...exp, currentApproverRole: waitingForRole }); setActionModalVisible(true); }}
                           style={{
                             backgroundColor: colors.primary,
                             paddingVertical: 4,

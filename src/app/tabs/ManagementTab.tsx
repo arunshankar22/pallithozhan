@@ -23,6 +23,7 @@ import { expenseService } from '@/services/expenseService';
 import { featureFlagsService } from '@/services/featureFlagsService';
 import { interestService } from '@/services/interestService';
 import { emailConfigService, EmailSystemConfig, DEFAULT_EMAIL_CONFIG } from '@/services/emailConfigService';
+import { emailService } from '@/services/emailService';
 import { UserModal } from '@/components/UserModal';
 import { UserBulkBar } from '@/components/UserBulkBar';
 import { DateTimePicker } from '@/components/DateTimePicker';
@@ -71,6 +72,10 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets, onFeat
   const [savingEmailConfig, setSavingEmailConfig] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
   const [newGroupEmails, setNewGroupEmails] = useState('');
+  const [showResendApiKey, setShowResendApiKey] = useState(false);
+  const [testEmailRecipient, setTestEmailRecipient] = useState('');
+  const [sendingTestEmail, setSendingTestEmail] = useState(false);
+  const [hasServerEnvKey, setHasServerEnvKey] = useState(false);
 
   // Feature flags states
   const [flagState, setFlagState] = useState<any>({
@@ -860,6 +865,11 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets, onFeat
       try {
         const eConfig = await emailConfigService.getEmailConfig();
         setEmailConfig(eConfig);
+        setTestEmailRecipient((prev) => {
+          if (prev) return prev;
+          const treasurers = eConfig.features?.expenses?.toEmails;
+          return (treasurers && treasurers.length > 0) ? treasurers[0] : (user?.email || 'arun.zorro@gmail.com');
+        });
       } catch (err) {
         console.warn('Failed to load email config in refreshData:', err);
       }
@@ -894,6 +904,53 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets, onFeat
       showToast('Failed to save email notification settings.', 'error');
     } finally {
       setSavingEmailConfig(false);
+    }
+  };
+
+  const handleSendTestEmail = async () => {
+    const targetEmail = testEmailRecipient.trim();
+    if (!targetEmail || !targetEmail.includes('@')) {
+      showToast('Please specify a valid test recipient email address.', 'warning');
+      return;
+    }
+    setSendingTestEmail(true);
+    try {
+      // Save current configuration first so backend receives latest API key and sender details
+      await emailConfigService.updateEmailConfig(emailConfig);
+
+      const result = await emailService.sendNotification({
+        feature: 'test',
+        to: targetEmail,
+        subject: `[Test Dispatch] PalliThozhan Automated Email Delivery Test`,
+        title: 'Email Delivery Test / மின்னஞ்சல் சோதனை',
+        summary: 'Success! Your automated school notification system is operational and connected to Resend.',
+        details: [
+          { label: 'Recipient', value: targetEmail },
+          { label: 'Sender Display Name', value: emailConfig.defaultSenderName },
+          { label: 'Configured Sender Email', value: emailConfig.defaultSenderEmail },
+          { label: 'Dispatched At', value: new Date().toLocaleString('en-AU') },
+          { label: 'API Key Source', value: emailConfig.resendApiKey ? 'Admin Settings Key' : 'Server Environment Key' }
+        ],
+        actionButton: {
+          text: 'Open PalliThozhan Portal',
+          url: 'https://pallithozhan.3stech.com.au/'
+        },
+        footerNote: 'This test confirms that your PalliThozhan email notification service is active and capable of sending live notifications.'
+      });
+
+      if (result.success && result.status === 'sent') {
+        showToast(`✅ Test email sent to ${targetEmail}! Please check your inbox / spam.`, 'success');
+      } else if (result.status === 'simulated') {
+        showToast('ℹ️ Simulation mode: Resend API Key is missing. Please enter your Resend API Key and save.', 'warning');
+      } else if (!result.success) {
+        showToast(`❌ Dispatch failed: ${result.error || result.reason || 'Check Resend credentials'}`, 'error');
+      } else {
+        showToast(`Status: ${result.status || 'Done'}`, 'success');
+      }
+    } catch (testErr: any) {
+      showToast(`Test dispatch error: ${testErr.message}`, 'error');
+    } finally {
+      setSendingTestEmail(false);
     }
   };
 
@@ -3579,13 +3636,53 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets, onFeat
               </Pressable>
             </View>
 
-            {/* 2. SENDER INFORMATION CARD */}
-            <View style={{ padding: 18, borderRadius: 16, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.cardBg, gap: 12 }}>
-              <ThemedText style={{ fontSize: 14, fontWeight: '800', color: colors.text }}>✉️ Default System Sender / அனுப்பியவர் விவரங்கள்</ThemedText>
-              <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>
-                Emails sent by the portal will display these credentials. (Note: For high deliverability and SPF/DKIM compliance, the sender email should be a verified domain).
-              </ThemedText>
+            {/* 2. SENDER & RESEND API CREDENTIALS CARD */}
+            <View style={{ padding: 18, borderRadius: 16, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.cardBg, gap: 14 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <View style={{ flex: 1, marginRight: 8 }}>
+                  <ThemedText style={{ fontSize: 14, fontWeight: '800', color: colors.text }}>✉️ System Sender & Resend API / மின்னஞ்சல் அமைப்புகள்</ThemedText>
+                  <ThemedText style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>
+                    Emails are delivered via Resend. You can enter your Resend API key directly below, or configure RESEND_API_KEY in Vercel.
+                  </ThemedText>
+                </View>
+                <View style={{
+                  paddingHorizontal: 8,
+                  paddingVertical: 3,
+                  borderRadius: 8,
+                  backgroundColor: (emailConfig.resendApiKey || hasServerEnvKey) ? '#DEF7EC' : '#FEF08A',
+                  borderWidth: 1,
+                  borderColor: (emailConfig.resendApiKey || hasServerEnvKey) ? '#31C48D' : '#EAB308'
+                }}>
+                  <ThemedText style={{ fontSize: 10, fontWeight: '800', color: (emailConfig.resendApiKey || hasServerEnvKey) ? '#03543F' : '#854D0E' }}>
+                    {(emailConfig.resendApiKey || hasServerEnvKey) ? '🔑 RESEND KEY CONFIGURED' : '⚠️ NO API KEY (SIMULATED)'}
+                  </ThemedText>
+                </View>
+              </View>
 
+              {/* Resend API Key Input */}
+              <View style={{ gap: 4 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <ThemedText style={{ fontSize: 12, fontWeight: '700' }}>Resend API Key (re_...)</ThemedText>
+                  <Pressable onPress={() => setShowResendApiKey(!showResendApiKey)}>
+                    <ThemedText style={{ fontSize: 11, color: colors.primary, fontWeight: '600' }}>
+                      {showResendApiKey ? '🙈 Hide Key' : '👁️ Reveal Key'}
+                    </ThemedText>
+                  </Pressable>
+                </View>
+                <TextInput
+                  style={[styles.directPathInput, { color: colors.text, borderColor: colors.border, fontFamily: Platform.OS === 'web' ? 'monospace' : 'default' }]}
+                  placeholder="re_xxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                  placeholderTextColor={colors.textSecondary}
+                  secureTextEntry={!showResendApiKey}
+                  value={emailConfig.resendApiKey || ''}
+                  onChangeText={(val) => setEmailConfig((prev: any) => ({ ...prev, resendApiKey: val.trim() }))}
+                />
+                <ThemedText style={{ fontSize: 10, color: colors.textSecondary }}>
+                  Get your free API key at <ThemedText style={{ color: colors.primary, fontWeight: '700' }}>resend.com</ThemedText>. Once entered here, automated emails will be dispatched live immediately without needing any Vercel configuration.
+                </ThemedText>
+              </View>
+
+              {/* Sender Name & Email */}
               <View style={{ flexDirection: isLargeScreen ? 'row' : 'column', gap: 12 }}>
                 <View style={{ flex: 1 }}>
                   <ThemedText style={{ fontSize: 12, fontWeight: '700', marginBottom: 4 }}>Sender Display Name</ThemedText>
@@ -3601,11 +3698,53 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets, onFeat
                   <ThemedText style={{ fontSize: 12, fontWeight: '700', marginBottom: 4 }}>Sender Email Address</ThemedText>
                   <TextInput
                     style={[styles.directPathInput, { color: colors.text, borderColor: colors.border }]}
-                    placeholder="e.g. noreply@3stech.com.au"
+                    placeholder="e.g. noreply@3stech.com.au or onboarding@resend.dev"
                     placeholderTextColor={colors.textSecondary}
                     value={emailConfig.defaultSenderEmail}
                     onChangeText={(val) => setEmailConfig((prev: any) => ({ ...prev, defaultSenderEmail: val }))}
                   />
+                  <ThemedText style={{ fontSize: 9, color: colors.textSecondary, marginTop: 2 }}>
+                    💡 Tip: If using a custom domain (e.g. 3stech.com.au), ensure it is verified in Resend. Otherwise, the system automatically falls back to onboarding@resend.dev for test delivery.
+                  </ThemedText>
+                </View>
+              </View>
+
+              {/* Instant Test Dispatch Section */}
+              <View style={{ marginTop: 4, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background, gap: 8 }}>
+                <ThemedText style={{ fontSize: 12, fontWeight: '800', color: colors.secondary }}>🧪 Test Email Dispatch / மின்னஞ்சல் சோதனை</ThemedText>
+                <ThemedText style={{ fontSize: 11, color: colors.textSecondary }}>
+                  Send a live test email to verify credentials, DNS deliverability, and inbox reception.
+                </ThemedText>
+                <View style={{ flexDirection: isLargeScreen ? 'row' : 'column', gap: 8, alignItems: isLargeScreen ? 'center' : 'stretch' }}>
+                  <TextInput
+                    style={[styles.directPathInput, { color: colors.text, borderColor: colors.border, flex: 1, fontSize: 12 }]}
+                    placeholder="Enter test recipient email (e.g. arun.zorro@gmail.com)"
+                    placeholderTextColor={colors.textSecondary}
+                    value={testEmailRecipient}
+                    onChangeText={setTestEmailRecipient}
+                  />
+                  <Pressable
+                    onPress={handleSendTestEmail}
+                    disabled={sendingTestEmail}
+                    style={({ pressed }) => [
+                      {
+                        backgroundColor: colors.secondary,
+                        paddingVertical: 10,
+                        paddingHorizontal: 16,
+                        borderRadius: 8,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        minWidth: 160
+                      },
+                      { opacity: pressed || sendingTestEmail ? 0.8 : 1 }
+                    ]}
+                  >
+                    {sendingTestEmail ? (
+                      <ActivityIndicator size="small" color="#FFF" />
+                    ) : (
+                      <ThemedText style={{ color: '#FFF', fontSize: 12, fontWeight: '700' }}>📨 Send Test Email</ThemedText>
+                    )}
+                  </Pressable>
                 </View>
               </View>
             </View>

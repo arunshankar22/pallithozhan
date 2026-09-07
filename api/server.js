@@ -13,8 +13,8 @@ const { handleApiRoutes } = require('./routes');
 
 const PORT = 5000;
 
-// Create HTTP server
-const server = http.createServer(async (req, res) => {
+// Request handler function for HTTP requests (Vercel Serverless Function compatible)
+const requestHandler = async (req, res) => {
   // CORS Headers
   if (req.method === 'OPTIONS') {
     res.writeHead(204, {
@@ -83,9 +83,12 @@ const server = http.createServer(async (req, res) => {
     console.error('Server Internal Error:', err);
     sendJson(res, 500, { error: 'Server Internal Error', message: err.message });
   }
-});
+};
 
-// Start the HTTP API Server
+// Create HTTP server for local standalone execution
+const server = http.createServer(requestHandler);
+
+// Start the HTTP API Server if run directly
 if (require.main === module) {
   server.listen(PORT, () => {
     console.log(`================================================================`);
@@ -95,4 +98,5 @@ if (require.main === module) {
   });
 }
 
-module.exports = server;
+module.exports = requestHandler;
+module.exports.server = server;

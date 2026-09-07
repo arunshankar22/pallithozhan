@@ -64,7 +64,67 @@ let localApproverConfig: ExpenseApproverConfig = {
   allowedSubmitRoles: ['teacher', 'volunteer', 'admin', 'superadmin']
 };
 
+export const getInitialApproverRole = (
+  config: ExpenseApproverConfig
+): 'secretary' | 'treasurer' | 'president' | 'completed' => {
+  if (config.secretaryUids && config.secretaryUids.length > 0) return 'secretary';
+  if (config.treasurerUids && config.treasurerUids.length > 0) return 'treasurer';
+  if (config.presidentUids && config.presidentUids.length > 0) return 'president';
+  return 'treasurer';
+};
+
+export const getNextApproverRole = (
+  currentRole: 'secretary' | 'treasurer' | 'president' | 'completed',
+  config: ExpenseApproverConfig
+): 'secretary' | 'treasurer' | 'president' | 'completed' => {
+  if (currentRole === 'secretary') {
+    if (config.treasurerUids && config.treasurerUids.length > 0) return 'treasurer';
+    if (config.presidentUids && config.presidentUids.length > 0) return 'president';
+    return 'completed';
+  }
+  if (currentRole === 'treasurer') {
+    if (config.presidentUids && config.presidentUids.length > 0) return 'president';
+    return 'completed';
+  }
+  return 'completed';
+};
+
+export const resolveEffectiveApproverRole = (
+  currentRole: 'secretary' | 'treasurer' | 'president' | 'completed' | undefined,
+  config: ExpenseApproverConfig
+): 'secretary' | 'treasurer' | 'president' | 'completed' => {
+  if (!currentRole || currentRole === 'completed') return 'completed';
+
+  const roleHasApprovers = (role: 'secretary' | 'treasurer' | 'president') => {
+    const list = (config as any)[`${role}Uids`];
+    return Array.isArray(list) && list.length > 0;
+  };
+
+  // If currently assigned role actually has configured approvers, keep it
+  if (roleHasApprovers(currentRole as any)) {
+    return currentRole;
+  }
+
+  // Otherwise, skip forward to the first available configured role
+  if (currentRole === 'secretary') {
+    if (roleHasApprovers('treasurer')) return 'treasurer';
+    if (roleHasApprovers('president')) return 'president';
+    return 'completed';
+  }
+
+  if (currentRole === 'treasurer') {
+    if (roleHasApprovers('president')) return 'president';
+    return 'completed';
+  }
+
+  return 'completed';
+};
+
 export const expenseService = {
+  getInitialApproverRole,
+  getNextApproverRole,
+  resolveEffectiveApproverRole,
+
   getApproverConfig: async (): Promise<ExpenseApproverConfig> => {
     if (!db) return localApproverConfig;
     try {
@@ -101,22 +161,49 @@ export const expenseService = {
   },
 
   getExpenses: async (): Promise<Expense[]> => {
-    if (!db) return localExpenses;
-    try {
-      const q = query(collection(db, 'expenses'), orderBy('dateSubmitted', 'desc'));
-      const querySnapshot = await getDocs(q);
-      const list: Expense[] = [];
-      querySnapshot.forEach((docSnap) => {
-        list.push({ expenseId: docSnap.id, ...docSnap.data() } as Expense);
-      });
-      return list;
-    } catch (e) {
-      console.warn('[expenseService] Failed to fetch expenses from Firestore:', e);
-      return [];
+    let list: Expense[] = [];
+    if (!db) {
+      list = [...localExpenses];
+    } else {
+      try {
+        const q = query(collection(db, 'expenses'), orderBy('dateSubmitted', 'desc'));
+        const querySnapshot = await getDocs(q);
+        querySnapshot.forEach((docSnap) => {
+          list.push({ expenseId: docSnap.id, ...docSnap.data() } as Expense);
+        });
+      } catch (e) {
+        console.warn('[expenseService] Failed to fetch expenses from Firestore:', e);
+        list = [...localExpenses];
+      }
     }
+
+    // Auto-heal: ensure expenses stuck on unconfigured stages (e.g. Secretary skipped) automatically advance
+    try {
+      const config = await expenseService.getApproverConfig();
+      for (const exp of list) {
+        if (exp.status === 'Pending Approval') {
+          const effectiveRole = resolveEffectiveApproverRole(exp.currentApproverRole, config);
+          if (effectiveRole !== exp.currentApproverRole) {
+            console.log(`[expenseService] Auto-healing expense "${exp.title}" (${exp.expenseId}) from ${exp.currentApproverRole} to ${effectiveRole}`);
+            exp.currentApproverRole = effectiveRole;
+            // Persist fix to Firestore if connected
+            if (db) {
+              setDoc(doc(db, 'expenses', exp.expenseId), { currentApproverRole: effectiveRole }, { merge: true }).catch(() => {});
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[expenseService] Error running auto-heal on pending expenses:', err);
+    }
+
+    return list;
   },
 
   createExpense: async (claim: Partial<Expense>, attachments?: any[]): Promise<Expense> => {
+    const config = await expenseService.getApproverConfig();
+    const initialApproverRole = getInitialApproverRole(config);
+
     const expenseId = `exp_${Date.now()}`;
     const newExpense: Expense = {
       expenseId,
@@ -132,7 +219,7 @@ export const expenseService = {
       fileNames: [],
       fileSizes: [],
       status: 'Pending Approval',
-      currentApproverRole: 'secretary',
+      currentApproverRole: initialApproverRole,
       approvals: [],
       paymentStatus: 'Pending Payment'
     };
@@ -145,13 +232,14 @@ export const expenseService = {
       }
       localExpenses.unshift(newExpense);
       
-      // Trigger notification alerts to all Secretaries
+      // Trigger notification alerts to the initial approver role
       try {
-        const config = await expenseService.getApproverConfig();
-        for (const secUid of config.secretaryUids) {
+        const targetUids = (config as any)[`${initialApproverRole}Uids`] || [];
+        const roleLabel = initialApproverRole.toUpperCase();
+        for (const approverUid of targetUids) {
           await attendanceService.pushAlertDirect(
-            secUid,
-            'New Expense Pending Approval',
+            approverUid,
+            `New Expense Pending ${roleLabel} Approval`,
             `A new expense claim of $${newExpense.amount} for "${newExpense.title}" was submitted by ${newExpense.submittedBy} and awaits your approval.`
           );
         }
@@ -229,13 +317,14 @@ export const expenseService = {
       localExpenses.unshift(newExpense);
     }
 
-    // Trigger notification alerts to all Secretaries
+    // Trigger notification alerts to the initial approver role
     try {
-      const config = await expenseService.getApproverConfig();
-      for (const secUid of config.secretaryUids) {
+      const targetUids = (config as any)[`${initialApproverRole}Uids`] || [];
+      const roleLabel = initialApproverRole.toUpperCase();
+      for (const approverUid of targetUids) {
         await attendanceService.pushAlertDirect(
-          secUid,
-          'New Expense Pending Approval',
+          approverUid,
+          `New Expense Pending ${roleLabel} Approval`,
           `A new expense claim of $${newExpense.amount} for "${newExpense.title}" was submitted by ${newExpense.submittedBy} and awaits your approval.`
         );
       }
@@ -303,24 +392,24 @@ export const expenseService = {
     try {
       const config = await expenseService.getApproverConfig();
       
-      // If Secretary approved, alert all Treasurers
-      if (updates.currentApproverRole === 'treasurer' && existing.currentApproverRole === 'secretary') {
+      // If advancing to Treasurer, alert all Treasurers
+      if (updates.currentApproverRole === 'treasurer' && existing.currentApproverRole !== 'treasurer') {
         for (const trUid of config.treasurerUids) {
           await attendanceService.pushAlertDirect(
             trUid,
-            'Expense Approved by Secretary',
-            `Expense claim of $${updatedExpense.amount} for "${updatedExpense.title}" has been approved by the Secretary and awaits your Treasurer approval.`
+            'Expense Pending Treasurer Approval',
+            `Expense claim of $${updatedExpense.amount} for "${updatedExpense.title}" awaits your Treasurer review & approval.`
           );
         }
       }
       
-      // If Treasurer approved, alert all Presidents
-      if (updates.currentApproverRole === 'president' && existing.currentApproverRole === 'treasurer') {
+      // If advancing to President, alert all Presidents
+      if (updates.currentApproverRole === 'president' && existing.currentApproverRole !== 'president') {
         for (const prUid of config.presidentUids) {
           await attendanceService.pushAlertDirect(
             prUid,
-            'Expense Approved by Treasurer',
-            `Expense claim of $${updatedExpense.amount} for "${updatedExpense.title}" has been approved by the Treasurer and awaits final President sign-off.`
+            'Expense Pending President Approval',
+            `Expense claim of $${updatedExpense.amount} for "${updatedExpense.title}" awaits final President sign-off.`
           );
         }
       }
