@@ -43,14 +43,6 @@ const requestHandler = async (req, res) => {
       pathname = '/api/' + pathname.slice('/api/server/'.length);
     }
 
-    if (pathname === '/api/debug' || req.url.includes('/debug') || req.url.includes('debug')) {
-      sendJson(res, 200, {
-        url: req.url,
-        pathname,
-        headers: req.headers
-      });
-      return;
-    }
 
     // Static files handler (Vercel/Local frontend production build pipeline)
     if (!pathname.startsWith('/api')) {
