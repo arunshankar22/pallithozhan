@@ -32,6 +32,15 @@ const requestHandler = async (req, res) => {
     const pathname = urlObj.pathname;
     const method = req.method;
 
+    if (req.url.includes('/debug') || req.url.includes('debug')) {
+      sendJson(res, 200, {
+        url: req.url,
+        pathname,
+        headers: req.headers
+      });
+      return;
+    }
+
     // Static files handler (Vercel/Local frontend production build pipeline)
     if (!pathname.startsWith('/api')) {
       const distPath = path.join(__dirname, '../dist');
