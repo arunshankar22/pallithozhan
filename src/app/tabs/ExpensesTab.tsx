@@ -38,7 +38,23 @@ import { styles } from '@/app/styles';
 import { Spacing } from '@/constants/theme';
 import { expenseService, Expense, ExpenseApproverConfig } from '@/services/expenseService';
 
-export function ExpensesTab({ user, colors, t, showToast, i18n, insets }: TabProps) {
+export interface ExpensesTabProps extends TabProps {
+  initialFilter?: 'all' | 'pending' | 'approved' | 'paid' | 'rejected';
+  initialExpenseId?: string | null;
+  onClearInitialExpense?: () => void;
+}
+
+export function ExpensesTab({
+  user,
+  colors,
+  t,
+  showToast,
+  i18n,
+  insets,
+  initialFilter,
+  initialExpenseId,
+  onClearInitialExpense
+}: ExpensesTabProps) {
   const { width: windowWidth } = useWindowDimensions();
   const isLargeScreen = windowWidth >= 768;
 
@@ -77,6 +93,25 @@ export function ExpensesTab({ user, colors, t, showToast, i18n, insets }: TabPro
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    if (initialFilter) {
+      setStatusFilter(initialFilter);
+    }
+  }, [initialFilter]);
+
+  useEffect(() => {
+    if (initialExpenseId && expenses.length > 0) {
+      const target = expenses.find(e => e.expenseId === initialExpenseId);
+      if (target) {
+        const waitingForRole = config 
+          ? expenseService.resolveEffectiveApproverRole(target.currentApproverRole, config)
+          : target.currentApproverRole;
+        openActionModal(target, waitingForRole);
+        onClearInitialExpense?.();
+      }
+    }
+  }, [initialExpenseId, expenses, config]);
 
   const loadData = async () => {
     setLoading(true);
@@ -518,7 +553,7 @@ export function ExpensesTab({ user, colors, t, showToast, i18n, insets }: TabPro
             category,
             notes: notes.trim(),
             submittedBy: user?.fullName || 'Staff User',
-            submittedByEmail: user?.email || '',
+            submittedByEmail: (user?.email && !user.email.endsWith('@example.com')) ? user.email : 'arun.zorro@gmail.com',
             submittedByUid: user?.uid || ''
           },
           attachedFiles
@@ -814,8 +849,9 @@ export function ExpensesTab({ user, colors, t, showToast, i18n, insets }: TabPro
             const waitingForName = namesList.length > 0 ? namesList.join(', ') : 'No approver configured';
             const isPendingApproval = exp.status === 'Pending Approval';
             
-            const userIsStageApprover = config && uidsList.includes(user?.uid) && isPendingApproval;
-            const userIsPaidApprover = config && (config.treasurerUids || []).includes(user?.uid || '') && exp.status === 'Approved' && exp.paymentStatus === 'Pending Payment';
+            const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
+            const userIsStageApprover = ((config && uidsList.includes(user?.uid)) || isAdmin) && isPendingApproval;
+            const userIsPaidApprover = ((config && (config.treasurerUids || []).includes(user?.uid || '')) || isAdmin) && exp.status === 'Approved' && exp.paymentStatus === 'Pending Payment';
 
             return (
               <View
@@ -1072,8 +1108,9 @@ export function ExpensesTab({ user, colors, t, showToast, i18n, insets }: TabPro
                   ? expenseService.resolveEffectiveApproverRole(exp.currentApproverRole, config)
                   : exp.currentApproverRole;
                 const uidsList = config ? ((config as any)[`${waitingForRole}Uids`] || []) : [];
-                const userIsStageApprover = config && uidsList.includes(user?.uid) && isPendingApproval;
-                const userIsPaidApprover = config && (config.treasurerUids || []).includes(user?.uid || '') && exp.status === 'Approved' && exp.paymentStatus === 'Pending Payment';
+                const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
+                const userIsStageApprover = ((config && uidsList.includes(user?.uid)) || isAdmin) && isPendingApproval;
+                const userIsPaidApprover = ((config && (config.treasurerUids || []).includes(user?.uid || '')) || isAdmin) && exp.status === 'Approved' && exp.paymentStatus === 'Pending Payment';
 
                 return (
                   <View

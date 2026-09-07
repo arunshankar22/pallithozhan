@@ -224,6 +224,8 @@ export default function HomeScreen() {
   const [newsletterSubTab, setNewsletterSubTab] = useState<'newsletters' | 'articles' | 'submit' | 'pending' | 'upload' | undefined>(undefined);
   const [newsletterSelectedArticleId, setNewsletterSelectedArticleId] = useState<string | null>(null);
   const [reportsSubTab, setReportsSubTab] = useState<'active' | 'pending' | 'record' | undefined>(undefined);
+  const [expensesInitialFilter, setExpensesInitialFilter] = useState<'all' | 'pending' | 'approved' | 'paid' | 'rejected'>('all');
+  const [expensesSelectedExpenseId, setExpensesSelectedExpenseId] = useState<string | null>(null);
 
   // Upcoming Topic edit states
   const [topicEditModalVisible, setTopicEditModalVisible] = useState(false);
@@ -431,6 +433,63 @@ export default function HomeScreen() {
           rawItem: item
         });
       });
+
+      // 4. Expenses (Pending Stage Approvals & Pending Reimbursements)
+      try {
+        const expenseList = await expenseService.getExpenses();
+        const expConfig = await expenseService.getApproverConfig();
+        const isAdminUser = user?.role === 'admin' || user?.role === 'superadmin';
+
+        // Claims waiting for approval
+        const pendingExpenses = expenseList.filter(e => e.status === 'Pending Approval');
+        pendingExpenses.forEach((exp: any) => {
+          const waitingForRole = expenseService.resolveEffectiveApproverRole(exp.currentApproverRole, expConfig);
+          const roleUids = (expConfig as any)[`${waitingForRole}Uids`] || [];
+          const isRoleApprover = roleUids.includes(user?.uid);
+
+          if (isRoleApprover || isAdminUser) {
+            const roleBadge = waitingForRole.toUpperCase();
+            combinedPending.push({
+              approvalId: exp.expenseId,
+              id: exp.expenseId,
+              type: 'expense',
+              titleEn: `Expense Claim Approval: ${exp.title} ($${Number(exp.amount).toFixed(2)})`,
+              titleTa: `செலவின அங்கீகாரம்: ${exp.title} ($${Number(exp.amount).toFixed(2)})`,
+              subtitleEn: `Submitted by: ${exp.submittedBy} • Category: ${exp.category} • Waiting: ${roleBadge} • Date: ${exp.dateSubmitted?.split('T')[0]}`,
+              subtitleTa: `சமர்ப்பித்தவர்: ${exp.submittedBy} • வகை: ${exp.category} • காத்திருப்பு: ${roleBadge} • தேதி: ${exp.dateSubmitted?.split('T')[0]}`,
+              date: exp.dateSubmitted || '',
+              studentName: exp.submittedBy,
+              markedByName: '',
+              className: '',
+              rawItem: exp
+            });
+          }
+        });
+
+        // Claims approved & waiting for Treasurer reimbursement
+        const isTreasurer = (expConfig.treasurerUids || []).includes(user?.uid || '') || isAdminUser;
+        if (isTreasurer) {
+          const pendingReimbursements = expenseList.filter(e => e.status === 'Approved' && e.paymentStatus === 'Pending Payment');
+          pendingReimbursements.forEach((exp: any) => {
+            combinedPending.push({
+              approvalId: exp.expenseId,
+              id: exp.expenseId,
+              type: 'expense_reimbursement',
+              titleEn: `Expense Reimbursement Pending: ${exp.title} ($${Number(exp.amount).toFixed(2)})`,
+              titleTa: `செலவின மீளளிப்பு நிலுவை: ${exp.title} ($${Number(exp.amount).toFixed(2)})`,
+              subtitleEn: `Approved claim awaiting payment transfer to ${exp.submittedBy} • Amount: $${Number(exp.amount).toFixed(2)}`,
+              subtitleTa: `அங்கீகரிக்கப்பட்ட செலவினத் தொகை செலுத்தப்பட வேண்டும்: ${exp.submittedBy} • தொகை: $${Number(exp.amount).toFixed(2)}`,
+              date: exp.dateSubmitted || '',
+              studentName: exp.submittedBy,
+              markedByName: '',
+              className: '',
+              rawItem: exp
+            });
+          });
+        }
+      } catch (expErr) {
+        console.warn('Failed to load pending expenses in dashboard:', expErr);
+      }
 
       // Sort combined list by date descending
       combinedPending.sort((a, b) => b.date.localeCompare(a.date));
@@ -680,7 +739,7 @@ export default function HomeScreen() {
     }
   };
 
-  const handleApprovePending = async (id: string, type: 'absence' | 'achievement' | 'article') => {
+  const handleApprovePending = async (id: string, type: 'absence' | 'achievement' | 'article' | 'expense' | 'expense_reimbursement') => {
     try {
       let res;
       if (type === 'absence') {
@@ -689,6 +748,33 @@ export default function HomeScreen() {
         res = await mockDb.approveAchievement(id);
       } else if (type === 'article') {
         res = await mockDb.approveArticle(id, user?.fullName || 'Staff Member');
+      } else if (type === 'expense') {
+        const item = pendingApprovalsList.find((p: any) => p.id === id);
+        const exp = item?.rawItem;
+        if (!exp) return;
+        const config = await expenseService.getApproverConfig();
+        const currentRole = expenseService.resolveEffectiveApproverRole(exp.currentApproverRole, config);
+        const nextApproverRole = expenseService.getNextApproverRole(currentRole, config);
+        const finalStatus = nextApproverRole === 'completed' ? 'Approved' : 'Pending Approval';
+        const approvals = [...(exp.approvals || [])];
+        approvals.push({
+          role: currentRole as any,
+          approvedBy: user?.fullName || 'Approver',
+          approvedByEmail: user?.email || '',
+          approvedByUid: user?.uid || '',
+          dateActioned: new Date().toISOString(),
+          action: 'Approved'
+        });
+        res = await expenseService.updateExpense(id, {
+          status: finalStatus,
+          currentApproverRole: nextApproverRole,
+          approvals
+        });
+      } else if (type === 'expense_reimbursement') {
+        setExpensesInitialFilter('approved');
+        setExpensesSelectedExpenseId(id);
+        setActiveTab('expenses');
+        return;
       }
 
       if (res) {
@@ -707,6 +793,15 @@ export default function HomeScreen() {
             auditLogService.logAchievementAction(user, 'Approved', id).catch(e => console.error(e));
           } else if (type === 'article') {
             auditLogService.logArticleAction(user, 'Approved', id).catch(e => console.error(e));
+          } else if (type === 'expense') {
+            auditLogService.logAction(
+              user.uid,
+              user.fullName,
+              user.email,
+              user.role,
+              'Approve Expense',
+              `Approved expense claim ID: ${id}`
+            ).catch(e => console.error(e));
           }
         }
 
@@ -719,7 +814,7 @@ export default function HomeScreen() {
     }
   };
 
-  const handleRejectPending = async (id: string, type: 'absence' | 'achievement' | 'article') => {
+  const handleRejectPending = async (id: string, type: 'absence' | 'achievement' | 'article' | 'expense' | 'expense_reimbursement') => {
     try {
       let res;
       if (type === 'absence') {
@@ -728,6 +823,23 @@ export default function HomeScreen() {
         res = await mockDb.deleteAchievement(id);
       } else if (type === 'article') {
         res = await mockDb.rejectArticle(id);
+      } else if (type === 'expense') {
+        const item = pendingApprovalsList.find((p: any) => p.id === id);
+        const exp = item?.rawItem;
+        const approvals = [...(exp?.approvals || [])];
+        approvals.push({
+          role: exp?.currentApproverRole || 'approver',
+          approvedBy: user?.fullName || 'Approver',
+          approvedByEmail: user?.email || '',
+          approvedByUid: user?.uid || '',
+          dateActioned: new Date().toISOString(),
+          action: 'Rejected'
+        });
+        res = await expenseService.updateExpense(id, {
+          status: 'Rejected',
+          currentApproverRole: 'completed',
+          approvals
+        });
       }
 
       if (res) {
@@ -739,15 +851,26 @@ export default function HomeScreen() {
         );
         
         // Log action in audit log
-        if (user && type === 'absence') {
-          auditLogService.logAction(
-            user.uid,
-            user.fullName,
-            user.email,
-            user.role,
-            'Reject Absence',
-            `Rejected absence approval alert for student/record ID: ${id}`
-          ).catch(e => console.error(e));
+        if (user) {
+          if (type === 'absence') {
+            auditLogService.logAction(
+              user.uid,
+              user.fullName,
+              user.email,
+              user.role,
+              'Reject Absence',
+              `Rejected absence approval alert for student/record ID: ${id}`
+            ).catch(e => console.error(e));
+          } else if (type === 'expense') {
+            auditLogService.logAction(
+              user.uid,
+              user.fullName,
+              user.email,
+              user.role,
+              'Reject Expense',
+              `Rejected expense claim ID: ${id}`
+            ).catch(e => console.error(e));
+          }
         }
 
         await reloadDashboardData();
@@ -1698,8 +1821,8 @@ export default function HomeScreen() {
           );
         })()}
 
-        {/* Pending Tasks & Approvals card for Admin, Teacher, and Volunteer */}
-        {((user?.role === 'admin' || user?.role === 'superadmin') || ((user?.role === 'teacher' || user?.role === 'volunteer') && pendingApprovalsList.length > 0)) && (
+        {/* Pending Tasks & Approvals card for Admin, Stage Approvers, Teachers, and Volunteers */}
+        {((user?.role === 'admin' || user?.role === 'superadmin') || pendingApprovalsList.length > 0) && (
           <View style={{ gap: Spacing.two, marginBottom: Spacing.four }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <CheckSquare size={16} color={colors.primary} />
@@ -1711,7 +1834,9 @@ export default function HomeScreen() {
             <View style={{ gap: 12 }}>
               {pendingApprovalsList.map((item: any) => {
                 const IconComponent = item.type === 'absence' ? CheckSquare :
-                                      item.type === 'achievement' ? Award : Newspaper;
+                                      item.type === 'achievement' ? Award :
+                                      item.type === 'expense' || item.type === 'expense_reimbursement' ? DollarSign :
+                                      Newspaper;
                 const titleLabel = i18n.language === 'ta' ? item.titleTa : item.titleEn;
                 const subtitleLabel = i18n.language === 'ta' ? item.subtitleTa : item.subtitleEn;
                 return (
@@ -1729,12 +1854,16 @@ export default function HomeScreen() {
                           padding: 8,
                           borderRadius: 8,
                           backgroundColor: item.type === 'absence' ? '#EBF5FA' :
-                                           item.type === 'achievement' ? '#FEF3C7' : '#E6FFFA',
+                                           item.type === 'achievement' ? '#FEF3C7' :
+                                           item.type === 'expense' ? '#FEF2F2' :
+                                           item.type === 'expense_reimbursement' ? '#ECFDF5' : '#E6FFFA',
                           justifyContent: 'center',
                           alignItems: 'center'
                         }}>
                           <IconComponent size={16} color={item.type === 'absence' ? '#0284C7' :
-                                                         item.type === 'achievement' ? '#D97706' : '#0D9488'} />
+                                                         item.type === 'achievement' ? '#D97706' :
+                                                         item.type === 'expense' ? '#DC2626' :
+                                                         item.type === 'expense_reimbursement' ? '#059669' : '#0D9488'} />
                         </View>
                         <View style={{ gap: 2, flex: 1 }}>
                           <ThemedText style={{ fontSize: 13, fontWeight: '700', color: colors.text }}>
@@ -1749,77 +1878,132 @@ export default function HomeScreen() {
                         paddingHorizontal: 8,
                         paddingVertical: 3,
                         borderRadius: 6,
-                        backgroundColor: item.rawItem.status === 'pending_deletion' ? 'rgba(239, 68, 68, 0.08)' : 'rgba(245, 158, 11, 0.08)',
+                        backgroundColor: item.rawItem.status === 'pending_deletion' ? 'rgba(239, 68, 68, 0.08)' :
+                                         item.type === 'expense_reimbursement' ? 'rgba(16, 185, 129, 0.08)' : 'rgba(245, 158, 11, 0.08)',
                         borderWidth: 0.5,
-                        borderColor: item.rawItem.status === 'pending_deletion' ? 'rgba(239, 68, 68, 0.25)' : 'rgba(245, 158, 11, 0.25)'
+                        borderColor: item.rawItem.status === 'pending_deletion' ? 'rgba(239, 68, 68, 0.25)' :
+                                     item.type === 'expense_reimbursement' ? 'rgba(16, 185, 129, 0.25)' : 'rgba(245, 158, 11, 0.25)'
                       }}>
                         <ThemedText style={{
-                          color: item.rawItem.status === 'pending_deletion' ? '#EF4444' : '#F59E0B',
+                          color: item.rawItem.status === 'pending_deletion' ? '#EF4444' :
+                                 item.type === 'expense_reimbursement' ? '#059669' : '#F59E0B',
                           fontSize: 9,
                           fontWeight: '800'
                         }}>
-                          {item.rawItem.status === 'pending_deletion' ? 'DELETE REQ' : 'PENDING'}
+                          {item.rawItem.status === 'pending_deletion' ? 'DELETE REQ' :
+                           item.type === 'expense_reimbursement' ? 'PAYMENT' : 'PENDING'}
                         </ThemedText>
                       </View>
                     </View>
                     
-                    <View style={{ flexDirection: 'row', gap: 6, marginTop: 4 }}>
-                      <Pressable
-                        onPress={() => handleApprovePending(item.id, item.type)}
-                        style={{
-                          flex: 1.2,
-                          backgroundColor: colors.primary,
-                          borderRadius: 8,
-                          paddingVertical: 8,
-                          alignItems: 'center'
-                        }}
-                      >
-                        <ThemedText style={{ color: '#FFF', fontSize: 11, fontWeight: '700' }}>
-                          {item.rawItem.status === 'pending_deletion' ? 'Confirm Delete' : (i18n.language === 'ta' ? 'அங்கீகரி' : 'Approve')}
-                        </ThemedText>
-                      </Pressable>
-                      <Pressable
-                        onPress={() => handleRejectPending(item.id, item.type)}
-                        style={{
-                          flex: 1.2,
-                          backgroundColor: '#EF4444',
-                          borderRadius: 8,
-                          paddingVertical: 8,
-                          alignItems: 'center'
-                        }}
-                      >
-                        <ThemedText style={{ color: '#FFF', fontSize: 11, fontWeight: '700' }}>
-                          {i18n.language === 'ta' ? 'நிராகரி' : 'Reject'}
-                        </ThemedText>
-                      </Pressable>
-                      <Pressable
-                        onPress={() => {
-                          if (item.type === 'absence') {
-                            setActiveTab('attendance');
-                          } else if (item.type === 'achievement') {
-                            setReportsSubTab('pending');
-                            setActiveTab('reports');
-                          } else if (item.type === 'article') {
-                            setNewsletterSubTab('pending');
-                            setNewsletterSelectedArticleId(item.id);
-                            setActiveTab('newsletter');
-                          }
-                        }}
-                        style={{
-                          flex: 1.6,
-                          borderWidth: 1,
-                          borderColor: colors.border,
-                          borderRadius: 8,
-                          paddingVertical: 8,
-                          alignItems: 'center',
-                          backgroundColor: colors.background
-                        }}
-                      >
-                        <ThemedText style={{ color: colors.text, fontSize: 11, fontWeight: '600' }}>
-                          {i18n.language === 'ta' ? 'காண்க' : 'Review'}
-                        </ThemedText>
-                      </Pressable>
-                    </View>
+                    {item.type === 'expense_reimbursement' ? (
+                      <View style={{ flexDirection: 'row', gap: 6, marginTop: 4 }}>
+                        <Pressable
+                          onPress={() => {
+                            setExpensesInitialFilter('approved');
+                            setExpensesSelectedExpenseId(item.id);
+                            setActiveTab('expenses');
+                          }}
+                          style={{
+                            flex: 2,
+                            backgroundColor: '#059669',
+                            borderRadius: 8,
+                            paddingVertical: 8,
+                            alignItems: 'center',
+                            flexDirection: 'row',
+                            justifyContent: 'center',
+                            gap: 6
+                          }}
+                        >
+                          <DollarSign size={13} color="#FFF" />
+                          <ThemedText style={{ color: '#FFF', fontSize: 11, fontWeight: '700' }}>
+                            {i18n.language === 'ta' ? 'செலுத்து & ரசீது ஏற்று' : 'Pay & Upload Proof'}
+                          </ThemedText>
+                        </Pressable>
+                        <Pressable
+                          onPress={() => {
+                            setExpensesInitialFilter('approved');
+                            setExpensesSelectedExpenseId(item.id);
+                            setActiveTab('expenses');
+                          }}
+                          style={{
+                            flex: 1,
+                            borderWidth: 1,
+                            borderColor: colors.border,
+                            borderRadius: 8,
+                            paddingVertical: 8,
+                            alignItems: 'center',
+                            backgroundColor: colors.background
+                          }}
+                        >
+                          <ThemedText style={{ color: colors.text, fontSize: 11, fontWeight: '600' }}>
+                            {i18n.language === 'ta' ? 'காண்க' : 'Review'}
+                          </ThemedText>
+                        </Pressable>
+                      </View>
+                    ) : (
+                      <View style={{ flexDirection: 'row', gap: 6, marginTop: 4 }}>
+                        <Pressable
+                          onPress={() => handleApprovePending(item.id, item.type)}
+                          style={{
+                            flex: 1.2,
+                            backgroundColor: colors.primary,
+                            borderRadius: 8,
+                            paddingVertical: 8,
+                            alignItems: 'center'
+                          }}
+                        >
+                          <ThemedText style={{ color: '#FFF', fontSize: 11, fontWeight: '700' }}>
+                            {item.rawItem.status === 'pending_deletion' ? 'Confirm Delete' : (i18n.language === 'ta' ? 'அங்கீகரி' : 'Approve')}
+                          </ThemedText>
+                        </Pressable>
+                        <Pressable
+                          onPress={() => handleRejectPending(item.id, item.type)}
+                          style={{
+                            flex: 1.2,
+                            backgroundColor: '#EF4444',
+                            borderRadius: 8,
+                            paddingVertical: 8,
+                            alignItems: 'center'
+                          }}
+                        >
+                          <ThemedText style={{ color: '#FFF', fontSize: 11, fontWeight: '700' }}>
+                            {i18n.language === 'ta' ? 'நிராகரி' : 'Reject'}
+                          </ThemedText>
+                        </Pressable>
+                        <Pressable
+                          onPress={() => {
+                            if (item.type === 'absence') {
+                              setActiveTab('attendance');
+                            } else if (item.type === 'achievement') {
+                              setReportsSubTab('pending');
+                              setActiveTab('reports');
+                            } else if (item.type === 'article') {
+                              setNewsletterSubTab('pending');
+                              setNewsletterSelectedArticleId(item.id);
+                              setActiveTab('newsletter');
+                            } else if (item.type === 'expense') {
+                              setExpensesInitialFilter('pending');
+                              setExpensesSelectedExpenseId(item.id);
+                              setActiveTab('expenses');
+                            }
+                          }}
+                          style={{
+                            flex: 1.6,
+                            borderWidth: 1,
+                            borderColor: colors.border,
+                            borderRadius: 8,
+                            paddingVertical: 8,
+                            alignItems: 'center',
+                            backgroundColor: colors.background
+                          }}
+                        >
+                          <ThemedText style={{ color: colors.text, fontSize: 11, fontWeight: '600' }}>
+                            {i18n.language === 'ta' ? 'காண்க' : 'Review'}
+                          </ThemedText>
+                        </Pressable>
+                      </View>
+                    )}
                   </View>
                 );
               })}
@@ -2508,7 +2692,14 @@ export default function HomeScreen() {
       case 'print-requests':
         return <PrintRequestsTab {...props} />;
       case 'expenses':
-        return <ExpensesTab {...props} />;
+        return (
+          <ExpensesTab 
+            {...props} 
+            initialFilter={expensesInitialFilter}
+            initialExpenseId={expensesSelectedExpenseId}
+            onClearInitialExpense={() => setExpensesSelectedExpenseId(null)}
+          />
+        );
       case 'library':
         return <LibraryTab {...props} />;
       case 'ai-assistant':

@@ -206,9 +206,15 @@ export const emailService = {
       comments?: string;
     }
   ): Promise<EmailDispatchResult> => {
-    if (!expense.submittedByEmail) {
-      console.log('[emailService] No submitter email provided for approval notification.');
-      return { success: false, reason: 'No submitter email available' };
+    const config = await emailConfigService.getEmailConfig();
+    const treasurerEmails = config.features?.expenses?.toEmails || config.customGroups?.treasury || ['arun.zorro@gmail.com'];
+    const defaultRecipient = treasurerEmails[0] || 'arun.zorro@gmail.com';
+
+    // If submitter email is dummy (@example.com) or missing, fallback to treasurer/tester email
+    let recipientEmail = (expense.submittedByEmail || '').trim();
+    if (!recipientEmail || recipientEmail.endsWith('@example.com') || !recipientEmail.includes('@')) {
+      console.log(`[emailService] Submitter email "${expense.submittedByEmail}" is non-deliverable. Falling back to test address: ${defaultRecipient}`);
+      recipientEmail = defaultRecipient;
     }
 
     const formattedAmount = `$${Number(expense.amount).toFixed(2)}`;
@@ -230,9 +236,12 @@ export const emailService = {
       details.push({ label: 'Approver Comments / குறிப்புகள்', value: approver.comments });
     }
 
+    const bccList = treasurerEmails.filter(e => e.toLowerCase() !== recipientEmail.toLowerCase());
+
     return emailService.sendNotification({
       feature: 'expenses',
-      to: expense.submittedByEmail,
+      to: recipientEmail,
+      bcc: bccList.length > 0 ? bccList : undefined,
       replyTo: approver.email,
       subject: `[Expense Approved] Claim for "${expense.title}" (${formattedAmount}) Approved`,
       title: `Expense Claim Approved! / செலவினக் கோரிக்கை அங்கீகரிக்கப்பட்டது`,
@@ -269,13 +278,18 @@ export const emailService = {
       email: string;
     }
   ): Promise<EmailDispatchResult> => {
-    if (!expense.submittedByEmail) {
-      console.log('[emailService] No submitter email provided for payment confirmation notification.');
-      return { success: false, reason: 'No submitter email available' };
+    const config = await emailConfigService.getEmailConfig();
+    const treasurerEmails = config.features?.expenses?.toEmails || config.customGroups?.treasury || ['arun.zorro@gmail.com'];
+    const defaultRecipient = treasurerEmails[0] || 'arun.zorro@gmail.com';
+
+    // If submitter email is dummy (@example.com) or missing, fallback to treasurer/tester email
+    let recipientEmail = (expense.submittedByEmail || '').trim();
+    if (!recipientEmail || recipientEmail.endsWith('@example.com') || !recipientEmail.includes('@')) {
+      console.log(`[emailService] Submitter email "${expense.submittedByEmail}" is non-deliverable. Falling back to test address: ${defaultRecipient}`);
+      recipientEmail = defaultRecipient;
     }
 
-    const config = await emailConfigService.getEmailConfig();
-    const treasurerEmails = config.features?.expenses?.toEmails || config.customGroups?.treasury || [];
+    const bccList = treasurerEmails.filter(e => e.toLowerCase() !== recipientEmail.toLowerCase());
 
     const formattedAmount = `$${Number(expense.amount).toFixed(2)}`;
     const formattedPaidDate = expense.paidDate
@@ -302,8 +316,8 @@ export const emailService = {
 
     return emailService.sendNotification({
       feature: 'expenses',
-      to: expense.submittedByEmail,
-      bcc: treasurerEmails,
+      to: recipientEmail,
+      bcc: bccList.length > 0 ? bccList : undefined,
       replyTo: payer.email,
       subject: `[Expense Reimbursed] Payment of ${formattedAmount} Completed for "${expense.title}"`,
       title: `Expense Reimbursed & Transferred! / தொகை செலுத்தப்பட்டது`,

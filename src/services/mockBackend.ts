@@ -147,7 +147,7 @@ export const mockDb = {
 
     const defaultUsers = [
       { uid: 'superadmin_1', email: 'superadmin@example.com', fullName: 'Super Admin', role: 'superadmin', phone: '+91 99999 99999', schoolId: 'balarmalar parramatta branch', languagePreference: 'en' },
-      { uid: 'admin_1', email: 'admin@example.com', fullName: 'Arun Pandian', role: 'admin', phone: '+91 98765 43210', schoolId: 'balarmalar parramatta branch', languagePreference: 'ta' },
+      { uid: 'admin_1', email: 'arun.zorro@gmail.com', fullName: 'Arun Pandian', role: 'admin', phone: '+91 98765 43210', schoolId: 'balarmalar parramatta branch', languagePreference: 'ta' },
       { uid: 'teacher_1', email: 'teacher@example.com', fullName: 'Suresh Kumar', role: 'teacher', phone: '+91 87654 32109', schoolId: 'balarmalar parramatta branch', languagePreference: 'ta' },
       { uid: 'volunteer_1', email: 'volunteer@example.com', fullName: 'Meena Ramasamy', role: 'volunteer', phone: '+91 76543 21098', schoolId: 'balarmalar parramatta branch', languagePreference: 'en' },
       { uid: 'parent_1', email: 'parent@example.com', fullName: 'Karthik Raja', role: 'parent', phone: '+91 65432 10987', schoolId: 'balarmalar parramatta branch', languagePreference: 'ta', associatedStudents: ['student_1'] },

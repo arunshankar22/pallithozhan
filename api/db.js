@@ -12,7 +12,7 @@ const inMemoryDbs = {};
 
 // --- SEED DATA DEFINITIONS ---
 const DEFAULT_USERS = [
-  { uid: 'admin_1', email: 'admin@example.com', fullName: 'Arun Pandian', role: 'admin', phone: '+91 98765 43210', schoolId: 'school_main', languagePreference: 'ta' },
+  { uid: 'admin_1', email: 'arun.zorro@gmail.com', fullName: 'Arun Pandian', role: 'admin', phone: '+91 98765 43210', schoolId: 'school_main', languagePreference: 'ta' },
   { 
     uid: 'teacher_1', 
     email: 'teacher@example.com', 

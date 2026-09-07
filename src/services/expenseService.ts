@@ -403,6 +403,17 @@ export const expenseService = {
             `Expense claim of $${updatedExpense.amount} for "${updatedExpense.title}" awaits your Treasurer review & approval.`
           );
         }
+        try {
+          await emailService.sendExpenseNotification(
+            updatedExpense,
+            {
+              fullName: updatedExpense.submittedBy || 'Staff Member',
+              email: updatedExpense.submittedByEmail || 'noreply@3stech.com.au'
+            }
+          );
+        } catch (emailErr) {
+          console.warn('Failed to send expense notification email to Treasurer on stage advance:', emailErr);
+        }
       }
       
       // If advancing to President, alert all Presidents
