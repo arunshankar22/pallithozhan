@@ -22,6 +22,7 @@ import { waitlistService } from '@/services/waitlistService';
 import { expenseService } from '@/services/expenseService';
 import { featureFlagsService } from '@/services/featureFlagsService';
 import { interestService } from '@/services/interestService';
+import { emailConfigService, EmailSystemConfig, DEFAULT_EMAIL_CONFIG } from '@/services/emailConfigService';
 import { UserModal } from '@/components/UserModal';
 import { UserBulkBar } from '@/components/UserBulkBar';
 import { DateTimePicker } from '@/components/DateTimePicker';
@@ -56,7 +57,7 @@ const FlatScrollContainer = ({
 export function ManagementTab({ user, colors, t, showToast, i18n, insets, onFeatureFlagsUpdated }: TabProps) {
   const { width: windowWidth } = useWindowDimensions();
   const isLargeScreen = windowWidth >= 768;
-  const [subTab, setSubTab] = useState<'users' | 'classes' | 'calendar' | 'import_export' | 'waitlist' | 'expense_config' | 'feature_flags' | 'interest'>('users');
+  const [subTab, setSubTab] = useState<'users' | 'classes' | 'calendar' | 'import_export' | 'waitlist' | 'expense_config' | 'feature_flags' | 'interest' | 'email_settings'>('users');
   
   // Expense config states
   const [treasurerUids, setTreasurerUids] = useState<string[]>([]);
@@ -64,6 +65,12 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets, onFeat
   const [presidentUids, setPresidentUids] = useState<string[]>([]);
   const [allowedSubmitRoles, setAllowedSubmitRoles] = useState<string[]>([]);
   const [savingExpenseConfig, setSavingExpenseConfig] = useState(false);
+
+  // Email notification config states
+  const [emailConfig, setEmailConfig] = useState<EmailSystemConfig>(DEFAULT_EMAIL_CONFIG);
+  const [savingEmailConfig, setSavingEmailConfig] = useState(false);
+  const [newGroupName, setNewGroupName] = useState('');
+  const [newGroupEmails, setNewGroupEmails] = useState('');
 
   // Feature flags states
   const [flagState, setFlagState] = useState<any>({
@@ -849,6 +856,13 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets, onFeat
       } catch (err) {
         console.warn('Failed to load feature flags in refreshData:', err);
       }
+
+      try {
+        const eConfig = await emailConfigService.getEmailConfig();
+        setEmailConfig(eConfig);
+      } catch (err) {
+        console.warn('Failed to load email config in refreshData:', err);
+      }
     } catch (e) {
       showToast('Failed to sync administrative portal data.', 'error');
     } finally {
@@ -868,6 +882,18 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets, onFeat
       showToast('Failed to save portal features configuration.', 'error');
     } finally {
       setSavingFlags(false);
+    }
+  };
+
+  const handleSaveEmailConfig = async () => {
+    setSavingEmailConfig(true);
+    try {
+      await emailConfigService.updateEmailConfig(emailConfig);
+      showToast('Email notification settings saved successfully!', 'success');
+    } catch (e) {
+      showToast('Failed to save email notification settings.', 'error');
+    } finally {
+      setSavingEmailConfig(false);
     }
   };
 
@@ -1424,6 +1450,19 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets, onFeat
             >
               <ThemedText style={{ color: subTab === 'feature_flags' ? '#FFF' : colors.text, fontWeight: '700', fontSize: 13 }}>
                 ⚙️ Portal Features
+              </ThemedText>
+            </Pressable>
+            <Pressable
+              onPress={() => setSubTab('email_settings')}
+              style={[
+                { paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20, borderWidth: 1 },
+                subTab === 'email_settings' 
+                  ? { backgroundColor: colors.primary, borderColor: colors.primary } 
+                  : { backgroundColor: 'transparent', borderColor: colors.border }
+              ]}
+            >
+              <ThemedText style={{ color: subTab === 'email_settings' ? '#FFF' : colors.text, fontWeight: '700', fontSize: 13 }}>
+                📧 Email Notifications
               </ThemedText>
             </Pressable>
           </View>
@@ -3267,6 +3306,27 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets, onFeat
                 </View>
               </View>
 
+              {/* Automated Email Notification to Treasurer */}
+              <View style={{ padding: 14, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background, gap: 8 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <View style={{ flex: 1, marginRight: 10 }}>
+                    <ThemedText style={{ fontSize: 13, fontWeight: '700' }}>📧 Automated Email Notification to Treasurer</ThemedText>
+                    <ThemedText style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2 }}>
+                      Sends instant email notification to Treasurer upon any new expense submission.
+                    </ThemedText>
+                  </View>
+                  <Pressable
+                    onPress={() => setSubTab('email_settings')}
+                    style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6, backgroundColor: colors.primaryLight, borderWidth: 1, borderColor: colors.primary }}
+                  >
+                    <ThemedText style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>Manage Email Settings →</ThemedText>
+                  </Pressable>
+                </View>
+                <ThemedText style={{ fontSize: 11, color: colors.textSecondary }}>
+                  Status: {emailConfig.masterEnabled && emailConfig.features?.expenses?.enabled ? '🟢 Enabled' : '🔴 Disabled'} | Recipient: {(emailConfig.features?.expenses?.toEmails || []).join(', ') || 'parramatta@balarmalar.nsw.edu.au'}
+                </ThemedText>
+              </View>
+
               {/* Submit Config Button */}
               <Pressable
                 onPress={async () => {
@@ -3452,6 +3512,406 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets, onFeat
                 <ActivityIndicator size="small" color="#FFF" />
               ) : (
                 <ThemedText style={{ color: '#FFF', fontWeight: '700', fontSize: 13 }}>💾 Save Feature Config</ThemedText>
+              )}
+            </Pressable>
+          </View>
+        </FlatScrollContainer>
+      ) : subTab === 'email_settings' ? (
+        /* EMAIL NOTIFICATIONS SUB-TAB */
+        <FlatScrollContainer style={{ flex: 1 }} contentContainerStyle={{ gap: Spacing.three, paddingBottom: isLargeScreen ? Spacing.three : 0 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderColor: colors.border, paddingBottom: 10 }}>
+            <View>
+              <ThemedText style={{ fontSize: 16, fontWeight: '800', color: colors.primary }}>📧 Email Notification Settings / மின்னஞ்சல் அறிவிப்புகள்</ThemedText>
+              <ThemedText style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>
+                Configure automated email dispatch, master kill-switch, sender addresses, and custom recipient groups.
+              </ThemedText>
+            </View>
+            <View style={{
+              paddingHorizontal: 10,
+              paddingVertical: 4,
+              borderRadius: 12,
+              backgroundColor: emailConfig.masterEnabled ? '#DEF7EC' : '#FDE8E8',
+              borderWidth: 1,
+              borderColor: emailConfig.masterEnabled ? '#31C48D' : '#F98080'
+            }}>
+              <ThemedText style={{ fontSize: 11, fontWeight: '700', color: emailConfig.masterEnabled ? '#03543F' : '#9B1C1C' }}>
+                {emailConfig.masterEnabled ? '🟢 SYSTEM ACTIVE' : '🔴 SYSTEM PAUSED'}
+              </ThemedText>
+            </View>
+          </View>
+
+          <View style={{ gap: 16 }}>
+            {/* 1. MASTER TOGGLE CARD */}
+            <View style={{
+              padding: 16,
+              borderRadius: 16,
+              borderWidth: 2,
+              borderColor: emailConfig.masterEnabled ? colors.primary : '#F98080',
+              backgroundColor: colors.cardBg,
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <View style={{ flex: 1, marginRight: 16 }}>
+                <ThemedText style={{ fontSize: 15, fontWeight: '800' }}>Master Email Notifications Switch</ThemedText>
+                <ThemedText style={{ fontSize: 12, color: colors.textSecondary, marginTop: 4 }}>
+                  Turn this ON to allow the portal to dispatch automated emails (expenses, announcements, homework, etc.). Turn OFF to instantly suppress all outgoing emails.
+                </ThemedText>
+              </View>
+              <Pressable
+                onPress={() => setEmailConfig((prev: any) => ({ ...prev, masterEnabled: !prev.masterEnabled }))}
+                style={{
+                  width: 52,
+                  height: 30,
+                  borderRadius: 15,
+                  backgroundColor: emailConfig.masterEnabled ? colors.primary : colors.border,
+                  justifyContent: 'center',
+                  paddingHorizontal: 4
+                }}
+              >
+                <View style={{
+                  width: 22,
+                  height: 22,
+                  borderRadius: 11,
+                  backgroundColor: '#FFF',
+                  alignSelf: emailConfig.masterEnabled ? 'flex-end' : 'flex-start'
+                }} />
+              </Pressable>
+            </View>
+
+            {/* 2. SENDER INFORMATION CARD */}
+            <View style={{ padding: 18, borderRadius: 16, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.cardBg, gap: 12 }}>
+              <ThemedText style={{ fontSize: 14, fontWeight: '800', color: colors.text }}>✉️ Default System Sender / அனுப்பியவர் விவரங்கள்</ThemedText>
+              <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>
+                Emails sent by the portal will display these credentials. (Note: For high deliverability and SPF/DKIM compliance, the sender email should be a verified domain).
+              </ThemedText>
+
+              <View style={{ flexDirection: isLargeScreen ? 'row' : 'column', gap: 12 }}>
+                <View style={{ flex: 1 }}>
+                  <ThemedText style={{ fontSize: 12, fontWeight: '700', marginBottom: 4 }}>Sender Display Name</ThemedText>
+                  <TextInput
+                    style={[styles.directPathInput, { color: colors.text, borderColor: colors.border }]}
+                    placeholder="e.g. Pallithozhan - Balar Malar"
+                    placeholderTextColor={colors.textSecondary}
+                    value={emailConfig.defaultSenderName}
+                    onChangeText={(val) => setEmailConfig((prev: any) => ({ ...prev, defaultSenderName: val }))}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <ThemedText style={{ fontSize: 12, fontWeight: '700', marginBottom: 4 }}>Sender Email Address</ThemedText>
+                  <TextInput
+                    style={[styles.directPathInput, { color: colors.text, borderColor: colors.border }]}
+                    placeholder="e.g. noreply@3stech.com.au"
+                    placeholderTextColor={colors.textSecondary}
+                    value={emailConfig.defaultSenderEmail}
+                    onChangeText={(val) => setEmailConfig((prev: any) => ({ ...prev, defaultSenderEmail: val }))}
+                  />
+                </View>
+              </View>
+            </View>
+
+            {/* 3. FEATURE SPECIFIC TOGGLES & RECIPIENTS */}
+            <View style={{ padding: 18, borderRadius: 16, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.cardBg, gap: 16 }}>
+              <ThemedText style={{ fontSize: 14, fontWeight: '800', color: colors.text }}>⚡ Feature-Specific Notification Rules</ThemedText>
+
+              {/* Expense Notification Config */}
+              <View style={{ padding: 14, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background, gap: 10 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <View style={{ flex: 1, marginRight: 12 }}>
+                    <ThemedText style={{ fontSize: 13, fontWeight: '800' }}>💸 Expense Claim Submissions (Treasurer Alert)</ThemedText>
+                    <ThemedText style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2 }}>
+                      Sends an alert to the Treasurer upon any new expense submission. The submitter's email is set as Reply-To so the Treasurer can reply directly to them.
+                    </ThemedText>
+                  </View>
+                  <Pressable
+                    onPress={() => setEmailConfig((prev: any) => ({
+                      ...prev,
+                      features: {
+                        ...prev.features,
+                        expenses: {
+                          ...prev.features.expenses,
+                          enabled: !prev.features?.expenses?.enabled
+                        }
+                      }
+                    }))}
+                    style={{
+                      width: 46,
+                      height: 26,
+                      borderRadius: 13,
+                      backgroundColor: emailConfig.features?.expenses?.enabled ? colors.primary : colors.border,
+                      justifyContent: 'center',
+                      paddingHorizontal: 3
+                    }}
+                  >
+                    <View style={{
+                      width: 20,
+                      height: 20,
+                      borderRadius: 10,
+                      backgroundColor: '#FFF',
+                      alignSelf: emailConfig.features?.expenses?.enabled ? 'flex-end' : 'flex-start'
+                    }} />
+                  </Pressable>
+                </View>
+
+                {emailConfig.features?.expenses?.enabled && (
+                  <View style={{ marginTop: 6, gap: 4 }}>
+                    <ThemedText style={{ fontSize: 11, fontWeight: '700', color: colors.textSecondary }}>Treasurer / Finance Recipient Email(s) (comma-separated):</ThemedText>
+                    <TextInput
+                      style={[styles.directPathInput, { color: colors.text, borderColor: colors.border, fontSize: 12 }]}
+                      placeholder="e.g. parramatta@balarmalar.nsw.edu.au, treasurer@balarmalar.nsw.edu.au"
+                      placeholderTextColor={colors.textSecondary}
+                      value={(emailConfig.features?.expenses?.toEmails || []).join(', ')}
+                      onChangeText={(val) => {
+                        const emails = val.split(',').map(s => s.trim()).filter(Boolean);
+                        setEmailConfig((prev: any) => ({
+                          ...prev,
+                          features: {
+                            ...prev.features,
+                            expenses: {
+                              ...prev.features.expenses,
+                              toEmails: emails
+                            }
+                          }
+                        }));
+                      }}
+                    />
+                  </View>
+                )}
+              </View>
+
+              {/* Announcements Config */}
+              <View style={{ padding: 14, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background, gap: 8 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <View style={{ flex: 1, marginRight: 12 }}>
+                    <ThemedText style={{ fontSize: 13, fontWeight: '800' }}>📢 Newsfeed & Announcements</ThemedText>
+                    <ThemedText style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2 }}>
+                      Optionally dispatch email summaries when new school-wide or campus announcements are published.
+                    </ThemedText>
+                  </View>
+                  <Pressable
+                    onPress={() => setEmailConfig((prev: any) => ({
+                      ...prev,
+                      features: {
+                        ...prev.features,
+                        announcements: {
+                          ...prev.features.announcements,
+                          enabled: !prev.features?.announcements?.enabled
+                        }
+                      }
+                    }))}
+                    style={{
+                      width: 46,
+                      height: 26,
+                      borderRadius: 13,
+                      backgroundColor: emailConfig.features?.announcements?.enabled ? colors.primary : colors.border,
+                      justifyContent: 'center',
+                      paddingHorizontal: 3
+                    }}
+                  >
+                    <View style={{
+                      width: 20,
+                      height: 20,
+                      borderRadius: 10,
+                      backgroundColor: '#FFF',
+                      alignSelf: emailConfig.features?.announcements?.enabled ? 'flex-end' : 'flex-start'
+                    }} />
+                  </Pressable>
+                </View>
+              </View>
+
+              {/* Homework Config */}
+              <View style={{ padding: 14, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background, gap: 8 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <View style={{ flex: 1, marginRight: 12 }}>
+                    <ThemedText style={{ fontSize: 13, fontWeight: '800' }}>📚 Homework Assignments</ThemedText>
+                    <ThemedText style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2 }}>
+                      Send automated notification emails to class parents when teachers post new homework.
+                    </ThemedText>
+                  </View>
+                  <Pressable
+                    onPress={() => setEmailConfig((prev: any) => ({
+                      ...prev,
+                      features: {
+                        ...prev.features,
+                        homework: {
+                          ...prev.features.homework,
+                          enabled: !prev.features?.homework?.enabled
+                        }
+                      }
+                    }))}
+                    style={{
+                      width: 46,
+                      height: 26,
+                      borderRadius: 13,
+                      backgroundColor: emailConfig.features?.homework?.enabled ? colors.primary : colors.border,
+                      justifyContent: 'center',
+                      paddingHorizontal: 3
+                    }}
+                  >
+                    <View style={{
+                      width: 20,
+                      height: 20,
+                      borderRadius: 10,
+                      backgroundColor: '#FFF',
+                      alignSelf: emailConfig.features?.homework?.enabled ? 'flex-end' : 'flex-start'
+                    }} />
+                  </Pressable>
+                </View>
+              </View>
+
+              {/* Digital Library Config */}
+              <View style={{ padding: 14, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background, gap: 8 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <View style={{ flex: 1, marginRight: 12 }}>
+                    <ThemedText style={{ fontSize: 13, fontWeight: '800' }}>📖 Digital Library Book Uploads</ThemedText>
+                    <ThemedText style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2 }}>
+                      Notify students and parents when a new storybook or reading material is added.
+                    </ThemedText>
+                  </View>
+                  <Pressable
+                    onPress={() => setEmailConfig((prev: any) => ({
+                      ...prev,
+                      features: {
+                        ...prev.features,
+                        library_books: {
+                          ...prev.features.library_books,
+                          enabled: !prev.features?.library_books?.enabled
+                        }
+                      }
+                    }))}
+                    style={{
+                      width: 46,
+                      height: 26,
+                      borderRadius: 13,
+                      backgroundColor: emailConfig.features?.library_books?.enabled ? colors.primary : colors.border,
+                      justifyContent: 'center',
+                      paddingHorizontal: 3
+                    }}
+                  >
+                    <View style={{
+                      width: 20,
+                      height: 20,
+                      borderRadius: 10,
+                      backgroundColor: '#FFF',
+                      alignSelf: emailConfig.features?.library_books?.enabled ? 'flex-end' : 'flex-start'
+                    }} />
+                  </Pressable>
+                </View>
+              </View>
+            </View>
+
+            {/* 4. RECIPIENT GROUPS (DYNAMIC & CUSTOM) */}
+            <View style={{ padding: 18, borderRadius: 16, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.cardBg, gap: 14 }}>
+              <ThemedText style={{ fontSize: 14, fontWeight: '800', color: colors.text }}>👥 Recipient Groups / பெறுநர் குழுக்கள்</ThemedText>
+              <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>
+                Emails can target automated dynamic role groups or custom admin-curated distribution lists. All group emails are dispatched with privacy protection (BCC / individual delivery) so personal email addresses are never exposed to other recipients.
+              </ThemedText>
+
+              {/* Dynamic Groups Summary */}
+              <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap' }}>
+                <View style={{ padding: 10, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background, flex: 1, minWidth: 140 }}>
+                  <ThemedText style={{ fontSize: 11, color: colors.textSecondary }}>👨‍🏫 All Teachers</ThemedText>
+                  <ThemedText style={{ fontSize: 15, fontWeight: '800', color: colors.primary, marginTop: 2 }}>
+                    {users.filter(u => u.role === 'teacher' && u.email).length} Teachers
+                  </ThemedText>
+                  <ThemedText style={{ fontSize: 10, color: colors.textSecondary, marginTop: 2 }}>Auto-resolved by role</ThemedText>
+                </View>
+                <View style={{ padding: 10, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background, flex: 1, minWidth: 140 }}>
+                  <ThemedText style={{ fontSize: 11, color: colors.textSecondary }}>👨‍👩‍👧 All Parents</ThemedText>
+                  <ThemedText style={{ fontSize: 15, fontWeight: '800', color: colors.primary, marginTop: 2 }}>
+                    {users.filter(u => u.role === 'parent' && u.email).length} Parents
+                  </ThemedText>
+                  <ThemedText style={{ fontSize: 10, color: colors.textSecondary, marginTop: 2 }}>Auto-resolved by role</ThemedText>
+                </View>
+                <View style={{ padding: 10, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background, flex: 1, minWidth: 140 }}>
+                  <ThemedText style={{ fontSize: 11, color: colors.textSecondary }}>🤝 All Volunteers</ThemedText>
+                  <ThemedText style={{ fontSize: 15, fontWeight: '800', color: colors.primary, marginTop: 2 }}>
+                    {users.filter(u => u.role === 'volunteer' && u.email).length} Volunteers
+                  </ThemedText>
+                  <ThemedText style={{ fontSize: 10, color: colors.textSecondary, marginTop: 2 }}>Auto-resolved by role</ThemedText>
+                </View>
+              </View>
+
+              {/* Custom Groups List */}
+              <View style={{ gap: 8, marginTop: 4 }}>
+                <ThemedText style={{ fontSize: 12, fontWeight: '700' }}>Custom Distribution Groups:</ThemedText>
+                {Object.entries(emailConfig.customGroups || {}).map(([groupKey, groupEmails]) => (
+                  <View key={groupKey} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 10, borderRadius: 8, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background }}>
+                    <View style={{ flex: 1, marginRight: 8 }}>
+                      <ThemedText style={{ fontSize: 12, fontWeight: '700', textTransform: 'capitalize' }}>🏷️ {groupKey}</ThemedText>
+                      <ThemedText style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2 }}>
+                        {Array.isArray(groupEmails) ? groupEmails.join(', ') : String(groupEmails)}
+                      </ThemedText>
+                    </View>
+                    <Pressable
+                      onPress={() => {
+                        const next = { ...emailConfig.customGroups };
+                        delete next[groupKey];
+                        setEmailConfig((prev: any) => ({ ...prev, customGroups: next }));
+                      }}
+                      style={{ padding: 6 }}
+                    >
+                      <Trash2 size={15} color="#EF4444" />
+                    </Pressable>
+                  </View>
+                ))}
+
+                {/* Add Custom Group Form */}
+                <View style={{ flexDirection: isLargeScreen ? 'row' : 'column', gap: 8, marginTop: 6 }}>
+                  <TextInput
+                    style={[styles.directPathInput, { color: colors.text, borderColor: colors.border, flex: 1 }]}
+                    placeholder="New Group Name (e.g. committee)"
+                    placeholderTextColor={colors.textSecondary}
+                    value={newGroupName}
+                    onChangeText={setNewGroupName}
+                  />
+                  <TextInput
+                    style={[styles.directPathInput, { color: colors.text, borderColor: colors.border, flex: 2 }]}
+                    placeholder="Emails (comma-separated)"
+                    placeholderTextColor={colors.textSecondary}
+                    value={newGroupEmails}
+                    onChangeText={setNewGroupEmails}
+                  />
+                  <Pressable
+                    onPress={() => {
+                      if (!newGroupName.trim() || !newGroupEmails.trim()) {
+                        showToast('Please specify group name and at least one email address.', 'warning');
+                        return;
+                      }
+                      const key = newGroupName.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
+                      const emails = newGroupEmails.split(',').map(s => s.trim()).filter(Boolean);
+                      setEmailConfig((prev: any) => ({
+                        ...prev,
+                        customGroups: {
+                          ...(prev.customGroups || {}),
+                          [key]: emails
+                        }
+                      }));
+                      setNewGroupName('');
+                      setNewGroupEmails('');
+                      showToast(`Custom group "${key}" added!`, 'success');
+                    }}
+                    style={{ backgroundColor: colors.primary, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, justifyContent: 'center', alignItems: 'center' }}
+                  >
+                    <ThemedText style={{ color: '#FFF', fontWeight: '700', fontSize: 12 }}>+ Add Group</ThemedText>
+                  </Pressable>
+                </View>
+              </View>
+            </View>
+
+            {/* SAVE BUTTON */}
+            <Pressable
+              onPress={handleSaveEmailConfig}
+              disabled={savingEmailConfig}
+              style={({ pressed }) => [
+                { backgroundColor: colors.primary, paddingVertical: 14, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginTop: 8 },
+                { opacity: pressed || savingEmailConfig ? 0.9 : 1 }
+              ]}
+            >
+              {savingEmailConfig ? (
+                <ActivityIndicator size="small" color="#FFF" />
+              ) : (
+                <ThemedText style={{ color: '#FFF', fontWeight: '700', fontSize: 14 }}>💾 Save All Email Settings</ThemedText>
               )}
             </Pressable>
           </View>

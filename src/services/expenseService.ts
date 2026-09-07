@@ -2,6 +2,7 @@ import { db, storage } from './firebase';
 import { collection, doc, getDoc, getDocs, setDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
 import { attendanceService } from './attendanceService';
 import { API_URL } from './dbCommon';
+import { emailService } from './emailService';
 
 export interface ExpenseApproval {
   role: 'secretary' | 'treasurer' | 'president';
@@ -158,6 +159,19 @@ export const expenseService = {
         console.warn('Failed to push alerts in local mode:', err);
       }
 
+      // Dispatch email notification to Treasurer
+      try {
+        await emailService.sendExpenseNotification(
+          newExpense,
+          {
+            fullName: newExpense.submittedBy || 'Staff Member',
+            email: newExpense.submittedByEmail || 'noreply@3stech.com.au'
+          }
+        );
+      } catch (emailErr) {
+        console.warn('Failed to send expense notification email in local mode:', emailErr);
+      }
+
       return newExpense;
     }
 
@@ -227,6 +241,19 @@ export const expenseService = {
       }
     } catch (err) {
       console.warn('Failed to push alerts for new expense:', err);
+    }
+
+    // Dispatch email notification to Treasurer
+    try {
+      await emailService.sendExpenseNotification(
+        newExpense,
+        {
+          fullName: newExpense.submittedBy || 'Staff Member',
+          email: newExpense.submittedByEmail || 'noreply@3stech.com.au'
+        }
+      );
+    } catch (emailErr) {
+      console.warn('Failed to send expense notification email:', emailErr);
     }
 
     return newExpense;

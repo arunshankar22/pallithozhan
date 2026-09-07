@@ -1510,7 +1510,292 @@ Guidelines for SQL generation:
     return true;
   }
 
+  // ==========================================
+  // EMAIL SYSTEM NOTIFICATION ENDPOINTS
+  // ==========================================
+
+  // GET /api/email/config
+  if (pathname === '/api/email/config' && method === 'GET') {
+    const config = dbData.email_config || getDefaultEmailConfig();
+    sendJson(res, 200, { success: true, config });
+    return true;
+  }
+
+  // POST /api/email/config
+  if (pathname === '/api/email/config' && method === 'POST') {
+    try {
+      const body = await parseBody(req);
+      const current = dbData.email_config || getDefaultEmailConfig();
+      const updated = {
+        ...current,
+        ...body,
+        features: {
+          ...current.features,
+          ...(body.features || {})
+        },
+        customGroups: {
+          ...current.customGroups,
+          ...(body.customGroups || {})
+        },
+        updatedAt: new Date().toISOString()
+      };
+      dbData.email_config = updated;
+      writeDb(dbData);
+
+      // Attempt to mirror to Firestore if connected
+      try {
+        const dbId = getDbIdForRequest(req);
+        const fDb = await getAuthenticatedDb(dbId);
+        const { doc, setDoc } = require('firebase/firestore');
+        await setDoc(doc(fDb, 'settings', 'email_config'), updated);
+      } catch (fErr) {
+        console.warn('[Backend Email] Firestore config mirror warning:', fErr.message);
+      }
+
+      sendJson(res, 200, { success: true, message: 'Email configuration updated successfully.', config: updated });
+    } catch (err) {
+      console.error('[Backend Email] Failed to save config:', err);
+      sendJson(res, 500, { error: 'Failed to update email configuration.', message: err.message });
+    }
+    return true;
+  }
+
+  // POST /api/email/send
+  if (pathname === '/api/email/send' && method === 'POST') {
+    try {
+      const body = await parseBody(req);
+      const emailConfig = dbData.email_config || getDefaultEmailConfig();
+
+      // 1. Master Toggle Verification
+      if (emailConfig.masterEnabled === false) {
+        console.log('[Backend Email] Email suppressed: Master email switch is disabled.');
+        sendJson(res, 200, {
+          success: false,
+          status: 'suppressed',
+          reason: 'Master email notification toggle is disabled by administrator.'
+        });
+        return true;
+      }
+
+      // 2. Feature Specific Toggle Verification
+      const feature = body.feature || 'general';
+      if (emailConfig.features?.[feature]?.enabled === false) {
+        console.log(`[Backend Email] Email suppressed: Feature '${feature}' notifications are disabled.`);
+        sendJson(res, 200, {
+          success: false,
+          status: 'suppressed',
+          reason: `Email notifications for feature '${feature}' are disabled by administrator.`
+        });
+        return true;
+      }
+
+      // 3. Resolve Target Recipients
+      let recipients = [];
+      if (Array.isArray(body.to)) {
+        recipients.push(...body.to);
+      } else if (typeof body.to === 'string' && body.to.trim()) {
+        recipients.push(...body.to.split(',').map(s => s.trim()));
+      }
+
+      const targetGroup = body.targetGroup || body.group;
+      if (targetGroup) {
+        if (emailConfig.customGroups && Array.isArray(emailConfig.customGroups[targetGroup])) {
+          recipients.push(...emailConfig.customGroups[targetGroup]);
+        } else if (targetGroup === 'teachers' || targetGroup === 'teacher') {
+          const teachers = (dbData.users || []).filter(u => u.role === 'teacher' && u.email);
+          recipients.push(...teachers.map(u => u.email));
+        } else if (targetGroup === 'parents' || targetGroup === 'parent') {
+          const parents = (dbData.users || []).filter(u => u.role === 'parent' && u.email);
+          recipients.push(...parents.map(u => u.email));
+        } else if (targetGroup === 'volunteers' || targetGroup === 'volunteer') {
+          const vols = (dbData.users || []).filter(u => u.role === 'volunteer' && u.email);
+          recipients.push(...vols.map(u => u.email));
+        } else if (targetGroup === 'treasury' || targetGroup === 'treasurer') {
+          const treasurers = emailConfig.features?.expenses?.toEmails || ['parramatta@balarmalar.nsw.edu.au'];
+          recipients.push(...treasurers);
+        } else if (targetGroup === 'all') {
+          const allUsers = (dbData.users || []).filter(u => u.email);
+          recipients.push(...allUsers.map(u => u.email));
+        }
+      }
+
+      // Feature specific fallback recipient if none specified
+      if (recipients.length === 0 && feature === 'expenses') {
+        recipients.push(...(emailConfig.features?.expenses?.toEmails || ['parramatta@balarmalar.nsw.edu.au']));
+      }
+
+      // Clean, validate, and deduplicate emails
+      recipients = [...new Set(recipients.map(e => (e || '').trim().toLowerCase()))].filter(e => e.includes('@'));
+
+      if (recipients.length === 0) {
+        sendJson(res, 400, { error: 'No valid recipient email address specified or resolved for this notification.' });
+        return true;
+      }
+
+      // 4. Construct Senders & Reply-To Headers
+      const senderName = body.fromName || emailConfig.defaultSenderName || 'Pallithozhan - Balar Malar';
+      const senderEmail = emailConfig.defaultSenderEmail || process.env.SENDER_EMAIL || 'noreply@3stech.com.au';
+      const replyTo = body.replyTo || body.reply_to || undefined;
+
+      // 5. Generate Branded HTML Content
+      const htmlContent = body.html || generateUniversalEmailHtml({
+        title: body.title || body.subject,
+        subtitle: body.subtitle,
+        summary: body.summary,
+        details: body.details,
+        actionButton: body.actionButton,
+        footerNote: body.footerNote
+      });
+
+      // 6. Dispatch via Resend API
+      if (process.env.RESEND_API_KEY) {
+        const emailPayload = {
+          from: `${senderName} <${senderEmail}>`,
+          to: recipients.length === 1 ? recipients[0] : senderEmail,
+          bcc: recipients.length > 1 ? recipients : undefined,
+          subject: body.subject || `[Notification] Balar Malar Tamil School`,
+          html: htmlContent
+        };
+
+        if (replyTo) {
+          emailPayload.reply_to = replyTo;
+        }
+
+        const resendRes = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${process.env.RESEND_API_KEY}`
+          },
+          body: JSON.stringify(emailPayload)
+        });
+
+        if (!resendRes.ok) {
+          const resendErrText = await resendRes.text();
+          console.error('[Backend Email] Resend API Error:', resendErrText);
+          throw new Error(`Resend Error: ${resendErrText}`);
+        }
+
+        const resendData = await resendRes.json();
+        console.log(`[Backend Email] Successfully dispatched email via Resend to ${recipients.length} recipient(s):`, recipients);
+        sendJson(res, 200, {
+          success: true,
+          status: 'sent',
+          messageId: resendData.id,
+          recipientCount: recipients.length,
+          recipients: recipients
+        });
+      } else {
+        console.log(`[Backend Email Mock] RESEND_API_KEY not configured. Mocking email dispatch to ${recipients.join(', ')}`);
+        sendJson(res, 200, {
+          success: true,
+          status: 'simulated',
+          message: 'Simulation: Email logged in development mode (RESEND_API_KEY not configured).',
+          recipientCount: recipients.length,
+          recipients: recipients
+        });
+      }
+    } catch (sendErr) {
+      console.error('[Backend Email] Dispatch error:', sendErr);
+      sendJson(res, 500, { error: 'Failed to dispatch email notification.', message: sendErr.message });
+    }
+    return true;
+  }
+
   return false;
+}
+
+function getDefaultEmailConfig() {
+  return {
+    masterEnabled: true,
+    defaultSenderName: 'Pallithozhan - Balar Malar',
+    defaultSenderEmail: process.env.SENDER_EMAIL || 'noreply@3stech.com.au',
+    features: {
+      expenses: {
+        enabled: true,
+        toEmails: [process.env.TREASURER_EMAIL || 'parramatta@balarmalar.nsw.edu.au'],
+        customSubject: '[Expense Claim] New Expense Submitted'
+      },
+      announcements: {
+        enabled: true,
+        targetGroup: 'all'
+      },
+      homework: {
+        enabled: true,
+        targetGroup: 'parents'
+      },
+      library_books: {
+        enabled: true,
+        targetGroup: 'all'
+      }
+    },
+    customGroups: {
+      treasury: [process.env.TREASURER_EMAIL || 'parramatta@balarmalar.nsw.edu.au'],
+      committee: ['parramatta@balarmalar.nsw.edu.au']
+    }
+  };
+}
+
+function generateUniversalEmailHtml({ title, subtitle, summary, details, actionButton, footerNote }) {
+  const detailsHtml = Array.isArray(details) && details.length > 0
+    ? `
+      <table style="width: 100%; border-collapse: collapse; margin: 18px 0; background: #FAF8F4; border-radius: 8px; overflow: hidden; border: 1px solid #EAE2D5;">
+        <tbody>
+          ${details.map(d => `
+            <tr style="border-bottom: 1px solid #EAE2D5;">
+              <td style="padding: 10px 14px; font-weight: 700; color: #1E201B; width: 35%; vertical-align: top; font-size: 13px;">${escapeHtml(d.label || '')}</td>
+              <td style="padding: 10px 14px; color: #44473F; font-size: 13px; vertical-align: top;">${d.isHtml ? d.value : escapeHtml(d.value || '')}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `
+    : '';
+
+  const actionHtml = actionButton && actionButton.url
+    ? `
+      <div style="text-align: center; margin: 26px 0 16px 0;">
+        <a href="${actionButton.url}" style="display: inline-block; background-color: #EA5330; color: #FFFFFF; text-decoration: none; padding: 12px 28px; font-size: 14px; font-weight: 700; border-radius: 8px; box-shadow: 0 4px 12px rgba(234, 83, 48, 0.25);">
+          ${escapeHtml(actionButton.text || 'View Details / விவரங்களைக் காண்க')}
+        </a>
+      </div>
+    `
+    : '';
+
+  return `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px 16px; background-color: #FDFCF7; border: 1px solid #EAE2D5; border-radius: 14px;">
+      <div style="text-align: center; margin-bottom: 20px;">
+        <h1 style="color: #EA5330; font-size: 22px; margin: 0; font-weight: 800; letter-spacing: -0.5px;">Balar Malar Tamil School - Parramatta</h1>
+        <p style="color: #6C7063; font-size: 12px; margin: 4px 0 0 0; font-weight: 600;">Pallithozhan Portal / பள்ளித் தோழன்</p>
+      </div>
+
+      <div style="background-color: #FFFFFF; border: 1px solid #EAE2D5; border-radius: 12px; padding: 22px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);">
+        <h2 style="font-size: 17px; font-weight: 700; color: #1E201B; margin-top: 0; margin-bottom: 8px;">
+          ${escapeHtml(title || 'Notification / அறிவிப்பு')}
+        </h2>
+        ${subtitle ? `<p style="font-size: 13px; color: #8F9288; margin-top: 0; margin-bottom: 14px;">${escapeHtml(subtitle)}</p>` : ''}
+        ${summary ? `<p style="font-size: 14px; line-height: 22px; color: #44473F; margin: 12px 0;">${escapeHtml(summary)}</p>` : ''}
+        ${detailsHtml}
+        ${actionHtml}
+      </div>
+
+      <div style="text-align: center; margin-top: 20px; font-size: 11px; color: #8F9288; line-height: 18px;">
+        <p style="margin: 4px 0;">${footerNote || 'This is an automated notification from the Pallithozhan Portal. Please contact parramatta@balarmalar.nsw.edu.au for support.'}</p>
+        <p style="margin: 4px 0;">© 2026 Balar Malar Tamil School Parramatta (ABN: 89 423 605 733). All rights reserved.</p>
+        <p style="margin: 4px 0;"><a href="https://pallithozhan.3stech.com.au/privacy" style="color: #EA5330; text-decoration: underline;">Privacy Policy</a> | <a href="https://pallithozhan.3stech.com.au/terms" style="color: #EA5330; text-decoration: underline;">Terms of Use</a></p>
+      </div>
+    </div>
+  `;
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }
 
 module.exports = {
