@@ -12,6 +12,7 @@ export interface NotificationDetailItem {
 export interface UniversalNotificationPayload {
   feature: 'expenses' | 'announcements' | 'homework' | 'library_books' | string;
   to?: string | string[];
+  bcc?: string | string[];
   targetGroup?: 'treasury' | 'committee' | 'teachers' | 'parents' | 'volunteers' | 'all' | string;
   replyTo?: string;
   subject: string;
@@ -170,7 +171,6 @@ export const emailService = {
     return emailService.sendNotification({
       feature: 'expenses',
       to: treasurerEmails,
-      targetGroup: 'treasury',
       replyTo: submitter.email, // Reply directly to the submitter
       subject: `[Expense Claim] New claim from ${submitter.fullName} (${formattedAmount})`,
       title: `New Expense Claim Submitted / புதிய செலவின கோரிக்கை`,
@@ -182,6 +182,139 @@ export const emailService = {
         url: 'https://pallithozhan.3stech.com.au/'
       },
       footerNote: 'You received this notification because you are designated as a Treasurer/Finance officer in PalliThozhan Portal. Reply directly to this email to contact the submitter.'
+    });
+  },
+
+  /**
+   * Helper: Send Expense Claim Approved notification to the Submitter
+   */
+  sendExpenseApprovalNotification: async (
+    expense: {
+      expenseId: string;
+      title: string;
+      amount: number;
+      category: string;
+      notes?: string;
+      dateSubmitted?: string;
+      submittedBy: string;
+      submittedByEmail: string;
+    },
+    approver: {
+      fullName: string;
+      email: string;
+      role?: string;
+      comments?: string;
+    }
+  ): Promise<EmailDispatchResult> => {
+    if (!expense.submittedByEmail) {
+      console.log('[emailService] No submitter email provided for approval notification.');
+      return { success: false, reason: 'No submitter email available' };
+    }
+
+    const formattedAmount = `$${Number(expense.amount).toFixed(2)}`;
+    const formattedDate = new Date().toLocaleDateString('en-AU', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric'
+    });
+
+    const details: NotificationDetailItem[] = [
+      { label: 'Claim Title / தலைப்பு', value: expense.title },
+      { label: 'Claim Amount / தொகை', value: formattedAmount },
+      { label: 'Category / வகை', value: expense.category },
+      { label: 'Approved By / ஒப்புதல் அளித்தவர்', value: `${approver.fullName} (${(approver.role || 'Approver').toUpperCase()})` },
+      { label: 'Approval Date / தேதி', value: formattedDate }
+    ];
+
+    if (approver.comments) {
+      details.push({ label: 'Approver Comments / குறிப்புகள்', value: approver.comments });
+    }
+
+    return emailService.sendNotification({
+      feature: 'expenses',
+      to: expense.submittedByEmail,
+      replyTo: approver.email,
+      subject: `[Expense Approved] Claim for "${expense.title}" (${formattedAmount}) Approved`,
+      title: `Expense Claim Approved! / செலவினக் கோரிக்கை அங்கீகரிக்கப்பட்டது`,
+      subtitle: `Approved by School Committee & Queued for Payment`,
+      summary: `Good news! Your expense claim of ${formattedAmount} for "${expense.title}" has been reviewed and approved. It is now queued with the School Treasury for bank transfer reimbursement.`,
+      details: details,
+      actionButton: {
+        text: 'View Status in Portal / போர்ட்டலில் நிலையைப் பார்க்கவும்',
+        url: 'https://pallithozhan.3stech.com.au/'
+      },
+      footerNote: 'You received this notification because you submitted an expense claim in PalliThozhan Portal. You will receive another notification once payment has been transferred.'
+    });
+  },
+
+  /**
+   * Helper: Send Expense Reimbursement (Paid) confirmation to Submitter & Treasurer
+   */
+  sendExpensePaidNotification: async (
+    expense: {
+      expenseId: string;
+      title: string;
+      amount: number;
+      category: string;
+      notes?: string;
+      submittedBy: string;
+      submittedByEmail: string;
+      paidDate?: string;
+      paymentReference?: string;
+      paymentProofUrl?: string;
+      paymentProofName?: string;
+    },
+    payer: {
+      fullName: string;
+      email: string;
+    }
+  ): Promise<EmailDispatchResult> => {
+    if (!expense.submittedByEmail) {
+      console.log('[emailService] No submitter email provided for payment confirmation notification.');
+      return { success: false, reason: 'No submitter email available' };
+    }
+
+    const config = await emailConfigService.getEmailConfig();
+    const treasurerEmails = config.features?.expenses?.toEmails || config.customGroups?.treasury || [];
+
+    const formattedAmount = `$${Number(expense.amount).toFixed(2)}`;
+    const formattedPaidDate = expense.paidDate
+      ? new Date(expense.paidDate).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })
+      : new Date().toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
+
+    const details: NotificationDetailItem[] = [
+      { label: 'Claim Title / தலைப்பு', value: expense.title },
+      { label: 'Amount Reimbursed / செலுத்தப்பட்ட தொகை', value: formattedAmount },
+      { label: 'Payment Date / தேதி', value: formattedPaidDate },
+      { label: 'Paid By (Treasurer) / செலுத்தியவர்', value: payer.fullName },
+      { label: 'Bank Transaction Ref / வங்கி குறிப்பு எண்', value: expense.paymentReference || 'Direct Bank Transfer' }
+    ];
+
+    if (expense.paymentProofUrl) {
+      const proofName = expense.paymentProofName || 'Bank Transfer Receipt Screenshot';
+      const isImage = expense.paymentProofUrl.startsWith('data:image/') || /\.(jpg|jpeg|png|webp|gif)($|\?)/i.test(expense.paymentProofUrl);
+      let proofHtml = `<a href="${expense.paymentProofUrl}" target="_blank" style="color: #2b8a3e; font-weight: bold; text-decoration: underline; display: inline-block; margin-bottom: 6px;">📎 ${proofName} (Click to View / Download)</a>`;
+      if (isImage) {
+        proofHtml += `<br/><a href="${expense.paymentProofUrl}" target="_blank"><img src="${expense.paymentProofUrl}" alt="Payment Receipt" style="max-width: 340px; max-height: 240px; border-radius: 8px; border: 1px solid #e0e0e0; margin-top: 6px; box-shadow: 0 2px 6px rgba(0,0,0,0.08); display: block;" /></a>`;
+      }
+      details.push({ label: 'Payment Receipt / செலுத்துகை ரசீது', value: proofHtml, isHtml: true });
+    }
+
+    return emailService.sendNotification({
+      feature: 'expenses',
+      to: expense.submittedByEmail,
+      bcc: treasurerEmails,
+      replyTo: payer.email,
+      subject: `[Expense Reimbursed] Payment of ${formattedAmount} Completed for "${expense.title}"`,
+      title: `Expense Reimbursed & Transferred! / தொகை செலுத்தப்பட்டது`,
+      subtitle: `Reimbursement confirmation from School Treasury`,
+      summary: `Your expense claim of ${formattedAmount} for "${expense.title}" has been reimbursed and transferred to your bank account.`,
+      details: details,
+      actionButton: {
+        text: 'View Claim Details in Portal / போர்ட்டலில் விவரங்களைப் பார்க்கவும்',
+        url: 'https://pallithozhan.3stech.com.au/'
+      },
+      footerNote: 'Please verify the funds in your bank account. A copy of this confirmation has been archived in the school finance records.'
     });
   },
 

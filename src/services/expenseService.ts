@@ -39,6 +39,8 @@ export interface Expense {
   paidBy?: string; // treasurer/admin name
   paidByUid?: string;
   paymentReference?: string; // bank reference
+  paymentProofUrl?: string; // payment receipt / screenshot
+  paymentProofName?: string;
 }
 
 export interface ExpenseApproverConfig {
@@ -428,6 +430,25 @@ export const expenseService = {
             `Expense claim of $${updatedExpense.amount} for "${updatedExpense.title}" is fully approved. Please reimburse the user.`
           );
         }
+
+        // Send approval confirmation email to submitter
+        try {
+          const latestApproval = (updatedExpense.approvals && updatedExpense.approvals.length > 0)
+            ? updatedExpense.approvals[updatedExpense.approvals.length - 1]
+            : undefined;
+
+          await emailService.sendExpenseApprovalNotification(
+            updatedExpense,
+            {
+              fullName: latestApproval?.approvedBy || 'School Approver',
+              email: latestApproval?.approvedByEmail || 'noreply@3stech.com.au',
+              role: latestApproval?.role,
+              comments: latestApproval?.comments
+            }
+          );
+        } catch (emailErr) {
+          console.warn('Failed to send expense approval email:', emailErr);
+        }
       }
 
       // If rejected, alert the submitter
@@ -446,6 +467,19 @@ export const expenseService = {
           'Expense Reimbursed! / தொகை செலுத்தப்பட்டது',
           `Your expense claim of $${updatedExpense.amount} for "${updatedExpense.title}" has been reimbursed (Paid). Ref: ${updatedExpense.paymentReference || 'N/A'}.`
         );
+
+        // Send reimbursement confirmation email with payment details and receipt proof
+        try {
+          await emailService.sendExpensePaidNotification(
+            updatedExpense,
+            {
+              fullName: updatedExpense.paidBy || 'School Treasurer',
+              email: 'noreply@3stech.com.au'
+            }
+          );
+        } catch (emailErr) {
+          console.warn('Failed to send expense reimbursement email:', emailErr);
+        }
       }
     } catch (alertErr) {
       console.warn('Failed to push notification alerts for expense update:', alertErr);
@@ -504,5 +538,38 @@ export const expenseService = {
       console.error('[expenseService] Failed to scan receipt:', e);
       throw e;
     }
+  },
+
+  uploadPaymentProof: async (
+    expenseId: string,
+    file: { name: string; url: string; size?: number }
+  ): Promise<{ downloadUrl: string; fileName: string }> => {
+    if (!file.url) {
+      throw new Error('No file data provided');
+    }
+
+    const safeName = file.name ? file.name.replace(/[^a-zA-Z0-9._-]/g, '_') : `payment_receipt_${Date.now()}.jpg`;
+
+    if (storage && process.env.EXPO_PUBLIC_DEMO_MODE !== 'true') {
+      try {
+        const { ref, uploadString, uploadBytes, getDownloadURL } = require('firebase/storage');
+        const storagePath = `expenses/payments/${expenseId}_receipt_${Date.now()}_${safeName}`;
+        const fileRef = ref(storage, storagePath);
+
+        if (file.url.startsWith('data:')) {
+          await uploadString(fileRef, file.url, 'data_url');
+        } else if (!file.url.startsWith('http://') && !file.url.startsWith('https://')) {
+          const response = await fetch(file.url);
+          const blob = await response.blob();
+          await uploadBytes(fileRef, blob);
+        }
+        const downloadUrl = await getDownloadURL(fileRef);
+        return { downloadUrl, fileName: safeName };
+      } catch (storageErr) {
+        console.warn('[expenseService] Failed to upload payment proof to Firebase Storage, using fallback URL:', storageErr);
+      }
+    }
+
+    return { downloadUrl: file.url, fileName: safeName };
   }
 };

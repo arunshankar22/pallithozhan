@@ -1601,25 +1601,28 @@ Guidelines for SQL generation:
         recipients.push(...body.to.split(',').map(s => s.trim()));
       }
 
-      const targetGroup = body.targetGroup || body.group;
-      if (targetGroup) {
-        if (emailConfig.customGroups && Array.isArray(emailConfig.customGroups[targetGroup])) {
-          recipients.push(...emailConfig.customGroups[targetGroup]);
-        } else if (targetGroup === 'teachers' || targetGroup === 'teacher') {
-          const teachers = (dbData.users || []).filter(u => u.role === 'teacher' && u.email);
-          recipients.push(...teachers.map(u => u.email));
-        } else if (targetGroup === 'parents' || targetGroup === 'parent') {
-          const parents = (dbData.users || []).filter(u => u.role === 'parent' && u.email);
-          recipients.push(...parents.map(u => u.email));
-        } else if (targetGroup === 'volunteers' || targetGroup === 'volunteer') {
-          const vols = (dbData.users || []).filter(u => u.role === 'volunteer' && u.email);
-          recipients.push(...vols.map(u => u.email));
-        } else if (targetGroup === 'treasury' || targetGroup === 'treasurer') {
-          const treasurers = emailConfig.features?.expenses?.toEmails || ['parramatta@balarmalar.nsw.edu.au'];
-          recipients.push(...treasurers);
-        } else if (targetGroup === 'all') {
-          const allUsers = (dbData.users || []).filter(u => u.email);
-          recipients.push(...allUsers.map(u => u.email));
+      // Only resolve targetGroup if explicit 'to' list was NOT provided
+      if (recipients.length === 0) {
+        const targetGroup = body.targetGroup || body.group;
+        if (targetGroup) {
+          if (emailConfig.customGroups && Array.isArray(emailConfig.customGroups[targetGroup])) {
+            recipients.push(...emailConfig.customGroups[targetGroup]);
+          } else if (targetGroup === 'teachers' || targetGroup === 'teacher') {
+            const teachers = (dbData.users || []).filter(u => u.role === 'teacher' && u.email);
+            recipients.push(...teachers.map(u => u.email));
+          } else if (targetGroup === 'parents' || targetGroup === 'parent') {
+            const parents = (dbData.users || []).filter(u => u.role === 'parent' && u.email);
+            recipients.push(...parents.map(u => u.email));
+          } else if (targetGroup === 'volunteers' || targetGroup === 'volunteer') {
+            const vols = (dbData.users || []).filter(u => u.role === 'volunteer' && u.email);
+            recipients.push(...vols.map(u => u.email));
+          } else if (targetGroup === 'treasury' || targetGroup === 'treasurer') {
+            const treasurers = emailConfig.features?.expenses?.toEmails || ['parramatta@balarmalar.nsw.edu.au'];
+            recipients.push(...treasurers);
+          } else if (targetGroup === 'all') {
+            const allUsers = (dbData.users || []).filter(u => u.email);
+            recipients.push(...allUsers.map(u => u.email));
+          }
         }
       }
 
@@ -1630,6 +1633,15 @@ Guidelines for SQL generation:
 
       // Clean, validate, and deduplicate emails
       recipients = [...new Set(recipients.map(e => (e || '').trim().toLowerCase()))].filter(e => e.includes('@'));
+
+      // Optional BCC list
+      let bccRecipients = [];
+      if (Array.isArray(body.bcc)) {
+        bccRecipients.push(...body.bcc);
+      } else if (typeof body.bcc === 'string' && body.bcc.trim()) {
+        bccRecipients.push(...body.bcc.split(',').map(s => s.trim()));
+      }
+      bccRecipients = [...new Set(bccRecipients.map(e => (e || '').trim().toLowerCase()))].filter(e => e.includes('@') && !recipients.includes(e));
 
       if (recipients.length === 0) {
         sendJson(res, 400, { error: 'No valid recipient email address specified or resolved for this notification.' });
@@ -1657,11 +1669,17 @@ Guidelines for SQL generation:
       if (apiKey) {
         let emailPayload = {
           from: `${senderName} <${senderEmail}>`,
-          to: recipients.length === 1 ? recipients[0] : senderEmail,
-          bcc: recipients.length > 1 ? recipients : undefined,
+          to: recipients.length === 1 ? recipients[0] : recipients,
+          bcc: bccRecipients.length > 0 ? bccRecipients : undefined,
           subject: body.subject || `[Notification] Balar Malar Tamil School`,
           html: htmlContent
         };
+
+        // If broadcasting to a broad group (e.g. parents, all), keep individual emails private via BCC
+        if (body.targetGroup && recipients.length > 1) {
+          emailPayload.to = senderEmail;
+          emailPayload.bcc = [...new Set([...recipients, ...bccRecipients])].filter(r => r !== senderEmail.toLowerCase());
+        }
 
         if (replyTo) {
           emailPayload.reply_to = replyTo;

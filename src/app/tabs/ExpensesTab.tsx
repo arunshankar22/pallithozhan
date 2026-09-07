@@ -7,7 +7,8 @@ import {
   Modal,
   ActivityIndicator,
   useWindowDimensions,
-  Platform
+  Platform,
+  Image
 } from 'react-native';
 
 import {
@@ -23,8 +24,13 @@ import {
   LayoutGrid,
   Shield,
   CircleSlash,
-  Sparkles
+  Sparkles,
+  Camera,
+  Upload,
+  Paperclip,
+  Image as ImageIcon
 } from 'lucide-react-native';
+import * as ImagePicker from 'expo-image-picker';
 
 import { ThemedText } from '@/components/themed-text';
 import { TabProps } from '@/app/sharedTypes';
@@ -65,6 +71,7 @@ export function ExpensesTab({ user, colors, t, showToast, i18n, insets }: TabPro
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
   const [actionComments, setActionComments] = useState('');
   const [reimburseRef, setReimburseRef] = useState('');
+  const [paymentProofFile, setPaymentProofFile] = useState<{ name: string; size: number; url: string } | null>(null);
   const [processingAction, setProcessingAction] = useState(false);
 
   useEffect(() => {
@@ -218,6 +225,105 @@ export function ExpensesTab({ user, colors, t, showToast, i18n, insets }: TabPro
     }
   };
 
+  const handlePickPaymentProof = async (mode: 'camera' | 'library' | 'document') => {
+    if (Platform.OS === 'web') {
+      try {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = mode === 'document' ? 'application/pdf,image/*' : 'image/*';
+        if (mode === 'camera') {
+          input.setAttribute('capture', 'environment');
+        }
+        input.onchange = async (e: any) => {
+          const files = e.target.files;
+          if (files && files.length > 0) {
+            const file = files[0];
+            if (file.size > 10 * 1024 * 1024) {
+              showToast('File exceeds 10MB limit.', 'warning');
+              return;
+            }
+            const reader = new FileReader();
+            reader.onload = () => {
+              setPaymentProofFile({
+                name: file.name,
+                size: file.size,
+                url: reader.result as string
+              });
+              showToast(i18n.language === 'ta' ? 'ரசீது இணைக்கப்பட்டது!' : 'Payment receipt attached!', 'success');
+            };
+            reader.readAsDataURL(file);
+          }
+        };
+        input.click();
+      } catch (err) {
+        console.warn('Web file picker error:', err);
+      }
+    } else {
+      // Mobile native
+      try {
+        if (mode === 'camera') {
+          const { status } = await ImagePicker.requestCameraPermissionsAsync();
+          if (status !== 'granted') {
+            showToast('Camera permission is required to capture receipt.', 'warning');
+            return;
+          }
+          const result = await ImagePicker.launchCameraAsync({
+            allowsEditing: true,
+            quality: 0.8
+          });
+          if (!result.canceled && result.assets && result.assets.length > 0) {
+            const asset = result.assets[0];
+            setPaymentProofFile({
+              name: asset.fileName || `payment_receipt_${Date.now()}.jpg`,
+              size: asset.fileSize || 0,
+              url: asset.uri
+            });
+            showToast(i18n.language === 'ta' ? 'ரசீது படம் எடுக்கப்பட்டது!' : 'Receipt photo captured!', 'success');
+          }
+        } else if (mode === 'library') {
+          const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+          if (status !== 'granted') {
+            showToast('Permission to access photo library is required.', 'warning');
+            return;
+          }
+          const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ['images'],
+            allowsEditing: true,
+            quality: 0.8
+          });
+          if (!result.canceled && result.assets && result.assets.length > 0) {
+            const asset = result.assets[0];
+            setPaymentProofFile({
+              name: asset.fileName || `payment_receipt_${Date.now()}.jpg`,
+              size: asset.fileSize || 0,
+              url: asset.uri
+            });
+            showToast(i18n.language === 'ta' ? 'ரசீது இணைக்கப்பட்டது!' : 'Receipt screenshot attached!', 'success');
+          }
+        } else {
+          // Document / PDF
+          const DocumentPicker = require('expo-document-picker');
+          const res = await DocumentPicker.getDocumentAsync({
+            type: ['application/pdf', 'image/*'],
+            multiple: false
+          });
+          if (!res.canceled && res.assets && res.assets.length > 0) {
+            const asset = res.assets[0];
+            setPaymentProofFile({
+              name: asset.name,
+              size: asset.size || 0,
+              url: asset.uri
+            });
+            showToast(i18n.language === 'ta' ? 'கோப்பு இணைக்கப்பட்டது!' : 'Document attached!', 'success');
+          }
+        }
+      } catch (err: any) {
+        console.warn('Payment proof pick error:', err);
+        showToast('Failed to attach payment proof.', 'error');
+      }
+    }
+  };
+
   const handleScanReceipt = async () => {
     if (Platform.OS === 'web') {
       try {
@@ -252,7 +358,7 @@ export function ExpensesTab({ user, colors, t, showToast, i18n, insets }: TabPro
               if (file.type.startsWith('image/')) {
                 try {
                   scanBase64 = await new Promise<string>((resolve) => {
-                    const img = new Image();
+                    const img = new (window as any).Image();
                     img.onload = () => {
                       const canvas = document.createElement('canvas');
                       let width = img.width;
@@ -376,6 +482,7 @@ export function ExpensesTab({ user, colors, t, showToast, i18n, insets }: TabPro
 
   // Form submission handler (Create / Edit)
   const handleSubmitExpense = async () => {
+    if (submittingForm) return;
     if (!title.trim()) {
       showToast(i18n.language === 'ta' ? 'தயவுசெய்து தலைப்பை உள்ளிடவும்!' : 'Please enter an expense title!', 'warning');
       return;
@@ -471,6 +578,14 @@ export function ExpensesTab({ user, colors, t, showToast, i18n, insets }: TabPro
     setAttachedFiles([]);
   };
 
+  const openActionModal = (exp: Expense, currentRole?: any) => {
+    setSelectedExpense(currentRole ? { ...exp, currentApproverRole: currentRole } : exp);
+    setActionComments('');
+    setReimburseRef('');
+    setPaymentProofFile(null);
+    setActionModalVisible(true);
+  };
+
   // Stage action workflow (Approve / Reject / Reimburse)
   const handleAction = async (action: 'Approved' | 'Rejected' | 'Paid') => {
     if (!selectedExpense) return;
@@ -485,12 +600,30 @@ export function ExpensesTab({ user, colors, t, showToast, i18n, insets }: TabPro
           setProcessingAction(false);
           return;
         }
+
+        let proofDownloadUrl = selectedExpense.paymentProofUrl;
+        let proofName = selectedExpense.paymentProofName;
+
+        if (paymentProofFile) {
+          try {
+            const uploadResult = await expenseService.uploadPaymentProof(selectedExpense.expenseId, paymentProofFile);
+            proofDownloadUrl = uploadResult.downloadUrl;
+            proofName = uploadResult.fileName;
+          } catch (uploadErr) {
+            console.warn('Failed to upload proof to storage, using fallback data URI:', uploadErr);
+            proofDownloadUrl = paymentProofFile.url;
+            proofName = paymentProofFile.name;
+          }
+        }
+
         await expenseService.updateExpense(selectedExpense.expenseId, {
           paymentStatus: 'Paid',
           paidDate: nowStr.split('T')[0],
           paidBy: user?.fullName || 'Treasurer',
           paidByUid: user?.uid,
-          paymentReference: reimburseRef.trim()
+          paymentReference: reimburseRef.trim(),
+          paymentProofUrl: proofDownloadUrl,
+          paymentProofName: proofName
         });
         showToast('Reimbursement completed successfully!', 'success');
       } else {
@@ -523,6 +656,7 @@ export function ExpensesTab({ user, colors, t, showToast, i18n, insets }: TabPro
       setActionModalVisible(false);
       setActionComments('');
       setReimburseRef('');
+      setPaymentProofFile(null);
       loadData();
     } catch (e) {
       showToast('Action process failed.', 'error');
@@ -774,11 +908,38 @@ export function ExpensesTab({ user, colors, t, showToast, i18n, insets }: TabPro
                 )}
 
                 {exp.paymentStatus === 'Paid' && (
-                  <View style={{ padding: 10, borderRadius: 8, backgroundColor: colors.background, borderWidth: 0.5, borderColor: colors.border, gap: 2 }}>
-                    <ThemedText style={{ fontSize: 10, fontWeight: '700', color: '#2b8a3e' }}>💰 Paid Details:</ThemedText>
+                  <View style={{ padding: 10, borderRadius: 8, backgroundColor: colors.background, borderWidth: 0.5, borderColor: colors.border, gap: 4 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <ThemedText style={{ fontSize: 10, fontWeight: '700', color: '#2b8a3e' }}>💰 Paid Details / செலுத்துகை விவரங்கள்:</ThemedText>
+                      {exp.paidDate && <ThemedText style={{ fontSize: 10, color: colors.textSecondary }}>{exp.paidDate}</ThemedText>}
+                    </View>
                     <ThemedText style={{ fontSize: 11, color: colors.text }}>
-                      Reimbursed by {exp.paidBy} on {exp.paidDate} (Ref: {exp.paymentReference})
+                      Reimbursed by <ThemedText style={{ fontWeight: '700' }}>{exp.paidBy}</ThemedText> (Ref: <ThemedText style={{ fontWeight: '700', fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }}>{exp.paymentReference || 'N/A'}</ThemedText>)
                     </ThemedText>
+                    {exp.paymentProofUrl && (
+                      <View style={{ marginTop: 2, flexDirection: 'row', alignItems: 'center' }}>
+                        <Pressable
+                          onPress={() => handleViewFile(exp.paymentProofUrl!, exp.paymentProofName || 'payment_receipt.jpg')}
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 5,
+                            backgroundColor: '#e6fcf5',
+                            borderWidth: 0.5,
+                            borderColor: '#20c997',
+                            paddingVertical: 4,
+                            paddingHorizontal: 8,
+                            borderRadius: 6
+                          }}
+                        >
+                          <Paperclip size={11} color="#0ca678" />
+                          <ThemedText style={{ fontSize: 10, color: '#0ca678', fontWeight: '700' }}>
+                            📎 {exp.paymentProofName || 'Payment Receipt / செலுத்துகை ரசீது'}
+                          </ThemedText>
+                          <Eye size={10} color="#0ca678" />
+                        </Pressable>
+                      </View>
+                    )}
                   </View>
                 )}
 
@@ -802,7 +963,7 @@ export function ExpensesTab({ user, colors, t, showToast, i18n, insets }: TabPro
                   <View style={{ flexDirection: 'row', gap: 6 }}>
                     {userIsStageApprover && (
                       <Pressable
-                        onPress={() => { setSelectedExpense({ ...exp, currentApproverRole: waitingForRole }); setActionModalVisible(true); }}
+                        onPress={() => openActionModal(exp, waitingForRole)}
                         style={{
                           backgroundColor: colors.primary,
                           paddingVertical: 6,
@@ -816,7 +977,7 @@ export function ExpensesTab({ user, colors, t, showToast, i18n, insets }: TabPro
 
                     {userIsPaidApprover && (
                       <Pressable
-                        onPress={() => { setSelectedExpense(exp); setActionModalVisible(true); }}
+                        onPress={() => openActionModal(exp)}
                         style={{
                           backgroundColor: '#2b8a3e',
                           paddingVertical: 6,
@@ -991,12 +1152,22 @@ export function ExpensesTab({ user, colors, t, showToast, i18n, insets }: TabPro
                           color: exp.paymentStatus === 'Paid' ? '#2b8a3e' : '#c92a2a'
                         }}>{exp.paymentStatus}</ThemedText>
                       </View>
+                      {exp.paymentProofUrl && (
+                        <Pressable
+                          onPress={() => handleViewFile(exp.paymentProofUrl!, exp.paymentProofName || 'payment_receipt.jpg')}
+                          style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 3 }}
+                        >
+                          <Paperclip size={9} color="#0ca678" />
+                          <ThemedText style={{ fontSize: 8, color: '#0ca678', fontWeight: '700' }}>Proof</ThemedText>
+                          <Eye size={8} color="#0ca678" />
+                        </Pressable>
+                      )}
                     </View>
 
                     <View style={{ width: 120, paddingHorizontal: 8, flexDirection: 'row', gap: 6 }}>
                       {userIsStageApprover && (
                         <Pressable
-                          onPress={() => { setSelectedExpense({ ...exp, currentApproverRole: waitingForRole }); setActionModalVisible(true); }}
+                          onPress={() => openActionModal(exp, waitingForRole)}
                           style={{
                             backgroundColor: colors.primary,
                             paddingVertical: 4,
@@ -1010,7 +1181,7 @@ export function ExpensesTab({ user, colors, t, showToast, i18n, insets }: TabPro
 
                       {userIsPaidApprover && (
                         <Pressable
-                          onPress={() => { setSelectedExpense(exp); setActionModalVisible(true); }}
+                          onPress={() => openActionModal(exp)}
                           style={{
                             backgroundColor: '#2b8a3e',
                             paddingVertical: 4,
@@ -1234,7 +1405,7 @@ export function ExpensesTab({ user, colors, t, showToast, i18n, insets }: TabPro
               </ThemedText>
 
               {selectedExpense?.status === 'Approved' ? (
-                <View style={{ gap: 8 }}>
+                <View style={{ gap: 10 }}>
                   <ThemedText style={styles.formLabel}>Bank Transfer Reference / Transaction ID*</ThemedText>
                   <TextInput
                     style={[styles.formInput, { color: colors.text, borderColor: colors.border }]}
@@ -1243,19 +1414,144 @@ export function ExpensesTab({ user, colors, t, showToast, i18n, insets }: TabPro
                     placeholder="e.g. TXN-1928471"
                     placeholderTextColor={colors.textSecondary}
                   />
+
+                  <View style={{ marginTop: 2, gap: 6 }}>
+                    <ThemedText style={styles.formLabel}>Payment Receipt Screenshot / செலுத்துகை சான்று</ThemedText>
+
+                    {paymentProofFile ? (
+                      <View style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: 10,
+                        backgroundColor: colors.background,
+                        borderRadius: 8,
+                        borderWidth: 1,
+                        borderColor: '#20c997'
+                      }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                          {paymentProofFile.url.startsWith('data:image/') || paymentProofFile.name.match(/\.(jpg|jpeg|png|webp)$/i) ? (
+                            <Image
+                              source={{ uri: paymentProofFile.url }}
+                              style={{ width: 42, height: 42, borderRadius: 6, backgroundColor: '#eee' }}
+                              resizeMode="cover"
+                            />
+                          ) : (
+                            <View style={{ width: 42, height: 42, borderRadius: 6, backgroundColor: '#e6fcf5', alignItems: 'center', justifyContent: 'center' }}>
+                              <Paperclip size={20} color="#20c997" />
+                            </View>
+                          )}
+                          <View style={{ flex: 1 }}>
+                            <ThemedText style={{ fontSize: 12, fontWeight: '700', color: colors.text }} numberOfLines={1}>
+                              {paymentProofFile.name}
+                            </ThemedText>
+                            <ThemedText style={{ fontSize: 10, color: colors.textSecondary }}>
+                              {paymentProofFile.size ? `${(paymentProofFile.size / 1024).toFixed(1)} KB • Ready` : 'Ready to upload'}
+                            </ThemedText>
+                          </View>
+                        </View>
+                        <Pressable
+                          onPress={() => setPaymentProofFile(null)}
+                          style={{ padding: 6, borderRadius: 16, backgroundColor: '#fff5f5' }}
+                        >
+                          <X size={16} color="#c92a2a" />
+                        </Pressable>
+                      </View>
+                    ) : (
+                      <View style={{ gap: 6 }}>
+                        <View style={{ flexDirection: 'row', gap: 8 }}>
+                          <Pressable
+                            onPress={() => handlePickPaymentProof('camera')}
+                            style={({ pressed }) => [
+                              {
+                                flex: 1,
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: 6,
+                                paddingVertical: 10,
+                                paddingHorizontal: 10,
+                                borderRadius: 8,
+                                borderWidth: 1,
+                                borderColor: colors.border,
+                                backgroundColor: colors.background
+                              },
+                              pressed && { opacity: 0.7 }
+                            ]}
+                          >
+                            <Camera size={15} color={colors.primary} />
+                            <ThemedText style={{ fontSize: 12, fontWeight: '700', color: colors.text }}>
+                              Camera / படம்
+                            </ThemedText>
+                          </Pressable>
+
+                          <Pressable
+                            onPress={() => handlePickPaymentProof('library')}
+                            style={({ pressed }) => [
+                              {
+                                flex: 1,
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: 6,
+                                paddingVertical: 10,
+                                paddingHorizontal: 10,
+                                borderRadius: 8,
+                                borderWidth: 1,
+                                borderColor: colors.border,
+                                backgroundColor: colors.background
+                              },
+                              pressed && { opacity: 0.7 }
+                            ]}
+                          >
+                            <ImageIcon size={15} color="#20c997" />
+                            <ThemedText style={{ fontSize: 12, fontWeight: '700', color: colors.text }}>
+                              Screenshot / கேலரி
+                            </ThemedText>
+                          </Pressable>
+                        </View>
+
+                        <Pressable
+                          onPress={() => handlePickPaymentProof('document')}
+                          style={({ pressed }) => [
+                            {
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: 6,
+                              paddingVertical: 7,
+                              borderRadius: 6,
+                              borderWidth: 1,
+                              borderStyle: 'dashed',
+                              borderColor: colors.border
+                            },
+                            pressed && { opacity: 0.7 }
+                          ]}
+                        >
+                          <Upload size={13} color={colors.textSecondary} />
+                          <ThemedText style={{ fontSize: 11, color: colors.textSecondary }}>
+                            Or choose PDF / bank receipt document
+                          </ThemedText>
+                        </Pressable>
+                      </View>
+                    )}
+                    <ThemedText style={{ fontSize: 10, color: colors.textSecondary, fontStyle: 'italic' }}>
+                      💡 The receipt photo/screenshot will be included in the confirmation email and saved in the portal.
+                    </ThemedText>
+                  </View>
                   
                   <Pressable
                     onPress={() => handleAction('Paid')}
                     disabled={processingAction}
                     style={({ pressed }) => [
-                      { backgroundColor: '#2b8a3e', paddingVertical: 12, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginTop: 12 },
+                      { backgroundColor: '#2b8a3e', paddingVertical: 12, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginTop: 10 },
                       { opacity: pressed || processingAction ? 0.9 : 1 }
                     ]}
                   >
                     {processingAction ? (
                       <ActivityIndicator size="small" color="#FFF" />
                     ) : (
-                      <ThemedText style={{ color: '#FFF', fontWeight: '800' }}>💸 Mark as Reimbursed</ThemedText>
+                      <ThemedText style={{ color: '#FFF', fontWeight: '800' }}>💸 Mark as Reimbursed & Send Email</ThemedText>
                     )}
                   </Pressable>
                 </View>
