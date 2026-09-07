@@ -10,7 +10,7 @@ import {
   Platform
 } from 'react-native';
 
-import { Edit, Trash2, UserPlus, Plus, X, CheckCircle, UserCheck, HelpCircle } from 'lucide-react-native';
+import { Edit, Trash2, UserPlus, Plus, X, CheckCircle, UserCheck, HelpCircle, AlertTriangle } from 'lucide-react-native';
 import { ThemedText } from '@/components/themed-text';
 import { HelperTooltip } from '@/components/HelperTooltip';
 import { TabProps } from '@/app/sharedTypes';
@@ -24,6 +24,8 @@ import { featureFlagsService } from '@/services/featureFlagsService';
 import { interestService } from '@/services/interestService';
 import { emailConfigService, EmailSystemConfig, DEFAULT_EMAIL_CONFIG } from '@/services/emailConfigService';
 import { emailService } from '@/services/emailService';
+import { userService } from '@/services/userService';
+import { auditLogService } from '@/services/auditLogService';
 import { UserModal } from '@/components/UserModal';
 import { UserBulkBar } from '@/components/UserBulkBar';
 import { DateTimePicker } from '@/components/DateTimePicker';
@@ -134,6 +136,52 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets, onFeat
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [userViewMode, setUserViewMode] = useState<'card' | 'table'>('card');
   const [waitlistViewMode, setWaitlistViewMode] = useState<'card' | 'table'>('card');
+
+  // Sensitive data sanitization states
+  const [sanitizingData, setSanitizingData] = useState(false);
+  const [sanitizeModalVisible, setSanitizeModalVisible] = useState(false);
+  const [confirmInput, setConfirmInput] = useState('');
+  const [sanitizationSummary, setSanitizationSummary] = useState<{
+    total: number;
+    modified: number;
+    errorCount: number;
+  } | null>(null);
+
+  const handleConfirmSanitize = async () => {
+    setSanitizingData(true);
+    try {
+      const result = await userService.sanitizeAllUsersSensitiveData();
+      setSanitizationSummary({
+        total: result.total,
+        modified: result.modified,
+        errorCount: result.errorCount
+      });
+
+      await auditLogService.logAction(
+        user?.uid || 'unknown',
+        user?.fullName || 'Admin',
+        user?.email || 'admin@balarmalar.edu.au',
+        user?.role || 'admin',
+        'sanitize_user_data',
+        `Sanitized user profiles: removed Phone, WWC, DOB from ${result.modified} of ${result.total} users.`
+      );
+
+      showToast(
+        i18n.language === 'ta'
+          ? `வெற்றிகரமாக ${result.modified} பயனர்களின் ரகசியத் தரவுகள் நீக்கப்பட்டன!`
+          : `Successfully sanitized ${result.modified} users' sensitive data!`,
+        'success'
+      );
+      refreshData();
+    } catch (err: any) {
+      showToast(
+        i18n.language === 'ta' ? 'தரவு நீக்கத்தில் பிழை ஏற்பட்டது.' : `Error: ${err.message || 'Sanitization failed'}`,
+        'error'
+      );
+    } finally {
+      setSanitizingData(false);
+    }
+  };
 
   // Filtered users
   const filteredUsers = users.filter(u => {
@@ -1605,6 +1653,33 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets, onFeat
               >
                 <UserPlus size={14} color="#FFF" />
                 <ThemedText style={{ color: '#FFF', fontSize: 12, fontWeight: '700' }}>Enroll User</ThemedText>
+              </Pressable>
+
+              <Pressable
+                onPress={() => {
+                  setConfirmInput('');
+                  setSanitizationSummary(null);
+                  setSanitizeModalVisible(true);
+                }}
+                style={({ pressed }) => [
+                  {
+                    backgroundColor: '#FEF2F2',
+                    borderWidth: 1,
+                    borderColor: '#FCA5A5',
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    paddingVertical: 8,
+                    paddingHorizontal: 12,
+                    borderRadius: 8,
+                    gap: 6
+                  },
+                  { opacity: pressed ? 0.9 : 1 }
+                ]}
+              >
+                <AlertTriangle size={14} color="#DC2626" />
+                <ThemedText style={{ color: '#DC2626', fontSize: 12, fontWeight: '700' }}>
+                  {i18n.language === 'ta' ? 'ரகசியத் தரவை நீக்கு' : 'Sanitize Data'}
+                </ThemedText>
               </Pressable>
             </View>
           </View>
@@ -4427,6 +4502,149 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets, onFeat
         showToast={showToast}
         onSave={handleSaveWaitlistEdit}
       />
+
+      {/* ==================== SENSITIVE DATA SANITIZATION MODAL ==================== */}
+      <Modal
+        visible={sanitizeModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => {
+          if (!sanitizingData) setSanitizeModalVisible(false);
+        }}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 16 }}>
+          <View style={[styles.driveModalContainer, { backgroundColor: colors.cardBg, borderColor: '#FCA5A5', borderWidth: 1, width: '92%', maxWidth: 520, borderRadius: 16 }]}>
+            <View style={[styles.driveModalHeader, { borderBottomColor: colors.border, padding: 16 }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <AlertTriangle size={20} color="#DC2626" />
+                <ThemedText style={{ fontSize: 16, fontWeight: '800', color: '#DC2626' }}>
+                  {i18n.language === 'ta' ? 'ரகசியத் தரவு நீக்க உறுதிப்படுத்தல்' : 'Confirm Sensitive Data Sanitization'}
+                </ThemedText>
+              </View>
+              {!sanitizingData && (
+                <Pressable onPress={() => setSanitizeModalVisible(false)} style={{ padding: 4 }}>
+                  <X size={20} color={colors.textSecondary} />
+                </Pressable>
+              )}
+            </View>
+
+            <ScrollView style={{ padding: 16 }}>
+              {sanitizationSummary ? (
+                <View style={{ gap: 14 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <CheckCircle size={22} color="#16A34A" />
+                    <ThemedText style={{ fontSize: 15, fontWeight: '800', color: '#16A34A' }}>
+                      {i18n.language === 'ta' ? 'தரவு தூய்மைப்படுத்தல் முடிந்தது!' : 'Sanitization Completed!'}
+                    </ThemedText>
+                  </View>
+                  <ThemedText style={{ fontSize: 13, color: colors.text }}>
+                    {i18n.language === 'ta'
+                      ? `மொத்தம் ${sanitizationSummary.total} பயனர்களில் ${sanitizationSummary.modified} பயனர்களின் ரகசியத் தரவுகள் வெற்றிகரமாக நீக்கப்பட்டன.`
+                      : `Successfully stripped sensitive fields from ${sanitizationSummary.modified} of ${sanitizationSummary.total} user profiles.`}
+                  </ThemedText>
+                  {sanitizationSummary.errorCount > 0 && (
+                    <ThemedText style={{ fontSize: 12, color: '#DC2626' }}>
+                      ⚠️ {sanitizationSummary.errorCount} errors encountered.
+                    </ThemedText>
+                  )}
+                  <Pressable
+                    onPress={() => setSanitizeModalVisible(false)}
+                    style={{ backgroundColor: colors.primary, paddingVertical: 10, borderRadius: 8, alignItems: 'center', marginTop: 12 }}
+                  >
+                    <ThemedText style={{ color: '#FFF', fontWeight: '800' }}>
+                      {i18n.language === 'ta' ? 'முடிந்தது' : 'Done'}
+                    </ThemedText>
+                  </Pressable>
+                </View>
+              ) : (
+                <View style={{ gap: 14 }}>
+                  <ThemedText style={{ fontSize: 13, color: colors.text, lineHeight: 18 }}>
+                    {i18n.language === 'ta'
+                      ? 'கவனம்: இந்த நடவடிக்கை தரவுத்தளத்தில் உள்ள அனைத்து பயனர்களிலிருந்தும் தொலைபேசி எண், WWC எண், மற்றும் பிறந்த தேதியை நிரந்தரமாக நீக்கும். இதை மீட்டெடுக்க முடியாது!'
+                      : 'WARNING: This action will permanently remove Phone Numbers, WWC Numbers, and Date of Birth from all users in the active database. This action cannot be reversed!'}
+                  </ThemedText>
+
+                  <View style={{ backgroundColor: colors.background, padding: 10, borderRadius: 8, borderWidth: 1, borderColor: colors.border, gap: 4 }}>
+                    <ThemedText style={{ fontSize: 11, fontWeight: '700', color: '#DC2626' }}>
+                      {i18n.language === 'ta' ? 'நீக்கப்படும் புலங்கள்:' : 'Fields removed:'} Phone, WWC, DOB
+                    </ThemedText>
+                    <ThemedText style={{ fontSize: 11, fontWeight: '700', color: '#16A34A' }}>
+                      {i18n.language === 'ta' ? 'பாதுகாக்கப்படும் புலங்கள்:' : 'Fields kept:'} Names, Email, Roles, School & Class
+                    </ThemedText>
+                  </View>
+
+                  <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>
+                    {i18n.language === 'ta'
+                      ? 'உறுதிப்படுத்த கீழே "SANITIZE" என தட்டச்சு செய்யவும்:'
+                      : 'Type "SANITIZE" below to confirm execution:'}
+                  </ThemedText>
+
+                  <TextInput
+                    value={confirmInput}
+                    onChangeText={setConfirmInput}
+                    placeholder="SANITIZE"
+                    autoCapitalize="characters"
+                    editable={!sanitizingData}
+                    style={{
+                      height: 42,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      paddingHorizontal: 12,
+                      fontSize: 13,
+                      color: colors.text,
+                      backgroundColor: colors.background,
+                      borderColor: confirmInput.trim() === 'SANITIZE' ? '#DC2626' : colors.border
+                    }}
+                  />
+
+                  <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
+                    <Pressable
+                      onPress={() => setSanitizeModalVisible(false)}
+                      disabled={sanitizingData}
+                      style={{
+                        flex: 1,
+                        paddingVertical: 10,
+                        borderRadius: 8,
+                        backgroundColor: colors.background,
+                        borderWidth: 1,
+                        borderColor: colors.border,
+                        alignItems: 'center'
+                      }}
+                    >
+                      <ThemedText style={{ color: colors.text, fontWeight: '700', fontSize: 13 }}>
+                        {i18n.language === 'ta' ? 'ரத்துசெய்' : 'Cancel'}
+                      </ThemedText>
+                    </Pressable>
+
+                    <Pressable
+                      onPress={handleConfirmSanitize}
+                      disabled={confirmInput.trim() !== 'SANITIZE' || sanitizingData}
+                      style={({ pressed }) => [
+                        {
+                          flex: 1,
+                          paddingVertical: 10,
+                          borderRadius: 8,
+                          backgroundColor: '#DC2626',
+                          alignItems: 'center',
+                          opacity: confirmInput.trim() !== 'SANITIZE' || sanitizingData ? 0.4 : (pressed ? 0.9 : 1)
+                        }
+                      ]}
+                    >
+                      {sanitizingData ? (
+                        <ActivityIndicator size="small" color="#FFF" />
+                      ) : (
+                        <ThemedText style={{ color: '#FFF', fontWeight: '800', fontSize: 13 }}>
+                          {i18n.language === 'ta' ? 'உறுதிசெய் & நீக்கு' : 'Confirm & Sanitize'}
+                        </ThemedText>
+                      )}
+                    </Pressable>
+                  </View>
+                </View>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
 
     </View>
   );

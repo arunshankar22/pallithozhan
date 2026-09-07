@@ -1087,6 +1087,7 @@ export default function HomeScreen() {
       items.push({ key: 'reports', label: t('nav.reports'), labelTa: 'சாதனைகள்', icon: Award });
     } else if (role === 'admin') {
       items.push({ key: 'management', label: 'Admin Panel', labelTa: 'நிர்வாகம்', icon: Users });
+      items.push({ key: 'superadmin', label: 'Super Admin', labelTa: 'முதன்மை நிர்வாகி', icon: Shield });
       items.push({ key: 'reports', label: t('nav.reports'), labelTa: 'சாதனைகள்', icon: Award });
     } else if (role === 'teacher') {
       items.push({ key: 'attendance', label: 'Take Attendance', labelTa: 'வருகைப்பதிவு', icon: CheckSquare });
@@ -2735,7 +2736,7 @@ export default function HomeScreen() {
     { key: 'calendar', label: t('nav.calendar'), icon: CalendarIcon, roles: ['superadmin', 'admin', 'teacher', 'volunteer', 'parent', 'student'] },
     { key: 'reports', label: t('nav.reports'), icon: Award, roles: ['superadmin', 'admin', 'teacher', 'volunteer', 'parent'] },
     { key: 'management', label: t('nav.management'), icon: Users, roles: ['superadmin', 'admin'] },
-    { key: 'superadmin', label: 'Super Admin', icon: Shield, roles: ['superadmin'] },
+    { key: 'superadmin', label: 'Super Admin', icon: Shield, roles: ['superadmin', 'admin'] },
   ] as const;
 
   // Filter Nav Items based on user role and active portal feature flags

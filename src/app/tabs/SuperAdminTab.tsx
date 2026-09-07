@@ -351,20 +351,49 @@ export function SuperAdminTab({ user, colors, t, showToast, i18n }: TabProps) {
             </ThemedText>
           </View>
         </View>
-        <Pressable 
-          style={({ pressed }) => [
-            stylesTab.refreshBtn, 
-            { backgroundColor: colors.border, opacity: pressed ? 0.7 : 1 }
-          ]}
-          onPress={handleRefresh}
-          disabled={refreshing}
-        >
-          {refreshing ? (
-            <ActivityIndicator size="small" color={colors.text} />
-          ) : (
-            <RefreshCw size={16} color={colors.text} />
-          )}
-        </Pressable>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Pressable
+            onPress={() => {
+              setConfirmInput('');
+              setSanitizationSummary(null);
+              setSanitizeModalVisible(true);
+            }}
+            style={({ pressed }) => [
+              {
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 6,
+                paddingHorizontal: 12,
+                paddingVertical: 7,
+                borderRadius: 8,
+                borderWidth: 1,
+                borderColor: '#FCA5A5',
+                backgroundColor: '#FEF2F2',
+                opacity: pressed ? 0.8 : 1
+              }
+            ]}
+          >
+            <AlertTriangle size={14} color="#DC2626" />
+            <ThemedText style={{ color: '#DC2626', fontSize: 12, fontWeight: '700' }}>
+              {isTa ? 'ரகசியத் தரவு நீக்கம்' : 'Sanitize User Data'}
+            </ThemedText>
+          </Pressable>
+
+          <Pressable 
+            style={({ pressed }) => [
+              stylesTab.refreshBtn, 
+              { backgroundColor: colors.border, opacity: pressed ? 0.7 : 1 }
+            ]}
+            onPress={handleRefresh}
+            disabled={refreshing}
+          >
+            {refreshing ? (
+              <ActivityIndicator size="small" color={colors.text} />
+            ) : (
+              <RefreshCw size={16} color={colors.text} />
+            )}
+          </Pressable>
+        </View>
       </View>
 
       {/* Sub-tab Selectors */}
@@ -458,6 +487,33 @@ export function SuperAdminTab({ user, colors, t, showToast, i18n }: TabProps) {
                 {userViewMode === 'card' ? <Table size={16} color={colors.primary} /> : <LayoutGrid size={16} color={colors.primary} />}
                 <ThemedText style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>
                   {userViewMode === 'card' ? (isTa ? 'அட்டவணை' : 'Table') : (isTa ? 'அட்டை' : 'Cards')}
+                </ThemedText>
+              </Pressable>
+
+              <Pressable
+                onPress={() => {
+                  setConfirmInput('');
+                  setSanitizationSummary(null);
+                  setSanitizeModalVisible(true);
+                }}
+                style={({ pressed }) => [
+                  {
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 6,
+                    paddingHorizontal: 12,
+                    paddingVertical: 10,
+                    borderRadius: 10,
+                    borderWidth: 1,
+                    borderColor: '#FCA5A5',
+                    backgroundColor: '#FEF2F2',
+                    opacity: pressed ? 0.8 : 1
+                  }
+                ]}
+              >
+                <AlertTriangle size={15} color="#DC2626" />
+                <ThemedText style={{ fontSize: 12, fontWeight: '700', color: '#DC2626' }}>
+                  {isTa ? 'ரகசியத் தரவை நீக்கு' : 'Sanitize Data'}
                 </ThemedText>
               </Pressable>
             </View>
