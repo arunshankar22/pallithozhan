@@ -842,7 +842,10 @@ async function handleApiRoutes(req, res, pathname, method, dbData, writeDb, urlO
     try {
       const body = await parseBody(req);
       const fileData = body.fileData || '';
-      const mimeType = body.mimeType || 'image/jpeg';
+      let mimeType = body.mimeType || 'image/jpeg';
+      if (mimeType === 'image/jpg') {
+        mimeType = 'image/jpeg';
+      }
       
       if (!fileData) {
         sendJson(res, 400, { error: 'fileData (base64 string) is required.' });
@@ -851,8 +854,15 @@ async function handleApiRoutes(req, res, pathname, method, dbData, writeDb, urlO
 
       const apiKey = process.env.GEMINI_API_KEY;
       if (!apiKey) {
-        console.error('Error: GEMINI_API_KEY is not defined.');
-        sendJson(res, 500, { error: 'Gemini API key is not configured on the server.' });
+        console.warn('Warning: GEMINI_API_KEY is not configured on the server. Providing fallback receipt info.');
+        sendJson(res, 200, {
+          title: 'Scanned Receipt',
+          amount: 0,
+          category: 'other',
+          date: new Date().toISOString().split('T')[0],
+          notes: 'Receipt attached. (AI key not configured: please review details manually.)',
+          aiScanFailed: true
+        });
         return true;
       }
 
@@ -883,7 +893,7 @@ Response Schema:
 
       // Query Gemini API using standard REST endpoint
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
         {
           method: 'POST',
           headers: {
@@ -914,8 +924,16 @@ Response Schema:
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Gemini API error during receipt scan:', errorText);
-        sendJson(res, 502, { error: 'Gemini API receipt scan request failed.', details: errorText });
+        console.warn('Gemini API error during receipt scan:', errorText);
+        // Graceful fallback: return partial data so receipt attachment succeeds
+        sendJson(res, 200, {
+          title: 'Scanned Receipt',
+          amount: 0,
+          category: 'other',
+          date: new Date().toISOString().split('T')[0],
+          notes: 'Receipt attached. (AI scan unavailable: please review details manually.)',
+          aiScanFailed: true
+        });
         return true;
       }
 
@@ -1429,7 +1447,7 @@ Guidelines for SQL generation:
         }
 
         const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${apiKey}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

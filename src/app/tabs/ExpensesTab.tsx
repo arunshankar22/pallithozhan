@@ -388,9 +388,15 @@ export function ExpensesTab({
                 reader.readAsDataURL(file);
               });
 
+              // Attach file to form immediately so the uploaded receipt is NEVER lost
+              setAttachedFiles(prev => [...prev, { name: fileData.name, size: fileData.size, url: fileData.url }].slice(0, 5));
+
               // Compress if it is an image to fit payload size limits (e.g. Vercel 4.5MB limit)
               let scanBase64 = fileData.base64;
-              if (file.type.startsWith('image/')) {
+              let effectiveMime = file.type || 'image/jpeg';
+              if (effectiveMime === 'image/jpg') effectiveMime = 'image/jpeg';
+
+              if (file.type && file.type.startsWith('image/')) {
                 try {
                   scanBase64 = await new Promise<string>((resolve) => {
                     const img = new (window as any).Image();
@@ -416,28 +422,34 @@ export function ExpensesTab({
                       ctx?.drawImage(img, 0, 0, width, height);
                       resolve(canvas.toDataURL('image/jpeg', 0.6));
                     };
+                    img.onerror = () => resolve(fileData.base64);
                     img.src = fileData.base64;
                   });
+                  effectiveMime = 'image/jpeg';
                 } catch (compressErr) {
                   console.warn('Failed to compress web image:', compressErr);
                 }
               }
 
               // Call AI Scanner
-              const scanResult = await expenseService.scanReceipt(scanBase64, file.type || 'image/jpeg');
+              const scanResult = await expenseService.scanReceipt(scanBase64, effectiveMime);
               
-              // Autofill form fields
-              setTitle(scanResult.title || '');
-              setAmount(String(scanResult.amount || ''));
-              setCategory(scanResult.category || 'other');
-              setNotes(scanResult.notes || '');
+              // Autofill form fields if detected
+              if (scanResult.title && scanResult.title !== 'Scanned Receipt') setTitle(scanResult.title);
+              if (scanResult.amount && scanResult.amount > 0) setAmount(String(scanResult.amount));
+              if (scanResult.category && scanResult.category !== 'other') setCategory(scanResult.category);
+              if (scanResult.notes && !scanResult.notes.includes('AI key not configured') && !scanResult.notes.includes('AI scan unavailable')) {
+                setNotes(scanResult.notes);
+              }
 
-              // Attach file to form automatically
-              setAttachedFiles([{ name: fileData.name, size: fileData.size, url: fileData.url }]);
-              showToast('Receipt scanned & fields populated!', 'success');
+              if ((scanResult as any).aiScanFailed) {
+                showToast(i18n.language === 'ta' ? 'ரசீது இணைக்கப்பட்டது! தொகையை உள்ளிடவும்.' : 'Receipt attached! Please enter expense details.', 'warning');
+              } else {
+                showToast(i18n.language === 'ta' ? 'ரசீது ஸ்கேன் செய்யப்பட்டது!' : 'Receipt scanned & fields populated!', 'success');
+              }
             } catch (err: any) {
               console.warn('Smart Receipt Scanner error:', err);
-              showToast('Smart scan failed. Please enter manually.', 'error');
+              showToast(i18n.language === 'ta' ? 'ரசீது இணைக்கப்பட்டது! விவரங்களை கைமுறையாக உள்ளிடவும்.' : 'Receipt attached! Please enter details manually.', 'warning');
             } finally {
               setScanning(false);
             }
@@ -463,7 +475,11 @@ export function ExpensesTab({
           }
           setScanning(true);
           try {
-            const mimeType = asset.mimeType || 'image/jpeg';
+            // Attach file to form immediately so it's never lost
+            setAttachedFiles(prev => [...prev, { name: asset.name, size: asset.size || 0, url: asset.uri }].slice(0, 5));
+
+            let mimeType = asset.mimeType || 'image/jpeg';
+            if (mimeType === 'image/jpg') mimeType = 'image/jpeg';
             let scanUri = asset.uri;
 
             // Compress if it is an image using expo-image-manipulator on mobile
@@ -476,6 +492,7 @@ export function ExpensesTab({
                   { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG } // 60% quality jpeg
                 );
                 scanUri = manipResult.uri;
+                mimeType = 'image/jpeg';
               } catch (manipErr) {
                 console.warn('Failed to compress image on mobile, using original file:', manipErr);
               }
@@ -489,18 +506,22 @@ export function ExpensesTab({
             // Call AI Scanner
             const scanResult = await expenseService.scanReceipt(base64Data, mimeType);
 
-            // Autofill form fields
-            setTitle(scanResult.title || '');
-            setAmount(String(scanResult.amount || ''));
-            setCategory(scanResult.category || 'other');
-            setNotes(scanResult.notes || '');
+            // Autofill form fields if detected
+            if (scanResult.title && scanResult.title !== 'Scanned Receipt') setTitle(scanResult.title);
+            if (scanResult.amount && scanResult.amount > 0) setAmount(String(scanResult.amount));
+            if (scanResult.category && scanResult.category !== 'other') setCategory(scanResult.category);
+            if (scanResult.notes && !scanResult.notes.includes('AI key not configured') && !scanResult.notes.includes('AI scan unavailable')) {
+              setNotes(scanResult.notes);
+            }
 
-            // Attach file to form automatically
-            setAttachedFiles([{ name: asset.name, size: asset.size || 0, url: asset.uri }]);
-            showToast('Receipt scanned & fields populated!', 'success');
+            if ((scanResult as any).aiScanFailed) {
+              showToast(i18n.language === 'ta' ? 'ரசீது இணைக்கப்பட்டது! தொகையை உள்ளிடவும்.' : 'Receipt attached! Please enter expense details.', 'warning');
+            } else {
+              showToast(i18n.language === 'ta' ? 'ரசீது ஸ்கேன் செய்யப்பட்டது!' : 'Receipt scanned & fields populated!', 'success');
+            }
           } catch (err: any) {
             console.warn('Smart Receipt Scanner error:', err);
-            showToast('Smart scan failed. Please enter manually.', 'error');
+            showToast(i18n.language === 'ta' ? 'ரசீது இணைக்கப்பட்டது! விவரங்களை கைமுறையாக உள்ளிடவும்.' : 'Receipt attached! Please enter details manually.', 'warning');
           } finally {
             setScanning(false);
           }

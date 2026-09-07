@@ -541,13 +541,28 @@ export const expenseService = {
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(errorText || `HTTP ${response.status}`);
+        console.warn('[expenseService] scan-receipt returned error:', errorText);
+        return {
+          title: 'Scanned Receipt',
+          amount: 0,
+          category: 'other',
+          date: new Date().toISOString().split('T')[0],
+          notes: 'Receipt attached. (AI scan unavailable: please review details manually.)',
+          aiScanFailed: true
+        } as any;
       }
 
       return await response.json();
     } catch (e) {
-      console.error('[expenseService] Failed to scan receipt:', e);
-      throw e;
+      console.warn('[expenseService] Failed to scan receipt, returning fallback:', e);
+      return {
+        title: 'Scanned Receipt',
+        amount: 0,
+        category: 'other',
+        date: new Date().toISOString().split('T')[0],
+        notes: 'Receipt attached. (AI scan unavailable: please review details manually.)',
+        aiScanFailed: true
+      } as any;
     }
   },
 

@@ -57,9 +57,6 @@ export function LibraryTab({ user, colors, t, showToast, i18n, insets }: TabProp
   // StoryWeaver Hub state
   const [swSelectedLevel, setSwSelectedLevel] = useState<'all' | '1' | '2' | '3' | '4'>('all');
   const [swSearchQuery, setSwSearchQuery] = useState('');
-  const [swReaderModalVisible, setSwReaderModalVisible] = useState(false);
-  const [swActiveUrl, setSwActiveUrl] = useState('');
-  const [swActiveTitle, setSwActiveTitle] = useState('');
 
   // Add Book: online story URL vs file
   const [bookSourceType, setBookSourceType] = useState<'pdf' | 'url'>('url');
@@ -100,15 +97,8 @@ export function LibraryTab({ user, colors, t, showToast, i18n, insets }: TabProp
 
   const handleOpenStoryWeaver = (level?: string, query?: string) => {
     const url = getStoryWeaverUrl(level, query);
-    const targetLevel = level !== undefined ? level : swSelectedLevel;
-    const title = targetLevel === 'all'
-      ? (i18n.language === 'ta' ? 'அனைத்து தமிழ்க் கதைகள் (StoryWeaver)' : 'All Tamil Stories (StoryWeaver)')
-      : (i18n.language === 'ta' ? `நிலை ${targetLevel} தமிழ்க் கதைகள் (StoryWeaver)` : `Level ${targetLevel} Tamil Stories (StoryWeaver)`);
-
     if (Platform.OS === 'web') {
-      setSwActiveUrl(url);
-      setSwActiveTitle(title);
-      setSwReaderModalVisible(true);
+      window.open(url, '_blank');
     } else {
       const WebBrowser = require('expo-web-browser');
       WebBrowser.openBrowserAsync(url);
@@ -343,6 +333,19 @@ export function LibraryTab({ user, colors, t, showToast, i18n, insets }: TabProp
 
     if (selectedBook.pdfUrl === 'interactive_aathichoodi') {
       setAathichoodiVisible(true);
+      return;
+    }
+
+    const isWebStory = selectedBook.pdfUrl.includes('storyweaver.org.in') ||
+      (!selectedBook.pdfUrl.endsWith('.pdf') && !selectedBook.pdfUrl.startsWith('data:application/pdf') && selectedBook.pdfUrl.startsWith('http'));
+
+    if (isWebStory) {
+      if (Platform.OS === 'web') {
+        window.open(selectedBook.pdfUrl, '_blank');
+      } else {
+        const WebBrowser = require('expo-web-browser');
+        WebBrowser.openBrowserAsync(selectedBook.pdfUrl);
+      }
       return;
     }
 
@@ -631,7 +634,7 @@ export function LibraryTab({ user, colors, t, showToast, i18n, insets }: TabProp
                 >
                   <BookOpen size={14} color="#FFF" />
                   <ThemedText style={{ color: '#FFF', fontSize: 12, fontWeight: '800' }}>
-                    {i18n.language === 'ta' ? 'உடனே படி (Read Online)' : 'Read Online'}
+                    {i18n.language === 'ta' ? 'கதைகளை வாசி (Browse Stories)' : 'Browse Stories'}
                   </ThemedText>
                 </Pressable>
 
@@ -846,9 +849,15 @@ export function LibraryTab({ user, colors, t, showToast, i18n, insets }: TabProp
                     borderRadius: 10
                   }}
                 >
-                  <Book size={14} color="#FFF" />
+                  {selectedBook.pdfUrl.includes('storyweaver.org.in') ? (
+                    <ExternalLink size={14} color="#FFF" />
+                  ) : (
+                    <Book size={14} color="#FFF" />
+                  )}
                   <ThemedText style={{ color: '#FFF', fontSize: 12, fontWeight: '800' }}>
-                    {i18n.language === 'ta' ? 'உடனே படி (Read Online)' : 'Read Online'}
+                    {selectedBook.pdfUrl.includes('storyweaver.org.in')
+                      ? (i18n.language === 'ta' ? 'கதையை வாசி (StoryWeaver)' : 'Read on StoryWeaver')
+                      : (i18n.language === 'ta' ? 'உடனே படி (Read Online)' : 'Read Online')}
                   </ThemedText>
                 </Pressable>
 
@@ -936,51 +945,6 @@ export function LibraryTab({ user, colors, t, showToast, i18n, insets }: TabProp
                 src={selectedBook.pdfUrl}
                 style={{ width: '100%', height: '100%', border: 'none' }}
               />
-            </View>
-          </View>
-        </Modal>
-      )}
-
-      {/* Inline StoryWeaver Catalog Web Reader Modal */}
-      {Platform.OS === 'web' && (
-        <Modal
-          visible={swReaderModalVisible}
-          animationType="fade"
-          onRequestClose={() => setSwReaderModalVisible(false)}
-        >
-          <View style={{ flex: 1, backgroundColor: '#1A202C' }}>
-            {/* Header bar */}
-            <View style={{ height: 48, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, borderBottomWidth: 1, borderColor: '#2D3748', backgroundColor: '#2D3748' }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, marginRight: 12 }}>
-                <Globe size={16} color="#F59E0B" />
-                <ThemedText style={{ color: '#FFF', fontWeight: '800', fontSize: 13 }} numberOfLines={1}>
-                  {swActiveTitle || 'StoryWeaver Tamil Stories'}
-                </ThemedText>
-              </View>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                <Pressable
-                  onPress={() => window.open(swActiveUrl, '_blank')}
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 4, paddingHorizontal: 8, backgroundColor: '#4A5568', borderRadius: 6 }}
-                >
-                  <ExternalLink size={14} color="#FFF" />
-                  <ThemedText style={{ color: '#FFF', fontSize: 11, fontWeight: '700' }}>
-                    {i18n.language === 'ta' ? 'முழுத்திரை / புதிய தாவல்' : 'Fullscreen / New Tab'}
-                  </ThemedText>
-                </Pressable>
-                <Pressable onPress={() => setSwReaderModalVisible(false)} style={{ padding: 6 }}>
-                  <X size={18} color="#FFF" />
-                </Pressable>
-              </View>
-            </View>
-
-            {/* Document Frame */}
-            <View style={{ flex: 1 }}>
-              {swActiveUrl ? (
-                <iframe
-                  src={swActiveUrl}
-                  style={{ width: '100%', height: '100%', border: 'none' }}
-                />
-              ) : null}
             </View>
           </View>
         </Modal>
