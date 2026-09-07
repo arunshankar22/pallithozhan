@@ -7,7 +7,8 @@ import {
   StyleSheet,
   Modal,
   ActivityIndicator,
-  Platform
+  Platform,
+  useWindowDimensions
 } from 'react-native';
 import {
   Shield,
@@ -23,7 +24,9 @@ import {
   ChevronRight,
   Database,
   RefreshCw,
-  Settings
+  Settings,
+  LayoutGrid,
+  Table
 } from 'lucide-react-native';
 import { ThemedText } from '@/components/themed-text';
 import { TabProps } from '@/app/sharedTypes';
@@ -80,6 +83,9 @@ const getActionIcon = (action: string) => {
 };
 
 export function SuperAdminTab({ user, colors, t, showToast, i18n }: TabProps) {
+  const { width: windowWidth } = useWindowDimensions();
+  const isMobile = windowWidth < 768;
+  const [userViewMode, setUserViewMode] = useState<'card' | 'table'>(windowWidth < 768 ? 'card' : 'table');
   const [activeSubTab, setActiveSubTab] = useState<'users' | 'logs' | 'settings'>('users');
   const [usersList, setUsersList] = useState<any[]>([]);
   const [logsList, setLogsList] = useState<AuditLog[]>([]);
@@ -374,15 +380,36 @@ export function SuperAdminTab({ user, colors, t, showToast, i18n }: TabProps) {
         <View style={{ flex: 1 }}>
           {/* User Search & Filters */}
           <View style={stylesTab.filterSection}>
-            <View style={[stylesTab.searchBar, { backgroundColor: colors.backgroundElement, borderColor: colors.border }]}>
-              <Search size={18} color={colors.textSecondary} style={{ marginRight: 8 }} />
-              <TextInput
-                placeholder={isTa ? 'பெயர், மின்னஞ்சல் அல்லது தொலைபேசியை தேடுங்கள்...' : 'Search by name, email or phone...'}
-                placeholderTextColor={colors.textSecondary}
-                value={userSearch}
-                onChangeText={setUserSearch}
-                style={[stylesTab.searchInput, { color: colors.text }]}
-              />
+            <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+              <View style={[stylesTab.searchBar, { flex: 1, backgroundColor: colors.backgroundElement, borderColor: colors.border }]}>
+                <Search size={18} color={colors.textSecondary} style={{ marginRight: 8 }} />
+                <TextInput
+                  placeholder={isTa ? 'பெயர், மின்னஞ்சல் அல்லது தொலைபேசியை தேடுங்கள்...' : 'Search by name, email or phone...'}
+                  placeholderTextColor={colors.textSecondary}
+                  value={userSearch}
+                  onChangeText={setUserSearch}
+                  style={[stylesTab.searchInput, { color: colors.text }]}
+                />
+              </View>
+              <Pressable
+                onPress={() => setUserViewMode(userViewMode === 'card' ? 'table' : 'card')}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6,
+                  paddingHorizontal: 12,
+                  paddingVertical: 10,
+                  borderRadius: 10,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  backgroundColor: colors.backgroundElement
+                }}
+              >
+                {userViewMode === 'card' ? <Table size={16} color={colors.primary} /> : <LayoutGrid size={16} color={colors.primary} />}
+                <ThemedText style={{ fontSize: 12, fontWeight: '700', color: colors.primary }}>
+                  {userViewMode === 'card' ? (isTa ? 'அட்டவணை' : 'Table') : (isTa ? 'அட்டை' : 'Cards')}
+                </ThemedText>
+              </Pressable>
             </View>
 
             {/* Role Filter Chips */}
@@ -411,69 +438,129 @@ export function SuperAdminTab({ user, colors, t, showToast, i18n }: TabProps) {
             </ScrollView>
           </View>
 
-          {/* Users Directory Table with Horizontal Scrolling */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={true} style={{ flex: 1 }} nestedScrollEnabled={true} directionalLockEnabled={true}>
-            <View style={stylesTab.tableWrapper}>
-              {/* Table Header Row */}
-              <View style={[stylesTab.tableRow, stylesTab.tableHeaderRow, { backgroundColor: colors.backgroundSelected, borderBottomColor: colors.border }]}>
-                <View style={{ width: 180 }}>{renderSortHeader(isTa ? 'பெயர்' : 'Name', 'fullName', userSortField, userSortAsc, handleSortUsers)}</View>
-                <View style={{ width: 220 }}>{renderSortHeader(isTa ? 'மின்னஞ்சல்' : 'Email', 'email', userSortField, userSortAsc, handleSortUsers)}</View>
-                <View style={{ width: 110 }}>{renderSortHeader(isTa ? 'பங்கு' : 'Role', 'role', userSortField, userSortAsc, handleSortUsers)}</View>
-                <View style={{ width: 140 }}>{renderSortHeader(isTa ? 'தொலைபேசி' : 'Phone', 'phone', userSortField, userSortAsc, handleSortUsers)}</View>
-                <View style={{ width: 150 }}>{renderSortHeader(isTa ? 'கிளை' : 'Branch', 'schoolId', userSortField, userSortAsc, handleSortUsers)}</View>
-              </View>
-
-              {/* Table Body Content */}
-              <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 40 }}>
-                {filteredUsers.map((item, index) => {
-                  const colorsTag = getRoleColor(item.role, colors);
-                  const isEven = index % 2 === 0;
-                  return (
-                    <View 
-                      key={item.uid}
-                      style={[
-                        stylesTab.tableRow, 
-                        { 
-                          backgroundColor: isEven ? colors.backgroundElement : colors.background,
-                          borderBottomColor: colors.border 
-                        }
-                      ]}
-                    >
-                      <View style={{ width: 180, paddingRight: 8 }}>
-                        <ThemedText style={[stylesTab.tableCellText, { fontWeight: '700' }]}>{item.fullName}</ThemedText>
+          {userViewMode === 'card' ? (
+            /* Card View for Mobile & Tablet */
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: 40 }}>
+              {filteredUsers.map((item) => {
+                const colorsTag = getRoleColor(item.role, colors);
+                const branchLabel = (item.schoolId || 'balarmalar parramatta branch').split(' ').slice(1, -1).join(' ').toUpperCase() || 'PARRAMATTA';
+                return (
+                  <View 
+                    key={item.uid}
+                    style={{
+                      padding: 14,
+                      borderRadius: 14,
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                      backgroundColor: colors.cardBg || colors.backgroundElement,
+                      gap: 8
+                    }}
+                  >
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <View style={{ flex: 1, gap: 2, paddingRight: 8 }}>
+                        <ThemedText style={{ fontSize: 14, fontWeight: '800', color: colors.text }}>
+                          {item.fullName}
+                        </ThemedText>
+                        <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>
+                          {item.email || (isTa ? 'மின்னஞ்சல் இல்லை' : 'No email registered')}
+                        </ThemedText>
                       </View>
-                      <View style={{ width: 220, paddingRight: 8 }}>
-                        <ThemedText style={stylesTab.tableCellText}>{item.email}</ThemedText>
-                      </View>
-                      <View style={{ width: 110, paddingRight: 8 }}>
-                        <View style={[stylesTab.roleBadge, { backgroundColor: colorsTag.bg, borderColor: colorsTag.border, alignSelf: 'flex-start' }]}>
-                          <ThemedText style={[stylesTab.roleBadgeText, { color: colorsTag.text }]}>
-                            {item.role}
-                          </ThemedText>
-                        </View>
-                      </View>
-                      <View style={{ width: 140, paddingRight: 8 }}>
-                        <ThemedText style={stylesTab.tableCellText}>{item.phone || '-'}</ThemedText>
-                      </View>
-                      <View style={{ width: 150, paddingRight: 8 }}>
-                        <ThemedText style={stylesTab.tableCellText}>
-                          {(item.schoolId || 'balarmalar parramatta branch').split(' ').slice(1, -1).join(' ').toUpperCase() || 'PARRAMATTA'}
+                      <View style={[stylesTab.roleBadge, { backgroundColor: colorsTag.bg, borderColor: colorsTag.border }]}>
+                        <ThemedText style={[stylesTab.roleBadgeText, { color: colorsTag.text }]}>
+                          {item.role}
                         </ThemedText>
                       </View>
                     </View>
-                  );
-                })}
-                {filteredUsers.length === 0 && (
-                  <View style={stylesTab.emptyContainer}>
-                    <Users size={48} color={colors.textSecondary} />
-                    <ThemedText style={{ marginTop: 12, color: colors.textSecondary }}>
-                      {isTa ? 'பயனர்கள் யாரும் கிடைக்கவில்லை' : 'No users found matching filters.'}
-                    </ThemedText>
+
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 0.5, borderTopColor: colors.border, paddingTop: 8 }}>
+                      <ThemedText style={{ fontSize: 11, color: item.phone ? colors.text : colors.textSecondary }}>
+                        📞 {item.phone || (isTa ? 'தொலைபேசி இல்லை' : 'No phone')}
+                      </ThemedText>
+                      <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: colors.primary + '15' }}>
+                        <ThemedText style={{ fontSize: 10, fontWeight: '700', color: colors.primary }}>
+                          🏫 {branchLabel}
+                        </ThemedText>
+                      </View>
+                    </View>
                   </View>
-                )}
-              </ScrollView>
-            </View>
-          </ScrollView>
+                );
+              })}
+              {filteredUsers.length === 0 && (
+                <View style={stylesTab.emptyContainer}>
+                  <Users size={48} color={colors.textSecondary} />
+                  <ThemedText style={{ marginTop: 12, color: colors.textSecondary }}>
+                    {isTa ? 'பயனர்கள் யாரும் கிடைக்கவில்லை' : 'No users found matching filters.'}
+                  </ThemedText>
+                </View>
+              )}
+            </ScrollView>
+          ) : (
+            /* Users Directory Table with Horizontal Scrolling */
+            <ScrollView horizontal showsHorizontalScrollIndicator={true} style={{ flex: 1 }} nestedScrollEnabled={true} directionalLockEnabled={true}>
+              <View style={stylesTab.tableWrapper}>
+                {/* Table Header Row */}
+                <View style={[stylesTab.tableRow, stylesTab.tableHeaderRow, { backgroundColor: colors.backgroundSelected, borderBottomColor: colors.border }]}>
+                  <View style={{ width: 180 }}>{renderSortHeader(isTa ? 'பெயர்' : 'Name', 'fullName', userSortField, userSortAsc, handleSortUsers)}</View>
+                  <View style={{ width: 220 }}>{renderSortHeader(isTa ? 'மின்னஞ்சல்' : 'Email', 'email', userSortField, userSortAsc, handleSortUsers)}</View>
+                  <View style={{ width: 110 }}>{renderSortHeader(isTa ? 'பங்கு' : 'Role', 'role', userSortField, userSortAsc, handleSortUsers)}</View>
+                  <View style={{ width: 140 }}>{renderSortHeader(isTa ? 'தொலைபேசி' : 'Phone', 'phone', userSortField, userSortAsc, handleSortUsers)}</View>
+                  <View style={{ width: 150 }}>{renderSortHeader(isTa ? 'கிளை' : 'Branch', 'schoolId', userSortField, userSortAsc, handleSortUsers)}</View>
+                </View>
+
+                {/* Table Body Content */}
+                <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 40 }}>
+                  {filteredUsers.map((item, index) => {
+                    const colorsTag = getRoleColor(item.role, colors);
+                    const isEven = index % 2 === 0;
+                    return (
+                      <View 
+                        key={item.uid}
+                        style={[
+                          stylesTab.tableRow, 
+                          { 
+                            backgroundColor: isEven ? colors.backgroundElement : colors.background,
+                            borderBottomColor: colors.border 
+                          }
+                        ]}
+                      >
+                        <View style={{ width: 180, paddingRight: 8 }}>
+                          <ThemedText style={[stylesTab.tableCellText, { fontWeight: '700' }]}>{item.fullName}</ThemedText>
+                        </View>
+                        <View style={{ width: 220, paddingRight: 8 }}>
+                          <ThemedText style={stylesTab.tableCellText}>{item.email}</ThemedText>
+                        </View>
+                        <View style={{ width: 110, paddingRight: 8 }}>
+                          <View style={[stylesTab.roleBadge, { backgroundColor: colorsTag.bg, borderColor: colorsTag.border, alignSelf: 'flex-start' }]}>
+                            <ThemedText style={[stylesTab.roleBadgeText, { color: colorsTag.text }]}>
+                              {item.role}
+                            </ThemedText>
+                          </View>
+                        </View>
+                        <View style={{ width: 140, paddingRight: 8 }}>
+                          <ThemedText style={[stylesTab.tableCellText, !item.phone && { color: colors.textSecondary }]}>
+                            {item.phone || (isTa ? 'இல்லை' : 'N/A')}
+                          </ThemedText>
+                        </View>
+                        <View style={{ width: 150, paddingRight: 8 }}>
+                          <ThemedText style={stylesTab.tableCellText}>
+                            🏫 {(item.schoolId || 'balarmalar parramatta branch').split(' ').slice(1, -1).join(' ').toUpperCase() || 'PARRAMATTA'}
+                          </ThemedText>
+                        </View>
+                      </View>
+                    );
+                  })}
+                  {filteredUsers.length === 0 && (
+                    <View style={stylesTab.emptyContainer}>
+                      <Users size={48} color={colors.textSecondary} />
+                      <ThemedText style={{ marginTop: 12, color: colors.textSecondary }}>
+                        {isTa ? 'பயனர்கள் யாரும் கிடைக்கவில்லை' : 'No users found matching filters.'}
+                      </ThemedText>
+                    </View>
+                  )}
+                </ScrollView>
+              </View>
+            </ScrollView>
+          )}
         </View>
       ) : activeSubTab === 'logs' ? (
         // --- SORTABLE AUDIT LOGS TABLE VIEW ---

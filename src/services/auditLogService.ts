@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import { db } from './firebase';
 import { collection, doc, setDoc, getDocs } from 'firebase/firestore';
 
@@ -45,14 +46,25 @@ export const auditLogService = {
   },
 
   // Centralized Modular Logging Helpers
-  logLogin: async (user: any, method: string) => {
+  logLogin: async (user: any, method: string, extraDetails?: string) => {
+    const platform = Platform.OS === 'web' ? 'Web' : Platform.OS === 'ios' ? 'iOS' : 'Android';
+    const branch = user?.schoolId
+      ? user.schoolId.replace(/balarmalar\s*/i, '').replace(/\s*branch/i, '').trim().toUpperCase() || 'PARRAMATTA'
+      : 'PARRAMATTA';
+    const parts = [
+      `User logged in via ${method}`,
+      `Platform: ${platform}`,
+      `Branch: ${branch}`
+    ];
+    if (extraDetails) parts.push(extraDetails);
+
     return auditLogService.logAction(
       user.uid,
       user.fullName,
       user.email,
       user.role,
       'Login',
-      `User logged in via ${method}`
+      parts.join(' • ')
     );
   },
 
