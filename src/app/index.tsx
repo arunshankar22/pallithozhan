@@ -188,7 +188,31 @@ export default function HomeScreen() {
   };
 
   // Layout Tab State
-  const [activeTab, setActiveTab] = useState<'newsfeed' | 'attendance' | 'homework' | 'library' | 'messages' | 'calendar' | 'reports' | 'management' | 'profile' | 'schools' | 'full-newsfeed' | 'students' | 'newsletter' | 'superadmin' | 'points' | 'print-requests' | 'expenses' | 'ai-assistant'>('newsfeed');
+  type ActiveTabType = 'newsfeed' | 'attendance' | 'homework' | 'library' | 'messages' | 'calendar' | 'reports' | 'management' | 'profile' | 'schools' | 'full-newsfeed' | 'students' | 'newsletter' | 'superadmin' | 'points' | 'print-requests' | 'expenses' | 'ai-assistant';
+  const [activeTab, setActiveTab] = useState<ActiveTabType>(() => {
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      try {
+        const saved = window.sessionStorage.getItem('pallithozhan_active_tab') as ActiveTabType;
+        const validTabs: ActiveTabType[] = ['newsfeed', 'attendance', 'homework', 'library', 'messages', 'calendar', 'reports', 'management', 'profile', 'schools', 'full-newsfeed', 'students', 'newsletter', 'superadmin', 'points', 'print-requests', 'expenses', 'ai-assistant'];
+        if (saved && validTabs.includes(saved)) {
+          return saved;
+        }
+      } catch (e) {
+        // Ignore sessionStorage errors
+      }
+    }
+    return 'newsfeed';
+  });
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      try {
+        window.sessionStorage.setItem('pallithozhan_active_tab', activeTab);
+      } catch (e) {
+        // Ignore sessionStorage errors
+      }
+    }
+  }, [activeTab]);
   const [isMainSidebarCollapsed, setIsMainSidebarCollapsed] = useState(false);
 
   // Points System states

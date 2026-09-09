@@ -53,6 +53,87 @@ async function handleApiRoutes(req, res, pathname, method, dbData, writeDb, urlO
     return true;
   }
 
+  // GET /api/storyweaver/search (Live search across 3,400+ StoryWeaver Tamil stories)
+  if (pathname === '/api/storyweaver/search' && method === 'GET') {
+    try {
+      const query = urlObj.searchParams.get('query') || '';
+      const level = urlObj.searchParams.get('level') || '';
+      const page = urlObj.searchParams.get('page') || '1';
+      const perPage = urlObj.searchParams.get('per_page') || '24';
+
+      let targetUrl = `https://storyweaver.org.in/node/api/v1/books-search?languages[]=Tamil&sort=Ratings&per_page=${perPage}&page=${page}`;
+      if (level && level !== 'all') {
+        targetUrl += `&levels[]=${encodeURIComponent(level)}`;
+      }
+      if (query.trim()) {
+        targetUrl += `&query=${encodeURIComponent(query.trim())}`;
+      }
+
+      if (!global._swCookie || Date.now() - (global._swCookieTime || 0) > 3600000) {
+        const init = await fetch('https://storyweaver.org.in/en/stories/embed/699005-enakku-vaasikka-pidikkum');
+        global._swCookie = init.headers.get('set-cookie') || '';
+        global._swCookieTime = Date.now();
+      }
+
+      const swRes = await fetch(targetUrl, {
+        headers: {
+          'Cookie': global._swCookie || '',
+          'Referer': 'https://storyweaver.org.in/en/stories?language=Tamil'
+        }
+      });
+
+      if (swRes.status === 200) {
+        const json = await swRes.json();
+        const levelLabels = {
+          '1': { en: 'Level 1 (Emergent)', ta: 'நிலை 1 (தொடக்க நிலை)', grades: 'KG, Year 1', points: 50 },
+          '2': { en: 'Level 2 (Growing)', ta: 'நிலை 2 (இரண்டாம் நிலை)', grades: 'Year 2, Year 3', points: 60 },
+          '3': { en: 'Level 3 (Developing)', ta: 'நிலை 3 (மூன்றாம் நிலை)', grades: 'Year 4, Year 5', points: 70 },
+          '4': { en: 'Level 4 (Fluent)', ta: 'நிலை 4 (உயர் நிலை)', grades: 'Year 6 - Year 9', points: 80 }
+        };
+
+        const books = (json.data || []).map(b => {
+          const lvl = String(b.level || '1');
+          const sizes = b.coverImage?.sizes || [];
+          const cover = sizes.find(s => s.width >= 400)?.url || sizes[0]?.url || '';
+          return {
+            id: `sw_${b.id}`,
+            storyId: b.slug,
+            titleEn: b.englishTitle || b.title || b.name,
+            titleTa: b.title || b.name,
+            author: (b.authors || []).map(a => a.name).join(', ') || 'Pratham Books',
+            level: lvl,
+            levelLabelEn: levelLabels[lvl]?.en || `Level ${lvl}`,
+            levelLabelTa: levelLabels[lvl]?.ta || `நிலை ${lvl}`,
+            targetGrades: levelLabels[lvl]?.grades || 'All',
+            coverUrl: cover,
+            embedUrl: `https://storyweaver.org.in/en/stories/embed/reader/${b.slug}?mode=read`,
+            descriptionEn: b.synopsis || b.description || b.title || b.name,
+            descriptionTa: b.description || b.title || b.name,
+            readingPoints: levelLabels[lvl]?.points || 50,
+            pagesCount: b.pageCount || 16,
+            tags: b.tags || []
+          };
+        });
+
+        sendJson(res, 200, {
+          ok: true,
+          total: json.metadata?.books_count || books.length,
+          page: Number(page),
+          perPage: Number(perPage),
+          totalPages: json.metadata?.totalPages || 1,
+          stories: books
+        });
+        return true;
+      } else {
+        sendJson(res, swRes.status, { ok: false, error: 'StoryWeaver upstream returned ' + swRes.status });
+        return true;
+      }
+    } catch (err) {
+      sendJson(res, 500, { ok: false, error: err.message });
+      return true;
+    }
+  }
+
   // GET /api/reset
   if (pathname === '/api/reset' && method === 'POST') {
     writeDb(INITIAL_DB);

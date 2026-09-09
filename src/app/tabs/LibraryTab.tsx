@@ -22,7 +22,8 @@ import {
   Award,
   Book,
   Globe,
-  Sparkles
+  Sparkles,
+  ArrowLeft
 } from 'lucide-react-native';
 
 import { ThemedText } from '@/components/themed-text';
@@ -33,6 +34,7 @@ import { libraryService, Book as BookType, ReadingProgress } from '@/services/li
 import { ThirukkuralPracticeGuide } from '@/components/ThirukkuralPracticeGuide';
 import { AathichoodiPracticeGuide } from '@/components/AathichoodiPracticeGuide';
 import { STORYWEAVER_STORIES, toStoryWeaverEmbedUrl, StoryWeaverStory } from '@/constants/storyweaverStories';
+import { storyweaverService } from '@/services/storyweaverService';
 
 export function LibraryTab({ user, colors, t, showToast, i18n, insets }: TabProps) {
   const { width: windowWidth } = useWindowDimensions();
@@ -73,6 +75,12 @@ export function LibraryTab({ user, colors, t, showToast, i18n, insets }: TabProp
   // StoryWeaver Hub state
   const [swSelectedLevel, setSwSelectedLevel] = useState<'all' | '1' | '2' | '3' | '4'>('all');
   const [swSearchQuery, setSwSearchQuery] = useState('');
+  const [swStories, setSwStories] = useState<StoryWeaverStory[]>(STORYWEAVER_STORIES.slice(0, 24));
+  const [swLoading, setSwLoading] = useState(false);
+  const [swLoadingMore, setSwLoadingMore] = useState(false);
+  const [swTotalCount, setSwTotalCount] = useState(3400);
+  const [swPage, setSwPage] = useState(1);
+  const [swHasMore, setSwHasMore] = useState(true);
 
   // Add Book: online story URL vs file
   const [bookSourceType, setBookSourceType] = useState<'pdf' | 'url'>('url');
@@ -118,6 +126,16 @@ export function LibraryTab({ user, colors, t, showToast, i18n, insets }: TabProp
     } else {
       const WebBrowser = require('expo-web-browser');
       WebBrowser.openBrowserAsync(url);
+    }
+  };
+
+  const handleCloseEmbeddedReader = () => {
+    setEmbeddedReaderVisible(false);
+    setEmbeddedStory(null);
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      try {
+        window.sessionStorage.setItem('pallithozhan_active_tab', 'library');
+      } catch (e) {}
     }
   };
 
@@ -206,16 +224,55 @@ export function LibraryTab({ user, colors, t, showToast, i18n, insets }: TabProp
     setShowCustomInput(false);
   };
 
-  const filteredSwStories = STORYWEAVER_STORIES.filter(s => {
-    const levelMatch = swSelectedLevel === 'all' || s.level === swSelectedLevel;
-    const query = swSearchQuery.trim().toLowerCase();
-    if (!query) return levelMatch;
-    const textMatch = s.titleEn.toLowerCase().includes(query) ||
-                      s.titleTa.includes(query) ||
-                      s.author.toLowerCase().includes(query) ||
-                      s.tags.some(t => t.toLowerCase().includes(query));
-    return levelMatch && textMatch;
-  });
+  // StoryWeaver live search with debounce across all 3,400+ stories
+  useEffect(() => {
+    let isCancelled = false;
+    setSwLoading(true);
+    const timer = setTimeout(async () => {
+      try {
+        const result = await storyweaverService.searchStories(swSearchQuery, swSelectedLevel, 1);
+        if (!isCancelled) {
+          setSwStories(result.stories);
+          setSwTotalCount(result.total);
+          setSwPage(1);
+          setSwHasMore(result.page < result.totalPages && result.stories.length < result.total);
+        }
+      } catch (err) {
+        console.warn('StoryWeaver live search error:', err);
+      } finally {
+        if (!isCancelled) {
+          setSwLoading(false);
+        }
+      }
+    }, 350);
+
+    return () => {
+      isCancelled = true;
+      clearTimeout(timer);
+    };
+  }, [swSearchQuery, swSelectedLevel]);
+
+  const handleLoadMoreSwStories = async () => {
+    if (swLoadingMore || !swHasMore) return;
+    setSwLoadingMore(true);
+    try {
+      const nextPage = swPage + 1;
+      const result = await storyweaverService.searchStories(swSearchQuery, swSelectedLevel, nextPage);
+      setSwStories(prev => {
+        const existingIds = new Set(prev.map(p => p.id));
+        const newOnes = result.stories.filter(s => !existingIds.has(s.id));
+        return [...prev, ...newOnes];
+      });
+      setSwPage(nextPage);
+      setSwHasMore(nextPage < result.totalPages);
+    } catch (err) {
+      console.warn('Load more stories error:', err);
+    } finally {
+      setSwLoadingMore(false);
+    }
+  };
+
+  const filteredSwStories = swStories;
 
   // Grade lists
   const gradeLevels = ['All', 'General', 'KG', 'Year 1', 'Year 2', 'Year 3', 'Year 4', 'Year 5', 'Year 6', 'Year 7', 'Year 8', 'Year 9'];
@@ -755,10 +812,10 @@ export function LibraryTab({ user, colors, t, showToast, i18n, insets }: TabProp
                   {i18n.language === 'ta' ? 'வாசிப்பு நிலை (Reading Levels):' : 'Select Reading Level:'}
                 </ThemedText>
                 <ThemedText style={{ fontSize: 10, color: colors.textSecondary }}>
-                  {filteredSwStories.length} {i18n.language === 'ta' ? 'கதைகள்' : 'stories'}
+                  {swTotalCount.toLocaleString()} {i18n.language === 'ta' ? 'கதைகள்' : 'stories'}
                 </ThemedText>
               </View>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
                 {[
                   { id: 'all', labelEn: 'All Tamil Stories', labelTa: 'அனைத்து கதைகள்' },
                   { id: '1', labelEn: 'Level 1 (KG - Yr 1)', labelTa: 'நிலை 1 (KG - Yr 1)' },
@@ -790,7 +847,7 @@ export function LibraryTab({ user, colors, t, showToast, i18n, insets }: TabProp
                     </Pressable>
                   );
                 })}
-              </ScrollView>
+              </View>
             </View>
 
             {/* Keyword Search Input */}
@@ -819,8 +876,15 @@ export function LibraryTab({ user, colors, t, showToast, i18n, insets }: TabProp
               )}
             </View>
 
-            {/* In-App Story Cards Carousel */}
-            {filteredSwStories.length === 0 ? (
+            {/* In-App Story Cards Grid (Vertical Wrap - No horizontal scroll) */}
+            {swLoading ? (
+              <View style={{ padding: 28, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background, borderRadius: 10, gap: 8 }}>
+                <ActivityIndicator size="small" color="#D97706" />
+                <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>
+                  {i18n.language === 'ta' ? 'கதைகள் தேடப்படுகின்றன...' : 'Searching stories...'}
+                </ThemedText>
+              </View>
+            ) : swStories.length === 0 ? (
               <View style={{ padding: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background, borderRadius: 10, gap: 6 }}>
                 <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>
                   {i18n.language === 'ta' ? 'பொருத்தமான கதைகள் இல்லை. தேடலை மாற்றவும்.' : 'No matching stories found. Try a different search.'}
@@ -832,27 +896,25 @@ export function LibraryTab({ user, colors, t, showToast, i18n, insets }: TabProp
                 </Pressable>
               </View>
             ) : (
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{ gap: 10, paddingVertical: 4 }}
-              >
-                {filteredSwStories.map((story) => {
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'flex-start' }}>
+                {swStories.map((story) => {
+                  const cardWidth = isLargeScreen ? (windowWidth > 1200 ? '23.8%' : '31.8%') : '48.2%';
                   return (
                     <View
                       key={story.id}
                       style={{
-                        width: 170,
+                        width: cardWidth,
                         backgroundColor: colors.background,
                         borderRadius: 12,
                         borderWidth: 1,
                         borderColor: colors.border,
                         padding: 8,
-                        gap: 6
+                        gap: 6,
+                        marginBottom: 4
                       }}
                     >
                       {/* Story Cover */}
-                      <View style={{ width: '100%', height: 110, borderRadius: 8, overflow: 'hidden', backgroundColor: '#E2E8F0', position: 'relative' }}>
+                      <View style={{ width: '100%', height: 115, borderRadius: 8, overflow: 'hidden', backgroundColor: '#E2E8F0', position: 'relative' }}>
                         <Image
                           source={{ uri: story.coverUrl }}
                           style={{ width: '100%', height: '100%' }}
@@ -925,7 +987,38 @@ export function LibraryTab({ user, colors, t, showToast, i18n, insets }: TabProp
                     </View>
                   );
                 })}
-              </ScrollView>
+
+                {/* Load More Stories Button */}
+                {swHasMore && (
+                  <View style={{ width: '100%', alignItems: 'center', marginTop: 8, marginBottom: 4 }}>
+                    <Pressable
+                      onPress={handleLoadMoreSwStories}
+                      disabled={swLoadingMore}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 8,
+                        backgroundColor: '#D97706',
+                        paddingHorizontal: 18,
+                        paddingVertical: 9,
+                        borderRadius: 8,
+                        opacity: swLoadingMore ? 0.7 : 1
+                      }}
+                    >
+                      {swLoadingMore ? (
+                        <ActivityIndicator size="small" color="#FFF" />
+                      ) : (
+                        <BookOpen size={14} color="#FFF" />
+                      )}
+                      <ThemedText style={{ color: '#FFF', fontSize: 12, fontWeight: '800' }}>
+                        {swLoadingMore
+                          ? (i18n.language === 'ta' ? 'ஏற்றுகிறது...' : 'Loading more...')
+                          : (i18n.language === 'ta' ? `மேலும் கதைகளை ஏற்று (${swStories.length} / ${swTotalCount.toLocaleString()})` : `Load More Stories (${swStories.length} / ${swTotalCount.toLocaleString()})`)}
+                      </ThemedText>
+                    </Pressable>
+                  </View>
+                )}
+              </View>
             )}
 
             {/* Footer with subtle Pratham link */}
@@ -1227,7 +1320,7 @@ export function LibraryTab({ user, colors, t, showToast, i18n, insets }: TabProp
         <Modal
           visible={embeddedReaderVisible}
           animationType="fade"
-          onRequestClose={() => setEmbeddedReaderVisible(false)}
+          onRequestClose={handleCloseEmbeddedReader}
         >
           <View style={{ flex: 1, backgroundColor: '#1A202C' }}>
             {/* Header bar */}
@@ -1246,16 +1339,21 @@ export function LibraryTab({ user, colors, t, showToast, i18n, insets }: TabProp
               {/* Back / Close button & Story info */}
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
                 <Pressable
-                  onPress={() => setEmbeddedReaderVisible(false)}
+                  onPress={handleCloseEmbeddedReader}
                   style={{
-                    padding: 8,
-                    borderRadius: 8,
-                    backgroundColor: '#4A5568',
+                    flexDirection: 'row',
                     alignItems: 'center',
-                    justifyContent: 'center'
+                    gap: 6,
+                    paddingHorizontal: 12,
+                    paddingVertical: 8,
+                    borderRadius: 8,
+                    backgroundColor: '#4A5568'
                   }}
                 >
-                  <X size={18} color="#FFF" />
+                  <ArrowLeft size={16} color="#FFF" />
+                  <ThemedText style={{ color: '#FFF', fontSize: 12, fontWeight: '700' }}>
+                    {i18n.language === 'ta' ? 'பள்ளி நூலகம்' : 'Back to Library'}
+                  </ThemedText>
                 </Pressable>
 
                 <View style={{ flex: 1 }}>
@@ -1318,6 +1416,19 @@ export function LibraryTab({ user, colors, t, showToast, i18n, insets }: TabProp
                     </ThemedText>
                   </Pressable>
                 )}
+
+                <Pressable
+                  onPress={handleCloseEmbeddedReader}
+                  style={{
+                    padding: 8,
+                    borderRadius: 8,
+                    backgroundColor: '#4A5568',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  <X size={18} color="#FFF" />
+                </Pressable>
               </View>
             </View>
 
@@ -1333,6 +1444,7 @@ export function LibraryTab({ user, colors, t, showToast, i18n, insets }: TabProp
                     backgroundColor: '#FFFFFF'
                   }}
                   allow="fullscreen; autoplay"
+                  sandbox="allow-scripts allow-same-origin allow-forms allow-fullscreen"
                   title={embeddedStory.titleEn}
                 />
               ) : (
