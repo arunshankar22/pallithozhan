@@ -1886,84 +1886,64 @@ Guidelines for SQL generation:
       const apiKey = (body && body.apiKey) || (emailConfig && emailConfig.resendApiKey) || process.env.RESEND_API_KEY;
 
       if (apiKey) {
-        let emailPayload = {
-          from: `${senderName} <${senderEmail}>`,
-          to: recipients.length === 1 ? recipients[0] : recipients,
-          bcc: bccRecipients.length > 0 ? bccRecipients : undefined,
-          subject: body.subject || `[Notification] Balar Malar Tamil School`,
-          html: htmlContent,
-          headers: {
-            'X-Entity-Ref-ID': `bm_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-            'X-Auto-Response-Suppress': 'OOF, AutoReply',
-            'Precedence': feature === 'expenses' ? 'personal' : 'bulk'
-          }
-        };
-
-        // If broadcasting to a broad group (e.g. parents, all), keep individual emails private via BCC
+        let allBcc = [];
         if (body.targetGroup && recipients.length > 1) {
-          emailPayload.to = senderEmail;
-          emailPayload.bcc = [...new Set([...recipients, ...bccRecipients])].filter(r => r !== senderEmail.toLowerCase());
+          allBcc = [...new Set([...recipients, ...bccRecipients])].filter(r => r !== senderEmail.toLowerCase());
         }
 
-        if (replyTo) {
-          emailPayload.reply_to = replyTo;
+        // Resend enforces a strict maximum limit of 50 recipients per API call
+        const BATCH_SIZE = 45;
+        const bccBatches = [];
+        if (allBcc.length > 0) {
+          for (let i = 0; i < allBcc.length; i += BATCH_SIZE) {
+            bccBatches.push(allBcc.slice(i, i + BATCH_SIZE));
+          }
+        } else {
+          bccBatches.push(undefined);
         }
 
-        let resendRes = await fetch('https://api.resend.com/emails', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`
-          },
-          body: JSON.stringify(emailPayload)
-        });
+        let firstResendData = null;
 
-        // If failed due to unverified custom domain, auto-retry with Resend test domain onboarding@resend.dev
-        if (!resendRes.ok) {
-          let resendErrText = await resendRes.text();
-          console.warn('[Backend Email] Primary Resend dispatch failed:', resendErrText);
-          
-          const isDomainError = resendErrText.toLowerCase().includes('domain') || 
-                                resendErrText.toLowerCase().includes('verify') || 
-                                resendRes.status === 403;
-
-          if (isDomainError && !senderEmail.includes('onboarding@resend.dev')) {
-            console.log('[Backend Email] Retrying with onboarding@resend.dev fallback sender...');
-            emailPayload.from = `${senderName} <onboarding@resend.dev>`;
-            
-            resendRes = await fetch('https://api.resend.com/emails', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`
-              },
-              body: JSON.stringify(emailPayload)
-            });
-
-            if (!resendRes.ok) {
-              resendErrText = await resendRes.text();
+        for (const batch of bccBatches) {
+          let emailPayload = {
+            from: `${senderName} <${senderEmail}>`,
+            to: batch ? senderEmail : (recipients.length === 1 ? recipients[0] : recipients.slice(0, BATCH_SIZE)),
+            bcc: batch,
+            subject: body.subject || `[Notification] Balar Malar Tamil School`,
+            html: htmlContent,
+            headers: {
+              'X-Entity-Ref-ID': `bm_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+              'X-Auto-Response-Suppress': 'OOF, AutoReply',
+              'Precedence': feature === 'expenses' ? 'personal' : 'bulk'
             }
+          };
+
+          if (replyTo) {
+            emailPayload.reply_to = replyTo;
           }
 
-          // Check if failure is due to unverified recipient in Resend test mode
-          // (e.g. "You can only send testing emails to your own email address (arun.zorro@gmail.com)")
+          let resendRes = await fetch('https://api.resend.com/emails', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify(emailPayload)
+          });
+
+          // If failed due to unverified custom domain, auto-retry with Resend test domain onboarding@resend.dev
           if (!resendRes.ok) {
-            const isTestRecipientRestriction = 
-              resendErrText.toLowerCase().includes('you can only send testing emails to your own email address') ||
-              resendErrText.toLowerCase().includes('testing email address instead of domains') ||
-              resendErrText.toLowerCase().includes('validation_error');
+            let resendErrText = await resendRes.text();
+            console.warn('[Backend Email] Primary Resend dispatch failed:', resendErrText);
+            
+            const isDomainError = resendErrText.toLowerCase().includes('domain') || 
+                                  resendErrText.toLowerCase().includes('verify') || 
+                                  resendRes.status === 403;
 
-            if (isTestRecipientRestriction) {
-              const match = resendErrText.match(/\(([^)]+@[^)]+)\)/);
-              const allowedTestEmail = match ? match[1] : (emailConfig.features?.expenses?.toEmails?.[0] || 'arun.zorro@gmail.com');
-              console.log(`[Backend Email] Rerouting to verified test account address (${allowedTestEmail}) due to Resend sandbox restriction.`);
-
-              const origTo = Array.isArray(emailPayload.to) ? emailPayload.to.join(', ') : emailPayload.to;
+            if (isDomainError && !senderEmail.includes('onboarding@resend.dev')) {
+              console.log('[Backend Email] Retrying with onboarding@resend.dev fallback sender...');
               emailPayload.from = `${senderName} <onboarding@resend.dev>`;
-              emailPayload.to = allowedTestEmail;
-              emailPayload.bcc = undefined;
-              emailPayload.subject = `[Test Mode: to ${origTo}] ${emailPayload.subject}`;
-
+              
               resendRes = await fetch('https://api.resend.com/emails', {
                 method: 'POST',
                 headers: {
@@ -1974,17 +1954,58 @@ Guidelines for SQL generation:
               });
 
               if (!resendRes.ok) {
-                const finalErr = await resendRes.text();
-                console.error('[Backend Email] Rerouted test dispatch failed:', finalErr);
-                throw new Error(`Resend Error: ${finalErr}`);
+                resendErrText = await resendRes.text();
               }
-            } else {
-              throw new Error(`Resend Error: ${resendErrText}`);
             }
+
+            // Check if failure is due to unverified recipient in Resend test mode or validation error
+            if (!resendRes.ok) {
+              const isTestRecipientRestriction = 
+                resendErrText.toLowerCase().includes('you can only send testing emails to your own email address') ||
+                resendErrText.toLowerCase().includes('testing email address instead of domains') ||
+                resendErrText.toLowerCase().includes('validation_error');
+
+              if (isTestRecipientRestriction) {
+                const match = resendErrText.match(/\(([^)]+@[^)]+)\)/);
+                const allowedTestEmail = match ? match[1] : (emailConfig.features?.expenses?.toEmails?.[0] || 'arun.zorro@gmail.com');
+                console.log(`[Backend Email] Rerouting to verified test account address (${allowedTestEmail}) due to Resend sandbox restriction.`);
+
+                const origTo = Array.isArray(emailPayload.to) ? emailPayload.to.join(', ') : emailPayload.to;
+                emailPayload.from = `${senderName} <onboarding@resend.dev>`;
+                emailPayload.to = allowedTestEmail;
+                emailPayload.bcc = undefined;
+                emailPayload.subject = `[Test Mode: to ${origTo}] ${emailPayload.subject}`;
+
+                resendRes = await fetch('https://api.resend.com/emails', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`
+                  },
+                  body: JSON.stringify(emailPayload)
+                });
+
+                if (!resendRes.ok) {
+                  const finalErr = await resendRes.text();
+                  console.error('[Backend Email] Rerouted test dispatch failed:', finalErr);
+                  throw new Error(`Resend Error: ${finalErr}`);
+                }
+
+                // If test rerouting was used, avoid duplicate reroutes for remaining batches
+                firstResendData = await resendRes.json();
+                break;
+              } else {
+                throw new Error(`Resend Error: ${resendErrText}`);
+              }
+            }
+          }
+
+          if (!firstResendData) {
+            firstResendData = await resendRes.json();
           }
         }
 
-        const resendData = await resendRes.json();
+        const resendData = firstResendData || { id: `msg_${Date.now()}` };
         console.log(`[Backend Email] Successfully dispatched email via Resend to ${recipients.length} recipient(s):`, recipients);
         sendJson(res, 200, {
           success: true,
@@ -1992,7 +2013,8 @@ Guidelines for SQL generation:
           messageId: resendData.id,
           recipientCount: recipients.length,
           recipients: recipients,
-          usedSender: emailPayload.from
+          batches: bccBatches.length,
+          usedSender: `${senderName} <${senderEmail}>`
         });
       } else {
         console.log(`[Backend Email Mock] RESEND_API_KEY not configured. Mocking email dispatch to ${recipients.join(', ')}`);
