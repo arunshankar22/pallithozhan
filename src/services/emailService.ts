@@ -36,6 +36,112 @@ export interface EmailDispatchResult {
   error?: string;
 }
 
+function escapeHtml(str: string): string {
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+export function formatExpenseNotesHtml(notes?: string): { isHtml: boolean; value: string } {
+  if (!notes || typeof notes !== 'string' || !notes.trim()) {
+    return { isHtml: false, value: '' };
+  }
+
+  // Normalize line item bullet delimiters if they run together on a single line
+  const normalized = notes
+    .replace(/\s+([*•])\s+/g, '\n$1 ')
+    .replace(/\s+(\d+\.)\s+/g, '\n$1 ');
+
+  const rawLines = normalized.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const items: Array<{ description: string; qty: string; amount: string }> = [];
+  const preamble: string[] = [];
+  const postamble: string[] = [];
+  let foundItem = false;
+
+  for (const line of rawLines) {
+    const bulletMatch = line.match(/^([*•\-–]|\d+[\.)])\s*(.+)$/);
+    const content = bulletMatch ? bulletMatch[2].trim() : line;
+
+    // Look for price pattern at the end: e.g. " - $8.40", " : $8.40", " $8.40"
+    const priceMatch = content.match(/^(.*?)(?:[-–—:]\s+|\s+)\$?([0-9,]+\.[0-9]{2})$/);
+
+    if (priceMatch) {
+      foundItem = true;
+      let descAndQty = priceMatch[1].trim();
+      const amount = priceMatch[2].trim();
+
+      let qtyRate = '';
+      const parenMatch = descAndQty.match(/\(([^)]*(?:@|each|x\d|\d+x)[^)]*)\)/i);
+      if (parenMatch) {
+        qtyRate = parenMatch[1].trim();
+        descAndQty = descAndQty.replace(parenMatch[0], '').trim();
+      } else {
+        const atMatch = descAndQty.match(/\b(\d+\s*@\s*\$?[0-9,.]+(?:\s*each)?)\b/i);
+        if (atMatch) {
+          qtyRate = atMatch[1].trim();
+          descAndQty = descAndQty.replace(atMatch[0], '').trim();
+        }
+      }
+
+      descAndQty = descAndQty.replace(/[-–—,]+$/, '').trim();
+
+      items.push({
+        description: descAndQty || 'Item',
+        qty: qtyRate || '-',
+        amount: `$${Number(amount.replace(/,/g, '')).toFixed(2)}`
+      });
+    } else {
+      if (foundItem) {
+        postamble.push(content);
+      } else {
+        preamble.push(content);
+      }
+    }
+  }
+
+  // If itemized lines were parsed, render a clean HTML table matching the Balar Malar portal palette
+  if (items.length >= 1) {
+    const tableRows = items.map((it, idx) => `
+      <tr style="border-bottom: 1px solid #EAE2D5; background-color: ${idx % 2 === 0 ? '#FFFFFF' : '#FAF8F4'};">
+        <td style="padding: 8px 10px; font-size: 12px; color: #1E201B; font-weight: 500; vertical-align: middle;">${escapeHtml(it.description)}</td>
+        <td style="padding: 8px 10px; font-size: 11px; color: #6C7063; text-align: center; vertical-align: middle; white-space: nowrap;">${escapeHtml(it.qty)}</td>
+        <td style="padding: 8px 10px; font-size: 12px; color: #1E201B; font-weight: 700; text-align: right; vertical-align: middle; white-space: nowrap;">${it.amount}</td>
+      </tr>
+    `).join('');
+
+    const preambleHtml = preamble.length > 0 ? `<p style="margin: 0 0 8px 0; font-size: 12px; color: #44473F;">${escapeHtml(preamble.join(' '))}</p>` : '';
+    const postambleHtml = postamble.length > 0 ? `<p style="margin: 8px 0 0 0; font-size: 12px; color: #6C7063; font-style: italic;">${escapeHtml(postamble.join(' '))}</p>` : '';
+
+    const html = `
+      ${preambleHtml}
+      <table style="width: 100%; border-collapse: collapse; margin: 4px 0; border: 1px solid #EAE2D5; border-radius: 6px; overflow: hidden; background: #FFFFFF;">
+        <thead>
+          <tr style="background-color: #F4EFE6; border-bottom: 2px solid #EAE2D5; color: #5C5549; font-size: 11px;">
+            <th style="padding: 7px 10px; text-align: left; font-weight: 700;">Item Description / பொருள்</th>
+            <th style="padding: 7px 10px; text-align: center; font-weight: 700; width: 28%;">Qty / Rate</th>
+            <th style="padding: 7px 10px; text-align: right; font-weight: 700; width: 22%;">Amount / தொகை</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${tableRows}
+        </tbody>
+      </table>
+      ${postambleHtml}
+    `.trim();
+
+    return { isHtml: true, value: html };
+  }
+
+  // Otherwise format with line breaks preserved
+  return {
+    isHtml: true,
+    value: `<div style="white-space: pre-wrap; font-size: 13px; line-height: 20px; color: #44473F;">${escapeHtml(notes)}</div>`
+  };
+}
+
 export const emailService = {
   /**
    * Generic Universal Notification Dispatcher
@@ -157,7 +263,12 @@ export const emailService = {
     ];
 
     if (expense.notes) {
-      details.push({ label: 'Notes / குறிப்புகள்', value: expense.notes });
+      const formattedNotes = formatExpenseNotesHtml(expense.notes);
+      details.push({
+        label: 'Notes / குறிப்புகள்',
+        value: formattedNotes.value,
+        isHtml: formattedNotes.isHtml
+      });
     }
 
     if (expense.fileUrls && expense.fileUrls.length > 0) {
@@ -234,6 +345,15 @@ export const emailService = {
 
     if (approver.comments) {
       details.push({ label: 'Approver Comments / குறிப்புகள்', value: approver.comments });
+    }
+
+    if (expense.notes) {
+      const formattedNotes = formatExpenseNotesHtml(expense.notes);
+      details.push({
+        label: 'Notes / குறிப்புகள்',
+        value: formattedNotes.value,
+        isHtml: formattedNotes.isHtml
+      });
     }
 
     const bccList = treasurerEmails.filter(e => e.toLowerCase() !== recipientEmail.toLowerCase());
@@ -338,8 +458,8 @@ export const emailService = {
   sendAnnouncementNotification: async (
     post: {
       id?: string;
-      title: string;
-      content: string;
+      title: string | { en?: string; ta?: string };
+      content: string | { en?: string; ta?: string };
       targetAudience?: string;
     },
     author: {
@@ -348,21 +468,62 @@ export const emailService = {
     },
     customTargetGroup?: string
   ): Promise<EmailDispatchResult> => {
+    const titleEn = typeof post.title === 'object' ? (post.title.en || '') : String(post.title || '');
+    const titleTa = typeof post.title === 'object' ? (post.title.ta || '') : '';
+    const displayTitle = [titleEn, titleTa].filter(Boolean).join(' / ') || 'School Announcement / பள்ளி அறிவிப்பு';
+
+    const contentEn = typeof post.content === 'object' ? (post.content.en || '') : String(post.content || '');
+    const contentTa = typeof post.content === 'object' ? (post.content.ta || '') : '';
+    const mainSummary = contentEn || contentTa || 'New school announcement posted on PalliThozhan.';
+    const truncatedSummary = mainSummary.length > 280 ? mainSummary.substring(0, 277) + '...' : mainSummary;
+
+    const details: NotificationDetailItem[] = [
+      { label: 'Published By / வெளியிட்டவர்', value: author.fullName || 'School Administration' },
+      { label: 'Date / தேதி', value: new Date().toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) }
+    ];
+
+    if (post.targetAudience) {
+      details.push({ label: 'Target Audience / இலக்கு', value: post.targetAudience });
+    }
+
+    if (contentEn && contentTa) {
+      details.push({
+        label: 'Tamil Announcement / தமிழ் உரை',
+        value: `<div style="white-space: pre-wrap; font-size: 13px; line-height: 20px; color: #1E201B;">${escapeHtml(contentTa)}</div>`,
+        isHtml: true
+      });
+      details.push({
+        label: 'English Announcement / ஆங்கில உரை',
+        value: `<div style="white-space: pre-wrap; font-size: 13px; line-height: 20px; color: #44473F;">${escapeHtml(contentEn)}</div>`,
+        isHtml: true
+      });
+    } else if (contentTa) {
+      details.push({
+        label: 'Announcement / அறிவிப்பு',
+        value: `<div style="white-space: pre-wrap; font-size: 13px; line-height: 20px; color: #1E201B;">${escapeHtml(contentTa)}</div>`,
+        isHtml: true
+      });
+    } else if (contentEn) {
+      details.push({
+        label: 'Announcement / அறிவிப்பு',
+        value: `<div style="white-space: pre-wrap; font-size: 13px; line-height: 20px; color: #44473F;">${escapeHtml(contentEn)}</div>`,
+        isHtml: true
+      });
+    }
+
     return emailService.sendNotification({
       feature: 'announcements',
       targetGroup: customTargetGroup || 'all',
       replyTo: author.email,
-      subject: `[School Announcement] ${post.title}`,
-      title: post.title,
-      summary: post.content.length > 280 ? post.content.substring(0, 277) + '...' : post.content,
-      details: [
-        { label: 'Published By', value: author.fullName },
-        { label: 'Date', value: new Date().toLocaleDateString('en-AU') }
-      ],
+      subject: `[School Announcement] ${displayTitle}`,
+      title: displayTitle,
+      summary: truncatedSummary,
+      details: details,
       actionButton: {
         text: 'View Full Announcement / அறிவிப்பைப் பார்க்கவும்',
         url: 'https://pallithozhan.3stech.com.au/'
-      }
+      },
+      footerNote: 'You received this notification because you are registered as a member of the Balar Malar Tamil School community.'
     });
   },
 

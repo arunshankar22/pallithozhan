@@ -967,11 +967,13 @@ async function handleApiRoutes(req, res, pathname, method, dbData, writeDb, urlO
 
       // Format the prompt
       const prompt = `Analyze this receipt image or document. Extract the following details:
-1. Title: The name of the merchant/store (e.g. Officeworks, Dymocks, Woolworths).
+1. Title: The name of the merchant/store (e.g. Officeworks, Dymocks, Woolworths, Coles).
 2. Amount: The final total amount paid as a raw number (e.g. 120.50).
 3. Category: Classify the purchase into exactly one of these options: 'teaching materials', 'catering', 'stationeries', 'events', 'rentals', 'other'.
 4. Date: The purchase date in YYYY-MM-DD format.
-5. Notes: A clean, bulleted, itemized list of all products purchased and their individual prices, followed by a brief summary of items if appropriate.
+5. Notes: A clean, itemized list of all products purchased and their individual prices. Format each item on its own separate line starting with a bullet point:
+• Product name (quantity @ unit price each) - $total_price
+Followed by a brief summary if applicable. Each item MUST be on a new line.
 
 Respond ONLY with a valid JSON object matching the schema below. Do NOT wrap the JSON in markdown formatting (do NOT use \`\`\`json or \`\`\`), do NOT include any comments, explanations, or chat introductory/concluding text.
 
@@ -1071,6 +1073,13 @@ Response Schema:
           category: 'other',
           notes: rawText
         };
+      }
+
+      // Ensure itemized bullet points are cleanly separated by newlines
+      if (parsedResult && parsedResult.notes && typeof parsedResult.notes === 'string') {
+        parsedResult.notes = parsedResult.notes
+          .replace(/\s+([*•])\s+/g, '\n$1 ')
+          .replace(/\s+(\d+\.)\s+/g, '\n$1 ');
       }
 
       sendJson(res, 200, parsedResult);
@@ -1792,6 +1801,39 @@ Guidelines for SQL generation:
           } else if (targetGroup === 'all') {
             const allUsers = (dbData.users || []).filter(u => u.email);
             recipients.push(...allUsers.map(u => u.email));
+            if (emailConfig.features?.announcements?.toEmails) {
+              recipients.push(...emailConfig.features.announcements.toEmails);
+            }
+          } else if (typeof targetGroup === 'string' && targetGroup.startsWith('class_')) {
+            const classId = targetGroup.replace('class_', '');
+            const classUsers = (dbData.users || []).filter(u => 
+              (u.associatedStudents && u.associatedStudents.includes(classId)) ||
+              u.className === classId ||
+              u.role === 'teacher'
+            );
+            recipients.push(...classUsers.map(u => u.email).filter(Boolean));
+          }
+
+          // Also attempt to query registered user emails from Firestore if connected
+          try {
+            const dbId = getDbIdForRequest(req);
+            const fDb = await getAuthenticatedDb(dbId);
+            const { collection, getDocs } = require('firebase/firestore');
+            const userSnap = await getDocs(collection(fDb, 'users'));
+            userSnap.forEach(d => {
+              const u = d.data();
+              if (u && u.email && u.email.includes('@')) {
+                if (targetGroup === 'all') {
+                  recipients.push(u.email);
+                } else if ((targetGroup === 'parents' || targetGroup === 'parent') && u.role === 'parent') {
+                  recipients.push(u.email);
+                } else if ((targetGroup === 'teachers' || targetGroup === 'teacher') && u.role === 'teacher') {
+                  recipients.push(u.email);
+                }
+              }
+            });
+          } catch (fErr) {
+            // Firestore user lookup is best-effort
           }
         }
       }
@@ -1799,6 +1841,8 @@ Guidelines for SQL generation:
       // Feature specific fallback recipient if none specified
       if (recipients.length === 0 && feature === 'expenses') {
         recipients.push(...(emailConfig.features?.expenses?.toEmails || ['parramatta@balarmalar.nsw.edu.au']));
+      } else if (recipients.length === 0 && feature === 'announcements') {
+        recipients.push(...(emailConfig.features?.announcements?.toEmails || emailConfig.customGroups?.committee || ['parramatta@balarmalar.nsw.edu.au']));
       }
 
       // Clean, validate, and deduplicate emails
@@ -1842,7 +1886,12 @@ Guidelines for SQL generation:
           to: recipients.length === 1 ? recipients[0] : recipients,
           bcc: bccRecipients.length > 0 ? bccRecipients : undefined,
           subject: body.subject || `[Notification] Balar Malar Tamil School`,
-          html: htmlContent
+          html: htmlContent,
+          headers: {
+            'X-Entity-Ref-ID': `bm_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+            'X-Auto-Response-Suppress': 'OOF, AutoReply',
+            'Precedence': feature === 'expenses' ? 'personal' : 'bulk'
+          }
         };
 
         // If broadcasting to a broad group (e.g. parents, all), keep individual emails private via BCC
@@ -1992,12 +2041,25 @@ function generateUniversalEmailHtml({ title, subtitle, summary, details, actionB
     ? `
       <table style="width: 100%; border-collapse: collapse; margin: 18px 0; background: #FAF8F4; border-radius: 8px; overflow: hidden; border: 1px solid #EAE2D5;">
         <tbody>
-          ${details.map(d => `
-            <tr style="border-bottom: 1px solid #EAE2D5;">
-              <td style="padding: 10px 14px; font-weight: 700; color: #1E201B; width: 35%; vertical-align: top; font-size: 13px;">${escapeHtml(d.label || '')}</td>
-              <td style="padding: 10px 14px; color: #44473F; font-size: 13px; vertical-align: top;">${d.isHtml ? d.value : escapeHtml(d.value || '')}</td>
-            </tr>
-          `).join('')}
+          ${details.map(d => {
+            const isWideTable = d.isHtml && typeof d.value === 'string' && d.value.includes('<table');
+            if (isWideTable) {
+              return `
+                <tr style="border-bottom: 1px solid #EAE2D5;">
+                  <td colspan="2" style="padding: 12px 14px; color: #44473F; font-size: 13px; vertical-align: top;">
+                    <div style="font-weight: 700; color: #1E201B; margin-bottom: 6px; font-size: 13px;">${escapeHtml(d.label || '')}</div>
+                    ${d.value}
+                  </td>
+                </tr>
+              `;
+            }
+            return `
+              <tr style="border-bottom: 1px solid #EAE2D5;">
+                <td style="padding: 10px 14px; font-weight: 700; color: #1E201B; width: 35%; vertical-align: top; font-size: 13px;">${escapeHtml(d.label || '')}</td>
+                <td style="padding: 10px 14px; color: #44473F; font-size: 13px; vertical-align: top;">${d.isHtml ? d.value : escapeHtml(d.value || '')}</td>
+              </tr>
+            `;
+          }).join('')}
         </tbody>
       </table>
     `

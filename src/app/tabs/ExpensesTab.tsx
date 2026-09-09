@@ -365,7 +365,11 @@ export function ExpensesTab({
     if (scanResult.amount && scanResult.amount > 0) setAmount(String(scanResult.amount));
     if (scanResult.category && scanResult.category !== 'other') setCategory(scanResult.category);
     if (scanResult.notes && !scanResult.notes.includes('AI key not configured') && !scanResult.notes.includes('AI scan unavailable')) {
-      setNotes(scanResult.notes);
+      let formattedNotes = String(scanResult.notes);
+      formattedNotes = formattedNotes
+        .replace(/\s+([*•])\s+/g, '\n$1 ')
+        .replace(/\s+(\d+\.)\s+/g, '\n$1 ');
+      setNotes(formattedNotes);
     }
 
     const isAiScanFailed = Boolean(scanResult.aiScanFailed || (!scanResult.amount && (!scanResult.title || scanResult.title === 'Scanned Receipt')));

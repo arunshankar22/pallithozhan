@@ -43,6 +43,7 @@ import { styles } from '@/app/styles';
 import { mockDb, MEDIA_PRESETS } from '@/services/mockBackend';
 import { autoTranslate, translateWithGemini } from '@/services/translator';
 import { useDebounce } from '@/hooks/useDebounce';
+import { emailService } from '@/services/emailService';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { VideoPlayer } from '@/components/VideoPlayer';
@@ -218,6 +219,7 @@ export function NewsfeedTab({
   const [deviceUploadedData, setDeviceUploadedData] = useState('');
   const [editingPostId, setEditingPostId] = useState('');
   const [attachedFiles, setAttachedFiles] = useState<{ name: string; type: 'image' | 'video'; data: string; }[]>([]);
+  const [sendEmailNotification, setSendEmailNotification] = useState(true);
 
   // Autoscrolling state & refs
   const [activeSlides, setActiveSlides] = useState<Record<string, number>>({});
@@ -501,8 +503,39 @@ export function NewsfeedTab({
         await mockDb.updateNewsfeedPost(editingPostId, postPayload);
         showToast('Announcement updated successfully!', 'success');
       } else {
-        await mockDb.createNewsfeedPost(postPayload);
-        showToast('Tamil/English announcement successfully broadcasted!', 'success');
+        const createdPost = await mockDb.createNewsfeedPost(postPayload);
+
+        if (sendEmailNotification) {
+          try {
+            const audienceLabel = selectedTaggedClassIds.length > 0
+              ? `Classes: ${selectedTaggedClassIds.join(', ')}`
+              : (i18n.language === 'ta' ? 'அனைத்து பெற்றோர்கள் மற்றும் ஆசிரியர்கள்' : 'All Parents, Teachers & Volunteers');
+
+            await emailService.sendAnnouncementNotification(
+              {
+                id: createdPost?.postId,
+                title: { en: titleEn, ta: titleTa },
+                content: { en: contentEn, ta: contentTa },
+                targetAudience: audienceLabel
+              },
+              {
+                fullName: user?.fullName || 'Balar Malar School Administration',
+                email: user?.email || 'parramatta@balarmalar.nsw.edu.au'
+              },
+              selectedTaggedClassIds.length === 1 ? `class_${selectedTaggedClassIds[0]}` : 'all'
+            );
+            console.log('[NewsfeedTab] Announcement email dispatched successfully.');
+          } catch (emailErr) {
+            console.warn('[NewsfeedTab] Failed to dispatch announcement email:', emailErr);
+          }
+        }
+
+        showToast(
+          sendEmailNotification
+            ? (i18n.language === 'ta' ? 'அறிவிப்பு வெளியிடப்பட்டது & மின்னஞ்சல் அனுப்பப்பட்டது!' : 'Announcement broadcasted & email notifications sent!')
+            : (i18n.language === 'ta' ? 'அறிவிப்பு வெற்றிகரமாக வெளியிடப்பட்டது!' : 'Tamil/English announcement successfully broadcasted!'),
+          'success'
+        );
       }
     } catch (e) {
       showToast('Failed to save announcement.', 'error');
@@ -1214,6 +1247,41 @@ export function NewsfeedTab({
               )}
             </View>
           </View>
+
+          {/* Email Notification Option for New Broadcasts */}
+          {!editingPostId && (
+            <Pressable
+              onPress={() => setSendEmailNotification(prev => !prev)}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                marginVertical: 12,
+                paddingHorizontal: 12,
+                paddingVertical: 10,
+                backgroundColor: sendEmailNotification ? (colors.primaryLight || '#FFF5F2') : (colors.card || '#FAF8F4'),
+                borderWidth: 1,
+                borderColor: sendEmailNotification ? colors.primary : colors.border,
+                borderRadius: 8
+              }}
+            >
+              <View style={{
+                width: 20,
+                height: 20,
+                borderRadius: 4,
+                borderWidth: 1.5,
+                borderColor: sendEmailNotification ? colors.primary : colors.textSecondary,
+                backgroundColor: sendEmailNotification ? colors.primary : 'transparent',
+                justifyContent: 'center',
+                alignItems: 'center',
+                marginRight: 10
+              }}>
+                {sendEmailNotification && <CheckCircle size={14} color="#FFF" />}
+              </View>
+              <ThemedText style={{ fontSize: 13, fontWeight: '600', color: sendEmailNotification ? colors.primary : colors.text, flex: 1 }}>
+                📧 {i18n.language === 'ta' ? 'சமூகத்திற்கு மின்னஞ்சல் அறிவிப்பை தானாக அனுப்பு' : 'Auto-send email broadcast to community'}
+              </ThemedText>
+            </Pressable>
+          )}
 
           <View style={styles.formButtonRow}>
             <Pressable onPress={() => setModalVisible(false)} style={[styles.formCancelButton, { borderColor: colors.border }]}>
