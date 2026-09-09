@@ -137,12 +137,38 @@ export function LibraryTab({ user, colors, t, showToast, i18n, insets }: TabProp
     setEmbeddedReaderVisible(false);
     setEmbeddedStory(null);
     setForceLandscapeMobile(false);
-    if (typeof window !== 'undefined' && window.sessionStorage) {
-      try {
-        window.sessionStorage.setItem('pallithozhan_active_tab', 'library');
-      } catch (e) {}
+    if (typeof window !== 'undefined') {
+      if (window.sessionStorage) {
+        try {
+          window.sessionStorage.setItem('pallithozhan_active_tab', 'library');
+        } catch (e) {}
+      }
+      if (window.history && window.history.state?.pallithozhan_reader) {
+        try {
+          window.history.back();
+        } catch (e) {}
+      }
     }
   };
+
+  // Intercept browser and iframe history navigation (e.g. StoryWeaver internal close button)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onPopState = () => {
+      if (embeddedReaderVisible) {
+        setEmbeddedReaderVisible(false);
+        setEmbeddedStory(null);
+        setForceLandscapeMobile(false);
+        if (window.sessionStorage) {
+          try {
+            window.sessionStorage.setItem('pallithozhan_active_tab', 'library');
+          } catch (e) {}
+        }
+      }
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, [embeddedReaderVisible]);
 
   const openEmbeddedStory = (story: {
     storyId?: string;
@@ -161,6 +187,12 @@ export function LibraryTab({ user, colors, t, showToast, i18n, insets }: TabProp
     });
     setEmbeddedReaderVisible(true);
     setDetailModalVisible(false);
+
+    if (typeof window !== 'undefined' && window.history) {
+      try {
+        window.history.pushState({ pallithozhan_reader: true }, '');
+      } catch (e) {}
+    }
 
     if (user?.uid && story.storyId) {
       const matchBook = books.find(b => b.pdfUrl?.includes(story.storyId || ''));
@@ -1335,55 +1367,60 @@ export function LibraryTab({ user, colors, t, showToast, i18n, insets }: TabProp
               flexDirection: 'row',
               justifyContent: 'space-between',
               alignItems: 'center',
-              paddingHorizontal: 16,
+              paddingHorizontal: isLargeScreen ? 16 : 10,
               paddingVertical: 8,
               borderBottomWidth: 1,
               borderColor: '#2D3748',
               backgroundColor: '#2D3748',
-              gap: 12
+              gap: 8
             }}>
               {/* Back / Close button & Story info */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
                 <Pressable
                   onPress={handleCloseEmbeddedReader}
                   style={{
                     flexDirection: 'row',
                     alignItems: 'center',
                     gap: 6,
-                    paddingHorizontal: 12,
+                    paddingHorizontal: isLargeScreen ? 12 : 8,
                     paddingVertical: 8,
                     borderRadius: 8,
-                    backgroundColor: '#4A5568'
+                    backgroundColor: '#4A5568',
+                    flexShrink: 0
                   }}
                 >
                   <ArrowLeft size={16} color="#FFF" />
-                  <ThemedText style={{ color: '#FFF', fontSize: 12, fontWeight: '700' }}>
-                    {i18n.language === 'ta' ? 'பள்ளி நூலகம்' : 'Back to Library'}
-                  </ThemedText>
+                  {isLargeScreen && (
+                    <ThemedText style={{ color: '#FFF', fontSize: 12, fontWeight: '700' }}>
+                      {i18n.language === 'ta' ? 'பள்ளி நூலகம்' : 'Back to Library'}
+                    </ThemedText>
+                  )}
                 </Pressable>
 
-                <View style={{ flex: 1 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <View style={{ flex: 1, minWidth: 0, justifyContent: 'center' }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 }}>
                     {embeddedStory.level && (
-                      <View style={{ backgroundColor: '#F59E0B', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                      <View style={{ backgroundColor: '#F59E0B', paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4, flexShrink: 0 }}>
                         <ThemedText style={{ color: '#000', fontSize: 9, fontWeight: '900' }}>
                           Level {embeddedStory.level}
                         </ThemedText>
                       </View>
                     )}
-                    <ThemedText style={{ color: '#FFF', fontWeight: '800', fontSize: 13 }} numberOfLines={1}>
+                    <ThemedText style={{ color: '#FFF', fontWeight: '800', fontSize: 13, flexShrink: 1 }} numberOfLines={1}>
                       {embeddedStory.titleTa}
                     </ThemedText>
                   </View>
-                  <ThemedText style={{ color: '#A0AEC0', fontSize: 10 }} numberOfLines={1}>
-                    {embeddedStory.titleEn}
-                  </ThemedText>
+                  {embeddedStory.titleEn !== embeddedStory.titleTa && (
+                    <ThemedText style={{ color: '#A0AEC0', fontSize: 10 }} numberOfLines={1}>
+                      {embeddedStory.titleEn}
+                    </ThemedText>
+                  )}
                 </View>
               </View>
 
               {/* Actions */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                {user?.role === 'student' && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                {user?.role === 'student' && isLargeScreen && (
                   <Pressable
                     onPress={handleClaimStoryXp}
                     style={{
@@ -1391,7 +1428,7 @@ export function LibraryTab({ user, colors, t, showToast, i18n, insets }: TabProp
                       alignItems: 'center',
                       gap: 4,
                       backgroundColor: '#10B981',
-                      paddingHorizontal: 12,
+                      paddingHorizontal: 10,
                       paddingVertical: 8,
                       borderRadius: 8
                     }}
@@ -1403,29 +1440,28 @@ export function LibraryTab({ user, colors, t, showToast, i18n, insets }: TabProp
                   </Pressable>
                 )}
 
-                {!isLargeScreen && (
-                  <Pressable
-                    onPress={() => setForceLandscapeMobile(prev => !prev)}
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: 4,
-                      backgroundColor: forceLandscapeMobile ? '#F59E0B' : '#4A5568',
-                      paddingHorizontal: 8,
-                      paddingVertical: 8,
-                      borderRadius: 8
-                    }}
-                  >
-                    <RotateCw size={14} color="#FFF" />
-                    <ThemedText style={{ color: '#FFF', fontSize: 11, fontWeight: '700' }}>
-                      {forceLandscapeMobile
-                        ? (i18n.language === 'ta' ? 'செங்குத்து' : 'Vertical')
-                        : (i18n.language === 'ta' ? 'சுழற்று' : 'Rotate')}
-                    </ThemedText>
-                  </Pressable>
-                )}
+                {/* Rotate button - ALWAYS available in both portrait and landscape! */}
+                <Pressable
+                  onPress={() => setForceLandscapeMobile(prev => !prev)}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 4,
+                    backgroundColor: forceLandscapeMobile ? '#F59E0B' : '#4A5568',
+                    paddingHorizontal: isLargeScreen ? 10 : 8,
+                    paddingVertical: 8,
+                    borderRadius: 8
+                  }}
+                >
+                  <RotateCw size={14} color="#FFF" />
+                  <ThemedText style={{ color: '#FFF', fontSize: 11, fontWeight: '700' }}>
+                    {forceLandscapeMobile
+                      ? (i18n.language === 'ta' ? 'செங்குத்து' : 'Vertical')
+                      : (i18n.language === 'ta' ? 'சுழற்று' : 'Rotate')}
+                  </ThemedText>
+                </Pressable>
 
-                {Platform.OS === 'web' && (
+                {Platform.OS === 'web' && isLargeScreen && (
                   <Pressable
                     onPress={() => window.open(embeddedStory.embedUrl, '_blank')}
                     style={{
@@ -1465,8 +1501,8 @@ export function LibraryTab({ user, colors, t, showToast, i18n, insets }: TabProp
               flex: 1,
               backgroundColor: '#000',
               justifyContent: 'center',
-              alignItems: 'center',
-              paddingHorizontal: (!isLandscape && !forceLandscapeMobile && !isLargeScreen) ? 4 : 0
+              alignItems: 'stretch',
+              overflow: 'hidden'
             }}>
               {Platform.OS === 'web' ? (
                 <>
@@ -1483,22 +1519,24 @@ export function LibraryTab({ user, colors, t, showToast, i18n, insets }: TabProp
                       border: 'none',
                       backgroundColor: '#FFFFFF',
                       borderRadius: (!isLandscape && !forceLandscapeMobile && !isLargeScreen) ? 8 : 0,
-                      overflow: 'hidden'
+                      margin: '0 auto',
+                      display: 'block'
                     }}
                     allow="fullscreen; autoplay"
-                    sandbox="allow-scripts allow-same-origin allow-forms allow-fullscreen"
                     title={embeddedStory.titleEn}
                   />
                   {!isLandscape && !forceLandscapeMobile && !isLargeScreen && (
                     <View style={{
                       flexDirection: 'row',
                       alignItems: 'center',
+                      justifyContent: 'center',
                       gap: 6,
                       marginTop: 8,
                       paddingHorizontal: 12,
                       paddingVertical: 6,
                       borderRadius: 16,
-                      backgroundColor: 'rgba(255,255,255,0.08)'
+                      backgroundColor: 'rgba(255,255,255,0.08)',
+                      alignSelf: 'center'
                     }}>
                       <Smartphone size={13} color="#94A3B8" />
                       <ThemedText style={{ color: '#94A3B8', fontSize: 10, fontWeight: '600' }}>
