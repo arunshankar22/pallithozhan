@@ -1845,8 +1845,8 @@ Guidelines for SQL generation:
         recipients.push(...(emailConfig.features?.announcements?.toEmails || emailConfig.customGroups?.committee || ['parramatta@balarmalar.nsw.edu.au']));
       }
 
-      // Clean, validate, and deduplicate emails
-      recipients = [...new Set(recipients.map(e => (e || '').trim().toLowerCase()))].filter(e => e.includes('@'));
+      // Clean, validate, and deduplicate emails (filter out mock @example.com addresses which Resend rejects)
+      recipients = [...new Set(recipients.map(e => (e || '').trim().toLowerCase()))].filter(e => e.includes('@') && !e.endsWith('@example.com'));
 
       // Optional BCC list
       let bccRecipients = [];
@@ -1855,7 +1855,12 @@ Guidelines for SQL generation:
       } else if (typeof body.bcc === 'string' && body.bcc.trim()) {
         bccRecipients.push(...body.bcc.split(',').map(s => s.trim()));
       }
-      bccRecipients = [...new Set(bccRecipients.map(e => (e || '').trim().toLowerCase()))].filter(e => e.includes('@') && !recipients.includes(e));
+      bccRecipients = [...new Set(bccRecipients.map(e => (e || '').trim().toLowerCase()))].filter(e => e.includes('@') && !e.endsWith('@example.com') && !recipients.includes(e));
+
+      if (recipients.length === 0) {
+        recipients.push(...(emailConfig.features?.announcements?.toEmails || emailConfig.customGroups?.committee || ['parramatta@balarmalar.nsw.edu.au', 'arun.zorro@gmail.com']));
+        recipients = [...new Set(recipients.map(e => (e || '').trim().toLowerCase()))].filter(e => e.includes('@') && !e.endsWith('@example.com'));
+      }
 
       if (recipients.length === 0) {
         sendJson(res, 400, { error: 'No valid recipient email address specified or resolved for this notification.' });
@@ -1943,7 +1948,11 @@ Guidelines for SQL generation:
           // Check if failure is due to unverified recipient in Resend test mode
           // (e.g. "You can only send testing emails to your own email address (arun.zorro@gmail.com)")
           if (!resendRes.ok) {
-            const isTestRecipientRestriction = resendErrText.toLowerCase().includes('you can only send testing emails to your own email address');
+            const isTestRecipientRestriction = 
+              resendErrText.toLowerCase().includes('you can only send testing emails to your own email address') ||
+              resendErrText.toLowerCase().includes('testing email address instead of domains') ||
+              resendErrText.toLowerCase().includes('validation_error');
+
             if (isTestRecipientRestriction) {
               const match = resendErrText.match(/\(([^)]+@[^)]+)\)/);
               const allowedTestEmail = match ? match[1] : (emailConfig.features?.expenses?.toEmails?.[0] || 'arun.zorro@gmail.com');
