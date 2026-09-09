@@ -727,7 +727,7 @@ export async function translateWithGemini(text: string): Promise<string> {
         : `Translate this educational school text to standard Tamil meaning. Keep the numbers as numbers (e.g. 'Term 2 Week 7' becomes 'பருவம் 2 வாரம் 7'). Respond ONLY with the final translated Tamil text, without any additional explanations, notes, markdown formatting, or chat prefixes.\n\nText:\n${text}`;
 
       const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${clientKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${clientKey}`,
         {
           method: 'POST',
           headers: {

@@ -877,38 +877,55 @@ async function handleApiRoutes(req, res, pathname, method, dbData, writeDb, urlO
         return true;
       }
 
-      // Query Gemini Developer API using the standard REST endpoint
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            contents: [{
-              parts: [{
-                text: /[\u0B80-\u0BFF]/.test(text)
-                  ? `Translate this Tamil text to standard English meaning. Keep the numbers as numbers. Respond ONLY with the final translated English text, without any additional explanations, notes, markdown formatting, or chat prefixes.\n\nText:\n${text}`
-                  : `Translate this educational school text to standard Tamil meaning. Keep the numbers as numbers (e.g. 'Term 2 Week 7' becomes 'பருவம் 2 வாரம் 7'). Respond ONLY with the final translated Tamil text, without any additional explanations, notes, markdown formatting, or chat prefixes.\n\nText:\n${text}`
-              }]
-            }],
-            generationConfig: {
-              temperature: 0.1,
-              maxOutputTokens: 8192
-            }
-          })
-        }
-      );
+      // Query Gemini Developer API using the standard REST endpoint with model fallback
+      const translateModels = ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3.7-flash', 'gemini-pro-latest'];
+      let translateData = null;
+      let lastTranslateError = '';
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Gemini API error:', errorText);
-        sendJson(res, 502, { error: 'Gemini translation API request failed.', details: errorText });
+      for (const model of translateModels) {
+        try {
+          const response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                contents: [{
+                  parts: [{
+                    text: /[\u0B80-\u0BFF]/.test(text)
+                      ? `Translate this Tamil text to standard English meaning. Keep the numbers as numbers. Respond ONLY with the final translated English text, without any additional explanations, notes, markdown formatting, or chat prefixes.\n\nText:\n${text}`
+                      : `Translate this educational school text to standard Tamil meaning. Keep the numbers as numbers (e.g. 'Term 2 Week 7' becomes 'பருவம் 2 வாரம் 7'). Respond ONLY with the final translated Tamil text, without any additional explanations, notes, markdown formatting, or chat prefixes.\n\nText:\n${text}`
+                  }]
+                }],
+                generationConfig: {
+                  temperature: 0.1,
+                  maxOutputTokens: 8192
+                }
+              })
+            }
+          );
+
+          if (response.ok) {
+            translateData = await response.json();
+            break;
+          } else {
+            lastTranslateError = await response.text();
+            if (response.status === 400 || response.status === 403) break;
+          }
+        } catch (tErr) {
+          lastTranslateError = tErr.message;
+        }
+      }
+
+      if (!translateData) {
+        console.error('Gemini API translation error:', lastTranslateError);
+        sendJson(res, 502, { error: 'Gemini translation API request failed.', details: lastTranslateError });
         return true;
       }
 
-      const data = await response.json();
+      const data = translateData;
       const translation = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
       sendJson(res, 200, { translation });
     } catch (err) {
@@ -974,7 +991,7 @@ Response Schema:
       }
 
       // Query Gemini API using standard REST endpoint with model fallback
-      const scanModels = ['gemini-1.5-flash', 'gemini-2.0-flash'];
+      const scanModels = ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3.7-flash', 'gemini-3.8-flash', 'gemini-3.5-flash-lite', 'gemini-pro-latest'];
       let scanResponse = null;
       let lastScanError = '';
 
@@ -1549,7 +1566,7 @@ Guidelines for SQL generation:
           requestBody.tools = tools;
         }
 
-        const models = ['gemini-1.5-flash', 'gemini-2.0-flash'];
+        const models = ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3.7-flash', 'gemini-3.8-flash', 'gemini-3.5-flash-lite', 'gemini-pro-latest'];
         let lastError = null;
         for (const model of models) {
           try {
