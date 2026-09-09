@@ -23,7 +23,9 @@ import {
   Book,
   Globe,
   Sparkles,
-  ArrowLeft
+  ArrowLeft,
+  RotateCw,
+  Smartphone
 } from 'lucide-react-native';
 
 import { ThemedText } from '@/components/themed-text';
@@ -37,8 +39,9 @@ import { STORYWEAVER_STORIES, toStoryWeaverEmbedUrl, StoryWeaverStory } from '@/
 import { storyweaverService } from '@/services/storyweaverService';
 
 export function LibraryTab({ user, colors, t, showToast, i18n, insets }: TabProps) {
-  const { width: windowWidth } = useWindowDimensions();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const isLargeScreen = windowWidth >= 768;
+  const isLandscape = windowWidth > windowHeight;
 
   // State Variables
   const [books, setBooks] = useState<BookType[]>([]);
@@ -71,6 +74,7 @@ export function LibraryTab({ user, colors, t, showToast, i18n, insets }: TabProp
   } | null>(null);
   const [customStoryInput, setCustomStoryInput] = useState('');
   const [showCustomInput, setShowCustomInput] = useState(false);
+  const [forceLandscapeMobile, setForceLandscapeMobile] = useState(false);
 
   // StoryWeaver Hub state
   const [swSelectedLevel, setSwSelectedLevel] = useState<'all' | '1' | '2' | '3' | '4'>('all');
@@ -132,6 +136,7 @@ export function LibraryTab({ user, colors, t, showToast, i18n, insets }: TabProp
   const handleCloseEmbeddedReader = () => {
     setEmbeddedReaderVisible(false);
     setEmbeddedStory(null);
+    setForceLandscapeMobile(false);
     if (typeof window !== 'undefined' && window.sessionStorage) {
       try {
         window.sessionStorage.setItem('pallithozhan_active_tab', 'library');
@@ -149,6 +154,7 @@ export function LibraryTab({ user, colors, t, showToast, i18n, insets }: TabProp
     pagesCount?: number;
   }) => {
     const normalizedEmbedUrl = toStoryWeaverEmbedUrl(story.embedUrl || story.storyId || '');
+    setForceLandscapeMobile(false);
     setEmbeddedStory({
       ...story,
       embedUrl: normalizedEmbedUrl
@@ -1397,6 +1403,28 @@ export function LibraryTab({ user, colors, t, showToast, i18n, insets }: TabProp
                   </Pressable>
                 )}
 
+                {!isLargeScreen && (
+                  <Pressable
+                    onPress={() => setForceLandscapeMobile(prev => !prev)}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 4,
+                      backgroundColor: forceLandscapeMobile ? '#F59E0B' : '#4A5568',
+                      paddingHorizontal: 8,
+                      paddingVertical: 8,
+                      borderRadius: 8
+                    }}
+                  >
+                    <RotateCw size={14} color="#FFF" />
+                    <ThemedText style={{ color: '#FFF', fontSize: 11, fontWeight: '700' }}>
+                      {forceLandscapeMobile
+                        ? (i18n.language === 'ta' ? 'செங்குத்து' : 'Vertical')
+                        : (i18n.language === 'ta' ? 'சுழற்று' : 'Rotate')}
+                    </ThemedText>
+                  </Pressable>
+                )}
+
                 {Platform.OS === 'web' && (
                   <Pressable
                     onPress={() => window.open(embeddedStory.embedUrl, '_blank')}
@@ -1433,20 +1461,54 @@ export function LibraryTab({ user, colors, t, showToast, i18n, insets }: TabProp
             </View>
 
             {/* Embedded Iframe Container */}
-            <View style={{ flex: 1, backgroundColor: '#000' }}>
+            <View style={{
+              flex: 1,
+              backgroundColor: '#000',
+              justifyContent: 'center',
+              alignItems: 'center',
+              paddingHorizontal: (!isLandscape && !forceLandscapeMobile && !isLargeScreen) ? 4 : 0
+            }}>
               {Platform.OS === 'web' ? (
-                <iframe
-                  src={embeddedStory.embedUrl}
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    border: 'none',
-                    backgroundColor: '#FFFFFF'
-                  }}
-                  allow="fullscreen; autoplay"
-                  sandbox="allow-scripts allow-same-origin allow-forms allow-fullscreen"
-                  title={embeddedStory.titleEn}
-                />
+                <>
+                  <iframe
+                    src={embeddedStory.embedUrl}
+                    style={{
+                      width: '100%',
+                      height: (isLandscape || forceLandscapeMobile || isLargeScreen)
+                        ? '100%'
+                        : Math.min(windowHeight - 110, Math.floor(windowWidth * 1.2)),
+                      maxHeight: (isLandscape || forceLandscapeMobile || isLargeScreen)
+                        ? '100%'
+                        : Math.min(windowHeight - 110, Math.floor(windowWidth * 1.2)),
+                      border: 'none',
+                      backgroundColor: '#FFFFFF',
+                      borderRadius: (!isLandscape && !forceLandscapeMobile && !isLargeScreen) ? 8 : 0,
+                      overflow: 'hidden'
+                    }}
+                    allow="fullscreen; autoplay"
+                    sandbox="allow-scripts allow-same-origin allow-forms allow-fullscreen"
+                    title={embeddedStory.titleEn}
+                  />
+                  {!isLandscape && !forceLandscapeMobile && !isLargeScreen && (
+                    <View style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 6,
+                      marginTop: 8,
+                      paddingHorizontal: 12,
+                      paddingVertical: 6,
+                      borderRadius: 16,
+                      backgroundColor: 'rgba(255,255,255,0.08)'
+                    }}>
+                      <Smartphone size={13} color="#94A3B8" />
+                      <ThemedText style={{ color: '#94A3B8', fontSize: 10, fontWeight: '600' }}>
+                        {i18n.language === 'ta'
+                          ? 'முழுத்திரைக்கு போனைப் பக்கவாட்டில் திருப்பவும்'
+                          : 'Rotate phone to landscape for full screen'}
+                      </ThemedText>
+                    </View>
+                  )}
+                </>
               ) : (
                 <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
                   <ThemedText style={{ color: '#FFF', textAlign: 'center', marginBottom: 12 }}>
