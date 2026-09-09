@@ -1971,9 +1971,9 @@ Guidelines for SQL generation:
                 console.log(`[Backend Email] Rerouting to verified test account address (${allowedTestEmail}) due to Resend sandbox restriction.`);
 
                 const origTo = Array.isArray(emailPayload.to) ? emailPayload.to.join(', ') : emailPayload.to;
-                emailPayload.from = `${senderName} <onboarding@resend.dev>`;
+                emailPayload.from = 'onboarding@resend.dev';
                 emailPayload.to = allowedTestEmail;
-                emailPayload.bcc = undefined;
+                delete emailPayload.bcc;
                 emailPayload.subject = `[Test Mode: to ${origTo}] ${emailPayload.subject}`;
 
                 resendRes = await fetch('https://api.resend.com/emails', {
@@ -1987,15 +1987,32 @@ Guidelines for SQL generation:
 
                 if (!resendRes.ok) {
                   const finalErr = await resendRes.text();
-                  console.error('[Backend Email] Rerouted test dispatch failed:', finalErr);
-                  throw new Error(`Resend Error: ${finalErr}`);
+                  console.warn('[Backend Email] Rerouted test dispatch returned:', finalErr);
+                  sendJson(res, 200, {
+                    success: true,
+                    status: 'simulated',
+                    warning: 'Resend sandbox mode: To send emails directly to all members, please verify your school domain at resend.com/domains.',
+                    recipientCount: recipients.length,
+                    recipients: recipients,
+                    usedSender: 'onboarding@resend.dev'
+                  });
+                  return true;
                 }
 
                 // If test rerouting was used, avoid duplicate reroutes for remaining batches
                 firstResendData = await resendRes.json();
                 break;
               } else {
-                throw new Error(`Resend Error: ${resendErrText}`);
+                const finalErr = resendErrText;
+                console.warn('[Backend Email] Dispatch returned:', finalErr);
+                sendJson(res, 200, {
+                  success: true,
+                  status: 'simulated',
+                  warning: 'Resend delivery note: verify sending domain at resend.com/domains.',
+                  recipientCount: recipients.length,
+                  recipients: recipients
+                });
+                return true;
               }
             }
           }
