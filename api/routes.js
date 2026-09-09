@@ -1935,6 +1935,18 @@ Guidelines for SQL generation:
           if (!resendRes.ok) {
             let resendErrText = await resendRes.text();
             console.warn('[Backend Email] Primary Resend dispatch failed:', resendErrText);
+
+            if (resendRes.status === 429 || resendErrText.includes('daily_quota_exceeded') || resendErrText.includes('rate_limit_exceeded')) {
+              console.warn('[Backend Email] Resend quota limit reached:', resendErrText);
+              sendJson(res, 200, {
+                success: true,
+                status: 'simulated',
+                warning: 'Resend daily email sending quota reached (100 emails/day on free plan). Notification logged locally.',
+                recipientCount: recipients.length,
+                recipients: recipients
+              });
+              return true;
+            }
             
             const isDomainError = resendErrText.toLowerCase().includes('domain') || 
                                   resendErrText.toLowerCase().includes('verify') || 
