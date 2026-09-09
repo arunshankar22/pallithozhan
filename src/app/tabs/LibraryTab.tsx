@@ -130,7 +130,11 @@ export function LibraryTab({ user, colors, t, showToast, i18n, insets }: TabProp
     readingPoints?: number;
     pagesCount?: number;
   }) => {
-    setEmbeddedStory(story);
+    const normalizedEmbedUrl = toStoryWeaverEmbedUrl(story.embedUrl || story.storyId || '');
+    setEmbeddedStory({
+      ...story,
+      embedUrl: normalizedEmbedUrl
+    });
     setEmbeddedReaderVisible(true);
     setDetailModalVisible(false);
 
