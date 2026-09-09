@@ -126,12 +126,20 @@ export function UtraThozhanWidget({ user, colors, branch = 'main' }: UtraThozhan
       await aiService.saveChatHistory(user.uid, result.history);
     } catch (err: any) {
       console.error(err);
-      setErrorMsg(err.message || 'உரையாடலில் பிழை ஏற்பட்டது. மீண்டும் முயற்சிக்கவும்.');
+      const errMsg = String(err?.message || '');
+      setErrorMsg(errMsg || 'உரையாடலில் பிழை ஏற்பட்டது. மீண்டும் முயற்சிக்கவும்.');
+      
+      let errorResponse = 'Sorry, a temporary network or server error occurred. Please try sending your message again. \n\n(மன்னிக்கவும், தற்காலிக சேவை இடையூறு ஏற்பட்டுள்ளது. மீண்டும் முயலவும்.)';
+      if (errMsg.includes('API key expired') || errMsg.includes('API_KEY_INVALID')) {
+        errorResponse = 'The AI Gemini API key has expired. Please renew the API key in the server settings.\n\n(AI விசை காலாவதியானது. புதிய விசையை உள்ளமைக்கவும்.)';
+      } else if (errMsg.includes('disabled') || errMsg.includes('SERVICE_DISABLED') || errMsg.includes('PERMISSION_DENIED') || errMsg.includes('not been used in project')) {
+        errorResponse = 'The Gemini API is disabled or unauthorized in Google Cloud. Please enable Generative Language API in Google Cloud Console.\n\n(Google Cloud இல் Gemini API முடக்கப்பட்டுள்ளது.)';
+      }
       
       // Append failure node so the user has visual feedback
       setMessages(prev => [
         ...prev,
-        { role: 'model' as const, parts: [{ text: 'Sorry, a temporary network or server error occurred. Please try sending your message again. \n\n(மன்னிக்கவும், தற்காலிக சேவை இடையூறு ஏற்பட்டுள்ளது. மீண்டும் முயலவும்.)' }] }
+        { role: 'model' as const, parts: [{ text: errorResponse }] }
       ]);
     } finally {
       setIsLoading(false);

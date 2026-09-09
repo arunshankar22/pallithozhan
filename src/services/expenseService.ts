@@ -548,12 +548,13 @@ export const expenseService = {
           category: 'other',
           date: new Date().toISOString().split('T')[0],
           notes: 'Receipt attached. (AI scan unavailable: please review details manually.)',
-          aiScanFailed: true
+          aiScanFailed: true,
+          errorMessage: errorText
         } as any;
       }
 
       return await response.json();
-    } catch (e) {
+    } catch (e: any) {
       console.warn('[expenseService] Failed to scan receipt, returning fallback:', e);
       return {
         title: 'Scanned Receipt',
@@ -561,7 +562,8 @@ export const expenseService = {
         category: 'other',
         date: new Date().toISOString().split('T')[0],
         notes: 'Receipt attached. (AI scan unavailable: please review details manually.)',
-        aiScanFailed: true
+        aiScanFailed: true,
+        errorMessage: e?.message || 'Network request failed'
       } as any;
     }
   },

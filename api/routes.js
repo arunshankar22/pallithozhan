@@ -870,7 +870,7 @@ async function handleApiRoutes(req, res, pathname, method, dbData, writeDb, urlO
         return true;
       }
 
-      const apiKey = process.env.GEMINI_API_KEY;
+      const apiKey = process.env.GEMINI_API_KEY || process.env.EXPO_PUBLIC_GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.GOOGLE_GEMINI_API_KEY;
       if (!apiKey) {
         console.error('Error: GEMINI_API_KEY is not defined.');
         sendJson(res, 500, { error: 'Gemini translation API key is not configured on the server.' });
@@ -933,7 +933,7 @@ async function handleApiRoutes(req, res, pathname, method, dbData, writeDb, urlO
         return true;
       }
 
-      const apiKey = process.env.GEMINI_API_KEY;
+      const apiKey = process.env.GEMINI_API_KEY || process.env.EXPO_PUBLIC_GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.GOOGLE_GEMINI_API_KEY;
       if (!apiKey) {
         console.warn('Warning: GEMINI_API_KEY is not configured on the server. Providing fallback receipt info.');
         sendJson(res, 200, {
@@ -942,7 +942,8 @@ async function handleApiRoutes(req, res, pathname, method, dbData, writeDb, urlO
           category: 'other',
           date: new Date().toISOString().split('T')[0],
           notes: 'Receipt attached. (AI key not configured: please review details manually.)',
-          aiScanFailed: true
+          aiScanFailed: true,
+          errorMessage: 'GEMINI_API_KEY is not configured on the server.'
         });
         return true;
       }
@@ -972,40 +973,60 @@ Response Schema:
         cleanBase64 = fileData.split(';base64,')[1];
       }
 
-      // Query Gemini API using standard REST endpoint
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            contents: [{
-              parts: [
-                {
-                  inlineData: {
-                    mimeType: mimeType,
-                    data: cleanBase64
-                  }
-                },
-                {
-                  text: prompt
-                }
-              ]
-            }],
-            generationConfig: {
-              responseMimeType: "application/json",
-              temperature: 0.1,
-              maxOutputTokens: 2048
-            }
-          })
-        }
-      );
+      // Query Gemini API using standard REST endpoint with model fallback
+      const scanModels = ['gemini-1.5-flash', 'gemini-2.0-flash'];
+      let scanResponse = null;
+      let lastScanError = '';
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.warn('Gemini API error during receipt scan:', errorText);
+      for (const model of scanModels) {
+        try {
+          const response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                contents: [{
+                  parts: [
+                    {
+                      inlineData: {
+                        mimeType: mimeType,
+                        data: cleanBase64
+                      }
+                    },
+                    {
+                      text: prompt
+                    }
+                  ]
+                }],
+                generationConfig: {
+                  responseMimeType: "application/json",
+                  temperature: 0.1,
+                  maxOutputTokens: 2048
+                }
+              })
+            }
+          );
+
+          if (response.ok) {
+            scanResponse = await response.json();
+            break;
+          } else {
+            lastScanError = await response.text();
+            // If the key itself is expired/invalid or service is disabled in GCP, switching models won't help
+            if (response.status === 400 || response.status === 403) {
+              break;
+            }
+          }
+        } catch (fetchErr) {
+          lastScanError = fetchErr.message;
+        }
+      }
+
+      if (!scanResponse) {
+        console.warn('Gemini API error during receipt scan:', lastScanError);
         // Graceful fallback: return partial data so receipt attachment succeeds
         sendJson(res, 200, {
           title: 'Scanned Receipt',
@@ -1013,12 +1034,13 @@ Response Schema:
           category: 'other',
           date: new Date().toISOString().split('T')[0],
           notes: 'Receipt attached. (AI scan unavailable: please review details manually.)',
-          aiScanFailed: true
+          aiScanFailed: true,
+          errorMessage: lastScanError
         });
         return true;
       }
 
-      const data = await response.json();
+      const data = scanResponse;
       const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
       
       let parsedResult = null;
@@ -1364,7 +1386,7 @@ Response Schema:
       const userRole = body.userRole || 'student';
       const branch = urlObj.searchParams.get('branch') || 'main';
       
-      const apiKey = process.env.GEMINI_API_KEY || process.env.EXPO_PUBLIC_GEMINI_API_KEY;
+      const apiKey = process.env.GEMINI_API_KEY || process.env.EXPO_PUBLIC_GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.GOOGLE_GEMINI_API_KEY;
       if (!apiKey) {
         sendJson(res, 500, { error: 'Gemini API key is not configured on the server.' });
         return true;
@@ -1527,19 +1549,35 @@ Guidelines for SQL generation:
           requestBody.tools = tools;
         }
 
-        const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(requestBody)
+        const models = ['gemini-1.5-flash', 'gemini-2.0-flash'];
+        let lastError = null;
+        for (const model of models) {
+          try {
+            const response = await fetch(
+              `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(requestBody)
+              }
+            );
+            if (response.ok) {
+              return await response.json();
+            }
+            const text = await response.text();
+            lastError = new Error(`Gemini API (${model}) error: ${response.status} - ${text}`);
+            // If the key itself is expired/invalid or service is disabled, break immediately
+            if (response.status === 400 || response.status === 403) {
+              throw lastError;
+            }
+          } catch (fetchErr) {
+            lastError = fetchErr;
+            if (fetchErr.message && (fetchErr.message.includes('400') || fetchErr.message.includes('403'))) {
+              throw fetchErr;
+            }
           }
-        );
-        if (!response.ok) {
-          const text = await response.text();
-          throw new Error(`Gemini API error: ${response.status} - ${text}`);
         }
-        return await response.json();
+        throw lastError;
       }
 
       let geminiResponse = await callGemini(contents);

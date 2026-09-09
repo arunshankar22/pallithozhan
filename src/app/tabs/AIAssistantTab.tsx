@@ -521,11 +521,19 @@ export function AIAssistantTab({ user, colors, t, showToast, insets, i18n }: AIA
       await aiService.saveChatSessions(user.uid, currentSessions);
     } catch (err: any) {
       console.error(err);
-      setErrorMsg(err.message || 'An error occurred.');
+      const errMsg = String(err?.message || '');
+      setErrorMsg(errMsg || 'An error occurred.');
+      
+      let errorResponse = 'Sorry, a temporary network or server error occurred. Please try again.';
+      if (errMsg.includes('API key expired') || errMsg.includes('API_KEY_INVALID')) {
+        errorResponse = 'The AI Gemini API key has expired. Please update GEMINI_API_KEY in the server environment settings.\n\n(AI விசை காலாவதியானது. புதிய விசையை உள்ளமைக்கவும்.)';
+      } else if (errMsg.includes('disabled') || errMsg.includes('SERVICE_DISABLED') || errMsg.includes('PERMISSION_DENIED') || errMsg.includes('not been used in project')) {
+        errorResponse = 'The Gemini API is currently disabled or unauthorized in Google Cloud. Please enable Generative Language API in Google Cloud Console or verify your API key.\n\n(Google Cloud இல் Gemini API முடக்கப்பட்டுள்ளது.)';
+      }
       
       activeSess.messages = [
         ...activeSess.messages,
-        { role: 'model' as const, parts: [{ text: 'Sorry, a temporary network or server error occurred. Please try again.' }] }
+        { role: 'model' as const, parts: [{ text: errorResponse }] }
       ];
       setSessions([...currentSessions]);
     } finally {
