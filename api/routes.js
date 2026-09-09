@@ -1548,10 +1548,15 @@ Guidelines for SQL generation:
               };
             }
             if (part.functionCall) {
-              return { functionCall: part.functionCall };
+              const fcPart = { functionCall: part.functionCall };
+              if (part.thoughtSignature) fcPart.thoughtSignature = part.thoughtSignature;
+              return fcPart;
             }
             if (part.functionResponse) {
               return { functionResponse: part.functionResponse };
+            }
+            if (part.thoughtSignature) {
+              return { thoughtSignature: part.thoughtSignature };
             }
             return part;
           })
@@ -1600,17 +1605,20 @@ Guidelines for SQL generation:
       let geminiResponse = await callGemini(contents);
       let attempts = 0;
       
-      while (geminiResponse.candidates?.[0]?.content?.parts?.[0]?.functionCall && attempts < 3) {
+      while (geminiResponse.candidates?.[0]?.content?.parts?.some(p => p.functionCall) && attempts < 3) {
         attempts++;
-        const callPart = geminiResponse.candidates[0].content.parts[0];
+        const candidateParts = geminiResponse.candidates[0].content.parts;
+        const callPart = candidateParts.find(p => p.functionCall);
+        if (!callPart) break;
+
         const functionCall = callPart.functionCall;
         const name = functionCall.name;
-        const args = functionCall.args;
+        const args = functionCall.args || {};
         
         let result;
         try {
           if (name === 'executeSQL') {
-            const query = args.sqlQuery.trim();
+            const query = (args.sqlQuery || '').trim();
             const lowerQuery = query.toLowerCase();
             if (lowerQuery.includes('insert') || lowerQuery.includes('update') || lowerQuery.includes('delete') || lowerQuery.includes('drop') || lowerQuery.includes('alter') || lowerQuery.includes('create table') || lowerQuery.includes('write')) {
               result = { error: "Security Exception: Writing/modifying queries are prohibited." };
@@ -1627,15 +1635,15 @@ Guidelines for SQL generation:
           result = { error: err.message };
         }
         
-        // Push the call to history
+        // Push the call to history (include complete callPart with thoughtSignature)
         contents.push({
           role: 'model',
           parts: [callPart]
         });
         
-        // Push the result back
+        // Push the result back (Gemini requires role: 'user' for function responses)
         contents.push({
-          role: 'function',
+          role: 'user',
           parts: [{
             functionResponse: {
               name: name,
@@ -1649,9 +1657,17 @@ Guidelines for SQL generation:
 
       const finalContent = geminiResponse.candidates?.[0]?.content;
       if (finalContent) {
+        let responseText = '';
+        if (finalContent.parts && Array.isArray(finalContent.parts)) {
+          for (const p of finalContent.parts) {
+            if (p.text) {
+              responseText += (responseText ? '\n' : '') + p.text;
+            }
+          }
+        }
         contents.push(finalContent);
         sendJson(res, 200, {
-          response: finalContent.parts?.[0]?.text || '',
+          response: responseText,
           history: contents
         });
       } else {
