@@ -10,7 +10,7 @@ import {
   Platform
 } from 'react-native';
 
-import { Edit, Trash2, UserPlus, Plus, X, CheckCircle, UserCheck, HelpCircle, AlertTriangle } from 'lucide-react-native';
+import { Edit, Trash2, UserPlus, Plus, X, CheckCircle, UserCheck, HelpCircle, AlertTriangle, ShieldCheck, Users, Filter, Check, Search } from 'lucide-react-native';
 import { ThemedText } from '@/components/themed-text';
 import { HelperTooltip } from '@/components/HelperTooltip';
 import { TabProps } from '@/app/sharedTypes';
@@ -24,6 +24,7 @@ import { featureFlagsService } from '@/services/featureFlagsService';
 import { interestService } from '@/services/interestService';
 import { emailConfigService, EmailSystemConfig, DEFAULT_EMAIL_CONFIG } from '@/services/emailConfigService';
 import { emailService } from '@/services/emailService';
+import { API_URL } from '@/services/dbCommon';
 import { userService } from '@/services/userService';
 import { auditLogService } from '@/services/auditLogService';
 import { UserModal } from '@/components/UserModal';
@@ -74,10 +75,13 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets, onFeat
   const [savingEmailConfig, setSavingEmailConfig] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
   const [newGroupEmails, setNewGroupEmails] = useState('');
-  const [showResendApiKey, setShowResendApiKey] = useState(false);
   const [testEmailRecipient, setTestEmailRecipient] = useState('');
   const [sendingTestEmail, setSendingTestEmail] = useState(false);
   const [hasServerEnvKey, setHasServerEnvKey] = useState(false);
+  const [selectedGroupToManage, setSelectedGroupToManage] = useState<string | null>(null);
+  const [groupModalSearch, setGroupModalSearch] = useState('');
+  const [groupModalRoleFilter, setGroupModalRoleFilter] = useState<'all' | 'teacher' | 'parent' | 'volunteer'>('all');
+  const [customEmailToAdd, setCustomEmailToAdd] = useState('');
 
   // Feature flags states
   const [flagState, setFlagState] = useState<any>({
@@ -918,6 +922,19 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets, onFeat
           const treasurers = eConfig.features?.expenses?.toEmails;
           return (treasurers && treasurers.length > 0) ? treasurers[0] : (user?.email || 'arun.zorro@gmail.com');
         });
+
+        // Check if server environment has RESEND_API_KEY configured
+        try {
+          const cfgRes = await fetch(`${API_URL}/email/config`);
+          if (cfgRes.ok) {
+            const json = await cfgRes.json();
+            if (json.hasServerEnvKey !== undefined) {
+              setHasServerEnvKey(!!json.hasServerEnvKey);
+            }
+          }
+        } catch (netErr) {
+          // ignore
+        }
       } catch (err) {
         console.warn('Failed to load email config in refreshData:', err);
       }
@@ -963,7 +980,7 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets, onFeat
     }
     setSendingTestEmail(true);
     try {
-      // Save current configuration first so backend receives latest API key and sender details
+      // Save current configuration first so backend receives latest sender details and test filter
       await emailConfigService.updateEmailConfig(emailConfig);
 
       const result = await emailService.sendNotification({
@@ -977,7 +994,7 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets, onFeat
           { label: 'Sender Display Name', value: emailConfig.defaultSenderName },
           { label: 'Configured Sender Email', value: emailConfig.defaultSenderEmail },
           { label: 'Dispatched At', value: new Date().toLocaleString('en-AU') },
-          { label: 'API Key Source', value: emailConfig.resendApiKey ? 'Admin Settings Key' : 'Server Environment Key' }
+          { label: 'API Key Source', value: 'Vercel Environment Variable (RESEND_API_KEY)' }
         ],
         actionButton: {
           text: 'Open PalliThozhan Portal',
@@ -989,7 +1006,7 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets, onFeat
       if (result.success && result.status === 'sent') {
         showToast(`✅ Test email sent to ${targetEmail}! Please check your inbox / spam.`, 'success');
       } else if (result.status === 'simulated') {
-        showToast('ℹ️ Simulation mode: Resend API Key is missing. Please enter your Resend API Key and save.', 'warning');
+        showToast('ℹ️ Simulation mode: RESEND_API_KEY is not configured in Vercel environment. Email logged.', 'warning');
       } else if (!result.success) {
         showToast(`❌ Dispatch failed: ${result.error || result.reason || 'Check Resend credentials'}`, 'error');
       } else {
@@ -3715,46 +3732,36 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets, onFeat
             <View style={{ padding: 18, borderRadius: 16, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.cardBg, gap: 14 }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                 <View style={{ flex: 1, marginRight: 8 }}>
-                  <ThemedText style={{ fontSize: 14, fontWeight: '800', color: colors.text }}>✉️ System Sender & Resend API / மின்னஞ்சல் அமைப்புகள்</ThemedText>
+                  <ThemedText style={{ fontSize: 14, fontWeight: '800', color: colors.text }}>✉️ System Sender & Resend Delivery / மின்னஞ்சல் அமைப்புகள்</ThemedText>
                   <ThemedText style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>
-                    Emails are delivered via Resend. You can enter your Resend API key directly below, or configure RESEND_API_KEY in Vercel.
+                    Automated transactional emails and broadcast announcements are delivered through Resend.
                   </ThemedText>
                 </View>
                 <View style={{
-                  paddingHorizontal: 8,
-                  paddingVertical: 3,
+                  paddingHorizontal: 10,
+                  paddingVertical: 4,
                   borderRadius: 8,
-                  backgroundColor: (emailConfig.resendApiKey || hasServerEnvKey) ? '#DEF7EC' : '#FEF08A',
+                  backgroundColor: hasServerEnvKey ? '#DEF7EC' : '#F3F4F6',
                   borderWidth: 1,
-                  borderColor: (emailConfig.resendApiKey || hasServerEnvKey) ? '#31C48D' : '#EAB308'
+                  borderColor: hasServerEnvKey ? '#31C48D' : '#D1D5DB'
                 }}>
-                  <ThemedText style={{ fontSize: 10, fontWeight: '800', color: (emailConfig.resendApiKey || hasServerEnvKey) ? '#03543F' : '#854D0E' }}>
-                    {(emailConfig.resendApiKey || hasServerEnvKey) ? '🔑 RESEND KEY CONFIGURED' : '⚠️ NO API KEY (SIMULATED)'}
+                  <ThemedText style={{ fontSize: 10, fontWeight: '800', color: hasServerEnvKey ? '#03543F' : '#374151' }}>
+                    {hasServerEnvKey ? '🔒 MANAGED IN VERCEL' : 'ℹ️ VERCEL ENV (RESEND_API_KEY)'}
                   </ThemedText>
                 </View>
               </View>
 
-              {/* Resend API Key Input */}
-              <View style={{ gap: 4 }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <ThemedText style={{ fontSize: 12, fontWeight: '700' }}>Resend API Key (re_...)</ThemedText>
-                  <Pressable onPress={() => setShowResendApiKey(!showResendApiKey)}>
-                    <ThemedText style={{ fontSize: 11, color: colors.primary, fontWeight: '600' }}>
-                      {showResendApiKey ? '🙈 Hide Key' : '👁️ Reveal Key'}
-                    </ThemedText>
-                  </Pressable>
+              {/* Secure Server-Side Key Management Info */}
+              <View style={{ padding: 12, borderRadius: 10, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <ShieldCheck size={20} color={colors.primary} />
+                <View style={{ flex: 1 }}>
+                  <ThemedText style={{ fontSize: 12, fontWeight: '700', color: colors.text }}>
+                    Server-Side Environment Security
+                  </ThemedText>
+                  <ThemedText style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2 }}>
+                    For production security and reliability, your Resend API credentials are configured via the <ThemedText style={{ fontWeight: '700', color: colors.primary }}>RESEND_API_KEY</ThemedText> environment variable in Vercel. Credentials are never entered or stored in the browser.
+                  </ThemedText>
                 </View>
-                <TextInput
-                  style={[styles.directPathInput, { color: colors.text, borderColor: colors.border, fontFamily: Platform.OS === 'web' ? 'monospace' : 'default' }]}
-                  placeholder="re_xxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                  placeholderTextColor={colors.textSecondary}
-                  secureTextEntry={!showResendApiKey}
-                  value={emailConfig.resendApiKey || ''}
-                  onChangeText={(val) => setEmailConfig((prev: any) => ({ ...prev, resendApiKey: val.trim() }))}
-                />
-                <ThemedText style={{ fontSize: 10, color: colors.textSecondary }}>
-                  Get your free API key at <ThemedText style={{ color: colors.primary, fontWeight: '700' }}>resend.com</ThemedText>. Once entered here, automated emails will be dispatched live immediately without needing any Vercel configuration.
-                </ThemedText>
               </View>
 
               {/* Sender Name & Email */}
@@ -3824,7 +3831,162 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets, onFeat
               </View>
             </View>
 
-            {/* 3. FEATURE SPECIFIC TOGGLES & RECIPIENTS */}
+            {/* 3. SAFE TEST RECIPIENT FILTER CARD */}
+            <View style={{ padding: 18, borderRadius: 16, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.cardBg, gap: 14 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <View style={{ flex: 1, marginRight: 12 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <ThemedText style={{ fontSize: 14, fontWeight: '800', color: colors.text }}>🛡️ Safe Test Recipient Filter / பாதுகாப்பான சோதனை முறை</ThemedText>
+                    {emailConfig.testFilter?.enabled && (
+                      <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, backgroundColor: '#DEF7EC', borderWidth: 1, borderColor: '#31C48D' }}>
+                        <ThemedText style={{ fontSize: 9, fontWeight: '800', color: '#03543F' }}>ACTIVE</ThemedText>
+                      </View>
+                    )}
+                  </View>
+                  <ThemedText style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>
+                    Sanitize and test broadcast notifications safely before sending to all members. When enabled, any mass email (announcements, homework, etc.) is intercepted so only users matching this name or email receive it.
+                  </ThemedText>
+                </View>
+                <Pressable
+                  onPress={() => setEmailConfig((prev: any) => ({
+                    ...prev,
+                    testFilter: {
+                      ...(prev.testFilter || { filterQuery: '', allowedEmails: [] }),
+                      enabled: !prev.testFilter?.enabled
+                    }
+                  }))}
+                  style={{
+                    width: 46,
+                    height: 26,
+                    borderRadius: 13,
+                    backgroundColor: emailConfig.testFilter?.enabled ? colors.primary : colors.border,
+                    justifyContent: 'center',
+                    paddingHorizontal: 3
+                  }}
+                >
+                  <View style={{
+                    width: 20,
+                    height: 20,
+                    borderRadius: 10,
+                    backgroundColor: '#FFF',
+                    alignSelf: emailConfig.testFilter?.enabled ? 'flex-end' : 'flex-start'
+                  }} />
+                </Pressable>
+              </View>
+
+              {emailConfig.testFilter?.enabled && (
+                <View style={{ padding: 14, borderRadius: 12, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, gap: 10 }}>
+                  <ThemedText style={{ fontSize: 12, fontWeight: '700', color: colors.text }}>
+                    Filter by User: First Name, Last Name, Full Name, or Email
+                  </ThemedText>
+                  
+                  <View style={{ flexDirection: isLargeScreen ? 'row' : 'column', gap: 8 }}>
+                    <TextInput
+                      style={[styles.directPathInput, { color: colors.text, borderColor: colors.border, flex: 1, fontSize: 12 }]}
+                      placeholder="e.g. Arun, Shankar, or arun.zorro@gmail.com"
+                      placeholderTextColor={colors.textSecondary}
+                      value={emailConfig.testFilter?.filterQuery || ''}
+                      onChangeText={(val) => {
+                        setEmailConfig((prev: any) => ({
+                          ...prev,
+                          testFilter: {
+                            ...(prev.testFilter || {}),
+                            enabled: true,
+                            filterQuery: val
+                          }
+                        }));
+                      }}
+                    />
+                    {user?.fullName && (
+                      <Pressable
+                        onPress={() => {
+                          setEmailConfig((prev: any) => ({
+                            ...prev,
+                            testFilter: {
+                              ...(prev.testFilter || {}),
+                              enabled: true,
+                              filterQuery: user.fullName || user.email,
+                              allowedEmails: user.email ? [user.email] : []
+                            }
+                          }));
+                          showToast(`Set safe test recipient to ${user.fullName}`, 'success');
+                        }}
+                        style={{
+                          paddingHorizontal: 12,
+                          paddingVertical: 8,
+                          borderRadius: 8,
+                          backgroundColor: colors.cardBg,
+                          borderWidth: 1,
+                          borderColor: colors.border,
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                      >
+                        <ThemedText style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>
+                          👤 Quick Select Me ({user.fullName.split(' ')[0]})
+                        </ThemedText>
+                      </Pressable>
+                    )}
+                  </View>
+
+                  {/* Live matched user preview */}
+                  {(() => {
+                    const q = (emailConfig.testFilter?.filterQuery || '').trim().toLowerCase();
+                    if (!q) {
+                      return (
+                        <ThemedText style={{ fontSize: 11, color: colors.textSecondary, fontStyle: 'italic' }}>
+                          💡 Type a user's first name, last name, or email above to sanitize and restrict broadcasts.
+                        </ThemedText>
+                      );
+                    }
+                    const matchedUsers = users.filter(u => {
+                      const full = (u.fullName || '').toLowerCase();
+                      const email = (u.email || '').toLowerCase();
+                      const fn = (u.firstName || '').toLowerCase();
+                      const ln = (u.lastName || '').toLowerCase();
+                      return full.includes(q) || email.includes(q) || fn.includes(q) || ln.includes(q) || full.split(/\s+/).some((w: string) => w.startsWith(q));
+                    });
+
+                    if (matchedUsers.length > 0) {
+                      return (
+                        <View style={{ gap: 6, marginTop: 4 }}>
+                          <ThemedText style={{ fontSize: 11, fontWeight: '700', color: '#03543F' }}>
+                            ✅ Matched {matchedUsers.length} test user{matchedUsers.length > 1 ? 's' : ''}:
+                          </ThemedText>
+                          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                            {matchedUsers.slice(0, 5).map(u => (
+                              <View key={u.uid || u.email} style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, backgroundColor: '#DEF7EC', borderWidth: 1, borderColor: '#31C48D', flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <ThemedText style={{ fontSize: 11, fontWeight: '700', color: '#03543F' }}>{u.fullName || u.email}</ThemedText>
+                                <ThemedText style={{ fontSize: 9, color: '#046C4E', textTransform: 'capitalize' }}>({u.role || 'user'})</ThemedText>
+                                <ThemedText style={{ fontSize: 9, color: '#046C4E' }}>{u.email}</ThemedText>
+                              </View>
+                            ))}
+                            {matchedUsers.length > 5 && (
+                              <ThemedText style={{ fontSize: 10, color: colors.textSecondary, alignSelf: 'center' }}>
+                                +{matchedUsers.length - 5} more
+                              </ThemedText>
+                            )}
+                          </View>
+                          <ThemedText style={{ fontSize: 10, color: colors.textSecondary, marginTop: 2 }}>
+                            🔒 Safe Mode Active: All email dispatches across PalliThozhan will only reach these matching test users.
+                          </ThemedText>
+                        </View>
+                      );
+                    } else {
+                      return (
+                        <View style={{ padding: 8, borderRadius: 6, backgroundColor: '#FEF08A', borderWidth: 1, borderColor: '#EAB308' }}>
+                          <ThemedText style={{ fontSize: 11, color: '#854D0E', fontWeight: '600' }}>
+                            ⚠️ No registered user in the directory matches "{q}". If you broadcast while this filter is active, notifications will route safely to your default admin/test email instead of blasting everyone.
+                          </ThemedText>
+                        </View>
+                      );
+                    }
+                  })()}
+                </View>
+              )}
+            </View>
+
+            {/* 4. FEATURE SPECIFIC TOGGLES & RECIPIENTS */}
             <View style={{ padding: 18, borderRadius: 16, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.cardBg, gap: 16 }}>
               <ThemedText style={{ fontSize: 14, fontWeight: '800', color: colors.text }}>⚡ Feature-Specific Notification Rules</ThemedText>
 
@@ -4014,82 +4176,164 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets, onFeat
               </View>
             </View>
 
-            {/* 4. RECIPIENT GROUPS (DYNAMIC & CUSTOM) */}
+            {/* 5. RECIPIENT GROUPS (DYNAMIC & CUSTOM) */}
             <View style={{ padding: 18, borderRadius: 16, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.cardBg, gap: 14 }}>
-              <ThemedText style={{ fontSize: 14, fontWeight: '800', color: colors.text }}>👥 Recipient Groups / பெறுநர் குழுக்கள்</ThemedText>
-              <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>
-                Emails can target automated dynamic role groups or custom admin-curated distribution lists. All group emails are dispatched with privacy protection (BCC / individual delivery) so personal email addresses are never exposed to other recipients.
-              </ThemedText>
-
-              {/* Dynamic Groups Summary */}
-              <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap' }}>
-                <View style={{ padding: 10, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background, flex: 1, minWidth: 140 }}>
-                  <ThemedText style={{ fontSize: 11, color: colors.textSecondary }}>👨‍🏫 All Teachers</ThemedText>
-                  <ThemedText style={{ fontSize: 15, fontWeight: '800', color: colors.primary, marginTop: 2 }}>
-                    {users.filter(u => u.role === 'teacher' && u.email).length} Teachers
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                <View style={{ flex: 1, minWidth: 200 }}>
+                  <ThemedText style={{ fontSize: 14, fontWeight: '800', color: colors.text }}>👥 Recipient Groups & Test Lists / பெறுநர் குழுக்கள்</ThemedText>
+                  <ThemedText style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>
+                    Manage distribution lists and test groups. You can target all members by role, or configure custom test groups (e.g. Test Parents, Test Teachers) to test with a few members before sending to everyone.
                   </ThemedText>
-                  <ThemedText style={{ fontSize: 10, color: colors.textSecondary, marginTop: 2 }}>Auto-resolved by role</ThemedText>
-                </View>
-                <View style={{ padding: 10, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background, flex: 1, minWidth: 140 }}>
-                  <ThemedText style={{ fontSize: 11, color: colors.textSecondary }}>👨‍👩‍👧 All Parents</ThemedText>
-                  <ThemedText style={{ fontSize: 15, fontWeight: '800', color: colors.primary, marginTop: 2 }}>
-                    {users.filter(u => u.role === 'parent' && u.email).length} Parents
-                  </ThemedText>
-                  <ThemedText style={{ fontSize: 10, color: colors.textSecondary, marginTop: 2 }}>Auto-resolved by role</ThemedText>
-                </View>
-                <View style={{ padding: 10, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background, flex: 1, minWidth: 140 }}>
-                  <ThemedText style={{ fontSize: 11, color: colors.textSecondary }}>🤝 All Volunteers</ThemedText>
-                  <ThemedText style={{ fontSize: 15, fontWeight: '800', color: colors.primary, marginTop: 2 }}>
-                    {users.filter(u => u.role === 'volunteer' && u.email).length} Volunteers
-                  </ThemedText>
-                  <ThemedText style={{ fontSize: 10, color: colors.textSecondary, marginTop: 2 }}>Auto-resolved by role</ThemedText>
                 </View>
               </View>
 
-              {/* Custom Groups List */}
-              <View style={{ gap: 8, marginTop: 4 }}>
-                <ThemedText style={{ fontSize: 12, fontWeight: '700' }}>Custom Distribution Groups:</ThemedText>
-                {Object.entries(emailConfig.customGroups || {}).map(([groupKey, groupEmails]) => (
-                  <View key={groupKey} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 10, borderRadius: 8, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background }}>
-                    <View style={{ flex: 1, marginRight: 8 }}>
-                      <ThemedText style={{ fontSize: 12, fontWeight: '700', textTransform: 'capitalize' }}>🏷️ {groupKey}</ThemedText>
-                      <ThemedText style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2 }}>
-                        {Array.isArray(groupEmails) ? groupEmails.join(', ') : String(groupEmails)}
-                      </ThemedText>
+              {/* Dynamic Role Groups Summary */}
+              <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap' }}>
+                <View style={{ padding: 12, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background, flex: 1, minWidth: 140 }}>
+                  <ThemedText style={{ fontSize: 11, color: colors.textSecondary }}>👨‍🏫 All Teachers</ThemedText>
+                  <ThemedText style={{ fontSize: 16, fontWeight: '800', color: colors.primary, marginTop: 2 }}>
+                    {users.filter(u => u.role === 'teacher' && u.email).length} Teachers
+                  </ThemedText>
+                  <ThemedText style={{ fontSize: 10, color: colors.textSecondary, marginTop: 2 }}>Auto-resolved by role</ThemedText>
+                  <Pressable
+                    onPress={() => {
+                      const firstFewTeachers = users.filter(u => u.role === 'teacher' && u.email).slice(0, 3).map(u => u.email);
+                      setEmailConfig((prev: any) => ({
+                        ...prev,
+                        customGroups: {
+                          ...(prev.customGroups || {}),
+                          test_teachers: prev.customGroups?.test_teachers?.length ? prev.customGroups.test_teachers : (firstFewTeachers.length ? firstFewTeachers : [user?.email || 'parramatta@balarmalar.nsw.edu.au'])
+                        }
+                      }));
+                      setSelectedGroupToManage('test_teachers');
+                    }}
+                    style={{ marginTop: 8, paddingVertical: 4, paddingHorizontal: 8, borderRadius: 6, backgroundColor: colors.cardBg, borderWidth: 1, borderColor: colors.border, alignItems: 'center' }}
+                  >
+                    <ThemedText style={{ fontSize: 10, fontWeight: '700', color: colors.primary }}>🧪 Manage Test Teachers</ThemedText>
+                  </Pressable>
+                </View>
+
+                <View style={{ padding: 12, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background, flex: 1, minWidth: 140 }}>
+                  <ThemedText style={{ fontSize: 11, color: colors.textSecondary }}>👨‍👩‍👧 All Parents</ThemedText>
+                  <ThemedText style={{ fontSize: 16, fontWeight: '800', color: colors.primary, marginTop: 2 }}>
+                    {users.filter(u => u.role === 'parent' && u.email).length} Parents
+                  </ThemedText>
+                  <ThemedText style={{ fontSize: 10, color: colors.textSecondary, marginTop: 2 }}>Auto-resolved by role</ThemedText>
+                  <Pressable
+                    onPress={() => {
+                      const firstFewParents = users.filter(u => u.role === 'parent' && u.email).slice(0, 3).map(u => u.email);
+                      setEmailConfig((prev: any) => ({
+                        ...prev,
+                        customGroups: {
+                          ...(prev.customGroups || {}),
+                          test_parents: prev.customGroups?.test_parents?.length ? prev.customGroups.test_parents : (firstFewParents.length ? firstFewParents : [user?.email || 'parramatta@balarmalar.nsw.edu.au'])
+                        }
+                      }));
+                      setSelectedGroupToManage('test_parents');
+                    }}
+                    style={{ marginTop: 8, paddingVertical: 4, paddingHorizontal: 8, borderRadius: 6, backgroundColor: colors.cardBg, borderWidth: 1, borderColor: colors.border, alignItems: 'center' }}
+                  >
+                    <ThemedText style={{ fontSize: 10, fontWeight: '700', color: colors.primary }}>🧪 Manage Test Parents</ThemedText>
+                  </Pressable>
+                </View>
+
+                <View style={{ padding: 12, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background, flex: 1, minWidth: 140 }}>
+                  <ThemedText style={{ fontSize: 11, color: colors.textSecondary }}>🤝 All Volunteers</ThemedText>
+                  <ThemedText style={{ fontSize: 16, fontWeight: '800', color: colors.primary, marginTop: 2 }}>
+                    {users.filter(u => u.role === 'volunteer' && u.email).length} Volunteers
+                  </ThemedText>
+                  <ThemedText style={{ fontSize: 10, color: colors.textSecondary, marginTop: 2 }}>Auto-resolved by role</ThemedText>
+                  <Pressable
+                    onPress={() => {
+                      const firstFewVols = users.filter(u => u.role === 'volunteer' && u.email).slice(0, 3).map(u => u.email);
+                      setEmailConfig((prev: any) => ({
+                        ...prev,
+                        customGroups: {
+                          ...(prev.customGroups || {}),
+                          test_volunteers: prev.customGroups?.test_volunteers?.length ? prev.customGroups.test_volunteers : (firstFewVols.length ? firstFewVols : [user?.email || 'parramatta@balarmalar.nsw.edu.au'])
+                        }
+                      }));
+                      setSelectedGroupToManage('test_volunteers');
+                    }}
+                    style={{ marginTop: 8, paddingVertical: 4, paddingHorizontal: 8, borderRadius: 6, backgroundColor: colors.cardBg, borderWidth: 1, borderColor: colors.border, alignItems: 'center' }}
+                  >
+                    <ThemedText style={{ fontSize: 10, fontWeight: '700', color: colors.primary }}>🧪 Manage Test Volunteers</ThemedText>
+                  </Pressable>
+                </View>
+              </View>
+
+              {/* Custom & Test Groups List */}
+              <View style={{ gap: 8, marginTop: 6 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <ThemedText style={{ fontSize: 13, fontWeight: '800', color: colors.text }}>Custom & Test Distribution Groups:</ThemedText>
+                  <ThemedText style={{ fontSize: 11, color: colors.textSecondary }}>Click "Manage Members" to select users from directory</ThemedText>
+                </View>
+
+                {Object.entries(emailConfig.customGroups || {}).map(([groupKey, groupEmails]) => {
+                  const emailList = Array.isArray(groupEmails) ? groupEmails : [String(groupEmails)];
+                  const isTestGroup = groupKey.startsWith('test_');
+                  return (
+                    <View key={groupKey} style={{ flexDirection: isLargeScreen ? 'row' : 'column', justifyContent: 'space-between', alignItems: isLargeScreen ? 'center' : 'stretch', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background, gap: 8 }}>
+                      <View style={{ flex: 1, marginRight: 8 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <ThemedText style={{ fontSize: 13, fontWeight: '700', textTransform: 'capitalize' }}>
+                            {isTestGroup ? '🧪' : '🏷️'} {groupKey.replace(/_/g, ' ')}
+                          </ThemedText>
+                          <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, backgroundColor: isTestGroup ? '#E0F2FE' : '#F3F4F6' }}>
+                            <ThemedText style={{ fontSize: 10, fontWeight: '700', color: isTestGroup ? '#0369A1' : '#4B5563' }}>
+                              {emailList.length} {emailList.length === 1 ? 'member' : 'members'}
+                            </ThemedText>
+                          </View>
+                        </View>
+                        <ThemedText style={{ fontSize: 11, color: colors.textSecondary, marginTop: 4 }} numberOfLines={2}>
+                          {emailList.join(', ') || 'No members assigned'}
+                        </ThemedText>
+                      </View>
+
+                      <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center', alignSelf: isLargeScreen ? 'center' : 'flex-start' }}>
+                        <Pressable
+                          onPress={() => setSelectedGroupToManage(groupKey)}
+                          style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, backgroundColor: colors.cardBg, borderWidth: 1, borderColor: colors.border }}
+                        >
+                          <Users size={13} color={colors.primary} />
+                          <ThemedText style={{ fontSize: 11, fontWeight: '700', color: colors.primary }}>Manage Members</ThemedText>
+                        </Pressable>
+                        <Pressable
+                          onPress={() => {
+                            const next = { ...emailConfig.customGroups };
+                            delete next[groupKey];
+                            setEmailConfig((prev: any) => ({ ...prev, customGroups: next }));
+                            showToast(`Removed group ${groupKey}`, 'success');
+                          }}
+                          style={{ padding: 6, borderRadius: 6, borderWidth: 1, borderColor: '#FEE2E2', backgroundColor: '#FEF2F2' }}
+                        >
+                          <Trash2 size={14} color="#EF4444" />
+                        </Pressable>
+                      </View>
                     </View>
-                    <Pressable
-                      onPress={() => {
-                        const next = { ...emailConfig.customGroups };
-                        delete next[groupKey];
-                        setEmailConfig((prev: any) => ({ ...prev, customGroups: next }));
-                      }}
-                      style={{ padding: 6 }}
-                    >
-                      <Trash2 size={15} color="#EF4444" />
-                    </Pressable>
-                  </View>
-                ))}
+                  );
+                })}
 
                 {/* Add Custom Group Form */}
-                <View style={{ flexDirection: isLargeScreen ? 'row' : 'column', gap: 8, marginTop: 6 }}>
+                <View style={{ flexDirection: isLargeScreen ? 'row' : 'column', gap: 8, marginTop: 8, padding: 10, borderRadius: 8, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.cardBg }}>
                   <TextInput
-                    style={[styles.directPathInput, { color: colors.text, borderColor: colors.border, flex: 1 }]}
-                    placeholder="New Group Name (e.g. committee)"
+                    style={[styles.directPathInput, { color: colors.text, borderColor: colors.border, flex: 1, fontSize: 12 }]}
+                    placeholder="New Group Name (e.g. test_finance)"
                     placeholderTextColor={colors.textSecondary}
                     value={newGroupName}
                     onChangeText={setNewGroupName}
                   />
                   <TextInput
-                    style={[styles.directPathInput, { color: colors.text, borderColor: colors.border, flex: 2 }]}
-                    placeholder="Emails (comma-separated)"
+                    style={[styles.directPathInput, { color: colors.text, borderColor: colors.border, flex: 2, fontSize: 12 }]}
+                    placeholder="Initial emails (comma-separated)"
                     placeholderTextColor={colors.textSecondary}
                     value={newGroupEmails}
                     onChangeText={setNewGroupEmails}
                   />
                   <Pressable
                     onPress={() => {
-                      if (!newGroupName.trim() || !newGroupEmails.trim()) {
-                        showToast('Please specify group name and at least one email address.', 'warning');
+                      if (!newGroupName.trim()) {
+                        showToast('Please specify a group name.', 'warning');
                         return;
                       }
                       const key = newGroupName.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
@@ -4098,12 +4342,13 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets, onFeat
                         ...prev,
                         customGroups: {
                           ...(prev.customGroups || {}),
-                          [key]: emails
+                          [key]: emails.length ? emails : [user?.email || 'parramatta@balarmalar.nsw.edu.au']
                         }
                       }));
                       setNewGroupName('');
                       setNewGroupEmails('');
-                      showToast(`Custom group "${key}" added!`, 'success');
+                      setSelectedGroupToManage(key);
+                      showToast(`Custom group "${key}" created!`, 'success');
                     }}
                     style={{ backgroundColor: colors.primary, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, justifyContent: 'center', alignItems: 'center' }}
                   >
@@ -4642,6 +4887,297 @@ export function ManagementTab({ user, colors, t, showToast, i18n, insets, onFeat
                 </View>
               )}
             </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ==================== GROUP MEMBERS MANAGEMENT MODAL ==================== */}
+      <Modal
+        visible={!!selectedGroupToManage}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setSelectedGroupToManage(null)}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 16 }}>
+          <View style={[styles.driveModalContainer, { backgroundColor: colors.cardBg, borderColor: colors.border, borderWidth: 1, width: '100%', maxWidth: 640, height: '85%', borderRadius: 16 }]}>
+            {/* Modal Header */}
+            <View style={styles.driveModalHeader}>
+              <View style={{ flex: 1, marginRight: 8 }}>
+                <ThemedText style={styles.driveModalTitle}>
+                  👥 Manage Group: {selectedGroupToManage ? selectedGroupToManage.replace(/_/g, ' ') : ''}
+                </ThemedText>
+                <ThemedText style={{ fontSize: 11, color: colors.textSecondary }}>
+                  Select or search users from the school directory to add/remove from this distribution list.
+                </ThemedText>
+              </View>
+              <Pressable onPress={() => setSelectedGroupToManage(null)} style={{ padding: 4 }}>
+                <X size={20} color={colors.textSecondary} />
+              </Pressable>
+            </View>
+
+            {/* Modal Body */}
+            <ScrollView style={{ padding: 16 }} contentContainerStyle={{ gap: 14 }}>
+              {(() => {
+                if (!selectedGroupToManage) return null;
+                const currentEmails = emailConfig.customGroups?.[selectedGroupToManage] || [];
+
+                return (
+                  <>
+                    {/* Current Members Section */}
+                    <View style={{ padding: 12, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background, gap: 8 }}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <ThemedText style={{ fontSize: 12, fontWeight: '700', color: colors.text }}>
+                          Current Assigned Members ({currentEmails.length}):
+                        </ThemedText>
+                        {currentEmails.length > 0 && (
+                          <Pressable
+                            onPress={() => {
+                              setEmailConfig((prev: any) => ({
+                                ...prev,
+                                customGroups: {
+                                  ...(prev.customGroups || {}),
+                                  [selectedGroupToManage]: []
+                                }
+                              }));
+                            }}
+                          >
+                            <ThemedText style={{ fontSize: 11, color: '#DC2626', fontWeight: '600' }}>Clear All</ThemedText>
+                          </Pressable>
+                        )}
+                      </View>
+
+                      {currentEmails.length === 0 ? (
+                        <ThemedText style={{ fontSize: 11, color: colors.textSecondary, fontStyle: 'italic' }}>
+                          No members currently in this group. Pick users below or enter an email.
+                        </ThemedText>
+                      ) : (
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                          {currentEmails.map((email: string) => {
+                            const matchedUser = users.find(u => (u.email || '').toLowerCase() === email.toLowerCase());
+                            return (
+                              <View key={email} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, backgroundColor: colors.cardBg, borderWidth: 1, borderColor: colors.border }}>
+                                <View>
+                                  <ThemedText style={{ fontSize: 11, fontWeight: '700' }}>
+                                    {matchedUser?.fullName || email}
+                                  </ThemedText>
+                                  {matchedUser && (
+                                    <ThemedText style={{ fontSize: 9, color: colors.textSecondary }}>
+                                      {matchedUser.email} ({matchedUser.role})
+                                    </ThemedText>
+                                  )}
+                                </View>
+                                <Pressable
+                                  onPress={() => {
+                                    const next = currentEmails.filter((e: string) => e.toLowerCase() !== email.toLowerCase());
+                                    setEmailConfig((prev: any) => ({
+                                      ...prev,
+                                      customGroups: {
+                                        ...(prev.customGroups || {}),
+                                        [selectedGroupToManage]: next
+                                      }
+                                    }));
+                                  }}
+                                  style={{ padding: 2 }}
+                                >
+                                  <X size={13} color="#EF4444" />
+                                </Pressable>
+                              </View>
+                            );
+                          })}
+                        </View>
+                      )}
+                    </View>
+
+                    {/* Add External Email */}
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                      <TextInput
+                        style={[styles.directPathInput, { color: colors.text, borderColor: colors.border, flex: 1, fontSize: 12 }]}
+                        placeholder="Add custom email address..."
+                        placeholderTextColor={colors.textSecondary}
+                        value={customEmailToAdd}
+                        onChangeText={setCustomEmailToAdd}
+                      />
+                      <Pressable
+                        onPress={() => {
+                          const em = customEmailToAdd.trim().toLowerCase();
+                          if (!em || !em.includes('@')) {
+                            showToast('Please enter a valid email address.', 'warning');
+                            return;
+                          }
+                          if (currentEmails.map((e: string) => e.toLowerCase()).includes(em)) {
+                            showToast('Email already in group.', 'warning');
+                            return;
+                          }
+                          setEmailConfig((prev: any) => ({
+                            ...prev,
+                            customGroups: {
+                              ...(prev.customGroups || {}),
+                              [selectedGroupToManage]: [...currentEmails, em]
+                            }
+                          }));
+                          setCustomEmailToAdd('');
+                          showToast(`Added ${em}`, 'success');
+                        }}
+                        style={{ backgroundColor: colors.secondary, paddingHorizontal: 14, borderRadius: 8, justifyContent: 'center' }}
+                      >
+                        <ThemedText style={{ color: '#FFF', fontWeight: '700', fontSize: 12 }}>+ Add Email</ThemedText>
+                      </Pressable>
+                    </View>
+
+                    {/* Directory Member Picker Header & Filters */}
+                    <View style={{ gap: 8 }}>
+                      <ThemedText style={{ fontSize: 12, fontWeight: '700', color: colors.text }}>
+                        Select from School Directory:
+                      </ThemedText>
+
+                      {/* Search Bar */}
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, borderWidth: 1, borderColor: colors.border, borderRadius: 8, backgroundColor: colors.background }}>
+                        <Search size={16} color={colors.textSecondary} />
+                        <TextInput
+                          style={{ flex: 1, paddingVertical: 8, color: colors.text, fontSize: 12 }}
+                          placeholder="Search directory by name, email, or role..."
+                          placeholderTextColor={colors.textSecondary}
+                          value={groupModalSearch}
+                          onChangeText={setGroupModalSearch}
+                        />
+                        {groupModalSearch ? (
+                          <Pressable onPress={() => setGroupModalSearch('')} style={{ padding: 4 }}>
+                            <X size={14} color={colors.textSecondary} />
+                          </Pressable>
+                        ) : null}
+                      </View>
+
+                      {/* Role Filter Chips */}
+                      <View style={{ flexDirection: 'row', gap: 6 }}>
+                        {[
+                          { key: 'all', label: 'All' },
+                          { key: 'parent', label: 'Parents' },
+                          { key: 'teacher', label: 'Teachers' },
+                          { key: 'volunteer', label: 'Volunteers' }
+                        ].map(f => {
+                          const active = groupModalRoleFilter === f.key;
+                          return (
+                            <Pressable
+                              key={f.key}
+                              onPress={() => setGroupModalRoleFilter(f.key as any)}
+                              style={{
+                                paddingHorizontal: 10,
+                                paddingVertical: 4,
+                                borderRadius: 6,
+                                backgroundColor: active ? colors.primary : colors.background,
+                                borderWidth: 1,
+                                borderColor: active ? colors.primary : colors.border
+                              }}
+                            >
+                              <ThemedText style={{ fontSize: 11, fontWeight: '700', color: active ? '#FFF' : colors.textSecondary }}>
+                                {f.label}
+                              </ThemedText>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                    </View>
+
+                    {/* Filtered Directory Users List */}
+                    <View style={{ gap: 6, maxHeight: 260 }}>
+                      {(() => {
+                        const sq = groupModalSearch.trim().toLowerCase();
+                        const filtered = users.filter(u => {
+                          if (!u.email) return false;
+                          if (groupModalRoleFilter !== 'all' && u.role !== groupModalRoleFilter) return false;
+                          if (!sq) return true;
+                          const fn = (u.fullName || '').toLowerCase();
+                          const em = (u.email || '').toLowerCase();
+                          const rl = (u.role || '').toLowerCase();
+                          return fn.includes(sq) || em.includes(sq) || rl.includes(sq);
+                        });
+
+                        if (filtered.length === 0) {
+                          return (
+                            <View style={{ padding: 16, alignItems: 'center' }}>
+                              <ThemedText style={{ fontSize: 12, color: colors.textSecondary }}>No users found matching search criteria.</ThemedText>
+                            </View>
+                          );
+                        }
+
+                        return filtered.slice(0, 50).map(u => {
+                          const isAdded = currentEmails.map((e: string) => e.toLowerCase()).includes((u.email || '').toLowerCase());
+                          return (
+                            <Pressable
+                              key={u.uid || u.email}
+                              onPress={() => {
+                                const targetEmail = (u.email || '').toLowerCase();
+                                const next = isAdded
+                                  ? currentEmails.filter((e: string) => e.toLowerCase() !== targetEmail)
+                                  : [...currentEmails, targetEmail];
+                                setEmailConfig((prev: any) => ({
+                                  ...prev,
+                                  customGroups: {
+                                    ...(prev.customGroups || {}),
+                                    [selectedGroupToManage]: next
+                                  }
+                                }));
+                              }}
+                              style={{
+                                flexDirection: 'row',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                padding: 8,
+                                borderRadius: 8,
+                                borderWidth: 1,
+                                borderColor: isAdded ? colors.primary : colors.border,
+                                backgroundColor: isAdded ? (colors.primary + '10') : colors.background
+                              }}
+                            >
+                              <View style={{ flex: 1, marginRight: 8 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                  <ThemedText style={{ fontSize: 12, fontWeight: '700' }}>{u.fullName || u.email}</ThemedText>
+                                  <View style={{ paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4, backgroundColor: colors.cardBg, borderWidth: 1, borderColor: colors.border }}>
+                                    <ThemedText style={{ fontSize: 9, color: colors.textSecondary, textTransform: 'capitalize' }}>{u.role}</ThemedText>
+                                  </View>
+                                </View>
+                                <ThemedText style={{ fontSize: 10, color: colors.textSecondary }}>{u.email}</ThemedText>
+                              </View>
+                              <View style={{
+                                width: 22,
+                                height: 22,
+                                borderRadius: 11,
+                                backgroundColor: isAdded ? colors.primary : colors.cardBg,
+                                borderWidth: 1,
+                                borderColor: isAdded ? colors.primary : colors.border,
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                              }}>
+                                {isAdded ? <Check size={13} color="#FFF" /> : <Plus size={13} color={colors.textSecondary} />}
+                              </View>
+                            </Pressable>
+                          );
+                        });
+                      })()}
+                    </View>
+                  </>
+                );
+              })()}
+            </ScrollView>
+
+            {/* Modal Footer */}
+            <View style={[styles.driveModalFooter, { padding: 14, borderTopWidth: 1, borderColor: colors.border }]}>
+              <Pressable
+                onPress={() => setSelectedGroupToManage(null)}
+                style={[styles.formCancelButton, { borderColor: colors.border }]}
+              >
+                <ThemedText style={{ fontWeight: '600' }}>Close</ThemedText>
+              </Pressable>
+              <Pressable
+                onPress={async () => {
+                  setSelectedGroupToManage(null);
+                  await handleSaveEmailConfig();
+                }}
+                style={[styles.formSubmitButton, { backgroundColor: colors.primary }]}
+              >
+                <ThemedText style={{ color: '#FFF', fontWeight: '700' }}>Done & Save</ThemedText>
+              </Pressable>
+            </View>
           </View>
         </View>
       </Modal>

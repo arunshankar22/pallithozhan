@@ -34,7 +34,9 @@ import {
   Image as ImageIcon,
   AlertTriangle,
   CheckCircle,
-  HelpCircle
+  HelpCircle,
+  ShieldCheck,
+  Users
 } from 'lucide-react-native';
 import { HelperTooltip } from '@/components/HelperTooltip';
 import { ThemedText } from '@/components/themed-text';
@@ -44,6 +46,7 @@ import { mockDb, MEDIA_PRESETS } from '@/services/mockBackend';
 import { autoTranslate, translateWithGemini } from '@/services/translator';
 import { useDebounce } from '@/hooks/useDebounce';
 import { emailService } from '@/services/emailService';
+import { emailConfigService, EmailSystemConfig } from '@/services/emailConfigService';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { VideoPlayer } from '@/components/VideoPlayer';
@@ -220,6 +223,8 @@ export function NewsfeedTab({
   const [editingPostId, setEditingPostId] = useState('');
   const [attachedFiles, setAttachedFiles] = useState<{ name: string; type: 'image' | 'video'; data: string; }[]>([]);
   const [sendEmailNotification, setSendEmailNotification] = useState(true);
+  const [emailTargetGroup, setEmailTargetGroup] = useState('all');
+  const [emailSystemConfig, setEmailSystemConfig] = useState<EmailSystemConfig | null>(null);
 
   // Autoscrolling state & refs
   const [activeSlides, setActiveSlides] = useState<Record<string, number>>({});
@@ -257,7 +262,14 @@ export function NewsfeedTab({
     loadFeedData();
     const savedEmail = getLocalStorageItem('drive_email', '');
     setConnectedDriveEmail(savedEmail);
+    emailConfigService.getEmailConfig().then(cfg => setEmailSystemConfig(cfg)).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (modalVisible) {
+      emailConfigService.getEmailConfig().then(cfg => setEmailSystemConfig(cfg)).catch(() => {});
+    }
+  }, [modalVisible]);
 
   useEffect(() => {
     if (dashboardEditPost) {
@@ -511,6 +523,10 @@ export function NewsfeedTab({
               ? `Classes: ${selectedTaggedClassIds.join(', ')}`
               : (i18n.language === 'ta' ? 'அனைத்து பெற்றோர்கள் மற்றும் ஆசிரியர்கள்' : 'All Parents, Teachers & Volunteers');
 
+            const targetAudienceGroup = emailTargetGroup === 'all' && selectedTaggedClassIds.length === 1
+              ? `class_${selectedTaggedClassIds[0]}`
+              : emailTargetGroup;
+
             await emailService.sendAnnouncementNotification(
               {
                 id: createdPost?.postId,
@@ -522,7 +538,7 @@ export function NewsfeedTab({
                 fullName: user?.fullName || 'Balar Malar School Administration',
                 email: user?.email || 'parramatta@balarmalar.nsw.edu.au'
               },
-              selectedTaggedClassIds.length === 1 ? `class_${selectedTaggedClassIds[0]}` : 'all'
+              targetAudienceGroup
             );
             console.log('[NewsfeedTab] Announcement email dispatched successfully.');
           } catch (emailErr) {
@@ -1250,37 +1266,96 @@ export function NewsfeedTab({
 
           {/* Email Notification Option for New Broadcasts */}
           {!editingPostId && (
-            <Pressable
-              onPress={() => setSendEmailNotification(prev => !prev)}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                marginVertical: 12,
-                paddingHorizontal: 12,
-                paddingVertical: 10,
-                backgroundColor: sendEmailNotification ? (colors.primaryLight || '#FFF5F2') : (colors.card || '#FAF8F4'),
-                borderWidth: 1,
-                borderColor: sendEmailNotification ? colors.primary : colors.border,
-                borderRadius: 8
-              }}
-            >
-              <View style={{
-                width: 20,
-                height: 20,
-                borderRadius: 4,
-                borderWidth: 1.5,
-                borderColor: sendEmailNotification ? colors.primary : colors.textSecondary,
-                backgroundColor: sendEmailNotification ? colors.primary : 'transparent',
-                justifyContent: 'center',
-                alignItems: 'center',
-                marginRight: 10
-              }}>
-                {sendEmailNotification && <CheckCircle size={14} color="#FFF" />}
-              </View>
-              <ThemedText style={{ fontSize: 13, fontWeight: '600', color: sendEmailNotification ? colors.primary : colors.text, flex: 1 }}>
-                📧 {i18n.language === 'ta' ? 'சமூகத்திற்கு மின்னஞ்சல் அறிவிப்பை தானாக அனுப்பு' : 'Auto-send email broadcast to community'}
-              </ThemedText>
-            </Pressable>
+            <View style={{ marginVertical: 10, gap: 8 }}>
+              <Pressable
+                onPress={() => setSendEmailNotification(prev => !prev)}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingHorizontal: 12,
+                  paddingVertical: 10,
+                  backgroundColor: sendEmailNotification ? (colors.primaryLight || '#FFF5F2') : (colors.card || '#FAF8F4'),
+                  borderWidth: 1,
+                  borderColor: sendEmailNotification ? colors.primary : colors.border,
+                  borderRadius: 8
+                }}
+              >
+                <View style={{
+                  width: 20,
+                  height: 20,
+                  borderRadius: 4,
+                  borderWidth: 1.5,
+                  borderColor: sendEmailNotification ? colors.primary : colors.textSecondary,
+                  backgroundColor: sendEmailNotification ? colors.primary : 'transparent',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  marginRight: 10
+                }}>
+                  {sendEmailNotification && <CheckCircle size={14} color="#FFF" />}
+                </View>
+                <ThemedText style={{ fontSize: 13, fontWeight: '600', color: sendEmailNotification ? colors.primary : colors.text, flex: 1 }}>
+                  📧 {i18n.language === 'ta' ? 'சமூகத்திற்கு மின்னஞ்சல் அறிவிப்பை தானாக அனுப்பு' : 'Auto-send email broadcast to community'}
+                </ThemedText>
+              </Pressable>
+
+              {sendEmailNotification && (
+                <View style={{ padding: 12, borderRadius: 8, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card || '#FAF8F4', gap: 10 }}>
+                  {/* Safe Test Filter Alert Banner if active */}
+                  {emailSystemConfig?.testFilter?.enabled && (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, padding: 8, borderRadius: 6, backgroundColor: '#DEF7EC', borderWidth: 1, borderColor: '#31C48D' }}>
+                      <ShieldCheck size={16} color="#03543F" />
+                      <View style={{ flex: 1 }}>
+                        <ThemedText style={{ fontSize: 11, fontWeight: '700', color: '#03543F' }}>
+                          🛡️ Safe Test Filter is ACTIVE ({emailSystemConfig.testFilter.filterQuery || 'Test User'})
+                        </ThemedText>
+                        <ThemedText style={{ fontSize: 10, color: '#046C4E' }}>
+                          Broadcast will only be dispatched to matching test user(s) before sending to all members.
+                        </ThemedText>
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Target Audience Selector */}
+                  <View style={{ gap: 6 }}>
+                    <ThemedText style={{ fontSize: 12, fontWeight: '700', color: colors.text }}>
+                      {i18n.language === 'ta' ? 'மின்னஞ்சல் பெறுநர் இலக்கு / Target Audience Group:' : 'Target Recipient Group / இலக்கு குழு:'}
+                    </ThemedText>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+                      {[
+                        { key: 'all', label: '🌐 All Community' },
+                        { key: 'teachers', label: '👨‍🏫 Teachers' },
+                        { key: 'parents', label: '👨‍👩‍👧 Parents' },
+                        { key: 'volunteers', label: '🤝 Volunteers' },
+                        ...(emailSystemConfig?.customGroups ? Object.keys(emailSystemConfig.customGroups).map(k => ({
+                          key: k,
+                          label: k.startsWith('test_') ? `🧪 ${k.replace('test_', 'Test ').replace(/_/g, ' ')}` : `🏷️ ${k.replace(/_/g, ' ')}`
+                        })) : [])
+                      ].map(grp => {
+                        const isSelected = emailTargetGroup === grp.key;
+                        return (
+                          <Pressable
+                            key={grp.key}
+                            onPress={() => setEmailTargetGroup(grp.key)}
+                            style={{
+                              paddingHorizontal: 10,
+                              paddingVertical: 6,
+                              borderRadius: 6,
+                              backgroundColor: isSelected ? colors.primary : colors.cardBg || '#FFF',
+                              borderWidth: 1,
+                              borderColor: isSelected ? colors.primary : colors.border
+                            }}
+                          >
+                            <ThemedText style={{ fontSize: 11, fontWeight: '700', color: isSelected ? '#FFF' : colors.text }}>
+                              {grp.label}
+                            </ThemedText>
+                          </Pressable>
+                        );
+                      })}
+                    </ScrollView>
+                  </View>
+                </View>
+              )}
+            </View>
           )}
 
           <View style={styles.formButtonRow}>

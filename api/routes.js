@@ -1712,6 +1712,10 @@ Guidelines for SQL generation:
       const updated = {
         ...current,
         ...body,
+        testFilter: {
+          ...(current.testFilter || { enabled: false, filterQuery: '', allowedEmails: [] }),
+          ...(body.testFilter || {})
+        },
         features: {
           ...current.features,
           ...(body.features || {})
@@ -1786,6 +1790,15 @@ Guidelines for SQL generation:
         if (targetGroup) {
           if (emailConfig.customGroups && Array.isArray(emailConfig.customGroups[targetGroup])) {
             recipients.push(...emailConfig.customGroups[targetGroup]);
+          } else if (targetGroup === 'test_parents') {
+            const testParents = emailConfig.customGroups?.test_parents || ['parramatta@balarmalar.nsw.edu.au'];
+            recipients.push(...testParents);
+          } else if (targetGroup === 'test_teachers') {
+            const testTeachers = emailConfig.customGroups?.test_teachers || ['parramatta@balarmalar.nsw.edu.au'];
+            recipients.push(...testTeachers);
+          } else if (targetGroup === 'test_volunteers') {
+            const testVols = emailConfig.customGroups?.test_volunteers || ['parramatta@balarmalar.nsw.edu.au'];
+            recipients.push(...testVols);
           } else if (targetGroup === 'teachers' || targetGroup === 'teacher') {
             const teachers = (dbData.users || []).filter(u => u.role === 'teacher' && u.email);
             recipients.push(...teachers.map(u => u.email));
@@ -1856,6 +1869,77 @@ Guidelines for SQL generation:
         bccRecipients.push(...body.bcc.split(',').map(s => s.trim()));
       }
       bccRecipients = [...new Set(bccRecipients.map(e => (e || '').trim().toLowerCase()))].filter(e => e.includes('@') && !e.endsWith('@example.com') && !recipients.includes(e));
+
+      // 3.5 Apply Safe Test Recipient Filter (Sanitize by user: first name, last name, email)
+      const activeTestFilter = (body.testFilter && typeof body.testFilter === 'object' && body.testFilter.enabled !== undefined)
+        ? body.testFilter
+        : emailConfig.testFilter;
+
+      let isTestFilterApplied = false;
+      let sanitizedCount = 0;
+      let originalTotalRecipients = recipients.length + bccRecipients.length;
+
+      if (activeTestFilter && activeTestFilter.enabled) {
+        const query = (activeTestFilter.filterQuery || '').trim().toLowerCase();
+        const allowedEmails = Array.isArray(activeTestFilter.allowedEmails)
+          ? activeTestFilter.allowedEmails.map(e => (e || '').trim().toLowerCase()).filter(Boolean)
+          : [];
+
+        const allUsers = Array.isArray(dbData.users) ? [...dbData.users] : [];
+
+        const matchesTestUser = (email) => {
+          if (!email) return false;
+          const e = email.toLowerCase().trim();
+          if (allowedEmails.includes(e)) return true;
+          if (query && e.includes(query)) return true;
+
+          if (query) {
+            const userMatch = allUsers.find(u => (u.email || '').toLowerCase() === e);
+            if (userMatch) {
+              const fn = (userMatch.firstName || '').toLowerCase();
+              const ln = (userMatch.lastName || '').toLowerCase();
+              const full = (userMatch.fullName || '').toLowerCase();
+              if (full.includes(query) || fn.includes(query) || ln.includes(query)) {
+                return true;
+              }
+              const words = full.split(/\s+/);
+              if (words.some(w => w.startsWith(query) || w === query)) {
+                return true;
+              }
+            }
+          }
+          return false;
+        };
+
+        recipients = recipients.filter(matchesTestUser);
+        bccRecipients = bccRecipients.filter(matchesTestUser);
+
+        // Fallback: If no recipients matched the filter from the requested group, but an allowed email or query user exists,
+        // safely deliver the test email to that user so they receive their test verification.
+        if (recipients.length === 0 && bccRecipients.length === 0) {
+          if (allowedEmails.length > 0) {
+            recipients = [...allowedEmails];
+          } else if (query) {
+            const foundUser = allUsers.find(u =>
+              (u.fullName || '').toLowerCase().includes(query) ||
+              (u.email || '').toLowerCase().includes(query) ||
+              (u.firstName || '').toLowerCase().includes(query) ||
+              (u.lastName || '').toLowerCase().includes(query)
+            );
+            if (foundUser && foundUser.email) {
+              recipients = [foundUser.email.toLowerCase()];
+            }
+          }
+        }
+
+        isTestFilterApplied = true;
+        sanitizedCount = Math.max(0, originalTotalRecipients - (recipients.length + bccRecipients.length));
+        console.log(`[Backend Email] 🛡️ Safe Test Filter active. Original: ${originalTotalRecipients}, Sanitized: ${sanitizedCount}, Dispatched To:`, recipients);
+
+        if (body.subject && !body.subject.includes('[TEST')) {
+          body.subject = `[TEST FILTERED: ${query || allowedEmails.join(', ')}] ${body.subject}`;
+        }
+      }
 
       if (recipients.length === 0) {
         recipients.push(...(emailConfig.features?.announcements?.toEmails || emailConfig.customGroups?.committee || ['parramatta@balarmalar.nsw.edu.au', 'arun.zorro@gmail.com']));
@@ -2043,7 +2127,10 @@ Guidelines for SQL generation:
           recipientCount: recipients.length,
           recipients: recipients,
           batches: bccBatches.length,
-          usedSender: `${senderName} <${senderEmail}>`
+          usedSender: `${senderName} <${senderEmail}>`,
+          testFilterActive: isTestFilterApplied,
+          sanitizedCount,
+          originalRecipientCount: originalTotalRecipients
         });
       } else {
         console.log(`[Backend Email Mock] RESEND_API_KEY not configured. Mocking email dispatch to ${recipients.join(', ')}`);
@@ -2052,7 +2139,10 @@ Guidelines for SQL generation:
           status: 'simulated',
           message: 'Simulation mode: Resend API Key is not configured on the server or in Admin Email Settings. Email logged locally.',
           recipientCount: recipients.length,
-          recipients: recipients
+          recipients: recipients,
+          testFilterActive: isTestFilterApplied,
+          sanitizedCount,
+          originalRecipientCount: originalTotalRecipients
         });
       }
     } catch (sendErr) {
@@ -2070,6 +2160,11 @@ function getDefaultEmailConfig() {
     masterEnabled: true,
     defaultSenderName: 'Pallithozhan - Balar Malar',
     defaultSenderEmail: process.env.SENDER_EMAIL || 'noreply@3stech.com.au',
+    testFilter: {
+      enabled: false,
+      filterQuery: '',
+      allowedEmails: []
+    },
     features: {
       expenses: {
         enabled: true,
@@ -2091,7 +2186,10 @@ function getDefaultEmailConfig() {
     },
     customGroups: {
       treasury: [process.env.TREASURER_EMAIL || 'parramatta@balarmalar.nsw.edu.au'],
-      committee: ['parramatta@balarmalar.nsw.edu.au']
+      committee: ['parramatta@balarmalar.nsw.edu.au'],
+      test_parents: ['parramatta@balarmalar.nsw.edu.au'],
+      test_teachers: ['parramatta@balarmalar.nsw.edu.au'],
+      test_volunteers: ['parramatta@balarmalar.nsw.edu.au']
     }
   };
 }

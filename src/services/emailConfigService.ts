@@ -9,11 +9,18 @@ export interface FeatureEmailConfig {
   targetGroup?: string;
 }
 
+export interface TestRecipientFilter {
+  enabled: boolean;
+  filterQuery: string;
+  allowedEmails?: string[];
+}
+
 export interface EmailSystemConfig {
   masterEnabled: boolean;
   defaultSenderName: string;
   defaultSenderEmail: string;
   resendApiKey?: string;
+  testFilter?: TestRecipientFilter;
   features: {
     expenses: FeatureEmailConfig;
     announcements: FeatureEmailConfig;
@@ -29,6 +36,11 @@ export const DEFAULT_EMAIL_CONFIG: EmailSystemConfig = {
   masterEnabled: true,
   defaultSenderName: 'Pallithozhan - Balar Malar',
   defaultSenderEmail: 'noreply@3stech.com.au',
+  testFilter: {
+    enabled: false,
+    filterQuery: '',
+    allowedEmails: []
+  },
   features: {
     expenses: {
       enabled: true,
@@ -50,7 +62,10 @@ export const DEFAULT_EMAIL_CONFIG: EmailSystemConfig = {
   },
   customGroups: {
     treasury: ['parramatta@balarmalar.nsw.edu.au'],
-    committee: ['parramatta@balarmalar.nsw.edu.au']
+    committee: ['parramatta@balarmalar.nsw.edu.au'],
+    test_parents: ['parramatta@balarmalar.nsw.edu.au'],
+    test_teachers: ['parramatta@balarmalar.nsw.edu.au'],
+    test_volunteers: ['parramatta@balarmalar.nsw.edu.au']
   }
 };
 
@@ -68,6 +83,10 @@ export const emailConfigService = {
           const merged: EmailSystemConfig = {
             ...DEFAULT_EMAIL_CONFIG,
             ...data,
+            testFilter: {
+              ...(DEFAULT_EMAIL_CONFIG.testFilter || { enabled: false, filterQuery: '', allowedEmails: [] }),
+              ...(data.testFilter || {})
+            },
             features: {
               ...DEFAULT_EMAIL_CONFIG.features,
               ...(data.features || {})

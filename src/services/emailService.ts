@@ -13,7 +13,7 @@ export interface UniversalNotificationPayload {
   feature: 'expenses' | 'announcements' | 'homework' | 'library_books' | string;
   to?: string | string[];
   bcc?: string | string[];
-  targetGroup?: 'treasury' | 'committee' | 'teachers' | 'parents' | 'volunteers' | 'all' | string;
+  targetGroup?: 'treasury' | 'committee' | 'teachers' | 'parents' | 'volunteers' | 'test_parents' | 'test_teachers' | 'test_volunteers' | 'all' | string;
   replyTo?: string;
   subject: string;
   title?: string;
@@ -25,6 +25,11 @@ export interface UniversalNotificationPayload {
     url: string;
   };
   footerNote?: string;
+  testFilter?: {
+    enabled: boolean;
+    filterQuery: string;
+    allowedEmails?: string[];
+  };
 }
 
 export interface EmailDispatchResult {
@@ -34,6 +39,10 @@ export interface EmailDispatchResult {
   recipientCount?: number;
   reason?: string;
   error?: string;
+  testFilterActive?: boolean;
+  sanitizedCount?: number;
+  originalRecipientCount?: number;
+  recipients?: string[];
 }
 
 function escapeHtml(str: string): string {
@@ -168,7 +177,8 @@ export const emailService = {
           ...payload,
           fromName: config.defaultSenderName || undefined,
           fromEmail: config.defaultSenderEmail || undefined,
-          apiKey: config.resendApiKey || undefined
+          apiKey: config.resendApiKey || undefined,
+          testFilter: payload.testFilter || config.testFilter || undefined
         };
 
         const response = await fetch(`${API_URL}/email/send`, {
@@ -466,7 +476,12 @@ export const emailService = {
       fullName: string;
       email: string;
     },
-    customTargetGroup?: string
+    customTargetGroup?: string,
+    testFilter?: {
+      enabled: boolean;
+      filterQuery: string;
+      allowedEmails?: string[];
+    }
   ): Promise<EmailDispatchResult> => {
     const titleEn = typeof post.title === 'object' ? (post.title.en || '') : String(post.title || '');
     const titleTa = typeof post.title === 'object' ? (post.title.ta || '') : '';
@@ -519,6 +534,7 @@ export const emailService = {
       title: displayTitle,
       summary: truncatedSummary,
       details: details,
+      testFilter: testFilter,
       actionButton: {
         text: 'View Full Announcement / அறிவிப்பைப் பார்க்கவும்',
         url: 'https://pallithozhan.3stech.com.au/'
